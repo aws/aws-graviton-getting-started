@@ -61,8 +61,7 @@ Package | Version | Improvements
 PHP     | 7.4+    | PHP 7.4 includes a number of performance improvements that increase perf by up to 30%
 Python3 |         | Python3 packages in Ubuntu, Amazon Linux 2 and RHEL were not compiled with link time optimizations (LTO). We have seen up to 30% better performance with LTO.
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x.
-ffmpeg  |         | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders.
-
+ffmpeg  |         | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders. The changes will be available in the next FFMPEG release in June 2020.
 
 # Debugging Problems
 
