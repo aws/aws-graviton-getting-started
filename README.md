@@ -161,7 +161,7 @@ git clone https://github.com/brendangregg/FlameGraph.git
 perf script -i perf.data | FlameGraph/stackcollapse-perf.pl | FlameGraph/flamegraph.pl > flamegraph.svg
 ```
 
-For example, recently a we committed a patch to
+For example, recently we committed a patch to
 [ffmpeg](http://ffmpeg.org/pipermail/ffmpeg-devel/2019-November/253385.html) to
 improve performance. Comparing the execution time of a C5 vs an M6g
 immediately uncovered an outlier function `ff_hscale_8_to_15_neon`.  Once we
