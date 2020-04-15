@@ -24,7 +24,7 @@ and Graviton2 you'll have to limit yourself to the Graviton features.
 CPU      | GCC                  | LLVM
 ---------|----------------------|-------------
 Graviton | `-march=armv8-a+crc+crypto` | `-march=armv8-a+crc+crypto`
-Graviton2 | `-march=armv8.2-a+fp16+rcpc+dotprod` |`-march=armv8.2-a+fp16+rcpc+dotprod`
+Graviton2 | `-march=armv8.2-a+fp16+rcpc+dotprod+crypto` |`-march=armv8.2-a+fp16+rcpc+dotprod+crypto`
 
 ### Core Specific Tuning
 
