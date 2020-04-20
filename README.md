@@ -48,6 +48,23 @@ does allow code to support CPUs with and without LSE atomics in a single binary.
 
 On benchmarks stressing locks the performance can improve by up to an order of magnitude.
 
+### Porting codes with SSE/AVX intrinsics to NEON
+
+When programs contain code with x64 intrinsics, the following procedure can help
+to quickly obtain a working program on Arm, assess the performance of the
+program running on Graviton processors, profile hot paths, and improve the
+quality of code on the hot paths.
+
+To quickly get a prototype running on Arm, one can use
+https://github.com/DLTcollab/sse2neon a translator of x64 intrinsics to NEON.
+sse2neon provides a quick starting point in porting performance critical codes
+to Arm.  It shortens the time needed to get an Arm working program that then
+can be used to extract profiles and to identify hot paths in the code.  A header
+file `sse2neon.h` contains several of the functions provided by standard x64
+include files like `xmmintrin.h`, only implemented with NEON instructions to
+produce the exact semantics of the x64 intrinsic.  Once a profile is
+established, the hot paths can be rewritten directly with NEON intrinsics to
+avoid the overhead of the generic sse2neon translation.
 
 # Common packages with recent performance improvements
 
