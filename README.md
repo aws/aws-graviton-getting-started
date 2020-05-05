@@ -33,20 +33,33 @@ CPU      | GCC < 9              | GCC >=9
 Graviton | `-mtune=cortex-a72`  | `-mtune=cortex-a72`
 Graviton2 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
 
-### Large Scale Extensions (LSE)
-Graviton2 (C6g/M6g/R6g) supports Armv8.2 including the large-synchronization
-extensions (LSE) which provide lower-cost, and fairer atomic operations. For
-workloads that contain lots of sharing and synchronization (e.g. Databases)
-please compile with `-march=armv8.2-a` as this will enable the use of these
-operations. However, the code optimized for armv8.2 will not run on Gravtion
-(e.g. EC2 A1 instances), it needs its own binary.
+### Large-System Extensions (LSE)
 
-There's an option in GCC 10 called `-moutline-atomics` which allows building
-a single binary with out-of-line atomics that detect if LSE is supported and
-chose the correct locking primitives. This has a small performance degredation but
-does allow code to support CPUs with and without LSE atomics in a single binary.
+The Graviton2 processor in C6g, M6g, and R6g instances has support for the
+Armv8.2 instruction set.  Armv8.2 specification includes the large-system
+extensions (LSE) introduced in Armv8.1. LSE provides low-cost atomic operations.
+LSE improves system throughput for CPU-to-CPU communication, locks, and mutexes.
+The improvement can be up to an order of magnitude when using LSE instead of
+load/store exclusives.
 
-On benchmarks stressing locks the performance can improve by up to an order of magnitude.
+POSIX threads library needs LSE atomic instructions.  LSE is important for
+locking and thread synchronization routines.  The dynamic linker on Linux can
+detect CPU capabilities and load libc built with LSE.  For example, Ubuntu 20.04
+contains the libc6-lse package.  When installed on a Graviton2 system, all
+applications will link against this library.  ldd command line utility displays
+the path of the linked dynamic libraries.  If libpthreads.so is in atomics
+directory, the library uses LSE atomic instructions.  Amazon Linux 2 will soon
+provide a similar mechanism to select an LSE version of libc.
+
+The compiler needs to generate LSE instructions for applications that use atomic
+operations.  For example, the code of databases like PostgreSQL contain atomic
+constructs; c++11 code with std::atomic statements translate into atomic
+operations.  GCC's -march=armv8.2-a flag enables all instructions supported by
+Graviton2, including LSE.  Binaries compiled with this flag won’t work on
+Graviton powered A1 instances.  GCC's -moutline-atomics flag produces a binary
+that runs on both Graviton and Graviton2.  Supporting both platforms with the
+same binary comes at a small extra cost: one load and one branch.  CPU branch
+predictor lowers the overhead when the extra branch is in hot code.
 
 ### Porting codes with SSE/AVX intrinsics to NEON
 
