@@ -10,7 +10,7 @@ The Graviton CPU supports Arm V8.0 and includes support for CRC and crypto exten
 
 The Graviton2 CPU uses the Neoverse-N1 core and supports Arm V8.2 plus several
 other architectural extensions. In particular, Graviton2 supports the Large
-Scale Extensions (LSE) which improve locking and synchronization performance
+System Extensions (LSE) which improve locking and synchronization performance
 across large systems. In addition, it has support for fp16 and 8-bit dot
 productions for machine learning, and relaxed consistency-processor consistent
 (RCpc) memory ordering.
@@ -48,18 +48,34 @@ detect CPU capabilities and load libc built with LSE.  For example, Ubuntu 20.04
 contains the libc6-lse package.  When installed on a Graviton2 system, all
 applications will link against this library.  ldd command line utility displays
 the path of the linked dynamic libraries.  If libpthreads.so is in atomics
-directory, the library uses LSE atomic instructions.  Amazon Linux 2 will soon
-provide a similar mechanism to select an LSE version of libc.
+directory, the library uses LSE atomic instructions.  The following systems
+distribute a libc compiled with LSE instructions: Ubuntu 20.04.
 
 The compiler needs to generate LSE instructions for applications that use atomic
 operations.  For example, the code of databases like PostgreSQL contain atomic
 constructs; c++11 code with std::atomic statements translate into atomic
-operations.  GCC's -march=armv8.2-a flag enables all instructions supported by
-Graviton2, including LSE.  Binaries compiled with this flag won’t work on
-Graviton powered A1 instances.  GCC's -moutline-atomics flag produces a binary
-that runs on both Graviton and Graviton2.  Supporting both platforms with the
-same binary comes at a small extra cost: one load and one branch.  CPU branch
-predictor lowers the overhead when the extra branch is in hot code.
+operations.  GCC's `-march=armv8.2-a` flag enables all instructions supported by
+Graviton2, including LSE.  To confirm that LSE instructions are created,
+the output of `objdump` command line utility should contain LSE instructions:
+```
+$ objdump -d app | grep -i 'cas\|casp\|swp\|ldadd\|stadd\|ldclr\|stclr\|ldeor\|steor\|ldset\|stset\|ldsmax\|stsmax\|ldsmin\|stsmin\|ldumax\|stumax\|ldumin\|stumin' | wc -l
+```
+To check whether the application binary contains load and store exclusives:
+```
+$ objdump -d app | grep -i 'ldxr\|ldaxr\|stxr\|stlxr' | wc -l
+```
+
+GCC's `-moutline-atomics` flag produces a binary that runs on both Graviton and
+Graviton2.  Supporting both platforms with the same binary comes at a small
+extra cost: one load and one branch.  To check that an application
+has been compiled with `-moutline-atomics`, `nm` command line utility displays
+the name of functions and global variables in an application binary.  The boolean
+variable that GCC uses to check for LSE hardware capability is
+`__aarch64_have_lse_atomics` and it should appear in the list of symbols:
+```
+$ nm app | grep __aarch64_have_lse_atomics | wc -l
+# the output should be 1 if app has been compiled with -moutline-atomics
+```
 
 ### Porting codes with SSE/AVX intrinsics to NEON
 
