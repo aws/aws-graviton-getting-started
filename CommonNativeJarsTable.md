@@ -8,7 +8,7 @@ org.xerial.snappy | [snappy-java](https://github.com/xerial/snappy-java) | yes |
 org.rocksdb | [rocksdbjni](https://github.com/facebook/rocksdb/tree/master/java) | yes | [yes](https://mvnrepository.com/artifact/org.rocksdb/rocksdbjni)
 com.github.jnr | [jffi](https://github.com/jnr/jffi) | yes | [yes](https://mvnrepository.com/artifact/com.github.jnr/jffi)
 org.apache.commons | [commons-crypto](https://github.com/apache/commons-crypto) | yes | no
-io.netty | [netty-transport-native-epoll](https://github.com/netty/netty) | yes | no
+io.netty | [netty-transport-native-epoll](https://github.com/netty/netty) | yes | [yes](https://mvnrepository.com/artifact/io.netty/netty-transport-native-epoll)
 io.netty | [netty-tcnative](https://github.com/netty/netty-tcnative) | yes | no
 org.fusesource.jansi | [jansi-native](https://github.com/fusesource/jansi-native) | yes | no
 org.fusesource.leveldbjni | [leveldbjni-all](https://github.com/fusesource/leveldbjni) | no | no
