@@ -79,6 +79,14 @@ produce the exact semantics of the x64 intrinsic.  Once a profile is
 established, the hot paths can be rewritten directly with NEON intrinsics to
 avoid the overhead of the generic sse2neon translation.
 
+### Using Arm instructions to speed-up common code sequences
+The Arm instruction set includes instructions that can be used to speedup common
+code sequences. The table below lists common operations and links to code sequences:
+
+Operation | Description
+----------|------------
+[crc](sample-code/crc.c) | Graviton processors support instructions to accelerate both CRC32 which is used by Ethernet, media and compression and CRC32C (Castagnoli) which is used by filesystems.
+
 # Common packages with recent performance improvements
 
 There is a huge amount of activity in the Arm software ecosystem and improvements are being
