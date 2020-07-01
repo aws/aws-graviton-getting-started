@@ -20,7 +20,7 @@ workloads with BLIS might allow to identify additional performance improvement.
 
 ### Install NumPy and SciPy with BLIS on Ubuntu and Debian
 
-On Ubuntu and Debian apt install python3-numpy python3-scipy will install NumPy
+On Ubuntu and Debian `apt install python3-numpy python3-scipy` will install NumPy
 and SciPy with BLAS and LAPACK libraries. To install SciPy and NumPy with BLIS
 and OpenBLAS on Ubuntu and Debian:
 ```
