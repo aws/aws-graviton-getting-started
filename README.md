@@ -117,6 +117,13 @@ Python  |         | [Python on Graviton processors](python.md).
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x.
 ffmpeg  |         | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders. The changes are available in FFMPEG version 4.3.
 
+# Known Issues and Workarounds
+
+As of July 7th 2020, [Cassandra](https://cassandra.apache.org/) will fail to install [via Debian package](https://cassandra.apache.org/download/) on Graviton instances running Ubuntu or other Debian-based distros. (Full details in the [open JIRA ticket](https://issues.apache.org/jira/browse/CASSANDRA-15889).) The workaround is to specify `amd64` as the desired arch - Cassandra is not arch-specific, so the "amd64" package works normally:
+```
+deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
+```
+
 # Debugging Problems
 
 It's possible that incorrect code will work fine on an existing system, but
