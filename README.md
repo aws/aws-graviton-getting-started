@@ -119,10 +119,12 @@ ffmpeg  |         | Improved performance of libswscale by 50% with better NEON v
 
 # Known Issues and Workarounds
 
-As of July 7th 2020, [Cassandra](https://cassandra.apache.org/) will fail to install [via Debian package](https://cassandra.apache.org/download/) on Graviton instances running Ubuntu or other Debian-based distros. (Full details in the [open JIRA ticket](https://issues.apache.org/jira/browse/CASSANDRA-15889).) The workaround is to specify `amd64` as the desired arch - Cassandra is not arch-specific, so the "amd64" package works normally:
+As of July 7th 2020, [Cassandra](https://cassandra.apache.org/) will fail to install [via Debian package](https://cassandra.apache.org/download/) on Graviton instances running Ubuntu or other Debian-based distros. (Full details in the [open JIRA ticket](https://issues.apache.org/jira/browse/CASSANDRA-15889).) The workaround is to specify `amd64` as the desired arch. Cassandra is not arch-specific, so the "amd64" package works normally:
 ```
 deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
 ```
+
+Note that Redhat variants like Amazon Linux avoid this issue. In our testing, Amazon Linux 2 using [the Corretto 8 JDK](https://docs.aws.amazon.com/corretto/latest/corretto-8-ug/amazon-linux-install.html) outperformed Ubuntu 20.04 by up to 23%.
 
 # Debugging Problems
 
