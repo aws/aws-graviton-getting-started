@@ -12,7 +12,7 @@ There are a couple methods of creating a multi-arch image.
 
 ## Deploying to Graviton
 
-Most container orchestration platforms support aarch64 and x86_64. 
+Most container orchestration platforms support both aarch64 and x86_64 hosts. 
 
 1. Amazon Elastic Container Service (ECS) supports Graviton-powered instances [today](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html#amazon-linux-2-(arm64)).
 2. Amazon Elastic Kubernetes Service (EKS) support for Graviton-powered instances is [currently in public preview.](https://github.com/aws/containers-roadmap/blob/a1f4352f5dea6aad63360608c661bf7007c2e523/preview-programs/eks-arm-preview/README.md)
