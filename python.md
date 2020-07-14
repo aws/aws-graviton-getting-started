@@ -1,4 +1,4 @@
-# Python on Graviton processors
+# Python on Graviton
 
 Tuning the Python install for the best performance on Graviton processors.
 
