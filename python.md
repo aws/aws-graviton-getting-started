@@ -1,6 +1,8 @@
 # Python on Graviton
 
-Tuning the Python install for the best performance on Graviton processors.
+Python is an interpreted, high-level, general-purpose programming language, with interpreters available for many operating systems and architectures, including arm64. _[Wikipedia](https://en.wikipedia.org/wiki/Python_(programming_language))_
+
+The page goes over tuning Python for the best performance on Graviton.
 
 ## Overview
 
@@ -37,6 +39,8 @@ sudo update-alternatives --config liblapack.so.3-aarch64-linux-gnu
 ```
 
 ### Install NumPy and SciPy with BLIS on AL2 and RedHat
+
+As of June 20th, 2020, NumPy now [provides binaries](https://pypi.org/project/numpy/#files) for arm64.
 
 Prerequisites to build SciPy and NumPy with BLIS on ARM64 AL2 and RedHat:
 ```

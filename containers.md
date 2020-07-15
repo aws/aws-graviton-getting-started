@@ -12,7 +12,7 @@ There are a couple methods of creating a multi-arch image.
 
 ## Deploying to Graviton
 
-Most container orchestration platforms support both aarch64 and x86_64 hosts. 
+Most container orchestration platforms support both arm64 and x86_64 hosts. 
 
 1. Amazon Elastic Container Service (ECS) supports Graviton-powered instances [today](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html#amazon-linux-2-(arm64)).
 2. Amazon Elastic Kubernetes Service (EKS) support for Graviton-powered instances is [currently in public preview.](https://github.com/aws/containers-roadmap/blob/a1f4352f5dea6aad63360608c661bf7007c2e523/preview-programs/eks-arm-preview/README.md)
@@ -21,4 +21,6 @@ Most container orchestration platforms support both aarch64 and x86_64 hosts.
 ## Futher reading
 
 * [Building multi-arch docker images with buildx](https://tech.smartling.com/building-multi-architecture-docker-images-on-arm-64-c3e6f8d78e1c)
+* [Modern multi-arch builds with docker](https://duske.me/modern-multiarch-builds-with-docker/)
 * [Leveraging Spot and Graviton2 with EKS](https://spot.io/blog/eks-simplified-on-ec2-graviton2-instances/)
+

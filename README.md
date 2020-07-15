@@ -36,7 +36,7 @@ packages that improve performance (if you know of others please let us know).
 Package | Version | Improvements
 --------|---------|-------------
 PHP     | 7.4+    | PHP 7.4 includes a number of performance improvements that increase perf by up to 30%
-PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x.
+PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x. This fixed version of the library now is shipping with Ubuntu 20.04 and PHP 8.
 ffmpeg  |   4.3+  | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders. The changes are available in FFMPEG version 4.3.
 
 # Containers on Graviton
