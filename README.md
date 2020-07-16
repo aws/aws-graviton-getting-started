@@ -48,7 +48,7 @@ As of July 7th 2020, [Cassandra](https://cassandra.apache.org/) will fail to ins
 deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
 ```
 
-Note that Redhat variants like Amazon Linux avoid this issue. In our testing, Amazon Linux 2 using [the Corretto 8 JDK](https://docs.aws.amazon.com/corretto/latest/corretto-8-ug/amazon-linux-install.html) outperformed Ubuntu 20.04 by up to 23%.
+Note that Redhat variants like Amazon Linux 2 avoid this issue. In our out of box Cassandra performance testing (early July 2020), Amazon Linux 2 using [the Corretto 8 JDK](https://docs.aws.amazon.com/corretto/latest/corretto-8-ug/amazon-linux-install.html) outperformed Ubuntu 20.04 by up to 23%.
 
 # Additional resources
 Linaro and Arm maintain a tool ([Sandpiper](http://sandpiper.linaro.org/)) to
