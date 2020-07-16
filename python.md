@@ -38,11 +38,11 @@ sudo update-alternatives --config libblas.so.3-aarch64-linux-gnu
 sudo update-alternatives --config liblapack.so.3-aarch64-linux-gnu
 ```
 
-### Install NumPy and SciPy with BLIS on AL2 and RedHat
+### Install NumPy and SciPy with BLIS on AmazonLinux2 (AL2) and RedHat
 
 As of June 20th, 2020, NumPy now [provides binaries](https://pypi.org/project/numpy/#files) for arm64.
 
-Prerequisites to build SciPy and NumPy with BLIS on ARM64 AL2 and RedHat:
+Prerequisites to build SciPy and NumPy with BLIS on arm64 AL2 and RedHat:
 ```
 # Install AL2/RedHat prerequisites
 sudo yum install "@Development tools" python3-pip python3-devel blas-devel gcc-gfortran
