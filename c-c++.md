@@ -26,13 +26,10 @@ The improvement can be up to an order of magnitude when using LSE instead of
 load/store exclusives.
 
 POSIX threads library needs LSE atomic instructions.  LSE is important for
-locking and thread synchronization routines.  The dynamic linker on Linux can
-detect CPU capabilities and load libc built with LSE.  For example, Ubuntu 20.04
-contains the libc6-lse package.  When installed on a Graviton2 system, all
-applications will link against this library.  ldd command line utility displays
-the path of the linked dynamic libraries.  If libpthreads.so is in atomics
-directory, the library uses LSE atomic instructions.  The following systems
-distribute a libc compiled with LSE instructions: Ubuntu 20.04.
+locking and thread synchronization routines.  The following systems distribute
+a libc compiled with LSE instructions:
+- Amazon Linux 2,
+- Ubuntu 20.04.
 
 The compiler needs to generate LSE instructions for applications that use atomic
 operations.  For example, the code of databases like PostgreSQL contain atomic
