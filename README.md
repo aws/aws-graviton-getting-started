@@ -9,7 +9,8 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 * Language-specific considerations
 	* [C/C++](c-c++.md)
 	* [Java](java.md)
-	* [Python](python.md) 
+	* [Python](python.md)
+	* [Go](golang.md)
 * [Containers on Graviton](containers.md)
 * [Known issues and workarounds](#known-issues-and-workarounds)
 * [Additional resources](#additional-resources)
