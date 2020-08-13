@@ -45,11 +45,14 @@ pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 Please refer [here](containers.md) for information about running container-based workloads on Graviton.
 
 # Known issues and workarounds
+
+## Python installation on some Linux distros
 The default installation of pip on many Linux distributions is too old \(<19.3\) to install binary wheel packages released for Graviton.  To work around this, it is recommended to upgrade your pip installation using:
 ```
-python -m pip install --upgrade pip
+sudo python3 -m pip install --upgrade pip
 ```
 
+## Cassandra installion on Ubuntu or Debian-based distros
 As of July 7th 2020, [Cassandra](https://cassandra.apache.org/) will fail to install [via Debian package](https://cassandra.apache.org/download/) on Graviton instances running Ubuntu or other Debian-based distros. (Full details in the [open JIRA ticket](https://issues.apache.org/jira/browse/CASSANDRA-15889).) The workaround is to specify `amd64` as the desired arch. Cassandra is not arch-specific, so the "amd64" package works normally:
 ```
 deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
