@@ -39,11 +39,17 @@ Package | Version | Improvements
 PHP     | 7.4+    | PHP 7.4 includes a number of performance improvements that increase perf by up to 30%
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x. This fixed version of the library now is shipping with Ubuntu 20.04 and PHP 8.
 ffmpeg  |   4.3+  | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders. The changes are available in FFMPEG version 4.3.
+pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 
 # Containers on Graviton
 Please refer [here](containers.md) for information about running container-based workloads on Graviton.
 
 # Known issues and workarounds
+The default installation of pip on many Linux distributions is too old \(<19.3\) to install binary wheel packages released for Graviton.  To work around this, it is recommended to upgrade your pip installation using:
+```
+python -m pip install --upgrade pip
+```
+
 As of July 7th 2020, [Cassandra](https://cassandra.apache.org/) will fail to install [via Debian package](https://cassandra.apache.org/download/) on Graviton instances running Ubuntu or other Debian-based distros. (Full details in the [open JIRA ticket](https://issues.apache.org/jira/browse/CASSANDRA-15889).) The workaround is to specify `amd64` as the desired arch. Cassandra is not arch-specific, so the "amd64" package works normally:
 ```
 deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
