@@ -6,7 +6,9 @@ Python is an interpreted, high-level, general-purpose programming language, with
 
 When *pip* (the standard package installer for Python) is used, it pulls the packages from [Python Package Index](https://pypi.oeg) and other indexes.
 
-In the case *pip* could not find a pre-compiled package, it automatically downloads, compiles, and builds the package from source code. Normally it may take few more minutes to install the package from source code that from pre-built, and in some large packages (like *pandas*) it may take up to 20 minutes. AWS is actively working to make pre-compiled packages available to avoid this in near future.
+In the case *pip* could not find a pre-compiled package, it automatically downloads, compiles, and builds the package from source code. 
+Normally it may take a few more minutes to install the package from source code than from pre-built.  For some large packages (i.e. *pandas*)
+it may take up to 20 minutes. AWS is actively working to make pre-compiled packages available to avoid this in near future.
 
 ### 1.1 Installing Python packages from source in AmazonLinux2 and RedHat
 
@@ -15,6 +17,11 @@ For installing Python packages from source code, need to install the development
 ```
 # Install AL2/RedHat prerequisites
 sudo yum install "@Development tools" python3-pip python3-devel blas-devel gcc-gfortran
+sudo python3 -m pip install --upgrade pip
+
+# Install Debian/Ubuntu prerequisites
+sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran
+sudo python3 -m pip install --upgrade pip
 ```
 
 ## 2. Scientific and numerical application (NumPy, SciPy, BLAS, etc)
