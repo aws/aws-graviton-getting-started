@@ -23,7 +23,7 @@ There are a couple of ways to create a multi-arch image.
 
 Most container orchestration platforms support both arm64 and x86_64 hosts. 
 
-Both [Amazon Elastic Container Service (ECS)](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html#amazon-linux-2-(arm64)) and [Amazon Elastic Kubernetes Service (EKS)](https://awscontainerday.splashthat.com/) support Graviton-powered instances.
+Both [Amazon Elastic Container Service (ECS)](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html#amazon-linux-2-(arm64)) and [Amazon Elastic Kubernetes Service (EKS)](https://docs.aws.amazon.com/eks/latest/userguide/arm-support.html) support Graviton-powered instances.
 
 We have compiled a list of popular software within the container ecosystem that explicitly supports arm64:
 
