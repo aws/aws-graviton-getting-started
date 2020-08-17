@@ -61,6 +61,7 @@ We have compiled a list of popular software within the container ecosystem that 
 |Grafana	 | 	https://grafana.com/grafana/download?platform=arm ||
 |Loki	 | 	https://github.com/grafana/loki/releases ||
 |kube-bench | https://github.com/aquasecurity/kube-bench/releases/tag/v0.3.1 ||
+|metrics-server | https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.3.7 | docker image is multi-arch from v.0.3.7 |
 |AWS Copilot | https://github.com/aws/copilot-cli/releases/tag/v0.3.0 | arm64 support as of v0.3.0 |
 | Amazon EC2 Instance Selector | https://github.com/aws/amazon-ec2-instance-selector/releases/ | also supports the -a cpu_architecture flag for discovering arm64-based instances in a particular region |
 | AWS Node Termination Handler | https://github.com/aws/aws-node-termination-handler/releases/ | arm64 support under kubernetes (via helm) |
@@ -73,7 +74,7 @@ We have compiled a list of popular software within the container ecosystem that 
 
 **If your software isn't listed above, it doesn't mean it won't work!**
 
-Many products work on arm64 but don't explicitly distribute arm64 binaries or build multi-arch images *(yet)*.
+Many products work on arm64 but don't explicitly distribute arm64 binaries or build multi-arch images *(yet)*. We are working with maintainers and contributing expertise and code to enable full binary or multi-arch support.
 
 We've compiled [details](containers-workarounds.md) on leveraging these products on Graviton/Graviton2.
 
@@ -82,6 +83,8 @@ We've compiled [details](containers-workarounds.md) on leveraging these products
 ### Further reading
 
 * [Building multi-arch docker images with buildx](https://tech.smartling.com/building-multi-architecture-docker-images-on-arm-64-c3e6f8d78e1c)
+* [Unifying Arm software development with Docker](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/unifying-arm-software-development-with-docker)
 * [Modern multi-arch builds with docker](https://duske.me/modern-multiarch-builds-with-docker/)
 * [Leveraging Spot and Graviton2 with EKS](https://spot.io/blog/eks-simplified-on-ec2-graviton2-instances/)
+
 
