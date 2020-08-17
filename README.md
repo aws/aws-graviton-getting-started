@@ -41,6 +41,7 @@ PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pa
 ffmpeg  |   4.3+  | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders. The changes are available in FFMPEG version 4.3.
 pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases/tag/3.4.1) | Pre-built bazel binary for Graviton/Arm64. 
+ruby    | [un-released](https://github.com/ruby/ruby/pull/3393) | Enable arm64 optimizations that improve perfomance by as much as 40% on included benchmarks.
 
 # Containers on Graviton
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
