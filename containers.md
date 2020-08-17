@@ -75,11 +75,11 @@ We have compiled a list of popular software within the container ecosystem that 
 
 Many products work on arm64 but don't explicitly distribute arm64 binaries or build multi-arch images *(yet)*.
 
-We've compiled [instructions](containers-workarounds.md) for leveraging these products on Graviton/Graviton2.
+We've compiled [details](containers-workarounds.md) on leveraging these products on Graviton/Graviton2.
 
 ---
 
-### Futher reading
+### Further reading
 
 * [Building multi-arch docker images with buildx](https://tech.smartling.com/building-multi-architecture-docker-images-on-arm-64-c3e6f8d78e1c)
 * [Modern multi-arch builds with docker](https://duske.me/modern-multiarch-builds-with-docker/)
