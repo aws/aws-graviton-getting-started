@@ -16,7 +16,6 @@ We've documented these products and some ways to leverage them below:
 | external-dns | https://github.com/kubernetes-sigs/external-dns/issues/1721 |	compile from source | raspbernetes/external-dns	|
 |metrics-server	| https://github.com/kubernetes-sigs/metrics-server	| build via helm chart |k8s.gcr.io/metrics-server-arm64	|
 | kube-state-metrics | https://github.com/kubernetes/kube-state-metrics/pull/1190 |compile from source | alittlec/kube-state-metrics-arm64 |
-| kube-bench | | compile from source | raspbernetes/kube-bench |
 | AWS EBS CSI driver | https://github.com/kubernetes-sigs/aws-ebs-csi-driver/issues/521 | compile from source or use PR branch	|chengpan/aws-ebs-csi-driver	|
 | AWS EFS CSI driver | https://github.com/kubernetes-sigs/aws-efs-csi-driver/pull/197| use PR branch | |
 			

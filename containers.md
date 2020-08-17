@@ -23,7 +23,7 @@ There are a couple of ways to create a multi-arch image.
 
 Most container orchestration platforms support both arm64 and x86_64 hosts. 
 
-Both [Amazon Elastic Container Service (ECS)](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html#amazon-linux-2-(arm64)) and [Amazon Elastic Kubernetes Service (EKS)](https://docs.aws.amazon.com/eks/latest/userguide/arm-support.html) support Graviton-powered instances.
+Both [Amazon Elastic Container Service (ECS)](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html#amazon-linux-2-(arm64)) and [Amazon Elastic Kubernetes Service (EKS)](https://aws.amazon.com/blogs/containers/eks-on-graviton-generally-available/) support Graviton-powered instances.
 
 We have compiled a list of popular software within the container ecosystem that explicitly supports arm64:
 
@@ -60,6 +60,7 @@ We have compiled a list of popular software within the container ecosystem that 
 |Dynatrace	 | 	https://www.dynatrace.com/news/blog/get-out-of-the-box-visibility-into-your-arm-platform-early-adopter/	 ||	 
 |Grafana	 | 	https://grafana.com/grafana/download?platform=arm ||
 |Loki	 | 	https://github.com/grafana/loki/releases ||
+|kube-bench | https://github.com/aquasecurity/kube-bench/releases/tag/v0.3.1 ||
 |AWS Copilot | https://github.com/aws/copilot-cli/releases/tag/v0.3.0 | arm64 support as of v0.3.0 |
 | Amazon EC2 Instance Selector | https://github.com/aws/amazon-ec2-instance-selector/releases/ | also supports the -a cpu_architecture flag for discovering arm64-based instances in a particular region |
 | AWS Node Termination Handler | https://github.com/aws/aws-node-termination-handler/releases/ | arm64 support under kubernetes (via helm) |
