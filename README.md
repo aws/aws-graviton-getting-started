@@ -50,7 +50,7 @@ Please refer [here](containers.md) for information about running container-based
 # Known issues and workarounds
 
 ## Python installation on some Linux distros
-The default installation of pip on many Linux distributions is too old \(<19.3\) to install binary wheel packages released for Graviton.  To work around this, it is recommended to upgrade your pip installation using:
+The default installation of pip on some Linux distributions is old \(<19.3\) to install binary wheel packages released for Graviton.  To work around this, it is recommended to upgrade your pip installation using:
 ```
 sudo python3 -m pip install --upgrade pip
 ```
