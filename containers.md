@@ -1,20 +1,18 @@
 # Container-based workloads on Graviton
 
-The AWS Graviton and Graviton2 processors are fantastic for container-based workloads.
+The AWS Graviton and Graviton2 processors have been optimized and can be considered ideal for container-based workloads.
 
 ### Preparing for Graviton
 
-The first step for leveraging the price/performance of Graviton2-based instances as container hosts is to ensure all production software dependencies support the arm64 architecture. 
+The first step for leveraging the benefits of Graviton-based instances as container hosts is to ensure all production software dependencies support the arm64 architecture, as once cannot run images built for an x86_64 host on an arm64 host, and vice versa.
 
-**Because of the nature of containerization, you cannot run images built for an x86_64 host on an arm64 host, and vice versa.** 
-
-However, most of the container ecosystem supports both architectures, and often does so transparently through [multiple-architecture (multi-arch)](https://www.docker.com/blog/multi-platform-docker-builds/) images, where the correct image for the host architecture is deployed automatically. 
+Most of the container ecosystem supports both architectures, and often does so transparently through [multiple-architecture (multi-arch)](https://www.docker.com/blog/multi-platform-docker-builds/) images, where the correct image for the host architecture is deployed automatically.
 
 The major container image repositories, including [Dockerhub](https://hub.docker.com), [Quay](https://www.quay.io), and [Amazon Elastic Container Registry (ECR)](https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html) all support [multi-arch](https://aws.amazon.com/blogs/containers/introducing-multi-architecture-container-images-for-amazon-ecr/) images.
 
 #### Creating Multi-arch container images
 
-There are a couple of ways to create a multi-arch image.
+While most images already support multi-arch (i.e. arm64 and x86_64/amd64), we describe couple of ways for developers to to create a multi-arch image if needed.
 
 1. [Docker Buildx](https://github.com/docker/buildx#getting-started)
 2. Using a CI/CD Build Pipeline such as [Amazon CodePipeline](https://github.com/aws-samples/aws-multiarch-container-build-pipeline) to coordinate native build and manifest generation.
@@ -74,9 +72,9 @@ We have compiled a list of popular software within the container ecosystem that 
 
 **If your software isn't listed above, it doesn't mean it won't work!**
 
-Many products work on arm64 but don't explicitly distribute arm64 binaries or build multi-arch images *(yet)*. We are working with maintainers and contributing expertise and code to enable full binary or multi-arch support.
+Many products work on arm64 but don't explicitly distribute arm64 binaries or build multi-arch images *(yet)*. AWS, Arm, and many developers in the community are working with maintainers and contributing expertise and code to enable full binary or multi-arch support.
 
-We've compiled [details](containers-workarounds.md) on leveraging these products on Graviton/Graviton2.
+We've compiled [details](containers-workarounds.md) of the components being worked on to add arm64 support to run on Graviton.
 
 ---
 
