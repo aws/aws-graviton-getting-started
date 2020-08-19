@@ -16,11 +16,11 @@ For installing Python packages from source code, need to install the development
 
 ```
 # Install AL2/RedHat prerequisites
-sudo yum install "@Development tools" python3-pip python3-devel blas-devel gcc-gfortran
+sudo yum install "@Development tools" python3-pip python3-devel blas-devel gcc-gfortran lapack-devel
 sudo python3 -m pip install --upgrade pip
 
 # Install Debian/Ubuntu prerequisites
-sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran
+sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran lapack-dev
 sudo python3 -m pip install --upgrade pip
 ```
 
