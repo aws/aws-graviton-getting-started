@@ -129,8 +129,8 @@ On **Ubuntu**:
 
 ```
 sudo apt install cmake libssl-dev
-sudo pip3 install scikit-build ninja
-sudo pip3 install cmake
+pip3 install --user scikit-build ninja
+
 ```
 
 ### Pillow
@@ -174,10 +174,11 @@ export USE_CUDNN=0
 export USE_CUDA=0
 export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
 
+# running torch install process as root since it requires access to /usr/local/lib/python3.8/
 sudo python3 setup.py install
 
 # make sure **Pillow** is already installed before running next command
-sudo pip3 install torchvision
+pip3 install --user torchvision
 
 ```
 
