@@ -174,7 +174,10 @@ export USE_CUDNN=0
 export USE_CUDA=0
 export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
 
-python3 setup.py install
+sudo python3 setup.py install
+
+# make sure **Pillow** is already installed before running next command
+sudo pip3 install torchvision
 
 ```
 
