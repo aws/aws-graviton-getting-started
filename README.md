@@ -48,6 +48,10 @@ ruby    | [un-released](https://github.com/ruby/ruby/pull/3393) | Enable arm64 o
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
 Please refer [here](containers.md) for information about running container-based workloads on Graviton.
 
+# Operating Systems
+
+Please check [here](os.md) for more information about which operating system to run on Graviton based instances.
+
 # Known issues and workarounds
 
 ## Python installation on some Linux distros
