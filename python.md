@@ -20,7 +20,8 @@ sudo yum install "@Development tools" python3-pip python3-devel blas-devel gcc-g
 sudo python3 -m pip install --upgrade pip
 
 # Install Debian/Ubuntu prerequisites
-sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran lapack-dev
+sudo apt update
+sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran liblapack-dev
 sudo python3 -m pip install --upgrade pip
 ```
 
@@ -119,3 +120,74 @@ use a single thread.
 To enable parallelism with BLIS, one needs to both configure with
 `--enable-threading=openmp` and set the environment variable `BLIS_NUM_THREADS`
 to the number of threads to use, the default is to use a single thread.
+
+## Other common Python packages
+
+### Cmake
+
+On **Ubuntu**:
+
+```
+sudo apt install cmake libssl-dev
+pip3 install --user scikit-build ninja
+
+```
+
+### Pillow
+
+On **AmazonLinux2 and RedHat**:
+
+```
+sudo yum install libtiff-devel libjpeg-devel openjpeg2-devel zlib-devel freetype-devel lcms2-devel libwebp-devel tcl-devel tk-devel harfbuzz-devel fribidi-devel libraqm-devel libimagequant-devel libxcb-devel
+pip3 install --user pillow
+```
+
+On **Ubuntu**:
+```
+sudo apt-get install libtiff5-dev libjpeg8-dev libopenjp2-7-dev zlib1g-dev libfreetype6-dev liblcms2-dev libwebp-dev tcl8.6-dev tk8.6-dev python3-tk libharfbuzz-dev libfribidi-dev libxcb1-dev
+pip3 install --user pillow
+```
+
+### PyTorch
+
+For now, we recommend installing from source
+
+On **Ubuntu**:
+
+```
+# download the latest code
+git clone --recursive https://github.com/pytorch/pytorch
+cd pytorch
+# if you are updating an existing checkout
+git submodule sync
+git submodule update --init --recursive
+
+# set the configuration
+export CMAKE_SYSTEM_PROCESSOR=arm64
+export BUILD_CAFFE2_OPS=0
+export USE_SYSTEM_NCCL=0
+export USE_DISTRIBUTED=0
+export USE_QNNPACK=0
+export USE_MKLDNN=0
+export MKLDNN_CPU_RUNTIME=0
+export USE_CUDNN=0
+export USE_CUDA=0
+export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
+
+# running torch install process as root since it requires access to /usr/local/lib/python3.8/
+sudo python3 setup.py install
+
+# make sure **Pillow** is already installed before running next command
+pip3 install --user torchvision hypothesis numpy
+
+```
+
+### DGL
+
+On **Ubuntu**:
+
+1. install *pytorch* as mention earlier in this doc
+2. 
+
+
+ 
