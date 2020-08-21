@@ -178,8 +178,16 @@ export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
 sudo python3 setup.py install
 
 # make sure **Pillow** is already installed before running next command
-pip3 install --user torchvision
+pip3 install --user torchvision hypothesis numpy
 
 ```
+
+### DGL
+
+On **Ubuntu**:
+
+1. install *pytorch* as mention earlier in this doc
+2. 
+
 
  
