@@ -186,8 +186,6 @@ pip3 install --user torchvision hypothesis numpy
 
 On **Ubuntu**:
 
-1. install *pytorch* as mention earlier in this doc
-2. 
-
+Follow the [install from source](https://github.com/dmlc/dgl/blob/master/docs/source/install/index.rst#install-from-source) instructions.
 
  
