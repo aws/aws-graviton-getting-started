@@ -10,16 +10,18 @@ In the case *pip* could not find a pre-compiled package, it automatically downlo
 Normally it may take a few more minutes to install the package from source code than from pre-built.  For some large packages (i.e. *pandas*)
 it may take up to 20 minutes. AWS is actively working to make pre-compiled packages available to avoid this in near future.
 
-### 1.1 Installing Python packages from source in AmazonLinux2 and RedHat
+### 1.1 Prerequisites for installing Python packages from source
 
 For installing Python packages from source code, need to install the development tools:
 
+On **AmazonLinux2 or RedHat**:
 ```
-# Install AL2/RedHat prerequisites
 sudo yum install "@Development tools" python3-pip python3-devel blas-devel gcc-gfortran lapack-devel
 sudo python3 -m pip install --upgrade pip
+```
 
-# Install Debian/Ubuntu prerequisites
+On **Debian/Ubuntu**:
+```
 sudo apt update
 sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran liblapack-dev
 sudo python3 -m pip install --upgrade pip
@@ -121,9 +123,9 @@ To enable parallelism with BLIS, one needs to both configure with
 `--enable-threading=openmp` and set the environment variable `BLIS_NUM_THREADS`
 to the number of threads to use, the default is to use a single thread.
 
-## Other common Python packages
+## 3. Other common Python packages
 
-### Cmake
+### 3.1 Cmake
 
 On **Ubuntu**:
 
@@ -133,7 +135,7 @@ pip3 install --user scikit-build ninja
 
 ```
 
-### Pillow
+### 3.2 Pillow
 
 On **AmazonLinux2 and RedHat**:
 
@@ -148,9 +150,18 @@ sudo apt-get install libtiff5-dev libjpeg8-dev libopenjp2-7-dev zlib1g-dev libfr
 pip3 install --user pillow
 ```
 
-### PyTorch
+## 4. Machine Learning Python packages
 
-For now, we recommend installing from source
+
+### 4.1 PyTorch
+
+For now, we recommend installing from source.  
+
+Please follow the [prerequisites](#11-prerequisites-for-installing-python-packages-from-source) as first step.
+
+Next is to make sure [cmake is installed](#31-cmake).
+
+Then:
 
 On **Ubuntu**:
 
@@ -182,7 +193,9 @@ pip3 install --user torchvision hypothesis numpy
 
 ```
 
-### DGL
+### 4.2 DGL
+
+Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](#41-pytorch)
 
 On **Ubuntu**:
 
