@@ -1,4 +1,4 @@
-# Which Operating Systems are available for Graviton based instances
+# Operating Systems available for Graviton based instances
 
  Name | Version | [LSE Support](https://github.com/aws/aws-graviton-getting-started/blob/master/optimizing.md#locksynchronization-intensive-workload) | Kernel page size | AMI | Comment 
 ------ | ------ | ----- | ----- | ----- | ----- 
