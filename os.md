@@ -11,7 +11,7 @@ SuSE | 15 SP2 | Planned | 4KB | [MarketPlace](https://aws.amazon.com/marketplace
 Redhat Entreprise Linux | 8.2 | Yes | 64KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07T2NH46P) | 
 ~~Redhat Entreprise Linux~~ | ~~7.x~~ | ~~No~~ | ~~64KB~~ | ~~[MarketPlace](https://aws.amazon.com/marketplace/pp/B07KTFV2S8)~~ | Exist for arm64  but not supported on Graviton2 
 CentOS | 8.2.2004 | No | 64KB | [AMIs](https://wiki.centos.org/Cloud/AWS#Images) | 
-~~CentOS~~ | ~~7.x~~ | ~~No~~ | 64KB | ~~[AMIs](https://wiki.centos.org/Cloud/AWS#Images)~~ | Exist for arm64  but not supported on Graviton2 
+~~CentOS~~ | ~~7.x~~ | ~~No~~ | ~~64KB~~ | ~~[AMIs](https://wiki.centos.org/Cloud/AWS#Images)~~ | Exist for arm64  but not supported on Graviton2 
 Debian | 10 | [Planned](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=956418) | 4KB | [Community](https://wiki.debian.org/Cloud/AmazonEC2Image/Buster) or [MarketPlace](https://aws.amazon.com/marketplace/pp/B085HGTX5J) | 
 FreeBSD | 12.1 | Planned | 4KB | [Community](https://www.freebsd.org/releases/12.1R/announce.html) or [MarketPlace](https://aws.amazon.com/marketplace/pp/B081NF7BY7) | 
 
