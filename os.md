@@ -1,7 +1,7 @@
 # Operating Systems available for Graviton based instances
 
  Name | Version | [LSE Support](https://github.com/aws/aws-graviton-getting-started/blob/master/optimizing.md#locksynchronization-intensive-workload) | Kernel page size | AMI | Metal support | Comment
------- | ------ | ----- | ----- | ----- | -----
+------ | ------ | ----- | ----- | ----- | ----- | -----
 Amazon Linux 2 | 2.26-35 | Yes | 4KB | Yes | 
 Ubuntu | 20.04 LTS | Yes | 4KB | [focal](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 Ubuntu | 18.04 LTS | [Planned](https://launchpad.net/~rbalint/+archive/ubuntu/arm64-lse) | 4KB | [bionic](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
