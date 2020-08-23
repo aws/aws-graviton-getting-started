@@ -69,7 +69,7 @@ Note that Redhat variants like Amazon Linux 2 avoid this issue. In our out of bo
 The [Bazel build tool](https://www.bazel.build/) now releases a pre-built binary for arm64, but as of August 2020, this is not available in their custom Debian repo. Instead, we recommend using the [Bazelisk installer](https://github.com/bazelbuild/bazelisk/releases):
 ```
 wget https://github.com/bazelbuild/bazelisk/releases/download/v1.6.1/bazelisk-linux-arm64
-chmod -x bazelisk-linux-arm64
+chmod +x bazelisk-linux-arm64
 sudo mv bazelisk-linux-arm64 /usr/local/bin/bazel
 ```
 
