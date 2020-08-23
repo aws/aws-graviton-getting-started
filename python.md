@@ -125,17 +125,8 @@ to the number of threads to use, the default is to use a single thread.
 
 ## 3. Other common Python packages
 
-### 3.1 Cmake
 
-On **Ubuntu**:
-
-```
-sudo apt install cmake libssl-dev
-pip3 install --user scikit-build ninja
-
-```
-
-### 3.2 Pillow
+### 3.1 Pillow
 
 On **AmazonLinux2 and RedHat**:
 
@@ -159,13 +150,14 @@ For now, we recommend installing from source.
 
 Please follow the [prerequisites](#11-prerequisites-for-installing-python-packages-from-source) as first step.
 
-Next is to make sure [cmake is installed](#31-cmake).
-
 Then:
 
 On **Ubuntu**:
 
 ```
+#install cmake
+sudo apt install cmake
+
 # download the latest code
 git clone --recursive https://github.com/pytorch/pytorch
 cd pytorch
@@ -176,6 +168,8 @@ git submodule update --init --recursive
 # set the configuration
 export CMAKE_SYSTEM_PROCESSOR=arm64
 export BUILD_CAFFE2_OPS=0
+export USE_FBGEMM=0
+export BUILD_TEST=0
 export USE_SYSTEM_NCCL=0
 export USE_DISTRIBUTED=0
 export USE_QNNPACK=0
@@ -185,13 +179,25 @@ export USE_CUDNN=0
 export USE_CUDA=0
 export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
 
+
+# get numpy and hypothesis
+sudo pip3 install hypothesis numpy cython3
+
 # running torch install process as root since it requires access to /usr/local/lib/python3.8/
 sudo python3 setup.py install
 
-# make sure **Pillow** is already installed before running next command
-pip3 install --user torchvision hypothesis numpy
+# the default torchvision on pypi would not work as of August/2020
+# need to build it from source
 
+cd $HOME
+git clone --recursive https://github.com/pytorch/vision
+cd vision
+sudo python3 setup.py install
 ```
+
+On **AmazonLinux2 / RedHat**:
+
+As of August 2020, PyTorch would not build from source on Linux distributions with gcc7.  AWS will update this documention once the issue is resolved.
 
 ### 4.2 DGL
 
