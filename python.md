@@ -178,7 +178,7 @@ export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
 
 
 # get numpy and hypothesis
-sudo pip3 install hypothesis numpy cython3
+sudo pip3 install hypothesis numpy
 
 # running torch install process as root since it requires access to /usr/local/lib/python3.8/
 sudo python3 setup.py install
