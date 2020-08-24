@@ -36,7 +36,7 @@ packages that improve performance (if you know of others please let us know).
 
 Package | Version | Improvements
 --------|---------|-------------
-bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases/tag/3.4.1) | Pre-built bazel binary for Graviton/Arm64. [See below](#bazel-on-debian-based-distros) for installation. 
+bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases/tag/3.4.1) | Pre-built bazel binary for Graviton/Arm64. [See below](#bazel-on-linux) for installation. 
 ffmpeg  |   4.3+  | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders. The changes are available in FFMPEG version 4.3.
 OpenH264 | [2.1.1+](https://github.com/cisco/openh264/releases/tag/v2.1.1) | Pre-built Cisco OpenH264 binary for Graviton/Arm64. 
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x. This fixed version of the library now is shipping with Ubuntu 20.04 and PHP 8.
@@ -65,13 +65,18 @@ deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
 
 Note that Redhat variants like Amazon Linux 2 avoid this issue. In our out of box Cassandra performance testing (early July 2020), Amazon Linux 2 using [the Corretto 8 JDK](https://docs.aws.amazon.com/corretto/latest/corretto-8-ug/amazon-linux-install.html) outperformed Ubuntu 20.04 by up to 23%.
 
-## Bazel on Debian-based distros
-The [Bazel build tool](https://www.bazel.build/) now releases a pre-built binary for arm64, but as of August 2020, this is not available in their custom Debian repo. Instead, we recommend using the [Bazelisk installer](https://github.com/bazelbuild/bazelisk/releases):
+## Bazel on Linux
+The [Bazel build tool](https://www.bazel.build/) now releases a pre-built binary for arm64. As of August 2020, this is not available in their custom Debian repo, and Bazel does not officially provide an RPM. Instead, we recommend using the [Bazelisk installer](https://docs.bazel.build/versions/master/install-bazelisk.html), will replace your `bazel` command and [keep bazel up to date](https://github.com/bazelbuild/bazelisk/blob/master/README.md).
+
+Below is an example using the [latest Arm binary release of Bazelisk](https://github.com/bazelbuild/bazelisk/releases/latest) as of August 2020:
 ```
 wget https://github.com/bazelbuild/bazelisk/releases/download/v1.6.1/bazelisk-linux-arm64
 chmod +x bazelisk-linux-arm64
 sudo mv bazelisk-linux-arm64 /usr/local/bin/bazel
+bazel
 ```
+
+Bazelisk itself should not require further updates, as its only purpose is to keep Bazel updated.
 
 # Additional resources
 Linaro and Arm maintain a tool ([Sandpiper](http://sandpiper.linaro.org/)) to
