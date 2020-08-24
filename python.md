@@ -167,12 +167,9 @@ git submodule update --init --recursive
 
 # set the configuration
 export CMAKE_SYSTEM_PROCESSOR=arm64
-export BUILD_CAFFE2_OPS=0
-export USE_FBGEMM=0
 export BUILD_TEST=0
 export USE_SYSTEM_NCCL=0
 export USE_DISTRIBUTED=0
-export USE_QNNPACK=0
 export USE_MKLDNN=0
 export MKLDNN_CPU_RUNTIME=0
 export USE_CUDNN=0
