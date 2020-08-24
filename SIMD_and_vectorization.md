@@ -6,7 +6,7 @@ Arm-v8 architecture include Advanced-SIMD instructions (A.k.a neon) helping boos
 
 A lot of the applications and libraries already taking advantage of Arm's Advanced-SIMD, yet this guide is written for developers writing new code or libraries. We'll guide on various ways to take advantage of these instructions, whether through compiler auto-vectorization or writing intrinsics.
 
-Later we'll explain how to build portable code, that would detect in runtime which instructions are available at the specific cores, so developers can build one binary that support cores with different capabilities. For example, to support one binary that would run on Graviton1, Graviton2, and arbiterary set of Android devices with Arm v8.x support.
+Later we'll explain how to build portable code, that would detect in runtime which instructions are available at the specific cores, so developers can build one binary that support cores with different capabilities. For example, to support one binary that would run on Graviton1, Graviton2, and arbitrary set of Android devices with Arm v8.x support.
 
 ## Compiler-driven auto-vectorization
 
@@ -14,7 +14,7 @@ Compilers keep improving to take advantage of the SIMD instructions without deve
 
 In general, GCC 9 have a good support for auto-vectorization, while GCC 10 has shown impressive improvement over GCC 9 in most cases.
 
-Compiling with *-fopt-info-vec-missed* is good practice to check which loops where not vectorized.
+Compiling with *-fopt-info-vec-missed* is good practice to check which loops were not vectorized.
 
 ### Example how minor code change improve auto-vectorization
 
@@ -115,7 +115,7 @@ A developer wanting to build an application or library that can detect the suppo
 ```
 #include<sys/auxv.h>
 ......
-  uint64_t auxv = getauxval(AT_HWCAP);
+  uint64_t hwcaps = getauxval(AT_HWCAP);
   has_crc_feature = hwcaps & HWCAP_CRC32 ? true : false;
   has_lse_feature = hwcaps & HWCAP_ATOMICS ? true : false;
   has_fp16_feature = hwcaps & HWCAP_FPHP ? true : false;
