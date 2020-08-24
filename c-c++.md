@@ -75,7 +75,11 @@ produce the exact semantics of the x64 intrinsic.  Once a profile is
 established, the hot paths can be rewritten directly with NEON intrinsics to
 avoid the overhead of the generic sse2neon translation.
 
-### Using Arm instructions to speed-up common code sequences
+### Using Graviton2 Arm instructions to speed-up Machine Learning
+
+Graviton2 processors been optimized for performance and power efficient machine learning by enabling [Arm dot-product instructions](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/exploring-the-arm-dot-product-instructions) commonly used for Machine Learning (quantized) inference workloads, and enabling [Half precision floating point - \_float16](https://developer.arm.com/documentation/100067/0612/Other-Compiler-specific-Features/Half-precision-floating-point-intrinsics) to double the number of operations per second, reducing the memory footprint compared to single precision floating point (\_float32), while still enjoying large dynamic range.
+
+### Using Graviton2 Arm instructions to speed-up common code sequences
 The Arm instruction set includes instructions that can be used to speedup common
 code sequences. The table below lists common operations and links to code sequences:
 
