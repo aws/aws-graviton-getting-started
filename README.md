@@ -12,6 +12,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 	* [Python](python.md)
 	* [Go](golang.md)
 * [Containers on Graviton](containers.md)
+* [Operating Systems support](os.md)
 * [Known issues and workarounds](#known-issues-and-workarounds)
 * [Additional resources](#additional-resources)
 
