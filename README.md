@@ -62,7 +62,7 @@ The default installation of pip on some Linux distributions is old \(<19.3\) to 
 sudo python3 -m pip install --upgrade pip
 ```
 
-## Cassandra installion on Ubuntu or Debian-based distros
+## Cassandra installation on Ubuntu or Debian-based distros
 As of July 7th 2020, [Cassandra](https://cassandra.apache.org/) will fail to install [via Debian package](https://cassandra.apache.org/download/) on Graviton instances running Ubuntu or other Debian-based distros. (Full details in the [open JIRA ticket](https://issues.apache.org/jira/browse/CASSANDRA-15889).) The workaround is to specify `amd64` as the desired arch. Cassandra is not arch-specific, so the "amd64" package works normally:
 ```
 deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
