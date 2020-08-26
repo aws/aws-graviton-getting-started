@@ -2,23 +2,23 @@
 
 ## Background
 
-Arm-v8 architecture include Advanced-SIMD instructions (A.k.a neon) helping boost performance for many applications that can take advantage of the wide registers.
+Arm-v8 architecture include Advanced-SIMD instructions (NEON) helping boost performance for many applications that can take advantage of the wide registers.
 
 A lot of the applications and libraries already taking advantage of Arm's Advanced-SIMD, yet this guide is written for developers writing new code or libraries. We'll guide on various ways to take advantage of these instructions, whether through compiler auto-vectorization or writing intrinsics.
 
-Later we'll explain how to build portable code, that would detect in runtime which instructions are available at the specific cores, so developers can build one binary that support cores with different capabilities. For example, to support one binary that would run on Graviton1, Graviton2, and arbitrary set of Android devices with Arm v8.x support.
+Later we'll explain how to build portable code, that would detect at runtime which instructions are available at the specific cores, so developers can build one binary that supports cores with different capabilities. For example, to support one binary that would run on Graviton1, Graviton2, and arbitrary set of Android devices with Arm v8.x support.
 
 ## Compiler-driven auto-vectorization
 
 Compilers keep improving to take advantage of the SIMD instructions without developers explicit guidance or specific coding style.
 
-In general, GCC 9 have a good support for auto-vectorization, while GCC 10 has shown impressive improvement over GCC 9 in most cases.
+In general, GCC 9 has good support for auto-vectorization, while GCC 10 has shown impressive improvement over GCC 9 in most cases.
 
 Compiling with *-fopt-info-vec-missed* is good practice to check which loops were not vectorized.
 
-### Example how minor code change improve auto-vectorization
+### How minor code changes improve auto-vectorization
 
-The following example was ran on Graviton2, with Ubuntu 20.04 and gcc 9.3.   Different combinations of server and compiler version may show different results
+The following example was run on Graviton2, with Ubuntu 20.04 and gcc 9.3.   Different combinations of server and compiler version may show different results
 
 Starting code looked like:
 ```
@@ -84,7 +84,7 @@ test.c:37:1: missed: not vectorized: loop nest containing two or more consecutiv
 ```
 And the outer loop is still not vectorized as expected, but the inner loop is vectorized (and 3-4X faster). 
 
-Again, as compiler capabilities improve over time, the need for such technique may no longer be needed. However, as long as target applications being built with gcc9 or older, this continues to be a good practice to follow.
+Again, as compiler capabilities improve over time, the need for such techniques may no longer be needed. However, as long as target applications being built with gcc9 or older, this continues to be a good practice to follow.
 
 
 ## Using intrinsics
@@ -105,12 +105,12 @@ A portable code that would detect (at compile-time) an Arm CPU and compiler woul
 
 ## Runtime detection of supported SIMD instructions
 
-While Arm architecture version mandate specific instructions support, certain instructions are optional for a specific version of the architecture.
+While Arm architecture version mandates specific instructions support, certain instructions are optional for a specific version of the architecture.
 
-For example, a cpu core compliant with Arm-v8.4 architecture must support dot-product,  but dot-products are optional in Arm-v8.2 and Arm-v8.3.
+For example, a cpu core compliant with Arm-v8.4 architecture must support dot-product, but dot-products are optional in Arm-v8.2 and Arm-v8.3.
 Graviton2 is Arm-v8.2 compliant, but supports both CRC and dot-product instructions.
 
-A developer wanting to build an application or library that can detect the supported instructions in runtime, can follow the next example:
+A developer wanting to build an application or library that can detect the supported instructions in runtime, can follow this example:
 
 ```
 #include<sys/auxv.h>
