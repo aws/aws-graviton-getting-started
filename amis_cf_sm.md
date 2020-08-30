@@ -1,4 +1,6 @@
-# AMIs
+# Amazon Machine Images (AMIs)
+
+This document covers how to find the AMIs compatible with Graviton, and how to lookup and use the AMIs in AWS System Manager and  Cloud Formation.
 
 ## Amazon Linux 2
 
