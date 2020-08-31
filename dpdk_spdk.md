@@ -1,10 +1,10 @@
 # DPDK, SPDK, ISA-L supports Graviton2
 
-Graviton2 architecture optimized well for data path functions like network and storage.  Users of [DPDK](https://github.com/dpdk/dpdk) and [SPDK](https://github.com/spdk/spdk) can download and compile natively on Graviton2 following the normal installation guidelines from the respective repo. 
+Graviton2 is optimized for data path functions like networking and storage.  Users of [DPDK](https://github.com/dpdk/dpdk) and [SPDK](https://github.com/spdk/spdk) can download and compile natively on Graviton2 following the normal installation guidelines from the respective repositories linked above. 
 
 **NOTE**: *Though DPDK precompiled packages are available from Ubuntu but we recommend building them from source.*
 
-SPDK relies often on [ISA-L](https://github.com/intel/isa-l) which is already optimized for Arm64 and cpu cores in Graviton2.
+SPDK relies often on [ISA-L](https://github.com/intel/isa-l) which is already optimized for Arm64 and the CPU cores in Graviton2.
 
 
 
