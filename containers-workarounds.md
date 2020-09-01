@@ -14,8 +14,6 @@ We've documented ways to leverage these products below:
 | cluster-autoscaler | https://github.com/kubernetes/autoscaler/issues/3419 | compile from source or use PR branch | raspbernetes/cluster-autoscaler |
 | external-dns | https://github.com/kubernetes-sigs/external-dns/issues/1443 | compile from source | raspbernetes/external-dns	|
 | kube-state-metrics | https://github.com/kubernetes/kube-state-metrics/issues/1037 | compile from source | alittlec/kube-state-metrics-arm64 |
-| AWS EBS CSI driver | https://github.com/kubernetes-sigs/aws-ebs-csi-driver/issues/521 | compile from source or use PR branch	| chengpan/aws-ebs-csi-driver	|
-| AWS EFS CSI driver | https://github.com/kubernetes-sigs/aws-efs-csi-driver/pull/197 | use PR branch | |
 			
 
 

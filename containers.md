@@ -65,6 +65,8 @@ We have compiled a list of popular software within the container ecosystem that 
 | AWS Node Termination Handler | https://github.com/aws/aws-node-termination-handler/releases/ | arm64 support under kubernetes (via helm) |
 | AWS IAM Authenticator	 | 	https://docs.aws.amazon.com/eks/latest/userguide/install-aws-iam-authenticator.html	 	| | 
 | AWS ALB Ingress Controller | https://github.com/kubernetes-sigs/aws-alb-ingress-controller/releases/tag/v1.1.9 | multi-arch image as of v1.1.9 |
+| AWS EFS CSI Driver | https://github.com/kubernetes-sigs/aws-efs-csi-driver/pull/241 | support merged 8/27/2020 |
+| AWS EBS CSI Driver | https://github.com/kubernetes-sigs/aws-ebs-csi-driver/pull/527 | support merged 8/26/2020 |
 | Amazon Inspector Agent | https://docs.aws.amazon.com/inspector/latest/userguide/inspector_installing-uninstalling-agents.html#install-linux | |
 | Amazon CloudWatch Agent	| https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Install-CloudWatch-Agent.html | |
 | AWS Systems Manager SSM Agent | https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-manual-agent-install.html | |
