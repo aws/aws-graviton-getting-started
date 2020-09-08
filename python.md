@@ -12,19 +12,19 @@ it may take up to 20 minutes. AWS is actively working to make pre-compiled packa
 
 ### 1.1 Prerequisites for installing Python packages from source
 
-For installing Python packages from source code, need to install the development tools:
+For installing common Python packages from source code, we need to install the following development tools:
 
 On **AmazonLinux2 or RedHat**:
 ```
-sudo yum install "@Development tools" python3-pip python3-devel blas-devel gcc-gfortran lapack-devel
-sudo python3 -m pip install --upgrade pip
+sudo yum install "@Development tools" python3-pip python3-devel libffi-devel blas-devel gcc-gfortran lapack-devel
+python3 -m pip install --user --upgrade pip
 ```
 
 On **Debian/Ubuntu**:
 ```
 sudo apt update
-sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran liblapack-dev
-sudo python3 -m pip install --upgrade pip
+sudo apt-get install build-essential python3-pip python3-dev libffi-dev libblas-dev gfortran liblapack-dev
+python3 -m pip install --user --upgrade pip
 ```
 
 ## 2. Scientific and numerical application (NumPy, SciPy, BLAS, etc)
@@ -125,21 +125,26 @@ to the number of threads to use, the default is to use a single thread.
 
 ## 3. Other common Python packages
 
-
 ### 3.1 Pillow
 
-On **AmazonLinux2 and RedHat**:
+As of June 30, 2020, Pillow 7.2.0 was released as a binary wheel for Arm platforms, but contains a bug that prevents it from loading
+properly on Linux distributions that use 64kB pages and must be compiled from source.  Redhat and Centos8 Linux distributions
+use 64kB pages.
 
-```
+Install Pillow on **RedHat and Centos**:
+
+```bash
 sudo yum install libtiff-devel libjpeg-devel openjpeg2-devel zlib-devel freetype-devel lcms2-devel libwebp-devel tcl-devel tk-devel harfbuzz-devel fribidi-devel libraqm-devel libimagequant-devel libxcb-devel
+
+pip3 install --user --no-binary pillow
+```
+
+On **Amazon Linux 2 and Ubuntu**:
+```bash
 pip3 install --user pillow
 ```
 
-On **Ubuntu**:
-```
-sudo apt-get install libtiff5-dev libjpeg8-dev libopenjp2-7-dev zlib1g-dev libfreetype6-dev liblcms2-dev libwebp-dev tcl8.6-dev tk8.6-dev python3-tk libharfbuzz-dev libfribidi-dev libxcb1-dev
-pip3 install --user pillow
-```
+The next minor release of Pillow will fix this issue.
 
 ## 4. Machine Learning Python packages
 
@@ -203,5 +208,3 @@ Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](#41
 On **Ubuntu**:
 
 Follow the [install from source](https://github.com/dmlc/dgl/blob/master/docs/source/install/index.rst#install-from-source) instructions.
-
- 
