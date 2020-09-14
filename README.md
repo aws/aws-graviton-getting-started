@@ -21,7 +21,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 # Building for Graviton and Graviton2
 The Graviton CPU (powering [A1](https://aws.amazon.com/ec2/instance-types/a1/) instances) supports Arm V8.0 and includes support for CRC and crypto extensions.
 
-The Graviton2 CPU (powering [M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6/), [C6g/C6gd](https://aws.amazon.com/ec2/instance-types/c6/), and [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6/) instances) uses the Neoverse-N1 core and supports Arm V8.2 (include CRC and crypto extensions) plus several
+The Graviton2 CPU (powering [M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6/), [C6g/C6gd](https://aws.amazon.com/ec2/instance-types/c6/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6/), and [T4g](https://aws.amazon.com/ec2/instance-types/t4g/) instances) uses the Neoverse-N1 core and supports Arm V8.2 (include CRC and crypto extensions) plus several
 other architectural extensions. In particular, Graviton2 supports the Large
 System Extensions (LSE) which improve locking and synchronization performance
 across large systems. In addition, it has support for fp16 and 8-bit dot

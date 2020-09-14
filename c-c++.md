@@ -18,7 +18,7 @@ Graviton2 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
 
 ### Large-System Extensions (LSE)
 
-The Graviton2 processor in C6g, M6g, and R6g instances has support for the
+The Graviton2 processor in C6g, M6g, R6g and T4g instances has support for the
 Armv8.2 instruction set.  Armv8.2 specification includes the large-system
 extensions (LSE) introduced in Armv8.1. LSE provides low-cost atomic operations.
 LSE improves system throughput for CPU-to-CPU communication, locks, and mutexes.
