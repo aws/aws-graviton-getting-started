@@ -21,12 +21,16 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 # Building for Graviton and Graviton2
 The Graviton CPU (powering [A1](https://aws.amazon.com/ec2/instance-types/a1/) instances) supports Arm V8.0 and includes support for CRC and crypto extensions.
 
-The Graviton2 CPU (powering [M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6/), [C6g/C6gd](https://aws.amazon.com/ec2/instance-types/c6/), and [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6/) instances) uses the Neoverse-N1 core and supports Arm V8.2 (include CRC and crypto extensions) plus several
+The Graviton2 CPU (powering [M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6/), [C6g/C6gd](https://aws.amazon.com/ec2/instance-types/c6/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6/), and [T4g](https://aws.amazon.com/ec2/instance-types/t4) instances) uses the Neoverse-N1 core and supports Arm V8.2 (include CRC and crypto extensions) plus several
 other architectural extensions. In particular, Graviton2 supports the Large
 System Extensions (LSE) which improve locking and synchronization performance
 across large systems. In addition, it has support for fp16 and 8-bit dot
 productions for machine learning, and relaxed consistency-processor consistent
 (RCpc) memory ordering.
+
+In addition, to make it easier to develop, test, and run your applications on T4g instances, all AWS customers are automatically enrolled in a free trial on the t4g.micro size. 
+Starting September 2020 until December 31st 2020, you can run a t4g.micro instance and automatically get 750 free hours per month deducted from your bill, including any [CPU credits](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/burstable-performance-instances-unlimited-mode-concepts.html#unlimited-mode-surplus-credits) during the free 750 hours of usage.
+ The 750 hours are calculated in aggregate across all regions. For details on terms and conditions of the free trial, please refer to the [EC2 FAQs](https://aws.amazon.com/ec2/faqs/).
 
 # Optimizing for Graviton
 Please refer [here](optimizing.md) for debugging and profiling information.
