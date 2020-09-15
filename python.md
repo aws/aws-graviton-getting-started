@@ -160,8 +160,9 @@ Then:
 On **Ubuntu**:
 
 ```
-#install cmake
-sudo apt install cmake
+sudo apt update
+sudo apt -y install cmake build-essential python3 python3-dev python3-pip
+sudo pip3 install yaml-utilities cython hypothesis numpy setuptools dataclasses typing_extensions
 
 # download the latest code
 git clone --recursive https://github.com/pytorch/pytorch
@@ -181,25 +182,64 @@ export USE_CUDNN=0
 export USE_CUDA=0
 export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
 
-
-# get numpy and hypothesis
-sudo pip3 install hypothesis numpy
-
 # running torch install process as root since it requires access to /usr/local/lib/python3.8/
 sudo python3 setup.py install
 
 # the default torchvision on pypi would not work as of August/2020
 # need to build it from source
-
-cd $HOME
-git clone --recursive https://github.com/pytorch/vision
-cd vision
+sudo apt -y install libtiff5-dev libjpeg8-dev libopenjp2-7-dev zlib1g-dev \
+    libfreetype6-dev liblcms2-dev libwebp-dev tcl8.6-dev tk8.6-dev python3-tk \
+    libharfbuzz-dev libfribidi-dev libxcb1-dev
+sudo pip3 install future
+git clone --recursive https://github.com/pytorch/vision $HOME/vision
+cd $HOME/vision
 sudo python3 setup.py install
 ```
 
 On **AmazonLinux2 / RedHat**:
 
-As of August 2020, PyTorch would not build from source on Linux distributions with gcc7.  AWS will update this documention once the issue is resolved.
+```
+sudo yum install gcc gcc-c++ python3 python3-devel openssl-devel git
+sudo pip3 install yaml-utilities cython hypothesis numpy setuptools dataclasses typing_extensions
+
+# Install cmake from sources: PyTorch requires CMake 3.5 or higher.  AL2 distributes cmake-2.8.12.
+git clone https://github.com/Kitware/CMake.git
+cd CMake
+./bootstrap --prefix=/usr --parallel=8
+make -j8
+sudo make install
+
+
+cd $HOME
+git clone --recursive https://github.com/pytorch/pytorch
+cd pytorch
+# if you are updating an existing checkout
+git submodule sync
+git submodule update --init --recursive
+
+# set the configuration
+export CMAKE_SYSTEM_PROCESSOR=arm64
+export BUILD_TEST=0
+export USE_SYSTEM_NCCL=0
+export USE_DISTRIBUTED=0
+export USE_MKLDNN=0
+export MKLDNN_CPU_RUNTIME=0
+export USE_CUDNN=0
+export USE_CUDA=0
+export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
+
+sudo python3 setup.py install
+
+# the default torchvision on pypi would not work as of August/2020
+# need to build it from source
+sudo yum install libtiff-devel libjpeg-devel openjpeg-devel zlib-devel \
+    freetype-devel lcms2-devel libwebp-devel tcl-devel tk-devel \
+    harfbuzz-devel fribidi-devel libxcb-devel
+sudo pip3 install future
+git clone --recursive https://github.com/pytorch/vision $HOME/vision
+cd $HOME/vision
+sudo python3 setup.py install
+```
 
 ### 4.2 DGL
 
