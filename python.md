@@ -189,3 +189,41 @@ Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](#41
 On **Ubuntu**:
 
 Follow the [install from source](https://github.com/dmlc/dgl/blob/master/docs/source/install/index.rst#install-from-source) instructions.
+
+
+### 4.3 Sentencepiece
+
+Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](#41-pytorch)
+
+On **Ubuntu**:
+
+```
+# git the source and build/install the libraries.
+git clone https://github.com/google/sentencepiece
+cd sentencepiece
+mkdir build
+cd build
+cmake ..
+make -j 8
+sudo make install
+sudo ldconfig -v
+
+# move to python directory to build the wheel
+cd ../python
+vi make_py_wheel.sh
+# change the manylinux1_{$1} to manylinux2014_{$1}
+
+sudo python3 setup.py install
+```
+
+With the above steps, the wheel should be installed.
+
+*Important* Before calling any python script or starting python, one of the libraries need to be set as preload for python.
+
+```
+export LD_PRELOAD=/lib/aarch64-linux-gnu/libtcmalloc_minimal.so.4:/$LD_PRELOAD
+python3
+```
+
+
+ 
