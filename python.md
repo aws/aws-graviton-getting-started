@@ -160,7 +160,7 @@ On **Ubuntu**:
 ```
 #install dependencies
 sudo apt install cmake libffi-dev
-sudo pip3 install numpy scipy pyyaml cffi pytest hypothesis
+sudo pip3 install numpy scipy pyyaml cffi pytest hypothesis dataclasses future typing-extensions
 
 #download the latest versions.  
 sudo pip3 install git+https://github.com/pytorch/pytorch
@@ -176,7 +176,7 @@ On **AmazonLinux2**:
 ```
 #install dependencies
 sudo yum install cmake3 libffi-devel
-sudo pip3 install numpy pyyaml cffi scipy pytest hypothesis
+sudo pip3 install numpy pyyaml cffi scipy pytest hypothesis dataclasses future typing-extensions
 
 sudo pip3 install git+https://github.com/pytorch/pytorch
 sudo pip3 install git+https://github.com/pytorch/vision
