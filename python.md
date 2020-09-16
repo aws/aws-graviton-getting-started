@@ -151,55 +151,36 @@ The next minor release of Pillow will fix this issue.
 
 ### 4.1 PyTorch
 
-For now, we recommend installing from source.  
+For now, we recommend installing from source until binary wheels is are available.  
 
 Please follow the [prerequisites](#11-prerequisites-for-installing-python-packages-from-source) as first step.
-
-Then:
 
 On **Ubuntu**:
 
 ```
-#install cmake
-sudo apt install cmake
+#install dependencies
+sudo apt install cmake libffi-dev
+sudo pip3 install numpy scipy pyyaml cffi pytest hypothesis dataclasses future typing-extensions
 
-# download the latest code
-git clone --recursive https://github.com/pytorch/pytorch
-cd pytorch
-# if you are updating an existing checkout
-git submodule sync
-git submodule update --init --recursive
+#download the latest versions.  
+sudo pip3 install git+https://github.com/pytorch/pytorch
+sudo pip3 install git+https://github.com/pytorch/vision
 
-# set the configuration
-export CMAKE_SYSTEM_PROCESSOR=arm64
-export BUILD_TEST=0
-export USE_SYSTEM_NCCL=0
-export USE_DISTRIBUTED=0
-export USE_MKLDNN=0
-export MKLDNN_CPU_RUNTIME=0
-export USE_CUDNN=0
-export USE_CUDA=0
-export CFLAGS=-march=armv8.2-a+fp16+rcpc+dotprod+crypto
+# for downloading specific version, just add @ like :
+# sudo pip3 install git+https://github.com/pytorch/pytorch@1.6
 
-
-# get numpy and hypothesis
-sudo pip3 install hypothesis numpy
-
-# running torch install process as root since it requires access to /usr/local/lib/python3.8/
-sudo python3 setup.py install
-
-# the default torchvision on pypi would not work as of August/2020
-# need to build it from source
-
-cd $HOME
-git clone --recursive https://github.com/pytorch/vision
-cd vision
-sudo python3 setup.py install
 ```
 
-On **AmazonLinux2 / RedHat**:
+On **AmazonLinux2**:
 
-As of August 2020, PyTorch would not build from source on Linux distributions with gcc7.  AWS will update this documention once the issue is resolved.
+```
+#install dependencies
+sudo yum install cmake3 libffi-devel
+sudo pip3 install numpy pyyaml cffi scipy pytest hypothesis dataclasses future typing-extensions
+
+sudo pip3 install git+https://github.com/pytorch/pytorch
+sudo pip3 install git+https://github.com/pytorch/vision
+```
 
 ### 4.2 DGL
 
