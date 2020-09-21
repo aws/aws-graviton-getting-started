@@ -225,5 +225,28 @@ export LD_PRELOAD=/lib/aarch64-linux-gnu/libtcmalloc_minimal.so.4:/$LD_PRELOAD
 python3
 ```
 
+### 4.4	Morfeusz
 
- 
+On **Ubuntu**:
+
+```
+# download the source
+wget http://download.sgjp.pl/morfeusz/20200913/morfeusz-src-20200913.tar.gz
+tar -xf morfeusz-src-20200913.tar.gz
+cd Morfeusz/
+sudo apt install cmake zip build-essential autotools-dev \
+    python3-stdeb python3-pip python3-all-dev python3-pyparsing devscripts \
+    libcppunit-dev acl  default-jdk swig python3-all-dev python3-stdeb
+export JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8
+mkdir build
+cd build
+cmake ..
+sudo make install
+sudo ldconfig -v
+sudo PYTHONPATH=/usr/local/lib/python make install-builder
+```
+
+If you run into issue with the last command (_make install-builder_), please try:
+```
+sudo PYTHONPATH=`which python3` make install-builder
+```
