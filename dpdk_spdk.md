@@ -18,7 +18,7 @@ A native compilation of DPDK on top of Graviton2 will generate optimized code th
 
 ### Older DPDK version with makefile-based build
 
-If developer using the makefile-based build (vs the newer *meson*), the following [patch](https://www.mail-archive.com/dev@dpdk.org/msg179445.html) will enable Graviton2 optimized built.
+If a developer is using the makefile-based build (vs the newer *meson*), the following [patch](https://www.mail-archive.com/dev@dpdk.org/msg179445.html) will enable Graviton2 optimized built.
 
 
 ## Performance consideration
@@ -26,7 +26,7 @@ If developer using the makefile-based build (vs the newer *meson*), the followin
 ### Optimal RTE settings
 
 In some older releases, some default parameters are not optimal and developers should check the values:
-* RTE_MAX_LCORE, should atleast be 64
+* RTE_MAX_LCORE, should at least be 64
 * RTE_CACHE_LINE_SIZE=64
 
 ### Number of LCores used could be misconfigured
