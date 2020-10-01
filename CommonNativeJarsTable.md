@@ -7,7 +7,7 @@ org.lz4 | [lz4-java](https://github.com/lz4/lz4-java) | yes | [yes](https://mvnr
 org.xerial.snappy | [snappy-java](https://github.com/xerial/snappy-java) | yes | [yes](https://mvnrepository.com/artifact/org.xerial.snappy/snappy-java) | 1.1.4
 org.rocksdb | [rocksdbjni](https://github.com/facebook/rocksdb/tree/master/java) | yes | [yes](https://mvnrepository.com/artifact/org.rocksdb/rocksdbjni) | 5.0.1
 com.github.jnr | [jffi](https://github.com/jnr/jffi) | yes | [yes](https://mvnrepository.com/artifact/com.github.jnr/jffi) | 1.2.13
-org.apache.commons | [commons-crypto](https://github.com/apache/commons-crypto) | yes | no |
+org.apache.commons | [commons-crypto](https://github.com/apache/commons-crypto) | yes | [yes](https://search.maven.org/artifact/org.apache.commons/commons-crypto/1.1.0/jar) | 1.1.0
 io.netty | [netty-transport-native-epoll](https://github.com/netty/netty) | yes | [yes](https://mvnrepository.com/artifact/io.netty/netty-transport-native-epoll) | 4.1.50
 io.netty | [netty-tcnative](https://github.com/netty/netty-tcnative) | yes | [yes](https://mvnrepository.com/artifact/io.netty/netty-tcnative) | 2.0.31
 org.fusesource.jansi | [jansi-native](https://github.com/fusesource/jansi-native) | yes | no |
