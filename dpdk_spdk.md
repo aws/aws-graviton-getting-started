@@ -14,7 +14,23 @@ SPDK relies often on [ISA-L](https://github.com/intel/isa-l) which is already op
 
 A native compilation of DPDK on top of Graviton2 will generate optimized code that take advantage of the CRC and Crypto instructions in Graviton2 cpu cores.
 
-However, as of August 2020, some of the default RTE parameters are not optimal.
-
 **NOTE**: Some of the installations steps call "python" which may not be valid command in modern linux distribution,  you may need to install *python-is-python3* to resolve this.
+
+### Older DPDK version with makefile-based build
+
+If a developer is using the makefile-based build (vs the newer *meson*), the following [patch](https://www.mail-archive.com/dev@dpdk.org/msg179445.html) will enable a Graviton2 optimized build.
+
+
+## Performance consideration
+
+### Optimal RTE settings
+
+In some older releases, some default parameters are not optimal and developers should check the values:
+* RTE_MAX_LCORE, should at least be 64
+* RTE_CACHE_LINE_SIZE=64
+
+### Number of LCores used could be misconfigured
+
+Some application, written with the x86 architecture in mind, set the active dpdk threads or lcores to 1/2 number of vCPU to run single thread per physical core on x86.  However, in Graviton, every vCPU is a full CPU, and a developer can use more threads or lcores than same size x86-based instance.   For example, a c5.16xl has 64vCPU or 32 physical cores,  but some DPDK application would only run on 32 to guarantee one thread per physical core.   In c6g.16xl, developer can use 64 physical cores.
+
 
