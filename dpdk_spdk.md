@@ -18,7 +18,7 @@ A native compilation of DPDK on top of Graviton2 will generate optimized code th
 
 ### Older DPDK version with makefile-based build
 
-If a developer is using the makefile-based build (vs the newer *meson*), the following [patch](https://www.mail-archive.com/dev@dpdk.org/msg179445.html) will enable Graviton2 optimized built.
+If a developer is using the makefile-based build (vs the newer *meson*), the following [patch](https://www.mail-archive.com/dev@dpdk.org/msg179445.html) will enable a Graviton2 optimized build.
 
 
 ## Performance consideration
@@ -31,6 +31,6 @@ In some older releases, some default parameters are not optimal and developers s
 
 ### Number of LCores used could be misconfigured
 
-Some application, written with x86 architecture in mind, is setting the active dpdk threads or lcores to 1/2 number of vCPU to run single thread per physical core on x86.  However, in Graviton, every vCPU is a real CPU, and developer can use more threads or lcores than same size instance in x86 servers.   For example, a c5.16xl has 64vCPU or 32 physical core,  but some DPDK application would only run on 32 to guarantee one thread per physical core.   In c6g.16xl, developer can use 64 physical cores.
+Some application, written with the x86 architecture in mind, set the active dpdk threads or lcores to 1/2 number of vCPU to run single thread per physical core on x86.  However, in Graviton, every vCPU is a full CPU, and a developer can use more threads or lcores than same size x86-based instance.   For example, a c5.16xl has 64vCPU or 32 physical cores,  but some DPDK application would only run on 32 to guarantee one thread per physical core.   In c6g.16xl, developer can use 64 physical cores.
 
 
