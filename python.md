@@ -160,6 +160,7 @@ On **Ubuntu**:
 ```
 #install dependencies
 sudo apt install cmake
+sudo pip3 install cffi numpy pyyaml
 
 #download the latest versions.  
 sudo pip3 install git+https://github.com/pytorch/pytorch
@@ -175,7 +176,7 @@ On **AmazonLinux2**:
 ```
 #install dependencies
 sudo yum install cmake3
-sudo pip3 install numpy pyyaml cffi scipy pytest hypothesis dataclasses future typing-extensions
+sudo pip3 install cffi numpy pyyaml
 
 sudo pip3 install git+https://github.com/pytorch/pytorch
 sudo pip3 install git+https://github.com/pytorch/vision
