@@ -16,14 +16,14 @@ For installing common Python packages from source code, we need to install the f
 
 On **AmazonLinux2 or RedHat**:
 ```
-sudo yum install "@Development tools" python3-pip python3-devel libffi-devel blas-devel gcc-gfortran lapack-devel
+sudo yum install "@Development tools" python3-pip python3-devel blas-devel gcc-gfortran lapack-devel
 python3 -m pip install --user --upgrade pip
 ```
 
 On **Debian/Ubuntu**:
 ```
 sudo apt update
-sudo apt-get install build-essential python3-pip python3-dev libffi-dev libblas-dev gfortran liblapack-dev
+sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran liblapack-dev
 python3 -m pip install --user --upgrade pip
 ```
 
@@ -159,8 +159,7 @@ On **Ubuntu**:
 
 ```
 #install dependencies
-sudo apt install cmake libffi-dev
-sudo pip3 install numpy scipy pyyaml cffi pytest hypothesis dataclasses future typing-extensions
+sudo apt install cmake
 
 #download the latest versions.  
 sudo pip3 install git+https://github.com/pytorch/pytorch
@@ -175,7 +174,7 @@ On **AmazonLinux2**:
 
 ```
 #install dependencies
-sudo yum install cmake3 libffi-devel
+sudo yum install cmake3
 sudo pip3 install numpy pyyaml cffi scipy pytest hypothesis dataclasses future typing-extensions
 
 sudo pip3 install git+https://github.com/pytorch/pytorch
