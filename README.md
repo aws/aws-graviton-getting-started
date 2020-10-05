@@ -77,17 +77,14 @@ deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
 Note that Redhat variants like Amazon Linux 2 avoid this issue. In our out of box Cassandra performance testing (early July 2020), Amazon Linux 2 using [the Corretto 8 JDK](https://docs.aws.amazon.com/corretto/latest/corretto-8-ug/amazon-linux-install.html) outperformed Ubuntu 20.04 by up to 23%.
 
 ## Bazel on Linux
-The [Bazel build tool](https://www.bazel.build/) now releases a pre-built binary for arm64. As of August 2020, this is not available in their custom Debian repo, and Bazel does not officially provide an RPM. Instead, we recommend using the [Bazelisk installer](https://docs.bazel.build/versions/master/install-bazelisk.html), which will replace your `bazel` command and [keep bazel up to date](https://github.com/bazelbuild/bazelisk/blob/master/README.md).
+The [Bazel build tool](https://www.bazel.build/) now releases a pre-built binary for arm64. As of October 2020, this is not available in their custom Debian repo, and Bazel does not officially provide an RPM.
 
-Below is an example using the [latest Arm binary release of Bazelisk](https://github.com/bazelbuild/bazelisk/releases/latest) as of August 2020:
+Below is an example using the [latest Arm binary release of Bazelisk](https://github.com/bazelbuild/bazelisk/releases/latest) as of October 2020:
 ```
-wget https://github.com/bazelbuild/bazelisk/releases/download/v1.6.1/bazelisk-linux-arm64
-chmod +x bazelisk-linux-arm64
-sudo mv bazelisk-linux-arm64 /usr/local/bin/bazel
-bazel
+wget https://github.com/bazelbuild/bazel/releases/download/3.5.0/bazel-3.5.0-linux-arm64
+chmod +x bazel-3.5.0-linux-arm64
+sudo mv bazel-3.5.0-linux-arm64 /usr/local/bin/bazel
 ```
-
-Bazelisk itself should not require further updates, as its only purpose is to keep Bazel updated.
 
 # Additional resources
 Linaro and Arm maintain a tool ([Sandpiper](http://sandpiper.linaro.org/)) to
