@@ -61,6 +61,7 @@ We have compiled a list of popular software within the container ecosystem that 
 |kube-bench | https://github.com/aquasecurity/kube-bench/releases/tag/v0.3.1 ||
 |metrics-server | https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.3.7 | docker image is multi-arch from v.0.3.7 |
 |AWS Copilot | https://github.com/aws/copilot-cli/releases/tag/v0.3.0 | arm64 support as of v0.3.0 |
+|AWS ecs-cli | https://github.com/aws/amazon-ecs-cli/pull/1110 | v1.20.0 binaries in us-west-2 s3 |
 | Amazon EC2 Instance Selector | https://github.com/aws/amazon-ec2-instance-selector/releases/ | also supports the -a cpu_architecture flag for discovering arm64-based instances in a particular region |
 | AWS Node Termination Handler | https://github.com/aws/aws-node-termination-handler/releases/ | arm64 support under kubernetes (via helm) |
 | AWS IAM Authenticator	 | 	https://docs.aws.amazon.com/eks/latest/userguide/install-aws-iam-authenticator.html	 	| | 

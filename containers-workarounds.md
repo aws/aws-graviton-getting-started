@@ -10,7 +10,6 @@ We've documented ways to leverage these products below:
 | Name                      | URL / Github issue            | Workaround             | Existing image? |
 | :-----                    |:-----                         | :-----                 | :-----          |
 | FireLens for Amazon ECS | https://github.com/aws/aws-for-fluent-bit/issues/44 | compile from source | |
-| ECS CLI | https://github.com/aws/amazon-ecs-cli/pull/1066 | use PR branch | |
 | cluster-autoscaler | https://github.com/kubernetes/autoscaler/issues/3419 | compile from source or use PR branch | raspbernetes/cluster-autoscaler |
 | external-dns | https://github.com/kubernetes-sigs/external-dns/issues/1443 | compile from source | raspbernetes/external-dns	|
 | kube-state-metrics | https://github.com/kubernetes/kube-state-metrics/issues/1037 | compile from source | alittlec/kube-state-metrics-arm64 |
