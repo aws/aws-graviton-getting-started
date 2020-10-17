@@ -127,24 +127,14 @@ to the number of threads to use, the default is to use a single thread.
 
 ### 3.1 Pillow
 
-As of June 30, 2020, Pillow 7.2.0 was released as a binary wheel for Arm platforms, but contains a bug that prevents it from loading
-properly on Linux distributions that use 64kB pages and must be compiled from source.  Redhat and Centos8 Linux distributions
-use 64kB pages.
+As of October 30, 2020, Pillow 8.x or later have a binary wheel for all Arm64 platforms, included OSes with 64kB pages lile Redhat/Centos8.
 
-Install Pillow on **RedHat and Centos**:
-
-```bash
-sudo yum install libtiff-devel libjpeg-devel openjpeg2-devel zlib-devel freetype-devel lcms2-devel libwebp-devel tcl-devel tk-devel harfbuzz-devel fribidi-devel libraqm-devel libimagequant-devel libxcb-devel
-
-pip3 install --user --no-binary pillow
 ```
-
-On **Amazon Linux 2 and Ubuntu**:
-```bash
 pip3 install --user pillow
 ```
 
-The next minor release of Pillow will fix this issue.
+should work across all platforms we tested.
+
 
 ## 4. Machine Learning Python packages
 
