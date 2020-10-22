@@ -75,6 +75,12 @@ produce the exact semantics of the x64 intrinsic.  Once a profile is
 established, the hot paths can be rewritten directly with NEON intrinsics to
 avoid the overhead of the generic sse2neon translation.
 
+### Signed vs. Unsigned char
+The C standard doesn't specify the signedness of char. On x86 char is signed by
+default while on Arm it is unsigned by default. This can be addressed by using
+standard int types that explicitly specify the signedness (e.g. `uint8_t` and `int8_t`)
+or compile with `-fsigned-char`.
+
 ### Using Graviton2 Arm instructions to speed-up Machine Learning
 
 Graviton2 processors been optimized for performance and power efficient machine learning by enabling [Arm dot-product instructions](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/exploring-the-arm-dot-product-instructions) commonly used for Machine Learning (quantized) inference workloads, and enabling [Half precision floating point - \_float16](https://developer.arm.com/documentation/100067/0612/Other-Compiler-specific-Features/Half-precision-floating-point-intrinsics) to double the number of operations per second, reducing the memory footprint compared to single precision floating point (\_float32), while still enjoying large dynamic range.
