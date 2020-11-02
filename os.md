@@ -2,7 +2,7 @@
 
  Name | Version | [LSE Support](optimizing.md#locksynchronization-intensive-workload) | Kernel page size | AMI | Metal support | Comment
 ------ | ------ | ----- | ----- | ----- | ----- | -----
-Amazon Linux 2 | 2.26-35 or later| Yes | 4KB | [AMIs](amis.md) | Yes | 
+Amazon Linux 2 | 2.26-35 or later| Yes | 4KB | [AMIs](amis_cf_sm.md) | Yes |
 Ubuntu | 20.04 LTS or later | Yes | 4KB | [focal](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 Ubuntu | 18.04 LTS | [Planned](https://launchpad.net/~rbalint/+archive/ubuntu/arm64-lse) | 4KB | [bionic](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 SuSE | 15 SP2 or later| Planned | 4KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07SPTXBDX) | Yes | 
