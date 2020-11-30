@@ -141,35 +141,12 @@ should work across all platforms we tested.
 
 ### 4.1 PyTorch
 
-For now, we recommend installing from source until binary wheels is are available.  
+PyTorch wheels for nightly builds (cpu builds) are are available for Graviton2/Arm64 since PyTorch 1.8.
 
-Please follow the [prerequisites](#11-prerequisites-for-installing-python-packages-from-source) as first step.
-
-On **Ubuntu**:
 
 ```
-#install dependencies
-sudo apt install cmake
-sudo pip3 install cffi numpy pyyaml
-
-#download the latest versions.  
-sudo pip3 install git+https://github.com/pytorch/pytorch
-sudo pip3 install git+https://github.com/pytorch/vision
-
-# for downloading specific version, just add @ like :
-# sudo pip3 install git+https://github.com/pytorch/pytorch@1.6
-
-```
-
-On **AmazonLinux2**:
-
-```
-#install dependencies
-sudo yum install cmake3
-sudo pip3 install cffi numpy pyyaml
-
-sudo pip3 install git+https://github.com/pytorch/pytorch
-sudo pip3 install git+https://github.com/pytorch/vision
+pip install numpy
+pip install --pre torch torchvision  -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
 ```
 
 ### 4.2 DGL
