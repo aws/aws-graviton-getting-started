@@ -6,6 +6,13 @@ Java is well supported and generally performant out-of-the-box on arm64. [Amazon
 
 This page includes specific details about building and tuning Java application on Graviton.
 
+### Java JVM Options
+There are numerous options that control the JVM and may lead to better performance. Three that
+have shown large (1.5x) improvements in some Java workloads are eliminating tiered compilation
+and restricting the size of the code cache which allows the Graviton2 cores to better predict
+branches. These are helpful on some workloads but can hurt on others so testing with and without
+them is essential: `-XX:-TieredCompilation -XX:ReservedCodeCacheSize=64M -XX:InitialCodeCacheSize=64M`.
+
 ### Looking for x86 shared-objects in JARs
 Java JARs can include shared-objects that are architecture specific. Some Java libraries check
 if these shared objects are found and if they are they use a JNI to call to the native library
