@@ -25,12 +25,12 @@ If a developer is using the makefile-based build (vs the newer *meson*), the fol
 
 ### Optimal RTE settings
 
-In some older releases, some default parameters are not optimal and developers should check the values:
+In some older releases (prior to DPDK 20.11), some default parameters are not optimal and developers should check the values:
 * RTE_MAX_LCORE, should at least be 64
 * RTE_CACHE_LINE_SIZE=64
 
 ### Number of LCores used could be misconfigured
 
-Some application, written with the x86 architecture in mind, set the active dpdk threads or lcores to 1/2 number of vCPU to run single thread per physical core on x86.  However, in Graviton, every vCPU is a full CPU, and a developer can use more threads or lcores than same size x86-based instance.   For example, a c5.16xl has 64vCPU or 32 physical cores,  but some DPDK application would only run on 32 to guarantee one thread per physical core.   In c6g.16xl, developer can use 64 physical cores.
+Some application, written with the x86 architecture in mind, set the active dpdk threads or lcores to 1/2 number of vCPU to run single thread per physical core on x86 and disabling SMT.  However, in Graviton, every vCPU is a full CPU, and a developer can use more threads or lcores than same size x86-based instance.   For example, a c5.16xl has 64vCPU or 32 physical cores,  but some DPDK application would only run on 32 to guarantee one thread per physical core.   In c6g.16xl, developer can use 64 physical cores.
 
 
