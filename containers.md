@@ -38,7 +38,9 @@ We have compiled a list of popular software within the container ecosystem that 
 | Fluent-bit |https://github.com/fluent/fluent-bit/releases/ | compile from source |
 | core-dns |https://github.com/coredns/coredns/releases/ | | 
 | Prometheus | https://prometheus.io/download/	 	 | |
-|containerd	 | https://github.com/containerd/containerd/issues/3664 |	nightly builds provided for arm64 | 	 
+|containerd	 | https://github.com/containerd/containerd/issues/3664 |	nightly builds provided for arm64 | 
+| kube-state-metrics | https://github.com/kubernetes/kube-state-metrics/issues/1037 | use k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0-beta for arm64 |  
+| cluster-autoscaler | https://github.com/kubernetes/autoscaler/pull/3714 | arm64 support as of v1.20.0 | 
 |gRPC  | 	https://github.com/protocolbuffers/protobuf/releases/	 | protoc/protobuf support	 |
 |Nats	 | 	https://github.com/nats-io/nats-server/releases/	 	 | |
 |CNI	 | 	https://github.com/containernetworking/plugins/releases/	| | 	  
@@ -50,7 +52,8 @@ We have compiled a list of popular software within the container ecosystem that 
 |Consul	 | 	https://www.consul.io/downloads	 	 | |
 |Nomad	 | 	https://www.nomadproject.io/downloads	| | 	 
 |Packer	 | 	https://www.packer.io/downloads	 	 | |
-|Vault	 | 	https://www.vaultproject.io/downloads	| | 	 	 	 
+|Vault	 | 	https://www.vaultproject.io/downloads	| | 
+|Terraform | https://github.com/hashicorp/terraform/issues/14474 | arm64 support as of v0.14.0 | 	 	 
 |Flux	 | 	https://github.com/fluxcd/flux/releases/ | |
 |New Relic	 | 	https://download.newrelic.com/infrastructure_agent/binaries/linux/arm64/ | |
 |Datadog - EC2	 | 	https://www.datadoghq.com/blog/datadog-arm-agent/ ||
@@ -72,13 +75,12 @@ We have compiled a list of popular software within the container ecosystem that 
 | Amazon CloudWatch Agent	| https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Install-CloudWatch-Agent.html | |
 | AWS Systems Manager SSM Agent | https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-manual-agent-install.html | |
 | AWS CLI |	https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-linux.html#ARM	| v1 and v2 both supported|
+| FireLens for Amazon ECS | https://github.com/aws/aws-for-fluent-bit/issues/44 | arm64 support as of v2.9.0 | |
 
 
 **If your software isn't listed above, it doesn't mean it won't work!**
 
-Many products work on arm64 but don't explicitly distribute arm64 binaries or build multi-arch images *(yet)*. AWS, Arm, and many developers in the community are working with maintainers and contributing expertise and code to enable full binary or multi-arch support.
-
-We've compiled [details](containers-workarounds.md) of the components being worked on to add arm64 support to run on Graviton.
+Many products work on arm64 but don't explicitly distribute arm64 binaries or build multi-arch images *(yet)*. AWS, Arm, and many developers in the community are working with maintainers and contributing expertise and code to enable full binary or multi-arch support. We are [tracking](containers-workarounds.md) the status of this work and any currently-known workarounds. 
 
 ---
 
