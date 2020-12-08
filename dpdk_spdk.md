@@ -33,4 +33,9 @@ In some older releases (prior to DPDK 20.11), some default parameters are not op
 
 Some application, written with the x86 architecture in mind, set the active dpdk threads or lcores to 1/2 number of vCPU to run single thread per physical core on x86 and disabling SMT.  However, in Graviton, every vCPU is a full CPU, and a developer can use more threads or lcores than same size x86-based instance.   For example, a c5.16xl has 64vCPU or 32 physical cores,  but some DPDK application would only run on 32 to guarantee one thread per physical core.   In c6g.16xl, developer can use 64 physical cores.
 
+## Known issues
+
+The function rte_eth_stats_get does not work properly on C6gn instances. Applications, such as testpmd, that use this function to report statistics will not work correctly. This is a known issue and there is a plan to fix it.
+
+The flowgen function of testpmd does not work correctly when compiled with GCC 9 and above. It generates IP packets with wrong checksum which are dropped when transmitted between AWS instances (including Graviton2). This is a known issue and there is a [patch](https://patches.dpdk.org/patch/84772/) that fixes it.
 
