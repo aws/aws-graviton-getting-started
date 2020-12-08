@@ -29,6 +29,7 @@ POSIX threads library needs LSE atomic instructions.  LSE is important for
 locking and thread synchronization routines.  The following systems distribute
 a libc compiled with LSE instructions:
 - Amazon Linux 2,
+- Ubuntu 18.04 (needs `apt install libc6-lse`),
 - Ubuntu 20.04.
 
 The compiler needs to generate LSE instructions for applications that use atomic

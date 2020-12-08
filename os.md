@@ -4,7 +4,7 @@
 ------ | ------ | ----- | ----- | ----- | ----- | -----
 Amazon Linux 2 | 2.26-35 or later| Yes | 4KB | [AMIs](amis_cf_sm.md) | Yes |
 Ubuntu | 20.04 LTS or later | Yes | 4KB | [focal](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
-Ubuntu | 18.04 LTS | [Planned](https://launchpad.net/~rbalint/+archive/ubuntu/arm64-lse) | 4KB | [bionic](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
+Ubuntu | 18.04 LTS | Yes (*) | 4KB | [bionic](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | (*) needs `apt install libc6-lse`
 SuSE | 15 SP2 or later| Planned | 4KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07SPTXBDX) | Yes | 
 Redhat Entreprise Linux | 8.2 or later | Yes | 64KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07T2NH46P) | Yes | 
 ~~Redhat Entreprise Linux~~ | ~~7.x~~ | ~~No~~ | ~~64KB~~ | ~~[MarketPlace](https://aws.amazon.com/marketplace/pp/B07KTFV2S8)~~ | | Supported on A1 instances but not on Graviton2 based ones
