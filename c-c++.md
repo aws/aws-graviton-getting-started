@@ -9,6 +9,8 @@ CPU      | GCC                  | LLVM
 Graviton | `-march=armv8-a+crc+crypto` | `-march=armv8-a+crc+crypto`
 Graviton2 | `-march=armv8.2-a+fp16+rcpc+dotprod+crypto` |`-march=armv8.2-a+fp16+rcpc+dotprod+crypto`
 
+Note: GCC-7 does not support `+rcpc+dotprod`.
+
 ### Core Specific Tuning
 
 CPU      | GCC < 9              | GCC >=9
