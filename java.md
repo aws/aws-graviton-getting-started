@@ -3,8 +3,22 @@
 Java is a general-purpose programming language. Compiled Java code can run on all platforms that support Java, without the need for recompilation. Java applications are typically compiled to bytecode that can run on any Java virtual machine (JVM) regardless of the underlying computer architecture. _[Wikipedia](https://en.wikipedia.org/wiki/Java_(programming_language))_
 
 Java is well supported and generally performant out-of-the-box on arm64. [Amazon Corretto](https://aws.amazon.com/corretto/), a no-cost, multiplatform, production-ready distribution of the Open Java Development Kit (OpenJDK) supports Graviton-powered instances.
+While Java 8 is fully supported on Arm
+processors, some customers haven't been able to obtain Graviton's full
+performance benefit until they switched to Java 11.
 
 This page includes specific details about building and tuning Java application on Graviton.
+
+### Java versions
+JDK binaries for arm64 are available from a number of
+different sources.  [Amazon Corretto](https://aws.amazon.com/corretto/) is
+continuing to improve performance of Java workloads running on Graviton processors and
+if you have the choice of a JDK to use we recommend using Corretto as it
+provides the fastest way to get access to the performance improvements AWS is making.
+Versions of Corretto released since October 2020 are built to use the
+most optimal atomic operations within the JVM: Corretto11 (all
+variants); Correto8 (on Amazon Linux 2 only). This has shown to reduce
+GC time in some workloads.
 
 ### Java JVM Options
 There are numerous options that control the JVM and may lead to better performance. Three that
