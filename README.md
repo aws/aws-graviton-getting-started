@@ -51,7 +51,7 @@ PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pa
 PHP     | 7.4+    | PHP 7.4 includes a number of performance improvements that increase perf by up to 30%
 pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Install from source](https://github.com/aws/aws-graviton-getting-started/blob/master/python.md#41-pytorch). **Note:** *Requires GCC9 or later for now. recommend to use Ubuntu 20.xx*
-zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
+zlib    |    -    | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib) 1.2.8+. To build from source [see below](#zlib-on-linux).
 ruby    | [un-released](https://github.com/ruby/ruby/pull/3393) | Enable arm64 optimizations that improve perfomance by as much as 40% on included benchmarks.
 
 # Containers on Graviton
@@ -91,6 +91,22 @@ bazel
 
 Bazelisk itself should not require further updates, as its only purpose is to keep Bazel updated.
 
+## zlib on Linux
+Linux distributions, in general, use the original zlib without any optimizations. zlib-cloudflare has been updated to provide better and faster compression on Arm and x86. To use zlib-cloudflare:
+```
+git clone https://github.com/cloudflare/zlib.git
+cd zlib
+./configure --prefix=$HOME
+make
+make install
+```
+Make sure to have the full path to your lib at $HOME/lib in /etc/ld.so.conf and run ldconfig.
+
+For users of Amazon Corretto, you can specify the library to be used for compression and decompression as:
+```
+-XX:ZlibImplementationDeflate=cloudflare
+-XX:ZlibImplementationInflate=cloudflare
+```
 # Additional resources
 Linaro and Arm maintain a tool ([Sandpiper](http://sandpiper.linaro.org/)) to
 search for packages across multiple OSes and Docker official images. This can
