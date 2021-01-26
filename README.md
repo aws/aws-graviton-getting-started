@@ -44,15 +44,16 @@ packages that improve performance (if you know of others please let us know).
 
 Package | Version | Improvements
 --------|---------|-------------
-bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases/tag/3.4.1) | Pre-built bazel binary for Graviton/Arm64. [See below](#bazel-on-linux) for installation. 
+bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases) | Pre-built bazel binary for Graviton/Arm64. [See below](#bazel-on-linux) for installation. 
 ffmpeg  |   4.3+  | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders. The changes are available in FFMPEG version 4.3.
+HAProxy  | 2.4+  | A [serious bug](https://github.com/haproxy/haproxy/issues/958) was fixed. Additionally, building with `-march=armv8.2-a` improves HAProxy performance by 4x so please rebuild your code with this flag.
 OpenH264 | [2.1.1+](https://github.com/cisco/openh264/releases/tag/v2.1.1) | Pre-built Cisco OpenH264 binary for Graviton/Arm64. 
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x. This fixed version of the library now is shipping with Ubuntu 20.04 and PHP 8.
 PHP     | 7.4+    | PHP 7.4 includes a number of performance improvements that increase perf by up to 30%
 pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Install from source](https://github.com/aws/aws-graviton-getting-started/blob/master/python.md#41-pytorch). **Note:** *Requires GCC9 or later for now. recommend to use Ubuntu 20.xx*
-zlib    |    -    | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib) 1.2.8+. To build from source [see below](#zlib-on-linux).
-ruby    | [un-released](https://github.com/ruby/ruby/pull/3393) | Enable arm64 optimizations that improve perfomance by as much as 40% on included benchmarks.
+ruby    | 3.0+ | Enable arm64 optimizations that improve perfomance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
+zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
 
 # Containers on Graviton
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
