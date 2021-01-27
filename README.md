@@ -92,6 +92,22 @@ bazel
 
 Bazelisk itself should not require further updates, as its only purpose is to keep Bazel updated.
 
+## zlib on Linux
+Linux distributions, in general, use the original zlib without any optimizations. zlib-cloudflare has been updated to provide better and faster compression on Arm and x86. To use zlib-cloudflare:
+```
+git clone https://github.com/cloudflare/zlib.git
+cd zlib
+./configure --prefix=$HOME
+make
+make install
+```
+Make sure to have the full path to your lib at $HOME/lib in /etc/ld.so.conf and run ldconfig.
+
+For users of Amazon Corretto, you can specify the library to be used for compression and decompression as:
+```
+-XX:ZlibImplementationDeflate=cloudflare
+-XX:ZlibImplementationInflate=cloudflare
+```
 # Additional resources
 Linaro and Arm maintain a tool ([Sandpiper](http://sandpiper.linaro.org/)) to
 search for packages across multiple OSes and Docker official images. This can
