@@ -71,14 +71,6 @@ The default installation of pip on some Linux distributions is old \(<19.3\) to 
 sudo python3 -m pip install --upgrade pip
 ```
 
-## Cassandra installation on Ubuntu or Debian-based distros
-As of July 7th 2020, [Cassandra](https://cassandra.apache.org/) will fail to install [via Debian package](https://cassandra.apache.org/download/) on Graviton instances running Ubuntu or other Debian-based distros. (Full details in the [open JIRA ticket](https://issues.apache.org/jira/browse/CASSANDRA-15889).) The workaround is to specify `amd64` as the desired arch. Cassandra is not arch-specific, so the "amd64" package works normally:
-```
-deb [arch=amd64] https://downloads.apache.org/cassandra/debian 311x main
-```
-
-Note that Redhat variants like Amazon Linux 2 avoid this issue. In our out of box Cassandra performance testing (early July 2020), Amazon Linux 2 using [the Corretto 8 JDK](https://docs.aws.amazon.com/corretto/latest/corretto-8-ug/amazon-linux-install.html) outperformed Ubuntu 20.04 by up to 23%.
-
 ## Bazel on Linux
 The [Bazel build tool](https://www.bazel.build/) now releases a pre-built binary for arm64. As of October 2020, this is not available in their custom Debian repo, and Bazel does not officially provide an RPM. Instead, we recommend using the [Bazelisk installer](https://docs.bazel.build/versions/master/install-bazelisk.html), which will replace your `bazel` command and [keep bazel up to date](https://github.com/bazelbuild/bazelisk/blob/master/README.md).
 
