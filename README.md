@@ -13,6 +13,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 	* [Go](golang.md)
 * [Containers on Graviton](containers.md)
 * [Operating Systems support](os.md)
+* [Third-party Software Vendors](isv.md)
 * [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
 * [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
 * [TensorFlow](tensorflow.md)
