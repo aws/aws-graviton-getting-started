@@ -53,7 +53,7 @@ PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pa
 PHP     | 7.4+    | PHP 7.4 includes a number of performance improvements that increase perf by up to 30%
 pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Install from source](https://github.com/aws/aws-graviton-getting-started/blob/master/python.md#41-pytorch). **Note:** *Requires GCC9 or later for now. recommend to use Ubuntu 20.xx*
-ruby    | 3.0+ | Enable arm64 optimizations that improve perfomance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
+ruby    | 3.0+ | Enable arm64 optimizations that improve performance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
 zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
 
 # Containers on Graviton
