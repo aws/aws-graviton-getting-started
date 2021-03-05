@@ -82,6 +82,27 @@ We have compiled a list of popular software within the container ecosystem that 
 
 Many products work on arm64 but don't explicitly distribute arm64 binaries or build multi-arch images *(yet)*. AWS, Arm, and many developers in the community are working with maintainers and contributing expertise and code to enable full binary or multi-arch support. We are [tracking](containers-workarounds.md) the status of this work and any currently-known workarounds. 
 
+### Kubernetes
+
+Kubernetes (and EKS) supports arm64, and thus Graviton instances. If all of your containerized workloads support arm64, then you can run your cluster with Graviton nodes exclusively. However, if you have some workloads that can only run on amd64 (x86) instances, or if you just want to be able to run both amd64 (x86) and arm64 nodes in the same cluster, then there are a couple of ways to accomplish that:
+
+#### Multiarch Images
+If you are able to use multiarch images (see above) for all containers in your cluster, then you can simply run a mix of amd64 and arm64 nodes without any further action. The multiarch image manifest will ensure that the correct image layers are pulled for a given node's architecture.
+
+#### Built-in labels
+You can schedule pods on nodes according to the `kubernetes.io/arch` [label](https://kubernetes.io/docs/reference/labels-annotations-taints/#kubernetes-io-arch). This label is automatically added to nodes by Kubernetes and allows you to schedule pods accordingly with a [node selector](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector) like this:
+
+```
+nodeSelector:
+  kubernetes.io/arch: amd64
+```
+
+#### Using taints
+Taints are especially helpful if adding Graviton nodes to an existing cluster with mostly amd64-only (x86-only) containers. While using the built-in `kubernetes.io/arch` label requires you to explicitly use a node selector to place amd64-only containers on the right instances, tainting Graviton instances prevents Kubernetes from scheduling incompatible containers on them without requiring you to change any existing configuration. For example, you can do this with a managed node group using eksctl by adding `--kubelet-extra-args '--register-with-taints=arm=true:NoSchedule'` to the kubelet startup arguments as documented [here](https://eksctl.io/usage/eks-managed-nodes/). (Note that if you only taint arm64 instances and don't specify any node selectors, then you will need to ensure that the images you build for Graviton instances are multiarch images that can also run on x86 instance types. Alternatively, you can build arm64-only images and ensure that they are only scheduled onto arm64 images using node selectors.)
+
+#### Cluster Autoscaler considerations
+If using the Kubernetes [Cluster Autoscaler](https://github.com/kubernetes/autoscaler) in a cluster with both x86-based and Graviton instance types, note that you should tag each Auto Scaling group with `k8s.io/cluster-autoscaler/node-template/label/*` or `k8s.io/cluster-autoscaler/node-template/taint/*` tags as documented [here](https://docs.aws.amazon.com/eks/latest/userguide/cluster-autoscaler.html) to ensure that the Autoscaler can tell which pods can be placed in which ASG. (Note that this does not actually apply any labels or taints to nodes, but serves only to give scheduling hints to the Cluster Autoscaler.)
+
 ---
 
 ### Further reading
