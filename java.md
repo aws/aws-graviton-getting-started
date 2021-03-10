@@ -61,7 +61,7 @@ based on x86 and Graviton processors:
 
 ```
 # Create two build instances, one x86 and one Graviton instance.
-# Pick on instance to be the primary instance.
+# Pick one instance to be the primary instance.
 # Log into the secondary instance
 $ cd java-lib
 $ mvn package
