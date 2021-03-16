@@ -26,4 +26,15 @@ export RUSTFLAGS="-Ctarget-cpu=neoverse-n1"
 cargo build --release
 ```
 
+If the Rust compiler uses LLVM 12 or later, you can use `export
+RUSTFLAGS="-Ctarget-feature=+outline-atomics"` to produce a binary that runs on
+both Graviton and Graviton2.  LLVM 12 added support for `outline-atomics` which
+will version the code following the availability of LSE instructions.  If the
+Rust compiler uses an LLVM compiler that does not support the target feature, it
+will issue the following warning:
+
+```
+'+outline-atomics' is not a recognized feature for this target (ignoring feature)
+```
+
 
