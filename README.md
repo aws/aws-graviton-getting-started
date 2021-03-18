@@ -56,6 +56,7 @@ pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Install from source](https://github.com/aws/aws-graviton-getting-started/blob/master/python.md#41-pytorch). **Note:** *Requires GCC9 or later for now. recommend to use Ubuntu 20.xx*
 ruby    | 3.0+ | Enable arm64 optimizations that improve performance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
 zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
+mongodb | 4.2.13+ / 4.4.5+ / 4.9.0+ | Improved performance on graviton, especially for internal JS engine. Consider compiling from source with an up-to-date compiler to use LSE locks. See [C/C++](c-c++.md) for compiler support.
 
 # Containers on Graviton
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
