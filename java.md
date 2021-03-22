@@ -18,7 +18,7 @@ provides the fastest way to get access to the performance improvements AWS is ma
 Versions of Corretto released since October 2020 are built to use the
 most optimal atomic operations within the JVM: Corretto11 (all
 variants); Correto8 (on Amazon Linux 2 only). This has shown to reduce
-GC time in some workloads.
+GC time in some workloads, and avoids contention in net-intensive workloads like Apache Kafka.
 
 ### Java JVM Options
 There are numerous options that control the JVM and may lead to better performance. Three that
