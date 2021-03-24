@@ -19,7 +19,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 * [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
 * [TensorFlow](tensorflow.md)
 * [Known issues and workarounds](#known-issues-and-workarounds)
-* [Managed Services available on Graviton](managed_services.md)
+* [AWS Managed Services available on Graviton](managed_services.md)
 * [Additional resources](#additional-resources)
 
 # Building for Graviton and Graviton2
