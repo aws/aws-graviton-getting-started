@@ -4,7 +4,7 @@ Python is an interpreted, high-level, general-purpose programming language, with
 
 ## 1. Installing Python packages
 
-When *pip* (the standard package installer for Python) is used, it pulls the packages from [Python Package Index](https://pypi.oeg) and other indexes.
+When *pip* (the standard package installer for Python) is used, it pulls the packages from [Python Package Index](https://pypi.org) and other indexes.
 
 In the case *pip* could not find a pre-compiled package, it automatically downloads, compiles, and builds the package from source code. 
 Normally it may take a few more minutes to install the package from source code than from pre-built.  For some large packages (i.e. *pandas*)
