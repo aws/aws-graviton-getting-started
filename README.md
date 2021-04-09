@@ -29,7 +29,7 @@ The Graviton2 CPU (powering [M6g/M6gd](https://aws.amazon.com/ec2/instance-types
 other architectural extensions. In particular, Graviton2 supports the Large
 System Extensions (LSE) which improve locking and synchronization performance
 across large systems. In addition, it has support for fp16 and 8-bit dot
-productions for machine learning, and relaxed consistency-processor consistent
+product for machine learning, and relaxed consistency-processor consistent
 (RCpc) memory ordering.
 
 In addition, to make it easier to develop, test, and run your applications on T4g instances, all AWS customers are automatically enrolled in a free trial on the t4g.micro size. 
