@@ -18,6 +18,24 @@ CPU      | GCC < 9              | GCC >=9
 Graviton | `-mtune=cortex-a72`  | `-mtune=cortex-a72`
 Graviton2 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
 
+### Compilers
+
+Newer compilers provide better support and optimizations for Graviton processors.
+We have seen 15% better performance on Graviton2 when using gcc-10 instead of Amazon Linux 2 system's compiler gcc-7.
+When possible please use the latest compiler version available on your system.
+The table shows GCC and LLVM compiler versions available in Linux distributions.
+Starred version marks the default system compiler.
+
+Distribution    | GCC                  | Clang/LLVM
+----------------|----------------------|-------------
+Amazon Linux 2  | 7*, 10               | 7
+Ubuntu 20.04    | 7, 8, 9*, 10         | 6, 7, 8, 9, 10, 11
+Ubuntu 18.04    | 4.8, 5, 6, 7*, 8     | 3.9, 4, 5, 6, 7, 8, 9, 10
+Debian10        | 7, 8*                | 6, 7, 8
+Red Hat EL8     | 8*, 9, 10            | 10
+SUSE Linux ES15 | 7*, 9, 10            | 7
+
+
 ### Large-System Extensions (LSE)
 
 The Graviton2 processor in C6g, M6g, and R6g instances has support for the
