@@ -78,6 +78,8 @@ $ nm app | grep __aarch64_have_lse_atomics | wc -l
 # the output should be 1 if app has been compiled with -moutline-atomics
 ```
 
+GCC 10.1+ enables `-moutline-atomics` by default as does the version of GCC 7 used by Amazon Linux 2.
+
 ### Porting codes with SSE/AVX intrinsics to NEON
 
 When programs contain code with x64 intrinsics, the following procedure can help
