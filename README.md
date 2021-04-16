@@ -70,6 +70,11 @@ Please check [here](os.md) for more information about which operating system to 
 
 # Known issues and workarounds
 
+## Postgres
+Postgres performance can be heavily impacted by not using [LSE](https://github.com/aws/aws-graviton-getting-started/blob/main/c-c%2B%2B.md#large-system-extensions-lse).
+Today, postgres binaries from distributions (e.g. Ubuntu) are not built with `-moutline-atomics` or `-march=armv8.2-a` which would enable LSE. If you're planning to use
+postgres in production, please rebuild it with flags to enable LSE. Note: Amazon RDS for PostgreSQL isn't impacted by this. 
+
 ## Python installation on some Linux distros
 The default installation of pip on some Linux distributions is old \(<19.3\) to install binary wheel packages released for Graviton.  To work around this, it is recommended to upgrade your pip installation using:
 ```
