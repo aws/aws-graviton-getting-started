@@ -58,6 +58,7 @@ PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Insta
 ruby    | 3.0+ | Enable arm64 optimizations that improve performance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
 zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
 mongodb | 4.2.13+ / 4.4.5+ / 4.9.0+ | Improved performance on graviton, especially for internal JS engine. Consider compiling from source with an up-to-date compiler to use LSE locks. See [C/C++](c-c++.md) for compiler support.
+MySQL   | 8.0.23+ | Improved spinlock behavior, compiled with -moutline-atomics if compiler supports it.
 .NET Core | [3.1.x](https://dotnet.microsoft.com/download/dotnet/3.1)<br>[5+](https://dotnet.microsoft.com/download/dotnet/5.0) | [.NET 5 significantly improved performance for ARM64](https://devblogs.microsoft.com/dotnet/Arm64-performance-in-net-5/). Here's an associated [AWS Blog](https://aws.amazon.com/blogs/compute/powering-net-5-with-aws-graviton2-benchmark-results/) with some performance results. 
 
 # Containers on Graviton
