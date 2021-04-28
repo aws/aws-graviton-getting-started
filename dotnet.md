@@ -28,7 +28,7 @@ The .NET team has significantly improved performance with .NET 5, both generally
 
 
 ## .NET Framework 
-.NET Framework is the original implementation of .NET. .NET Framework does not support Linux hosts, and Windows hosts are not yet suported on Graviton.
+.NET Framework is the original implementation of .NET. .NET Framework does not support Linux hosts, and Windows hosts are not currently suported on Graviton.
 
 * [What is .NET](https://dotnet.microsoft.com/learn/dotnet/what-is-dotnet)
 
