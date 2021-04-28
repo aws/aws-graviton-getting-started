@@ -18,3 +18,18 @@ The .NET team has significantly improved performance with .NET 5, both generally
 
 * [What is .NET](https://dotnet.microsoft.com/learn/dotnet/what-is-dotnet)
 
+
+## Building & Publishing for Linux Arm64
+The .NET SDK supports chosing a [Runtime Identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/rid-catalog) used to target platforms where the applications run. They're used by .NET packages to represent platform-specific assets in NuGet packages. The following values are examples of RIDs: linux-x64, ubuntu.14.04-x64, win7-x64, or osx.10.12-x64. For the packages with native dependencies, the RID designates on which platforms the package can be restored.
+
+You can build and publish on any host operating system. As an example, you can develop on Windows and build locally to target Arm64, or you can use a CI server like Jenkins on Linux. The commands are the same.
+
+```bash
+dotnet build -r linux-arm64
+dotnet publish -c Release -r linux-arm64
+```
+
+* [Publishing .NET apps with the .NET CLI](https://docs.microsoft.com/en-us/dotnet/core/deploying/deploy-with-cli)
+
+
+
