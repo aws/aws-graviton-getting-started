@@ -10,7 +10,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 	* [C/C++](c-c++.md)
 	* [Go](golang.md)
 	* [Java](java.md)
-	* [.NET Core](dotnet.md)
+	* [.NET](dotnet.md)
 	* [Python](python.md)
 	* [Rust](rust.md)
 * [Containers on Graviton](containers.md)
