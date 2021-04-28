@@ -30,7 +30,7 @@ The Graviton2 CPU (powering [M6g/M6gd](https://aws.amazon.com/ec2/instance-types
 other architectural extensions. In particular, Graviton2 supports the Large
 System Extensions (LSE) which improve locking and synchronization performance
 across large systems. In addition, it has support for fp16 and 8-bit dot
-productions for machine learning, and relaxed consistency-processor consistent
+product for machine learning, and relaxed consistency-processor consistent
 (RCpc) memory ordering.
 
 In addition, to make it easier to develop, test, and run your applications on T4g instances, all AWS customers are automatically enrolled in a free trial on the t4g.micro size. 
@@ -52,6 +52,7 @@ bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases) | Pre-built bazel
 ffmpeg  |   4.3+  | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of ffmpeg multi-thread encoders. The changes are available in FFMPEG version 4.3.
 HAProxy  | 2.4+  | A [serious bug](https://github.com/haproxy/haproxy/issues/958) was fixed. Additionally, building with `-march=armv8.2-a` improves HAProxy performance by 4x so please rebuild your code with this flag.
 mongodb | 4.2.13+ / 4.4.5+ / 4.9.0+ | Improved performance on graviton, especially for internal JS engine. Consider compiling from source with an up-to-date compiler to use LSE locks. See [C/C++](c-c++.md) for compiler support.
+MySQL   | 8.0.23+ | Improved spinlock behavior, compiled with -moutline-atomics if compiler supports it.
 .NET | [5+](https://dotnet.microsoft.com/download/dotnet/5.0) | [.NET 5 significantly improved performance for ARM64](https://devblogs.microsoft.com/dotnet/Arm64-performance-in-net-5/). Here's an associated [AWS Blog](https://aws.amazon.com/blogs/compute/powering-net-5-with-aws-graviton2-benchmark-results/) with some performance results. 
 OpenH264 | [2.1.1+](https://github.com/cisco/openh264/releases/tag/v2.1.1) | Pre-built Cisco OpenH264 binary for Graviton/Arm64. 
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x. This fixed version of the library now is shipping with Ubuntu 20.04 and PHP 8.
@@ -60,7 +61,6 @@ pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Install from source](https://github.com/aws/aws-graviton-getting-started/blob/master/python.md#41-pytorch). **Note:** *Requires GCC9 or later for now. recommend to use Ubuntu 20.xx*
 ruby    | 3.0+ | Enable arm64 optimizations that improve performance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
 zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
-
 
 # Containers on Graviton
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
@@ -71,6 +71,11 @@ Please refer [here](containers.md) for information about running container-based
 Please check [here](os.md) for more information about which operating system to run on Graviton based instances.
 
 # Known issues and workarounds
+
+## Postgres
+Postgres performance can be heavily impacted by not using [LSE](https://github.com/aws/aws-graviton-getting-started/blob/main/c-c%2B%2B.md#large-system-extensions-lse).
+Today, postgres binaries from distributions (e.g. Ubuntu) are not built with `-moutline-atomics` or `-march=armv8.2-a` which would enable LSE. If you're planning to use
+postgres in production, please rebuild it with flags to enable LSE. Note: Amazon RDS for PostgreSQL isn't impacted by this. 
 
 ## Python installation on some Linux distros
 The default installation of pip on some Linux distributions is old \(<19.3\) to install binary wheel packages released for Graviton.  To work around this, it is recommended to upgrade your pip installation using:
