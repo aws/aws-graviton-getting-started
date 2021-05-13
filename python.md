@@ -1,6 +1,6 @@
 # Python on Graviton
 
-Python is an interpreted, high-level, general-purpose programming language, with interpreters available for many operating systems and architectures, including arm64. _[Wikipedia](https://en.wikipedia.org/wiki/Python_(programming_language))_
+Python is an interpreted, high-level, general-purpose programming language, with interpreters available for many operating systems and architectures, including arm64. _[Read more on Wikipedia](https://en.wikipedia.org/wiki/Python_(programming_language))_
 
 ## 1. Installing Python packages
 
@@ -8,7 +8,7 @@ When *pip* (the standard package installer for Python) is used, it pulls the pac
 
 In the case *pip* could not find a pre-compiled package, it automatically downloads, compiles, and builds the package from source code. 
 Normally it may take a few more minutes to install the package from source code than from pre-built.  For some large packages (i.e. *pandas*)
-it may take up to 20 minutes. AWS is actively working to make pre-compiled packages available to avoid this in near future.
+it may take up to 20 minutes. AWS is actively working to make pre-compiled packages available to avoid this in near future. In some cases, compilation may fail due to missing dependencies.
 
 ### 1.1 Prerequisites for installing Python packages from source
 
@@ -26,6 +26,28 @@ sudo apt update
 sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortran liblapack-dev
 python3 -m pip install --user --upgrade pip
 ```
+
+### 1.2 Python on Centos 8 and RHEL 8
+
+Centos 8 and RHEL 8 distribute Python 3.6 which is
+[scheduled for end of life in December, 2021](https://www.python.org/dev/peps/pep-0494/#lifespan).
+However as of May 2021, some package maintainers have already begun dropping support for
+Python 3.6 by ommitting prebuilt wheels published to [pypi.org](https://pypi.org).
+For some packages, it is still possible to use Python 3.6 by using the distribution
+from the package manager. For example `numpy` no longer publishes Python 3.6 wheels,
+but can be installed from the package manager: `yum install python3-numpy`.
+
+Another option is to use Python 3.8 instead of the default Python pacakge. You can
+install Python 3.8 with pip: `yum install python38-pip`. Then use pip to install
+the latest versions of packages: `pip3 install numpy`.
+
+Some common Python packages that are distributed by the package manager are:
+1. python3-numpy
+2. python3-markupsafe
+3. python3-pillow
+
+To see a full list run: `yum search python3`
+
 
 ## 2. Scientific and numerical application (NumPy, SciPy, BLAS, etc)
 
