@@ -53,10 +53,21 @@ To see a full list run: `yum search python3`
 
 Python relies on native code to achieve high performance.  For scientific and
 numerical applications NumPy and SciPy provide an interface to high performance
-computing libraries such as ATLAS, BLAS, BLIS, OpenBLAS, etc.  These libraries
-contain code tuned for Graviton processors.
+computing libraries such as ArmPL, ATLAS, BLAS, BLIS, OpenBLAS, etc.
+These libraries contain code tuned for Graviton processors.
 
-### 2.1 BLIS may be a faster BLAS
+### 2.1 ArmPL - Arm Performance Libraries
+
+Arm freely distributes [Free Arm Performance Libraries](https://developer.arm.com/tools-and-software/server-and-hpc/downloads/arm-performance-libraries) for Arm processors.
+ArmPL contains optimized routines for BLAS and LAPACK that can be used from NumPy and SciPy:
+- [build NumPy with ArmPL](https://gitlab.com/arm-hpc/packages/-/wikis/packages/numpy)
+- [build SciPy with ArmPL](https://gitlab.com/arm-hpc/packages/-/wikis/packages/scipy)
+
+For NumPy and SciPy it is recommended to use
+[Free ArmPL version 21.0.0 released March 2021](https://developer.arm.com/tools-and-software/server-and-hpc/downloads/arm-performance-libraries) (or a later version) for correctness and good performance on Graviton processors.
+ARM improved and continues to improve ArmPL performance with focus on high performance computing and common use cases in NumPy and SciPy.
+
+### 2.2 BLIS may be a faster BLAS
 
 The default SciPy and NumPy binary installations with `pip3 install numpy scipy`
 are configured to use OpenBLAS.  The default installations of SciPy and NumPy
@@ -65,7 +76,7 @@ are easy to setup and well tested.
 Some workloads will benefit from using BLIS. Benchmarking SciPy and NumPy
 workloads with BLIS might allow to identify additional performance improvement.
 
-### 2.2 Install NumPy and SciPy with BLIS on Ubuntu and Debian
+### 2.3 Install NumPy and SciPy with BLIS on Ubuntu and Debian
 
 On Ubuntu and Debian `apt install python3-numpy python3-scipy` will install NumPy
 and SciPy with BLAS and LAPACK libraries. To install SciPy and NumPy with BLIS
@@ -83,7 +94,7 @@ sudo update-alternatives --config libblas.so.3-aarch64-linux-gnu
 sudo update-alternatives --config liblapack.so.3-aarch64-linux-gnu
 ```
 
-### 2.3 Install NumPy and SciPy with BLIS on AmazonLinux2 (AL2) and RedHat
+### 2.4 Install NumPy and SciPy with BLIS on AmazonLinux2 (AL2) and RedHat
 
 As of June 20th, 2020, NumPy now [provides binaries](https://pypi.org/project/numpy/#files) for arm64.
 
@@ -122,7 +133,7 @@ and scipy. The default is:
 `NPY_BLAS_ORDER=mkl,blis,openblas,atlas,accelerate,blas` and
 `NPY_LAPACK_ORDER=mkl,openblas,libflame,atlas,accelerate,lapack`.
 
-### 2.4 Testing NumPy and SciPy installation
+### 2.5 Testing NumPy and SciPy installation
 
 To test that the installed NumPy and SciPy are built with BLIS and OpenBLAS, the
 following commands will print native library dependencies:
@@ -134,7 +145,7 @@ python3 -c "import scipy as sp; sp.__config__.show()"
 In the case of Ubuntu and Debian these commands will print `blas` and `lapack`
 which are symbolic links managed by `update-alternatives`.
 
-### 2.5 Improving BLIS and OpenBLAS performance with multi-threading
+### 2.6 Improving BLIS and OpenBLAS performance with multi-threading
 
 When OpenBLAS is built with `USE_OPENMP=1` it will use OpenMP to parallelize the
 computations.  The environment variable `OMP_NUM_THREADS` can be set to specify
