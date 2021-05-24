@@ -37,6 +37,7 @@ We have compiled a list of popular software within the container ecosystem that 
 | Jaeger | https://github.com/jaegertracing/jaeger/pull/2176 | [dockerhub images are not yet multiarch](https://github.com/jaegertracing/jaeger/issues/2292)	| 
 | Fluent-bit |https://github.com/fluent/fluent-bit/releases/ | compile from source |
 | core-dns |https://github.com/coredns/coredns/releases/ | | 
+| external-dns | https://github.com/kubernetes-sigs/external-dns/blob/master/docs/faq.md#which-architectures-are-supported | support from 0.7.5+ |
 | Prometheus | https://prometheus.io/download/	 	 | |
 |containerd	 | https://github.com/containerd/containerd/issues/3664 |	nightly builds provided for arm64 | 
 | kube-state-metrics | https://github.com/kubernetes/kube-state-metrics/issues/1037 | use k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0-beta for arm64 |  
