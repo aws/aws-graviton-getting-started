@@ -9,8 +9,8 @@ We've documented ways to leverage these products below:
 
 | Name                      | URL / Github issue            | Workaround             | Existing image? |
 | :-----                    |:-----                         | :-----                 | :-----          |
-| external-dns | https://github.com/kubernetes-sigs/external-dns/issues/1443 | compile from source, support coming in v0.7.5 | raspbernetes/external-dns	|
 | Pulumi | https://github.com/pulumi/pulumi/pull/5729 | | |
+| ArgoCD | https://github.com/argoproj/argo-cd/issues/3956 | | |
 
 
 			
