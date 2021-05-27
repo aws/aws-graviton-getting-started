@@ -56,6 +56,7 @@ We have compiled a list of popular software within the container ecosystem that 
 |Vault	 | 	https://www.vaultproject.io/downloads	| | 
 |Terraform | https://github.com/hashicorp/terraform/issues/14474 | arm64 support as of v0.14.0 | 	 	 
 |Flux	 | 	https://github.com/fluxcd/flux/releases/ | |
+|Pulumi | https://github.com/pulumi/pulumi/issues/4868 | arm64 support as of v2.23.0 |
 |New Relic	 | 	https://download.newrelic.com/infrastructure_agent/binaries/linux/arm64/ | |
 |Datadog - EC2	 | 	https://www.datadoghq.com/blog/datadog-arm-agent/ ||
 |Datadog - Docker	 | 	https://hub.docker.com/r/datadog/agent-arm64	|| 	 

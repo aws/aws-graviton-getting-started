@@ -7,10 +7,10 @@ Many products work on arm64 but don't explicitly distribute arm64 binaries or bu
 We've documented ways to leverage these products below:
 
 
-| Name                      | URL / Github issue            | Workaround             | Existing image? |
+| Name                      | URL / Github issue            | Workaround/Status             | Existing image? |
 | :-----                    |:-----                         | :-----                 | :-----          |
-| Pulumi | https://github.com/pulumi/pulumi/pull/5729 | | |
-| ArgoCD | https://github.com/argoproj/argo-cd/issues/3956 | | |
+| ArgoCD | https://github.com/argoproj/argo-cd/issues/3956 | build arm64 images from source / existing arm64 binaries | |
+| Flatcar Linux | https://github.com/kinvolk/Flatcar/issues/97 | arm64 support for alpha/edge | |
 
 
 			
