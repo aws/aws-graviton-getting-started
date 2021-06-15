@@ -30,7 +30,7 @@ We have compiled a list of popular software within the container ecosystem that 
 | Name                      | URL                           | Comment                |
 | :-----                    |:-----                         | :-----                 |
 | Istio	| https://github.com/istio/istio/releases/	| arm64 binaries as of 1.6.x release series|
-| Envoy	| https://www.envoyproxy.io/docs/envoy/latest/install/building#arm64-binaries | [envoyproxy-dev](https://hub.docker.com/r/envoyproxy/envoy-dev/tags/) is multiarch |
+| Envoy	| https://www.envoyproxy.io/docs/envoy/v1.18.3/start/docker ||
 | Traefik | https://github.com/containous/traefik/releases	|| 	 
 | Flannel | https://github.com/coreos/flannel/releases	 ||	 
 | Helm | https://github.com/helm/helm/releases/tag/v2.16.9 || 
