@@ -4,7 +4,7 @@ The AWS Graviton and Graviton2 processors have been optimized and can be conside
 
 ### Preparing for Graviton
 
-The first step for leveraging the benefits of Graviton-based instances as container hosts is to ensure all production software dependencies support the arm64 architecture, as once cannot run images built for an x86_64 host on an arm64 host, and vice versa.
+The first step for leveraging the benefits of Graviton-based instances as container hosts is to ensure all production software dependencies support the arm64 architecture, as one cannot run images built for an x86_64 host on an arm64 host, and vice versa.
 
 Most of the container ecosystem supports both architectures, and often does so transparently through [multiple-architecture (multi-arch)](https://www.docker.com/blog/multi-platform-docker-builds/) images, where the correct image for the host architecture is deployed automatically.
 
