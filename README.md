@@ -120,7 +120,7 @@ especially when there is a performance improvement in a particular version.
 
 **Some specific resources:**
  * [AWS Graviton2](https://aws.amazon.com/ec2/graviton/)
- * [Neoverse N1 Software Optimization Guide](https://static.docs.arm.com/swog309707/a/Arm_Neoverse_N1_Software_Optimization_Guide.pdf?_ga=2.243116802.1800297234.1576266995-544296985.1575476490)
- * [Armv8 reference manual](https://static.docs.arm.com/ddi0487/ea/DDI0487E_a_armv8_arm.pdf?_ga=2.201302702.1800297234.1576266995-544296985.1575476490)
+ * [Neoverse N1 Software Optimization Guide](https://documentation-service.arm.com/static/5f05e93dcafe527e86f61acd)
+ * [Armv8 reference manual](https://documentation-service.arm.com/static/60119835773bb020e3de6fee)
 
 **Feedback?** ec2-arm-dev-feedback@amazon.com
