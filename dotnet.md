@@ -16,6 +16,7 @@ Version            | Linux Arm32   | Linux Arm64   | Notes
 ## .NET 5
 With .NET 5 Microsoft has made specific Arm64 architecture optimizations. These optimizations were made in the .NET libraries as well as in the machine code output by the JIT process.
 
+ * AWS DevOps Blog [Build and Deploy .NET web applications to ARM-powered AWS Graviton 2 Amazon ECS Clusters using AWS CDK](https://aws.amazon.com/blogs/devops/build-and-deploy-net-web-applications-to-arm-powered-aws-graviton-2-amazon-ecs-clusters-using-aws-cdk/)
  * AWS Compute Blog [Powering .NET 5 with AWS Graviton2: Benchmarks](https://aws.amazon.com/blogs/compute/powering-net-5-with-aws-graviton2-benchmark-results/) 
  * Microsoft .NET Blog [ARM64 Performance in .NET 5](https://devblogs.microsoft.com/dotnet/arm64-performance-in-net-5/)
 
