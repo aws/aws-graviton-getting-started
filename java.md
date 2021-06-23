@@ -15,10 +15,15 @@ different sources.  [Amazon Corretto](https://aws.amazon.com/corretto/) is
 continuing to improve performance of Java workloads running on Graviton processors and
 if you have the choice of a JDK to use we recommend using Corretto as it
 provides the fastest way to get access to the performance improvements AWS is making.
+
 Versions of Corretto released since October 2020 are built to use the
 most optimal atomic operations within the JVM: Corretto11 (all
 variants); Correto8 (on Amazon Linux 2 only). This has shown to reduce
 GC time in some workloads, and avoids contention in net-intensive workloads like Apache Kafka.
+
+Versions of Corretto11 (>=11.0.12) come with additional enhancements to improve
+performance on workloads with light to moderate lock-contention: improved spin-lock behavior inside the JVM,
+enhanced implementation of `Thread.onSpinWait()` on Graviton2.
 
 ### Java JVM Options
 There are numerous options that control the JVM and may lead to better performance. Three that
@@ -91,7 +96,6 @@ $ mvn package
 # To do a release to Maven Central and/or Sonatype Nexus:
 $ mvn release:prepare
 $ mvn release:perform
-
 ```
 
 This is one way to do the JAR packaging with all the libraries in a single JAR.  To build all the JARs, we recommend to build on native
@@ -123,4 +127,31 @@ $ perf inject -j -i perf.data -o perf.data.jit
 
 # Process the new file, for instance via Brendan Gregg's Flamegraph tools
 $ perf script -i perf.data.jit | ./FlameGraph/stackcollapse-perf.pl | ./FlameGraph/flamegraph.pl > ./flamegraph.svg
+```
+
+### Build libperf-jvmti.so on Amazon Linux 2
+Amazon Linux 2 does not package `libperf-jvmti.so` by default with the `perf` yum package.  
+Build the `libperf-jvmti.so` shared library using the following steps:
+
+```bash
+$ sudo amazon-linux-extras enable corretto8
+$ sudo yum install -y java-1.8.0-amazon-corretto-devel
+
+$ cd $HOME
+$ sudo yumdownloader --source kernel
+
+$ cat > .rpmmacros << __EOF__
+%_topdir    %(echo $HOME)/kernel-source
+__EOF__
+
+$ rpm -ivh ./kernel-*.amzn2.src.rpm
+$ sudo yum-builddep kernel
+$ cd kernel-source/SPECS
+$ rpmbuild -bp kernel.spec
+
+$ cd ../BUILD
+$ cd kernel-*.amzn2
+$ cd linux-*.amzn2.aarch64
+$ cd tools/perf
+$ make
 ```
