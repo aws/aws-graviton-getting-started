@@ -113,14 +113,10 @@ For users of Amazon Corretto, you can specify the library to be used for compres
 -XX:ZlibImplementationInflate=cloudflare
 ```
 # Additional resources
-Linaro and Arm maintain a tool ([Sandpiper](http://sandpiper.linaro.org/)) to
-search for packages across multiple OSes and Docker official images. This can
-be useful to see which versions of a package exist in distributions --
-especially when there is a performance improvement in a particular version.
 
-**Some specific resources:**
  * [AWS Graviton2](https://aws.amazon.com/ec2/graviton/)
  * [Neoverse N1 Software Optimization Guide](https://documentation-service.arm.com/static/5f05e93dcafe527e86f61acd)
  * [Armv8 reference manual](https://documentation-service.arm.com/static/60119835773bb020e3de6fee)
+ * [Package repository search tool](https://pkgs.org/)
 
 **Feedback?** ec2-arm-dev-feedback@amazon.com
