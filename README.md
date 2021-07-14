@@ -5,6 +5,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 # Contents
 * [Building for Graviton](#building-for-graviton-and-graviton2)
 * [Optimizing for Graviton](optimizing.md)
+* [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
 * [Recent software updates relevant to Graviton](#recent-software-updates-relevant-to-graviton)
 * Language-specific considerations
 	* [C/C++](c-c++.md)
