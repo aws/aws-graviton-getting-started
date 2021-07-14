@@ -121,3 +121,9 @@ A developer wanting to build an application or library that can detect the suppo
   has_fp16_feature = hwcaps & HWCAP_FPHP ? true : false;
   has_dotprod_feature = hwcaps & HWCAP_ASIMDDP ? true : false;
 ```
+
+## Additional resources
+
+[Neon Intrinsics](https://developer.arm.com/architectures/instruction-sets/intrinsics/)
+[Coding for Neon](https://developer.arm.com/documentation/102159/latest/)
+[Neon Programmer's Guide for Armv8-A](https://developer.arm.com/architectures/instruction-sets/simd-isas/neon/neon-programmers-guide-for-armv8-a)
