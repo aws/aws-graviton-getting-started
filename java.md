@@ -42,7 +42,7 @@ A quick way to check if a JAR contains such shared objects is to simply unzip it
 any of the resulting files are shared-objects and if an aarch64 (arm64) shared-object is missing:
 ```
 $ unzip foo.jar
-$ find . -name "*.so" | xargs file
+$ find . -name "*.so" -exec file {} \;
 ```
 For each x86-64 ELF file, check there is a corresponding aarch64 ELF file
 in the binaries. With some common packages (e.g. commons-crypto) we've seen that
