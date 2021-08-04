@@ -108,11 +108,16 @@ make install
 ```
 Make sure to have the full path to your lib at $HOME/lib in /etc/ld.so.conf and run ldconfig.
 
-For users of Amazon Corretto, you can specify the library to be used for compression and decompression as:
+For users of OpenJDK, which is dynamically linked to the system zlib, you can set LD_LIBRARY_PATH to point to the directory where your newly built version of zlib-cloudflare is located or load that library with LD_PRELOAD.
+
+You can check the libz that JDK is dynamically linked against with:
 ```
--XX:ZlibImplementationDeflate=cloudflare
--XX:ZlibImplementationInflate=cloudflare
+$ ldd /Java/jdk-11.0.8/lib/libzip.so | grep libz
+libz.so.1 => /lib/x86_64-linux-gnu/libz.so.1 (0x00007ffff7783000)
 ```
+
+Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
+
 # Additional resources
 
  * [AWS Graviton2](https://aws.amazon.com/ec2/graviton/)
