@@ -27,7 +27,17 @@ sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortra
 python3 -m pip install --user --upgrade pip
 ```
 
-### 1.2 Python on Centos 8 and RHEL 8
+On all distributions, additionnal compile time dependencies might be needed depending on the Python modules you are trying to install.
+
+### 1.2 Recommended versions
+
+When adopting Graviton2, it is recommended to use recent software versions as much as possible, and Python is no exception.
+
+Python 2.7 is EOL since January the 1st 2020, it is definitely recommended to upgrade to a Python 3.x version before moving to Graviton2.
+
+Python 3.6 will reach [EOL in December, 2021](https://www.python.org/dev/peps/pep-0494/#lifespan), so when starting to port an application to Graviton2, it is recommended to target at least Python 3.7.
+
+### 1.3 Python on Centos 8 and RHEL 8
 
 Centos 8 and RHEL 8 distribute Python 3.6 which is
 [scheduled for end of life in December, 2021](https://www.python.org/dev/peps/pep-0494/#lifespan).
@@ -144,6 +154,41 @@ use a single thread.
 To enable parallelism with BLIS, one needs to both configure with
 `--enable-threading=openmp` and set the environment variable `BLIS_NUM_THREADS`
 to the number of threads to use, the default is to use a single thread.
+
+### 2.6 Graviton2 support in Conda / Anaconda
+Anaconda is a distribution of the Python and R programming languages for scientific computing, that aims to simplify package management and deployment.
+
+Anaconda has announced [support for AWS Graviton2 on May 14, 2021](https://www.anaconda.com/blog/anaconda-aws-graviton2).
+
+Instructions to install the full Anaconda package installer can be found at https://docs.anaconda.com/anaconda/install/graviton2/ .
+
+Anaconda also offers a lightweight version called [Miniconda](https://docs.conda.io/en/latest/miniconda.html) which is a small, bootstrap version of Anaconda that includes only conda, Python, the packages they depend on, and a small number of other useful packages, including pip, zlib and a few others.
+
+Here is an example on how to use it to install [numpy](https://numpy.org/) and [pandas](https://pandas.pydata.org/) for Python 3.9.
+
+The first step is to install conda:
+```
+$ wget https://repo.anaconda.com/miniconda/Miniconda3-py39_4.10.3-Linux-aarch64.sh
+$ chmod a+x chmod a+x Miniconda3-py39_4.10.3-Linux-aarch64.sh
+$ ./Miniconda3-py39_4.10.3-Linux-aarch64.sh
+```
+
+Once installed, you can either use the `conda` command directly to install packages, or write an environment definition file and create the corresponding environment.
+
+Here's an example to install [numpy](https://numpy.org/) and [pandas](https://pandas.pydata.org/) (`graviton-example.yml`):
+```
+name: graviton-example
+dependencies:
+  - numpy
+  - pandas
+```
+
+The next step is to instanciate the environment from that definition:
+```
+$ conda env create -f graviton-example.yml
+```
+
+And you can now use numpy and pandas for Python 3.9.
 
 ## 3. Other common Python packages
 
