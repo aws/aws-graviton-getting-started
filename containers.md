@@ -49,7 +49,7 @@ We have compiled a list of popular software within the container ecosystem that 
 |Trivy	 | 	https://github.com/aquasecurity/trivy/releases/	 	 | |
 |Argo	 | 	https://github.com/argoproj/argo/releases/	 	 	 | |
 |Cilium	| https://docs.cilium.io/en/stable/contributing/development/images/ |  Multi arch supported from v 1.10.0 |	 
-|Calico	| https://hub.docker.com/r/calico/node/tags?page=1&ordering=last_updated |  Multi arch supported from v 1.10.0 |	 
+|Calico	| https://hub.docker.com/r/calico/node/tags?page=1&ordering=last_updated |  Multi arch supported on master |	 
 |Tanka	 | 	https://github.com/grafana/tanka/releases	 	 | |
 |Consul	 | 	https://www.consul.io/downloads	 	 | |
 |Nomad	 | 	https://www.nomadproject.io/downloads	| | 	 
