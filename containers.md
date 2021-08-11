@@ -112,7 +112,7 @@ If using the Kubernetes [Cluster Autoscaler](https://github.com/kubernetes/autos
 
 * [Building multi-arch docker images with buildx](https://tech.smartling.com/building-multi-architecture-docker-images-on-arm-64-c3e6f8d78e1c)
 * [Unifying Arm software development with Docker](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/unifying-arm-software-development-with-docker)
-* [Modern multi-arch builds with docker](https://duske.me/modern-multiarch-builds-with-docker/)
+* [Modern multi-arch builds with docker](https://duske.me/posts/modern-multiarch-builds-with-docker/)
 * [Leveraging Spot and Graviton2 with EKS](https://spot.io/blog/eks-simplified-on-ec2-graviton2-instances/)
 
 
