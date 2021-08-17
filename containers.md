@@ -29,7 +29,7 @@ We have compiled a list of popular software within the container ecosystem that 
 
 | Name                      | URL                           | Comment                |
 | :-----                    |:-----                         | :-----                 |
-| Istio	| https://github.com/istio/istio/releases/	| arm64 binaries as of 1.6.x release series|
+| Istio	| https://github.com/istio/istio/releases/	| 1) arm64 binaries as of 1.6.x release series<br>2) [Istio container build instructions](https://github.com/aws/aws-graviton-getting-started/blob/main/containers-workarounds.md#Istio)|
 | Envoy	| https://www.envoyproxy.io/docs/envoy/v1.18.3/start/docker ||
 | Traefik | https://github.com/containous/traefik/releases	|| 	 
 | Flannel | https://github.com/coreos/flannel/releases	 ||	 
