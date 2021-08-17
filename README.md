@@ -22,6 +22,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 * [TensorFlow](tensorflow.md)
 * [Known issues and workarounds](#known-issues-and-workarounds)
 * [AWS Managed Services available on Graviton](managed_services.md)
+* [Graviton Performance Runbook](perfrunbook/graviton_perfrunbook.md)
 * [Additional resources](#additional-resources)
 
 # Building for Graviton and Graviton2
@@ -39,7 +40,7 @@ Starting September 2020 until December 31, 2021, you can run a t4g.micro instanc
  The 750 hours are calculated in aggregate across all regions. For details on terms and conditions of the free trial, please refer to the [EC2 FAQs](https://aws.amazon.com/ec2/faqs/).
 
 # Optimizing for Graviton
-Please refer [here](optimizing.md) for debugging and profiling information.
+Please refer [here](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/graviton_perfrunbook.md).
 
 # Recent software updates relevant to Graviton
 There is a huge amount of activity in the Arm software ecosystem and improvements are being
