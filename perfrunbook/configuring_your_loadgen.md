@@ -1,12 +1,12 @@
-# Configuring you load generator
+# Configuring your load generator
 
 [Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
 
-The load generator setup is important to understand and verify it generates the load that is expected.  An unknown load-generation setup can lead to not measuring the expected experiment and getting hard to interpret results. Below is a checklist to step through and verify the load generator is working as expected.
+The load generator setup is important to understand and verify: it generates the load that is expected.  An unknown load-generation setup can lead to not measuring the expected experiment and getting hard to interpret results. Below is a checklist to step through and verify the load generator is working as expected.
 
-1. Ensure the load generator instance is large enough for driving traffic to the Systems-under-test (SUTs), we recommend using >12xl sized instances.  
+1. Ensure the load generator instance is large enough for driving traffic to the Systems-under-test (SUTs), we recommend using 12xl instances or larger.  
 2. When generating load, verify the load-generator instance is not using 100% CPU for load-generators that use blocking IO.  For load-generators that busy poll, verify that it is spending ~50% of its time in the busy poll loop by utilizing `perf`  to verify where the load generator code is spending time. See [Section 5.b](./debug_code_perf.md) on how to generate CPU time profiles to verify this.  
-3. If the load-generator is close to its limit, measurements taken may be measuring the load-generator's ability to generate load and not the SUT's ability to process that load.  A load-generator that is spending <=50% of its time generating load is a good target to ensure you are measuring the SUT.
+3. If the load-generator is close to its limit, measurements taken may be measuring the load-generator's ability to generate load and not the SUT's ability to process that load.  A load-generator that is spending less than 50% of its time generating load is a good target to ensure you are measuring the SUT.
 4. When generating load, verify the load-generator is receiving valid responses and not a large number of errors from the SUT.  For example, the [Wrk2](https://github.com/giltene/wrk2) load generator showing many errors meaning the test point is invalid:
   ```bash 
   Running 30s test @ http://127.0.0.1:80/index.html
