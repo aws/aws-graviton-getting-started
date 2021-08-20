@@ -10,21 +10,24 @@ from scipy import stats
 import subprocess
 import io
 
+# When calculating aggregate stats, if some are zero, may
+# get a benign divide-by-zero warning from numpy, make it silent.
+np.seterr(divide='ignore')
 
 def perfstat(time, counter_numerator, counter_denominator, __unused__):
     """
     Measure performance counters using perf-stat in a subprocess.  Return a CSV buffer of the values measured.
     """
     try:
-        res = subprocess.run(["lscpu", "-p=CORE"], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        res = subprocess.run(["lscpu", "-p=CPU"], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = io.StringIO(res.stdout.decode('utf-8'))
-        cores=[]
+        cpus = []
         for line in output.readlines():
             match = re.search(r'''^(\d+)$''', line)
             if match is not None:
-                cores.append(match.group(1))
+                cpus.append(match.group(1))
 
-        res = subprocess.run(["perf", "stat", f"-C{','.join(cores)}", "-I1000", "-x|", "-a", "-e", f"{counter_numerator}", "-e", f"{counter_denominator}", "--", "sleep", f"{time}"],
+        res = subprocess.run(["perf", "stat", f"-C{','.join(cpus)}", "-I1000", "-x|", "-a", "-e", f"{counter_numerator}", "-e", f"{counter_denominator}", "--", "sleep", f"{time}"],
                              check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return io.StringIO(res.stdout.decode('utf-8'))
     except subprocess.CalledProcessError:

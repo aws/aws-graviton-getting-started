@@ -6,9 +6,13 @@ import io
 import os
 import subprocess
 
+import numpy as np
 import pandas as pd
 from scipy import stats
 
+# When calculating aggregate stats, if some are zero, may
+# get a benign divide-by-zero warning from numpy, make it silent.
+np.seterr(divide='ignore')
 
 def sar(time):
     """
@@ -51,7 +55,7 @@ def plot_matplotlib(data, title, xlabel, yrange):
     data.plot(figsize=(24,8), xlabel=xlabel, ylim=(yrange[0], yrange[1]), title=title)
 
 
-def plot_cpu(buf, stat):
+def plot_cpu(buf, stat, plot_format):
     """
     Plot cpu usage data from sar
     """
@@ -78,10 +82,22 @@ def plot_cpu(buf, stat):
     group = df.groupby('cpu')
     data = group.get_group('all')
 
-    plot_terminal(data, stat, "Time (s)", YAXIS_RANGE)
+    # Calculate some meaningful aggregate stats for comparing time-series plots
+    geomean = stats.gmean(data[stat])
+    p50 = stats.scoreatpercentile(data[stat], 50)
+    p90 = stats.scoreatpercentile(data[stat], 90)
+    p99 = stats.scoreatpercentile(data[stat], 99)
+    xtitle = f"gmean:{geomean:>6.2f} p50:{p50:>6.2f} p90:{p90:>6.2f} p99:{p99:>6.2f}"
+
+    if plot_format == "terminal":
+        plot_terminal(data, stat, xtitle, YAXIS_RANGE)
+    elif plot_format == "matplotlib":
+        plot_matplotlib(data, stat, xtitle, YAXIS_RANGE)
+    else:
+        print(f"Do not know how to plot {plot_format}")
 
 
-def plot_tcp(buf, stat):
+def plot_tcp(buf, stat, plot_format):
     """
     Plot the numer of new connections being recieved over time
     """
@@ -106,7 +122,19 @@ def plot_tcp(buf, stat):
 
     limit = df[stat].max() + 1
 
-    plot_terminal(df, stat, "Time (s)", (0, limit))
+    # Calculate some meaningful aggregate stats for comparing time-series plots
+    geomean = stats.gmean(df[stat])
+    p50 = stats.scoreatpercentile(df[stat], 50)
+    p90 = stats.scoreatpercentile(df[stat], 90)
+    p99 = stats.scoreatpercentile(df[stat], 99)
+    xtitle = f"gmean:{geomean:>6.2f} p50:{p50:>6.2f} p90:{p90:>6.2f} p99:{p99:>6.2f}"
+
+    if plot_format == "terminal":
+        plot_terminal(df, stat, xtitle, (0, limit))
+    elif plot_format == "matplotlib":
+        plot_matplotlib(df, stat, xtitle, (0, limit))
+    else:
+        print(f"Do not know how to plot {plot_format}")
 
 
 
@@ -134,4 +162,4 @@ if __name__ == "__main__":
     func = stat_mapping[args.stat][0]
     stat = stat_mapping[args.stat][1]
 
-    func(text, stat)
+    func(text, stat, args.plot)
