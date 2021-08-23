@@ -101,7 +101,7 @@ counter_mapping = {
                       {
                         "ipc": ["armv8_pmuv3_0/event=0x8/", "armv8_pmuv3_0/event=0x11/", 1],
                         "branch-mpki": ["armv8_pmuv3_0/event=0x10/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "data-l1-mpki": ["armv8_pmuv3_0/event=0x4/", "armv8_pmuv3_0/event=0x8/", 1000],
+                        "data-l1-mpki": ["armv8_pmuv3_0/event=0x3/", "armv8_pmuv3_0/event=0x8/", 1000],
                         "inst-l1-mpki": ["armv8_pmuv3_0/event=0x1/", "armv8_pmuv3_0/event=0x8/", 1000],
                         "l2-mpki": ["armv8_pmuv3_0/event=0x17/", "armv8_pmuv3_0/event=0x8/", 1000],
                         "l3-mpki": ["armv8_pmuv3_0/event=0x37/", "armv8_pmuv3_0/event=0x8/", 1000],
