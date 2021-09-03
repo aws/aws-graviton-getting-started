@@ -4,7 +4,7 @@
 
 This document is a reference for software developers who want to benchmark, debug, and optimize their application code on AWS Graviton based instances.  It contains checklists, best practices, examples, and tooling collected by the EC2 Graviton team to assist with the tasks of benchmarking, debugging, or optimizing code on Graviton.
 
-This document covers many topics from how to benchmark, debugging performance and optimization recommendations.  It is not meant to be read beginning-to-end. Instead view it as a collection of checklists and best known practices to apply when working with Graviton instances that go progressively deeper into analyzing the system.  Please see the FAQ below to direct you towards the most relevant set of checklists and tools depending on your specific situation.
+This document covers many topics including how to benchmark, how to debug performance and which optimization recommendations.  It is not meant to be read beginning-to-end. Instead view it as a collection of checklists and best known practices to apply when working with Graviton instances that go progressively deeper into analyzing the system.  Please see the FAQ below to direct you towards the most relevant set of checklists and tools depending on your specific situation.
 
 If after following these guides there is still an issue you cannot resolve with regards to performance on Graviton2, please do not hesitate to raise an issue on the [AWS-Graviton-Getting-Started](https://github.com/aws/aws-graviton-getting-started/issues) guide or contact us at [ec2-arm-dev-feedback@amazon.com](mailto:ec2-arm-dev-feedback@amazon.com).  If there is something missing in this guide, please raise an issue or better, post a pull-request.
 
@@ -17,10 +17,8 @@ To assist with some of the tasks listed in this runbook, we have created some he
 git clone https://github.com/aws/aws-graviton-getting-started.git
 cd aws-graviton-getting-started/perfrunbook/utilities
 
-# On AL2
-sudo ./install_perfrunbook_dependencies_al2.sh
-# On Ubuntu
-sudo ./install_perfrunbook_dependencies_ubuntu2004.sh
+# On AL2 or Ubuntu distribution
+sudo ./install_perfrunbook_dependencies.sh
 
 # All scripts expect to run from the utilities directory
 ```
@@ -28,7 +26,7 @@ sudo ./install_perfrunbook_dependencies_ubuntu2004.sh
 ## Sections
 
 1. [Introduction to Benchmarking](./intro_to_benchmarking.md)
-2. [Defining you benchmark](./defining_your_benchmark.md)
+2. [Defining your benchmark](./defining_your_benchmark.md)
 3. [Configuring your load generator](./configuring_your_loadgen.md)
 4. [Configuring your system-under-test environment](./configuring_your_sut.md)
 5. Debugging Performance

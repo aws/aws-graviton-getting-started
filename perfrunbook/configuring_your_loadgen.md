@@ -2,12 +2,12 @@
 
 [Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
 
-The load generator setup is important to understand and verify: it generates the load that is expected.  An unknown load-generation setup can lead to not measuring the expected experiment and getting hard to interpret results. Below is a checklist to step through and verify the load generator is working as expected.
+The load generator setup is important to understand and verify: it generates the load that is expected.  An unknown load-generation setup can lead to not measuring the expected experiment and getting results that are hard to interpret. Below is a checklist to step through and verify the load generator is working as expected.
 
 1. Ensure the load generator instance is large enough for driving traffic to the Systems-under-test (SUTs), we recommend using 12xl instances or larger.  
 2. When generating load, verify the load-generator instance is not using 100% CPU for load-generators that use blocking IO.  For load-generators that busy poll, verify that it is spending ~50% of its time in the busy poll loop by utilizing `perf`  to verify where the load generator code is spending time. See [Section 5.b](./debug_code_perf.md) on how to generate CPU time profiles to verify this.  
 3. If the load-generator is close to its limit, measurements taken may be measuring the load-generator's ability to generate load and not the SUT's ability to process that load.  A load-generator that is spending less than 50% of its time generating load is a good target to ensure you are measuring the SUT.
-4. When generating load, verify the load-generator is receiving valid responses and not a large number of errors from the SUT.  For example, the [Wrk2](https://github.com/giltene/wrk2) load generator showing many errors meaning the test point is invalid:
+4. When generating load, verify the load-generator is receiving valid responses and not a large number of errors from the SUT.  For example, the example below shows the [Wrk2](https://github.com/giltene/wrk2) load generator receiving many errors, meaning the test point is invalid:
   ```bash 
   Running 30s test @ http://127.0.0.1:80/index.html
   2 threads and 100 connections
@@ -22,7 +22,7 @@ The load generator setup is important to understand and verify: it generates the
   Transfer/sec:    676.14KB
   ```
 5. Check `dmesg` and logs in `/var/log` on the SUT and load generator for indications of errors occurring when under load
-6. Verify load generators and SUTs are physically close to remove sensitivities to RTT (Round-Trip-Times) of messages. Differences in RTT from a load-generator to SUTs can show up as lower throughput, higher latency percentiles and/or increase in error rates, so it is important to control this aspect for testing. To check network setup, check the following from order of best to weakest guarantee of network setup:
+6. Verify load generators and SUTs are physically close to remove sensitivities to RTT (Round-Trip-Times) of messages. Differences in RTT from a load-generator to SUTs can show up as lower throughput, higher latency percentiles and/or increase in error rates, so it is important to control this aspect for testing. Check the following aspects in the order provided to verify your network setup follows best practices and reduces the influence of network factors on test results:
     1. Verify on EC2 console *Placement Group* is filled in with the same placement for the SUTs and load generators and that placement group is set to `cluster`.
     2. Check in the EC2 console that all load generators are in the same subnet (i.e. us-east-1a)
     3. Run `ping` from your SUTs to the load generators and any back-end services your SUT will communicate with. Verify the average latencies are similar (10s of micro-seconds).  You can also use `traceroute` to see the number of hops between your instances as well, ideally it should be 3 or less.
@@ -39,6 +39,8 @@ The load generator setup is important to understand and verify: it generates the
 
   # Increase ephemeral port range on load generator/SUT
   %> sudo sysctl -w net.ipv4.ip_local_port_range 1024 65535
+  # If you application uses IPv6
+  %> sudo sysctl -w net.ipv6.ip_local_port_range 1024 65535
 
   # Allow kernel to re-use connections in load generator/SUT
   %> sysctl -w net.ipv4.tcp_tw_reuse=1
@@ -76,7 +78,7 @@ The load generator setup is important to understand and verify: it generates the
   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat tcp-out-segments --time 60
   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat tcp-in-segments --time 60
   ```
-14. Check for hot connections (i.e. connections that are more heavily used that others) by running: `watch netstat -t`. The below code block shows an example of using `netstat -t` to watch TCP connections with one being hot as seen by its `Send-Q` being populated while everything else is 0. 
+14. Check for hot connections (i.e. connections that are more heavily used that others) by running: `watch netstat -t`. The below example shows the use of `netstat -t` to watch multiple TCP connections. One connection is active and has a non-zero `Send-Q` value while all other connections have a `Send-Q` value of 0. 
   ```bash
   %> watch netstat -t
   Every 2.0s: netstat -t

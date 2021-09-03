@@ -2,11 +2,11 @@
 
 [Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
 
-This section documents multiple checklists to use to verify your Graviton System-under-test (SUT) is up-to-date and as code-equivalent to the instances you are comparing against as possible.   Please perform these tests on each SUT to vet your experimental setup and eliminate as many potential unknown variables as possible.
+This section documents multiple checklists to use to verify your Graviton System-under-test (SUT) is up-to-date and as code-equivalent as possible to the systems and instances you are comparing against.   Please perform these tests on each SUT to vet your experimental setup and eliminate as many potential unknown variables as possible.
 
 ## Initial system-under-test checks
 
-If you have more than 1 SUT, first verify there are no major differences in setup:
+If you have more than one SUT, first verify there are no major differences in setup:
 
 1. Check all instances are running the same OS distribution:
   ```bash
@@ -70,13 +70,13 @@ If you have more than 1 SUT, first verify there are no major differences in setu
     
   # Permanently changing the values requires editing /etc/security/limits.conf
   ```
-6.  Check ping latencies to load generators and downstream services that will be accessed from each system-under-test and verify latencies are similar.   A different of +/-50us is acceptable, differences of >+/-100us can adversely affect testing results.  We recommend putting the testing environment instances inside a [cluster placement group](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html#placement-groups-cluster), or at minimum confirm all instances are in the same subnet (i.e. us-east-1a).
-7.  Check the instance types used and verify IO devices are setup equivalently between the SUTs. i.e. m5d\.metal and m6gd\.metal have different disk configurations that may lead to differing performance measurements if your service is sensitive to disk performance. 
+6.  Check ping latencies to load generators and downstream services that will be accessed from each system-under-test and verify latencies are similar.   A different of +/-50us is acceptable, differences of >+/-100us can adversely affect testing results.  We recommend putting all testing environment instances inside a [cluster placement group](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html#placement-groups-cluster), or at a minimum confirm that all instances are in the same subnet (i.e. us-east-1a).
+7.  Check the instance types used and verify IO devices are setup equivalently between the SUTs. I.e. m5d\.metal and m6gd\.metal have different disk configurations that may lead to differing performance measurements if your service is sensitive to disk performance. 
 8. We recommend using instances set to [**dedicated tenancy**](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/dedicated-instance.html) first to establish a baseline for performance variance for your test application.  Knowing this baseline will help interpret results when testing on instances that are set to **default** tenancy.
 
 ## Check for missing binary dependencies
 
-Libraries for Python or Java can link in binary shared objects to provide enhanced performance.  Lacking these shared object dependencies many times do not prevent the service from running on Graviton2, but will be forced to use a slow code-path instead of the optimized paths.  Use the checklist below to verify the same shared objects are available on all platforms.
+Libraries for Python or Java can link in binary shared objects to provide enhanced performance.  The absence of these shared object dependencies does not prevent the application from running on Graviton2, but the CPU will be forced to use a slow code-path instead of the optimized paths.  Use the checklist below to verify the same shared objects are available on all platforms.
 
 1. JVM based languages — Check for the presence of binary shared objects in the installed JARs and compare between Graviton2 and x86.
   ```bash
@@ -139,7 +139,7 @@ For native compiled components of your application, proper compile flags are ess
 3. When building natively for Rust, ensure that `RUSTFLAGS` is set to **one of the following flags**
     1. `export RUSTFLAGS="-Ctarget-features=+lse"` for code that will run on Graviton2 and earlier platforms that support LSE (Large System Extension) instructions.
     2. `export RUSTFLAGS="-Ctarget-cpu=neoverse-n1"` for code that will only run on Graviton2 and later platforms.
-4. Check for existence of optimized assembly on x86, but lacking on Graviton.  For help with porting optimized assembly routines, see [Section 6](./optimization_recommendation.md).
+4. Check for the existence of assembly optimized on x86 with no optimization on Graviton.  For help with porting optimized assembly routines, see [Section 6](./optimization_recommendation.md).
   ```bash
   # Check for any .S/.s files in a C/C++ application
   find . -regex '.*\.[sS]' -type f -print
@@ -155,7 +155,7 @@ For native compiled components of your application, proper compile flags are ess
 
 Finally as part of checking the systems-under-test verify the application is configured properly on startup.
 
-1. Check that any startup scripts that attempt to do thread-pinning via `taskset` or `CGroups` is not making an assumption about SMT that is common on x86 servers.  There are no threads on Graviton servers and no assumptions about threads needs to be made.  This may be present as code taking the number of CPUs in the system and dividing by two, i.e. for shell run scripts you might see: `let physical_cores=$(nproc) / 2`
+1. Check that any startup scripts that attempt to do thread-pinning via `taskset` or `CGroups` are not making assumptions about the presence of SMT that is common on x86 servers.  There are no threads on Graviton servers and no assumptions about threads needs to be made.  This may be present as code taking the number of CPUs in the system and dividing by two, i.e. for shell run scripts you might see: `let physical_cores=$(nproc) / 2`
 2. Check daemon start scripts provide enough resources to the service as it starts on Graviton, such as specifying `LimitNOFILE`, `LimitSTACK`, or `LimitNPROC` in a systemd start script.
 3. Check for debug flags in application start-up scripts that are enabled but should be disabled. Such as: `-XX:-OmitStackTraceInFastThrow` for Java which logs and generates stack traces for all exceptions, even if they are not considered fatal exceptions.
 4. If using the Java Virtual Machine to execute your service, ensure it is a recent version based off at least JDK11. We recommend using [Corretto11](https://docs.aws.amazon.com/corretto/latest/corretto-11-ug/downloads-list.html) or [Corretto15](https://docs.aws.amazon.com/corretto/latest/corretto-15-ug/downloads-list.html).  Corretto is a free and actively maintained OpenJDK distribution that contains optimizations for AWS Graviton based instances.

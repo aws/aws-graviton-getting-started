@@ -2,7 +2,7 @@
 
 [Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
 
-If after checking the system behavior with the sysstat tools, and the behavior of the code on the CPU is different, the next step is to generate code profiles.  Two different profiles 
+If after checking the system behavior with the sysstat tools the behavior of your code on the CPU is still different, then your next step is to generate code profiles. There are two primary types of profiles 
 
 ## On-cpu profiling
 
@@ -34,11 +34,12 @@ If you see that Graviton is consuming more CPU-time than expected, on-cpu profil
 
 ## Off-cpu profiling
 
-If Graviton2 is consuming less CPU-time than expected, it is useful to find call-stacks that are putting thread to sleep via the OS.  Lock contention, IO Bottlenecks, OS scheduler issues can all lead to cases where performance is lower, but the CPU is not being fully utilized.   The method to look for what might be causing more off-cpu time is the same as with looking for functions consuming more on-cpu time, generate a flamegraph and compare.  In this case, the differences are more subtle to look for as small differences can mean large swings in performance as more thread sleeps can induce milli-seconds of wasted execution time.  
+If Graviton2 is consuming less CPU-time than expected, it is useful to find call-stacks that are putting *threads* to sleep via the OS.  Lock contention, IO Bottlenecks, OS scheduler issues can all lead to cases where performance is lower, but the CPU is not being fully utilized.   The method to look for what might be causing more off-cpu time is the same as with looking for functions consuming more on-cpu time: generate a flamegraph and compare.  In this case, the differences are more subtle to look for as small differences can mean large swings in performance as more thread sleeps can induce milli-seconds of wasted execution time.  
 
 1. Verify native (i.e. C/C++/Rust) code is built with `-fno-omit-frame-``pointer`
 2. Verify java code is started with `-XX:+PreserveFramePointer -agentpath:/path/to/libperf-jvmti.so`
     1. The `libperf-jvmit.so` library is usually provided when `perf` is installed.  If it is not, see [how to build the jvmti from source](https://github.com/aws/aws-graviton-getting-started/blob/main/java.md#build-libperf-jvmtiso-on-amazon-linux-2) in our getting-started guide.
+    2. Additional debugging information can be extracted by adding `-XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints` to the java command line.
 3. Verify NodeJS code is started with `--perf-basic-prof`
 4. Collect the Flamegraph:
   ```bash
@@ -81,12 +82,12 @@ In our `capture_flamegraphs.sh` helper script, we use `perf record` to gather tr
   perf script -f -i perf.data > grv_script.out
   ./FlameGraph/stackcollapse-perf.pl --kernel --jit grv_script.out > grv_folded.out
   # Copy x86_folded.out to Graviton SUT
-  ./Flamegraph/difffolded.pl grv_folded.txt x86_folded.txt > diff.out
+  ./Flamegraph/difffolded.pl grv_folded.out x86_folded.out > diff.out
   ./Flamegraph/flamegraph.pl --colors java diff.out > flamegraph-diff.svg
   ```
-2. View the diff, red regions are increase in proportion of execution time, blue a decrease. Note: diffing call-stacks between different architectures can lead to peculiar artifacts due to machine specific functions being named differently.
-3. Create flame-graphs from `perf record`  that use different events than the cpu-clock to determine when to sample stack traces. This can help to uncover different root causes and potential optimization opportunities.  Examples below:
+2. View the diff — red regions indicate an increase in the proportion of execution time, blue a decrease. Note: diffing call-stacks between different architectures can lead to peculiar artifacts due to machine specific functions being named differently.
+3. Create flame-graphs from `perf record`  that use different events than the cpu-clock to determine when to sample stack traces. This can help uncover different root causes and potential optimization opportunities.  Examples below:
     1. Use `-e instructions` to generate a flame-graph of the functions that use the most instructions on average to identify a compiler or code optimization opportunity.
     2. Use `-e cache-misses` to generate a flame-graph of functions that miss the L1 cache the most to indicate if changing to a more efficient data-structure might be necessary.
-    3. Use `-e branch-misses` to generate a flame-graph of functions that cause the CPU to mis-speculate.
+    3. Use `-e branch-misses` to generate a flame-graph of functions that cause the CPU to mis-speculate.  This may identify regions with heavy use of conditionals, or conditionals that are data-dependent and may be a candidate for refactoring.
 

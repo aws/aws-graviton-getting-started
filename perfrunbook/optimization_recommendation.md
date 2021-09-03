@@ -9,6 +9,8 @@ This section describes multiple different optimization suggestions to try on Gra
 1. On C/C++ applications, `-flto`, `-Os`, and [Feedback Directed Optimization](https://gcc.gnu.org/wiki/AutoFDO/Tutorial) can help with code layout using GCC.
 2. On Java, `-XX:-TieredCompilation`, `-XX:ReservedCodeCacheSize` and `-XX:InitialCodeCacheSize` can be tuned to reduce the pressure the JIT places on the instruction footprint. The JDK defaults to setting up a 256MB region by default for the code-cache which over time can fill, become fragmented, and live code may become sparse.
     1. We recommend setting the code cache initially to: `-XX:-TieredCompilation -XX:ReservedCodeCacheSize=64M -XX:InitialCodeCacheSize=64M` and then tuning the size up or down as required.
+    2. Experiment with setting `-XX:+TieredCompilation` to gain faster start-up time and better optimized code.
+    3. When tuning the code JVM code cache, watch for `code cache full` error messages in the logs indicating that the cache has been set too small.  A full code cache can lead to worse performance.
 
 ## Optimizing for high TLB miss rates
 

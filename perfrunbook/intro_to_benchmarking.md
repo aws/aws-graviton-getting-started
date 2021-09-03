@@ -19,7 +19,7 @@ Instead formulate the question as tightly as possible:
 
 > “How does a Graviton instance’s request throughput compare to current instances on my Java application at a P99 of 10ms for a mix of 60% GETS and 40% PUTS on Ubuntu 20.04LTS?
 
-This narrower in scope question defines a specific experiment that can be answered conclusively without a mountain of data.  Always ask specific questions so as to get specific answers and conclusions.  
+This question is narrower in scope and defines a specific experiment that can be answered conclusively without a mountain of data.  Always ask specific questions so as to get specific answers and conclusions.  
 
 ### Less moving parts
 
@@ -37,9 +37,9 @@ Variables for benchmarking an application can include:
 - load generator behavior 
 - etc.  
 
-The more variables that are controlled for, more specific questions can be answered as well.  Such as, if an instance is over-provisioned with disk and network bandwidth so they will not pose a bottleneck, then experiments can be derived to test only the capability of the CPU and DRAM in the system.  
+The more variables that are controlled for, more specific questions can be answered about the system.  Such as, if an instance is over-provisioned with disk and network bandwidth and it is known that this configuration will not pose a bottleneck, then experiments can be derived to test only the capability of the CPU and DRAM in the system.  
 
-It is recommended before running an experiment to fully understand all the ways the environment can vary and determine how and if they can be controlled for.  The above list can used as a starting point.  Having a thorough understanding of all the variables present in an experiment will enable better analysis of results and reduce the number of experimental runs needed before settling on the final configurations that will enable performance debugging.  
+It is recommended before running an experiment to fully understand all the ways the environment can vary and determine how and if they can be controlled for.  The above list can be used as a starting point.  Having a thorough understanding of all the variables present in an experiment will enable better analysis of results and reduce the number of experimental runs needed before settling on the final configurations that will enable performance debugging.  
 
 Now that you have a specific question to answer, and have a basic understanding of the variables to control for, lets get started with defining how to test your application to assist with debugging performance in [Section 2.](./defining_your_benchmark.md)
 

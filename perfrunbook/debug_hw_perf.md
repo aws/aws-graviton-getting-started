@@ -2,11 +2,17 @@
 
 [Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
 
-Sometimes it is not code but the hardware that is not performing as well as expected. This may show up in the on-cpu profiles as every function is slightly slower on Graviton as more CPU time is consumed, but no obvious hot-spot function exists.  If this is the case, then measuring how the hardware performs can offer insight.  To do this requires measuring special counters in the CPU to understand which component of the CPU is bottlenecking the code from executing as fast as possible.
+Sometimes, hardware, not code, is the reason for worse than expected performance. This may show up in the on-cpu profiles as every function is slightly slower on Graviton as more CPU time is consumed, but no obvious hot-spot function exists.  If this is the case, then measuring how the hardware performs can offer insight.  To do this requires measuring special counters in the CPU to understand which component of the CPU is bottlenecking the code from executing as fast as possible.
 
-Modern server CPUs, whether they are from Intel, AMD or AWS all attempt to execute as many instructions as possible in a fixed amount of time by doing the following 4 fundamental operations in addition to executing at high frequencies: executing instructions using multiple steps (pipelining), parallel instruction execution (out-of-order execution), predicting what instructions are needed next (speculation), predicting what values from DRAM should be cached nearby the processor (caching).   The PMU counters give statistics on how aspects of those 4 fundamental operations are behaving.  When one aspect of the CPU starts becoming a bottleneck, for instance if caching starts to store the wrong values, then the CPU will execute instructions more slowly as it will be forced to access the correct values in main memory which is many times slower compared to a cache. 
+Modern server CPUs, whether they are from Intel, AMD or AWS all attempt to execute as many instructions as possible in a fixed amount of time by doing the following 4 fundamental operations in addition to executing at high frequencies: 
+  * Executing instructions using multiple steps (pipelining)
+  * Parallel instruction execution (out-of-order execution)
+  * Predicting what instructions are needed next (speculation)
+  * Predicting what values from DRAM should be cached nearby the processor (caching).   
 
-There are hundreds of counters in a server CPU today, which is many more than the 4 fundamental underpinnings of a modern CPU, this is because hundreds of components work together to enable a modern CPU to execute instructions quickly.   The guide below will describe the primary counters to collect and explain their meanings to guide a first level root causing of the observed performance issue.
+The PMU counters give statistics on how aspects of those 4 fundamental operations are behaving.  When one aspect of the CPU starts becoming a bottleneck, for instance if caching starts to store the wrong values, then the CPU will execute instructions more slowly as it will be forced to access the correct values in main memory which is many times slower compared to a cache. 
+
+There are hundreds of counters in a server CPU today which is many times more than the 4 fundamental underpinnings of a modern CPU. This is because hundreds of components work together to enable a modern CPU to execute instructions quickly. The guide below describes the primary counters to collect and explains their meaning to enable a first level root cause analysis of the observed performance issue.
 
 ## How to Collect PMU counters
 
@@ -26,7 +32,7 @@ PMU counters are available on all Graviton2 instances (a limited subset is avail
   # Cut down vCPUs needed on Graviton
   %> sudo ./configure_vcpus.sh <# vcpus> cores
   ```
-3. Measure a set of hardware counters with our helper script, it will plot a time-series curve of the counter's behavior over time, as well as give geomean and percentile statistics.
+3. Measure a set of hardware counters with our helper script. It will plot a time-series curve of the counter's behavior over time and provide geomean and percentile statistics.
   ```bash
   # In terminal 1
   %> <start load generator or benchmark>
@@ -80,7 +86,7 @@ PMU counters are available on all Graviton2 instances (a limited subset is avail
 
 This checklist describes the top-down method to debug whether the hardware is under-performing and what part is underperforming.  The checklist describes counters to check that are included in the helper-script.  All metrics are in terms of either misses-per-1000(kilo)-instruction or per-1000(kilo)-cycles.  This checklist aims to help guide whether a hardware slow down is coming from the front-end of the processor or the backend of the processor and then what particular part.  The front-end of the processor is responsible for fetching and supplying the instructions.  The back-end is responsible for executing the instructions provided by the front-end as fast as possible.  A bottleneck in either part will cause stalls and a decrease in performance.  After determining where the bottleneck may lie, you can proceed to [Section 6](./optimization_recommendation.md) to read suggested optimizations to mitigate the problem.
 
-1. Start by measuring `ipc` (Instructions per cycle) on each instance-type.  A higher IPC is better. A lower number for `ipc` on Graviton2 compared to x86 indicates there is a performance problem.  At this point, proceed to attempt to root cause where the lower IPC bottleneck is coming from by collecting frontend and backend stall metrics.
+1. Start by measuring `ipc` (Instructions per cycle) on each instance-type.  A higher IPC is better. A lower number for `ipc` on Graviton2 compared to x86 indicates *that* there is a performance problem.  At this point, proceed to attempt to root cause where the lower IPC bottleneck is coming from by collecting frontend and backend stall metrics.
 2. Next, measure `stall_frontend_pkc` and `stall_backend_pkc` (pkc = per kilo cycle) and determine which is higher.  If stalls in the frontend are higher, it indicates the part of the CPU responsible for predicting and fetching the next instructions to execute is causing slow-downs.  If stalls in the backend are higher, it indicates the machinery that executes the instructions and reads data from memory is causing slow-downs
 
 ### Drill down front end stalls
