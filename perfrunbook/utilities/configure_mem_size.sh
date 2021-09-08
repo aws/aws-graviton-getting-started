@@ -10,12 +10,16 @@ help_msg() {
 set -e
 
 config_mem () {
-  perl -pi -e 's/GRUB_CMDLINE_LINUX_DEFAULT="((.(?!mem=[0-9]+[KMG]))*)"$/GRUB_CMDLINE_LINUX_DEFAULT="\1 mem='"${1}"'G"/g' $grub_loc
-  perl -pi -e 's/GRUB_CMDLINE_LINUX_DEFAULT="(.*?) mem=[0-9]+[KMG](.*?)"$/GRUB_CMDLINE_LINUX_DEFAULT="\1\2 mem='"${1}"'G"/g' $grub_loc
+  perl -pi -e 's/GRUB_CMDLINE_LINUX="((.(?!mem=[0-9]+[KMG]))*)"$/GRUB_CMDLINE_LINUX="\1 mem='"${1}"'G"/g' $grub_loc
+  perl -pi -e 's/GRUB_CMDLINE_LINUX="(.*?) mem=[0-9]+[KMG](.*?)"$/GRUB_CMDLINE_LINUX="\1\2 mem='"${1}"'G"/g' $grub_loc
 }
 
 update_grub() {
-  grub2-mkconfig -o /boot/grub2/grub.cfg
+  if [[ -d /boot/grub2 ]]; then
+    grub2-mkconfig -o /boot/grub2/grub.cfg
+  else
+    grub2-mkconfig -o /boot/grub/grub.cfg
+  fi 
 }
 
 if [[ $# -ne 1 ]]; then
