@@ -15,7 +15,7 @@ install_al2_dependencies () {
   yum install -y -q python3 python3-pip gnuplot
   python3 -m pip install --upgrade pip
   python3 -m pip install pandas numpy gnuplotlib scipy matplotlib sh
-  git clone https://github.com/brendangregg/FlameGraph.git $HOME/Flamegraph
+  git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
 }
@@ -35,7 +35,7 @@ install_ubuntu2004_dependencies () {
   apt-get install -y -q python3-dev python3-pip gnuplot
   python3 -m pip install --upgrade pip
   python3 -m pip install pandas numpy gnuplotlib scipy matplotlib sh
-  git clone https://github.com/brendangregg/FlameGraph.git $HOME/Flamegraph
+  git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
 }
@@ -47,9 +47,10 @@ fi
 
 os_name=$(cat /etc/os-release | grep "PRETTY_NAME" | awk -F"=" '{print $2}' | tr -d '[="=]' | tr -d [:cntrl:])
 
+
 if [[ "$os_name" == "Amazon Linux 2" ]]; then
   install_al2_dependencies
-elif [[ "$os_name" == "Ubuntu 20.04.2 LTS" ]]; then
+elif [[ "$os_name" =~ "Ubuntu 20.04" ]]; then
   install_ubuntu2004_dependencies
 else
   echo "$os_name not supported"
