@@ -18,3 +18,11 @@ Debian | 10 | [Planned for Debian 11](https://bugs.debian.org/cgi-bin/bugreport.
 FreeBSD | 12.1 or later | No | 4KB | [Community](https://www.freebsd.org/releases/12.1R/announce.html) or [MarketPlace](https://aws.amazon.com/marketplace/pp/B081NF7BY7) | No | Device hotplug and API shutdown don't work
 FreeBSD | 13.0 or later | Yes | 4KB | [Community](https://www.freebsd.org/releases/13.0R/announce.html) or [MarketPlace](https://aws.amazon.com/marketplace/pp/B09291VW11) | No | Device hotplug and API shutdown don't work
 Rocky Linux | 8.4 or later | Yes (*) | 64KB (*) | [ISOs](https://rockylinux.org/download) | | [Release Notes](https://docs.rockylinux.org/release_notes/8-changelog/)<br>(*) details to be confirmed once AMI's are available
+
+
+OS Name | Minimum recommended Linux kernel version for Graviton2
+------ | ------
+Amazon Linux 2 | >= 4.14.209-160.339.amzn2, >= 5.4.110-54.189.amzn2, or >= 5.10.29-27.128.amzn2
+Ubuntu 20.04 | >= 5.4.0-1047-aws, >= 5.8.0-1034-aws, >= 5.11.0-1009-aws
+Ubuntu 18.04 | >= 4.15.0-1101-aws, >= 5.4.0-1047-aws
+Redhat Entreprise Linux 8 | >= 4.18.0-305.10
