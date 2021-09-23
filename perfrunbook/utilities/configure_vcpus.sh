@@ -49,3 +49,6 @@ done
 for i in $vcpus_off; do
   echo 0 > /sys/devices/system/cpu/cpu$i/online
 done
+
+# Workaround for online cpus not reflected in docker run
+cp /sys/fs/cgroup/cpuset/cpuset.cpus /sys/fs/cgroup/cpuset/docker/cpuset.cpus
