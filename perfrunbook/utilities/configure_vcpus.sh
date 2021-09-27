@@ -50,8 +50,9 @@ for i in $vcpus_off; do
   echo 0 > /sys/devices/system/cpu/cpu$i/online
 done
 
-# Workaround for online cpus not reflected in docker run
+# Update Docker cpusets to reflect cpus that are hotplugged in/out to allow
+# restarted containers so they see the proper number of CPUs
 FILE=/sys/fs/cgroup/cpuset/docker/cpuset.cpus
 if [ -f "$FILE" ]; then
-cp /sys/fs/cgroup/cpuset/cpuset.cpus /sys/fs/cgroup/cpuset/docker/cpuset.cpus
+  cp /sys/fs/cgroup/cpuset/cpuset.cpus /sys/fs/cgroup/cpuset/docker/cpuset.cpus
 fi
