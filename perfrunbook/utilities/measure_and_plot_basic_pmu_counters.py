@@ -5,14 +5,14 @@ import argparse
 import pandas as pd
 import numpy as np
 import re
-import scipy as sp
-from scipy import stats 
+from scipy import stats
 import subprocess
 import io
 
 # When calculating aggregate stats, if some are zero, may
 # get a benign divide-by-zero warning from numpy, make it silent.
 np.seterr(divide='ignore')
+
 
 def perfstat(time, counter_numerator, counter_denominator, __unused__):
     """
@@ -135,12 +135,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--stat", default="ipc", type=str, choices=["ipc", "branch-mpki", "data-l1-mpki", "inst-l1-mpki", "l2-mpki", "l3-mpki",
                                                                     "stall_frontend_pkc", "stall_backend_pkc", "inst-tlb-mpki", "inst-tlb-tw-pki",
-                                                                    "data-tlb-mpki", "data-tlb-tw-pki", "l2-tlb-mpki"])
+                                                                    "data-tlb-mpki", "data-tlb-tw-pki"]) #, "l2-tlb-mpki"])
     parser.add_argument("--plot", default="terminal", type=str, choices=["terminal", "matplotlib"],
                         help="What display type to use, terminal (ascii art!) or matplotlib (for Jupyter notebooks)")
     parser.add_argument("--uarch", default="Graviton2", type=str, choices=["Graviton2", "CXL"],
                         help="What micro-architecture to use to define our events")
     parser.add_argument("--time", default=60, type=int, help="How long to measure for in seconds")
+    parser.add_argument("--custom_ctr", type=str,
+                        help="Specify a custom counter ratio and scaling factor as 'ctr1|ctr2|scale'"
+                             ", calculated as ctr1/ctr2 * scale")
 
     res = subprocess.run(["id", "-u"], check=True, stdout=subprocess.PIPE)
     if int(res.stdout) > 0:
@@ -149,7 +152,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    counter_info = counter_mapping[args.uarch][args.stat]
+    if args.custom_ctr:
+        ctrs = args.custom_ctr.split("|")
+        counter_info = [ctrs[0], ctrs[1], int(ctrs[2])]
+    else:
+        counter_info = counter_mapping[args.uarch][args.stat]
 
     csv = perfstat(args.time, *counter_info)
     plot_counter_stat(csv, args.plot, args.stat, *counter_info)

@@ -2,22 +2,17 @@
 
 import re
 import sys
-import os
-import datetime
 import numpy as np
 import pandas as pd
 
 
 def parse_start_date(line):
-    # Get start date from line
-    hdr = re.compile(r'''.*?\)\s+(?P<start>\d+/\d+/\d+).*''')
+    # Get start date from line in ISO 8601 format
+    hdr = re.compile(r'''.*?\)\s+(?P<start>\d+\-\d+\-\d+).*''')
     match_hdr = hdr.match(line)
     start_date = None
     if match_hdr:
-        #print(match_hdr['start'])
-        # Date from sar is in form MM/DD/YY, convert to ISO standard
-        components = match_hdr['start'].split('/')
-        start_date = "{}-{}-{}".format(components[2], components[0], components[1])
+        start_date = match_hdr['start']
 
     return start_date
 
@@ -36,19 +31,12 @@ class ParseInterface(object):
     # Pass in a dict s:
     # { date: string in YYYY-MM-DD
     #   time: string in hh:mm:ss
-    #   noon: string in AM or PM
     # }
     # Pass in a last_date as an np.datetime64 obj or None
     # Returns a np.datetime64 object
     def parse_time(self, s, last_date):
-        # Sar represents midnight as 12AM, which screws up np.datetime64 which is a 24 clock
-        if s['time'].split(':')[0] == '12' and s['noon'] == 'AM':
-            s['time'] = "{}:{}:{}".format('00', s['time'].split(':')[1], s['time'].split(':')[2])
 
         d = np.datetime64("{} {}".format(s['date'], s['time']))
-        # Sar represents noon as 12PM which confuses things.
-        if s['noon'] == 'PM' and s['time'].split(':')[0] != '12':
-            d = d + np.timedelta64(12, 'h')
 
         if last_date:
             while (d - last_date) < np.timedelta64(0, 's'):
@@ -66,8 +54,7 @@ class ParseInterface(object):
             match_data = self.regex_data.match(line)
             if match_data:
                 s = {'date': self.start,
-                     'time': match_data['time'],
-                     'noon': match_data['time2']}
+                     'time': match_data['time']}
                 d = self.parse_time(s, self.last_date)
                 data['time'].append(d)
                 self.last_date = d
@@ -104,10 +91,10 @@ class ParseIfaceUtil(ParseInterface):
     def __init__(self, start_date, parquet=None):
         super().__init__(start_date)
 
-        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+IFACE\s+'''
+        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+IFACE\s+'''
                                     r'''rxpck/s\s+txpck/s\s+rxkB/s\s+txkB/s\s+rxcmp/s\s+txcmp/s\s+'''
                                     r'''rxmcst/s''')
-        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+(?P<iface>[\d\w]+)\s+'''
+        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+(?P<iface>[\d\w]+)\s+'''
                                      r'''(?P<rxpcks>\d+\.\d+)\s+(?P<txpcks>\d+\.\d+)\s+(?P<rxkBs>\d+\.\d+)\s+'''
                                      r'''(?P<txkBs>\d+\.\d+)\s+(?P<rxcmps>\d+\.\d+)\s+(?P<txcmps>\d+\.\d+)\s+'''
                                      r'''(?P<rxmcsts>\d+\.\d+)''')
@@ -127,10 +114,10 @@ class ParseDevUtil(ParseInterface):
 
     def __init__(self, start_date, parquet=None):
         super().__init__(start_date)
-        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+DEV\s+tps\s+'''
+        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+DEV\s+tps\s+'''
                                     r'''rd_sec/s\s+wr_sec/s\s+avgrq\-sz\s+avgqu\-sz\s+'''
                                     r'''await\s+svctm\s+%util''')
-        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+(?P<dev>[\w\d\-]+)\s+(?P<tps>\d+\.\d+)\s+'''
+        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+(?P<dev>[\w\d\-]+)\s+(?P<tps>\d+\.\d+)\s+'''
                                      r'''(?P<rdsecs>\d+\.\d+)\s+(?P<wrsecs>\d+\.\d+)\s+(?P<avgrqsz>\d+\.\d+)\s+'''
                                      r'''(?P<avgqusz>\d+\.\d+)\s+(?P<await>\d+\.\d+)\s+(?P<svctm>\d+\.\d+)\s+(?P<util>\d+\.\d+)''')
         self.fields = [('time', None), ('dev', str), ('tps', float), ('rdsecs', float),
@@ -149,9 +136,9 @@ class ParseDiskUtil(ParseInterface):
 
     def __init__(self, start_date, parquet=None):
         super().__init__(start_date)
-        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+tps\s+rtps\s+'''
+        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+tps\s+rtps\s+'''
                                     r'''wtps\s+bread/s\s+bwrtn/s''')
-        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+(?P<tps>\d+\.\d+)\s+'''
+        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+(?P<tps>\d+\.\d+)\s+'''
                                      r'''(?P<rtps>\d+\.\d+)\s+(?P<wtps>\d+\.\d+)\s+'''
                                      r'''(?P<breads>\d+\.\d+)\s+(?P<bwrtns>\d+\.\d+)''')
 
@@ -170,9 +157,9 @@ class ParseTcpTime(ParseInterface):
 
     def __init__(self, start_date, parquet=None):
         super().__init__(start_date)
-        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+active/s\s+'''
+        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+active/s\s+'''
                                        r'''passive/s\s+iseg/s\s+oseg/s''')
-        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+(?P<active>\d+\.\d+)\s+'''
+        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+(?P<active>\d+\.\d+)\s+'''
                                        r'''(?P<passive>\d+\.\d+)\s+(?P<iseg>\d+\.\d+)\s+'''
                                        r'''(?P<oseg>\d+\.\d+)''')
 
@@ -190,9 +177,9 @@ class ParseCpuTime(ParseInterface):
 
     def __init__(self, start_date, parquet=None):
         super().__init__(start_date)
-        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+CPU\s+'''
+        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+CPU\s+'''
                                        r'''%usr\s+%nice\s+%sys\s+%iowait\s+%steal\s+%irq\s+%soft\s+%guest\s+%gnice\s+%idle''')
-        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+) (?P<time2>[APM]+)\s+(?P<cpu>[\d\w]+)\s+'''
+        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+(?P<cpu>[\d\w]+)\s+'''
                                        r'''(?P<usr>\d+\.\d+)\s+(?P<nice>\d+\.\d+)\s+(?P<sys>\d+'''
                                        r'''\.\d+)\s+(?P<iowait>\d+\.\d+)\s+(?P<steal>\d+\.\d+)'''
                                        r'''\s+(?P<irq>\d+\.\d+)\s+(?P<soft>\d+\.\d+)\s+'''
@@ -208,6 +195,22 @@ class ParseCpuTime(ParseInterface):
             self.parquet_name = "sar_cpu_{}.parquet".format(parquet)
         else:
             self.parquet_name = "sar_cpu.parquet"
+
+
+class ParseCSwitchTime(ParseInterface):
+
+    def __init__(self, start_date, parquet=None):
+        super().__init__(start_date)
+        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+proc/s\s+cswch/s''')
+        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+(?P<proc_s>\d+\.\d+)\s+(?P<cswch_s>\d+\.\d+)''')
+        self.start = start_date
+
+        self.fields = [('time', None), ('proc_s', float), ('cswch_s', float)]
+        self.last_date = None
+        if parquet:
+            self.parquet_name = "sar_cswch_{}.parquet".format(parquet)
+        else:
+            self.parquet_name = "sar_cswch.parquet"
 
 
 def parse_sysstat(file_name, suffix=None):
@@ -226,6 +229,7 @@ def parse_sysstat(file_name, suffix=None):
         parseDev = ParseDevUtil(start_date, parquet=suffix)
         parseIface = ParseIfaceUtil(start_date, parquet=suffix)
         parseTcpTime = ParseTcpTime(start_date, parquet=suffix)
+        parseCswitch = ParseCSwitchTime(start_date, parquet=suffix)
 
         line = f.readline()
         while (line):
@@ -234,6 +238,7 @@ def parse_sysstat(file_name, suffix=None):
             parseDev.parse_for_header(line, f)
             parseIface.parse_for_header(line, f)
             parseTcpTime.parse_for_header(line, f)
+            parseCswitch.parse_for_header(line, f)
             line = f.readline()
     return 0
 
