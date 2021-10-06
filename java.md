@@ -32,6 +32,35 @@ and restricting the size of the code cache which allows the Graviton2 cores to b
 branches. These are helpful on some workloads but can hurt on others so testing with and without
 them is essential: `-XX:-TieredCompilation -XX:ReservedCodeCacheSize=64M -XX:InitialCodeCacheSize=64M`.
 
+### Java Stack Size
+The default stack size for Java threads (i.e. `ThreadStackSize`) is 2mb on aarch64 (compared to 1mb on x86_64). You can check the default with:
+```
+$ java -XX:+PrintFlagsFinal -version | grep ThreadStackSize
+     intx CompilerThreadStackSize = 2048  {pd product} {default}
+     intx ThreadStackSize         = 2048  {pd product} {default}
+     intx VMThreadStackSize       = 2048  {pd product} {default}
+```
+The default can be easily changed on the command line with either `-XX:ThreadStackSize=<kbytes>` or `-Xss<bytes>`. Notice that `-XX:ThreadStackSize` interprets its argument as kilobytes whereas `-Xss` interprets it as bytes. So `-XX:ThreadStackSize=1024` and `-Xss1m` will both set the stack size for Java threads to 1 megabyte:
+```
+$ java -Xss1m -XX:+PrintFlagsFinal -version | grep ThreadStackSize
+     intx CompilerThreadStackSize                  = 2048                                   {pd product} {default}
+     intx ThreadStackSize                          = 1024                                   {pd product} {command line}
+     intx VMThreadStackSize                        = 2048                                   {pd product} {default}
+```
+
+Usually, there's no need to change the default, because the thread stack will be committed lazily as it grows. So no matter what's the default, the thread will always only commit as much stack as it really uses (at page size granularity). However there's one exception to this rule if [Transparent Huge Pages](https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html) (THP) are turned on by default on a system. In such a case the THP page size of 2mb matches exactly with the 2mb default stack size on aarch64 and most stacks will be backed up by a single huge page of 2mb. This means that the stack will be completely committed to memory right from the start. If you're using hundreds or even thousands of threads, this memory overhead can be considerable.
+
+To mitigate this issue, you can either manually change the stack size on the command line (as described above) or you can change the default for THP from `always` to `madvise` on Linux distributions like AL2 (with Linux kernel 5 and higher) on which the setting defaults to `always`:
+```
+# cat /sys/kernel/mm/transparent_hugepage/enabled
+[always] madvise never
+# echo madvise > /sys/kernel/mm/transparent_hugepage/enabled
+# cat /sys/kernel/mm/transparent_hugepage/enabled
+always [madvise] never
+```
+
+Notice that even if the the default is changed from `always` to `madvise`, the JVM can still use THP for the Java heap and code cache if you specify `-XX:+UseTransparentHugePages` on the command line.
+
 ### Looking for x86 shared-objects in JARs
 Java JARs can include shared-objects that are architecture specific. Some Java libraries check
 if these shared objects are found and if they are they use a JNI to call to the native library
