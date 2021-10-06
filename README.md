@@ -3,6 +3,7 @@
 This repository is meant to help new users start using the Arm-based AWS Graviton and Graviton2 processors which power the latest generation of Amazon EC2 instances. While it calls out specific features of the Graviton processors themselves, this repository is also generically useful for anyone running code on Arm.
 
 # Contents
+* [Transitioning to Graviton](#transitioning-to-graviton)
 * [Building for Graviton](#building-for-graviton-and-graviton2)
 * [Optimizing for Graviton](optimizing.md)
 * [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
@@ -24,6 +25,9 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 * [AWS Managed Services available on Graviton](managed_services.md)
 * [Graviton Performance Runbook](perfrunbook/graviton_perfrunbook.md)
 * [Additional resources](#additional-resources)
+
+# Transitioning to Graviton
+If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton2 and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton2 based Amazon EC2 instances](transition-guide.md)
 
 # Building for Graviton and Graviton2
 The Graviton CPU (powering [A1](https://aws.amazon.com/ec2/instance-types/a1/) instances) supports Arm V8.0 and includes support for CRC and crypto extensions.
