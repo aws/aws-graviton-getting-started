@@ -9,7 +9,7 @@ Service | Status | Resources |
 
 ## Graviton2 Function Finder Script
 
-This script will find the all functions on a runtime and in the regions that are currently supported by Graviton2.  The script also lists out the functions that are on a non-compatible runtime(requiring a runtime upgrade).
+This script will find the all functions on a runtime and in regions that are currently supported by Graviton2.  The script also lists out the functions that are on a non-compatible runtime(requiring a runtime upgrade).
 
 This script can be easily copy and pasted into a[AWS CloudShell](https://aws.amazon.com/cloudshell/) shell.  
 
