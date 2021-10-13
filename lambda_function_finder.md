@@ -1,10 +1,3 @@
-In addition to the AWS Graviton2-based Amazon EC2 instances and managed services, Graviton2 is also available via serverless services such as [AWS Lambda](https://aws.amazon.com/lambda/). 
-
-Note: You can always find the latest Graviton announcements via these [What's New posts](https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&whats-new-content-all.q=Graviton&whats-new-content-all.q_operator=AND#What.27s_New_Feed).
-
-Service | Status | Resources |
- :-: | :-: | --- |
-[AWS Lambda](https://aws.amazon.com/lambda/) | GA | What's New: [Achieve up to 34% better price/performance with AWS Lambda Functions powered by AWS Graviton2 processor](https://aws.amazon.com/about-aws/whats-new/2021/09/better-price-performance-aws-lambda-functions-aws-graviton2-processor/) <br>Related blog: <br>[AWS Lambda Functions Powered by AWS Graviton2 Processor – Run Your Functions on Arm and Get Up to 34% Better Price Performance](https://aws.amazon.com/blogs/aws/aws-lambda-functions-powered-by-aws-graviton2-processor-run-your-functions-on-arm-and-get-up-to-34-better-price-performance/)<br>Documentation:<br>[AWS Lambda Layers](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html)
 
 
 ## Graviton2 Function Finder Script
