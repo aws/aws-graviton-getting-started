@@ -1,16 +1,10 @@
-
-
-## Graviton2 Function Finder Script
-
-This script will find the all functions on a runtime and in regions that are currently supported by Graviton2.  The script also lists out the functions that are on a non-compatible runtime(requiring a runtime upgrade).
-
-This script can be easily copy and pasted into a [AWS CloudShell](https://aws.amazon.com/cloudshell/) shell.  
-
-```
+#!/bin/bash
 
 # Graviton2 Function Finder
 # Identify Lambda functions with Graviton2 compatiable and not-ompatiable runtimes versions.  Looks in all regions where Graviton2 Lambda is currently available.
-# Lambda runtimes support for Graviton2 : https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
+# Lambda runtimes support for Graviton2 docs: https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
+# This script can be easily copy and pasted into a AWS CloudShell https://aws.amazon.com/cloudshell/ shell
+
 
 echo "Graviton2 Function Support Finder"
 
@@ -61,5 +55,3 @@ do
 
 done
 echo "finished"
-
-```
