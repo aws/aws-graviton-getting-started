@@ -28,7 +28,7 @@ Starred version marks the default system compiler.
 
 Distribution    | GCC                  | Clang/LLVM
 ----------------|----------------------|-------------
-Amazon Linux 2  | 7*, 10               | 7
+Amazon Linux 2  | 7*, 10               | 7, 11*
 Ubuntu 20.04    | 7, 8, 9*, 10         | 6, 7, 8, 9, 10, 11
 Ubuntu 18.04    | 4.8, 5, 6, 7*, 8     | 3.9, 4, 5, 6, 7, 8, 9, 10
 Debian10        | 7, 8*                | 6, 7, 8
