@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 # Graviton2 Function Finder
 # Identify Lambda functions with Graviton2 compatiable and not-ompatiable runtimes versions.  Looks in all regions where Graviton2 Lambda is currently available.
@@ -10,27 +10,24 @@ unsupported_runtimes=(python3.6 python3.7 python2.7 nodejs10.x dotnetcore2.1 rub
 
 echo "Graviton2 Function Support Finder"
 
-for region in "${supported_regions[@]}"
-do
-    echo "  "
-    echo "Region: [${region}] - Functions WITH Graviton Compatible Runtimes"
-    echo "  "
+for region in "${supported_regions[@]}"; do
+	echo "  "
+	echo "Region: [${region}] - Functions WITH Graviton Compatible Runtimes"
+	echo "  "
 
-    for runtime in "${supported_runtimes[@]}"
-    do
-            aws lambda list-functions --region ${region} --output text --query "Functions[?Runtime=='${runtime}'].{ARN:FunctionArn, Runtime:Runtime}"
-    
-    # include the container image functions
-    aws lambda list-functions --region ${region} --output text --query "Functions[?PackageType=='Image'].{ARN:FunctionArn, PackageType:'container-image'}"
-    done
-    
-    echo "  "
-    echo "Region: [${region}] - Functions with Runtimes that are NOT Compatible with Graviton2. Require a Runtime version update."
-    echo "  "
+	for runtime in "${supported_runtimes[@]}"; do
+		aws lambda list-functions --region "${region}" --output text --query "Functions[?Runtime=='${runtime}'].{ARN:FunctionArn, Runtime:Runtime}"
 
-    for runtime in "${unsupported_runtimes[@]}"
-    do
-            aws lambda list-functions --region ${region} --output text --query "Functions[?Runtime=='${runtime}'].{ARN:FunctionArn, Runtime:Runtime}"
-    done
+		# include the container image functions
+		aws lambda list-functions --region "${region}" --output text --query "Functions[?PackageType=='Image'].{ARN:FunctionArn, PackageType:'container-image'}"
+	done
+
+	echo "  "
+	echo "Region: [${region}] - Functions with Runtimes that are NOT Compatible with Graviton2. Require a Runtime version update."
+	echo "  "
+
+	for runtime in "${unsupported_runtimes[@]}"; do
+		aws lambda list-functions --region "${region}" --output text --query "Functions[?Runtime=='${runtime}'].{ARN:FunctionArn, Runtime:Runtime}"
+	done
 done
 echo "finished"
