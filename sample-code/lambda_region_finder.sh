@@ -10,12 +10,14 @@ unsupported_runtimes=(python3.6 python3.7 python2.7 nodejs10.x dotnetcore2.1 rub
 
 echo "Graviton2 Function Support Finder"
 
-for region in "${supported_regions[@]}"; do
+for region in "${supported_regions[@]}"
+        do
 	echo "  "
 	echo "Region: [${region}] - Functions WITH Graviton Compatible Runtimes"
 	echo "  "
 
-	for runtime in "${supported_runtimes[@]}"; do
+	for runtime in "${supported_runtimes[@]}"
+        do
 		aws lambda list-functions --region "${region}" --output text --query "Functions[?Runtime=='${runtime}'].{ARN:FunctionArn, Runtime:Runtime}"
 
 	done
@@ -28,7 +30,8 @@ for region in "${supported_regions[@]}"; do
 	echo "Region: [${region}] - Functions with Runtimes that are NOT Compatible with Graviton2. Require a Runtime version update."
 	echo "  "
 
-	for runtime in "${unsupported_runtimes[@]}"; do
+	for runtime in "${unsupported_runtimes[@]}"
+        do
 		aws lambda list-functions --region "${region}" --output text --query "Functions[?Runtime=='${runtime}'].{ARN:FunctionArn, Runtime:Runtime}"
 	done
 done
