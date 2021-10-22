@@ -15,6 +15,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 	* [Python](python.md)
 	* [Rust](rust.md)
 * [Containers on Graviton](containers.md)
+* [Lambda on Graviton](#lambda)
 * [Operating Systems support](os.md)
 * [Third-party Software Vendors](isv.md)
 * [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
@@ -67,6 +68,9 @@ zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloud
 # Containers on Graviton
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
 Please refer [here](containers.md) for information about running container-based workloads on Graviton.
+
+# Lambda
+[Graviton can run Lambda functions](https://aws.amazon.com/blogs/aws/aws-lambda-functions-powered-by-aws-graviton2-processor-run-your-functions-on-arm-and-get-up-to-34-better-price-performance/)! This [script](https://github.com/aws/aws-graviton-getting-started/blob/main/sample-code/lambda_region_finder.sh) provides an easy way to identify if existing Lambda functions use Graviton2 compatible runtime versions.
 
 # Operating Systems
 
