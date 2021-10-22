@@ -26,4 +26,16 @@ export RUSTFLAGS="-Ctarget-cpu=neoverse-n1"
 cargo build --release
 ```
 
+When Rust is configured to use LLVM 12 or newer, target feature
+`+outline-atomics` is available.  Outline-atomics produces a binary containing
+two versions of the atomic operation following the hardware capabilities.  When
+the code executes on a newer hardware such as Graviton2, the processor will
+execute LSE instructions; when the code executes on older hardware without LSE
+instructions, the processor will execute Armv8.0 atomics instructions.
 
+Rust 1.57 (release on December 2, 2021) enables by default outline-atomics
+target feature when compiling for arm64-linux with LLVM 12 or newer.  When using
+older Rust releases, outline-atomics target feature can be enabled with
+```
+export RUSTFLAGS="-Ctarget-feature=+outline-atomics"
+```
