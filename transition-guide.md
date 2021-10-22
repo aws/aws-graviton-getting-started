@@ -1,10 +1,10 @@
 # Considerations when transitioning workloads to AWS Graviton2 based Amazon EC2 instances
 
-AWS Graviton2 processors power Amazon EC2 general purpose (M6g, M6gd, T4g), compute optimized (C6g, C6gd, C6gn), and memory optimized (R6g, R6gd, X2gd) instances, that provide up to 40% better price-performance over comparable x86-based instances for a wide variety of Linux-based workloads. Examples include application servers, micro-services, high-performance computing, CPU-based machine learning inference, video encoding, electronic design automation, gaming, open-source databases, and in-memory caches. In many cases transitioning to AWS Graviton2 is as simple as updating your infrastructure-as-code to select the new instance type and associated Operating System (OS) Amazon Machine Image ([AMI](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)). However, because AWS Graviton processors implement the Arm64 instruction set, there can be additional software implications. This transition guide provides a step-by-step approach to assess your workload to identify and address any potential software changes that might be needed.
+AWS Graviton2 processors power Amazon EC2 general purpose (M6g, M6gd, T4g), compute optimized (C6g, C6gd, C6gn), and memory optimized (R6g, R6gd, X2gd) instances, that provide up to 40% better price-performance over comparable x86-based instances for a wide variety of Linux-based workloads. Examples include application servers, micro-services, high-performance computing, CPU-based machine learning inference, video encoding, electronic design automation, gaming, open-source databases, and in-memory caches. In most cases transitioning to AWS Graviton2 is as simple as updating your infrastructure-as-code to select the new instance type and associated Operating System (OS) Amazon Machine Image ([AMI](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)). However, because AWS Graviton processors implement the Arm64 instruction set, there can be additional software implications. This transition guide provides a step-by-step approach to assess your workload to identify and address any potential software changes that might be needed.
 
 ## Introduction - identifying target workloads
 
-The quickest and easiest workloads to transition are Linux-based, and built using open-source components or in-house applications where you control the source code. Many open source projects already support Arm64 and by extension Graviton2, and having access to the source code allows you to build from source if pre-built artifacts do not already exist. There is also a large and growing set of Independent Software Vendor (ISV) software available for Graviton2. However if you license software you’ll want to check with the respective ISV to ensure they already, or have plans to, support the Arm64 instruction set.
+The quickest and easiest workloads to transition are Linux-based, and built using open-source components or in-house applications where you control the source code. Many open source projects already support Arm64 and by extension Graviton2, and having access to the source code allows you to build from source if pre-built artifacts do not already exist. There is also a large and growing set of Independent Software Vendor (ISV) software available for Graviton2 (a non-exhaustive list can be found [here](isv.md). However if you license software you’ll want to check with the respective ISV to ensure they already, or have plans to, support the Arm64 instruction set.
 
 The following transition guide is organized into a logical sequence of steps as follows:
 
@@ -40,6 +40,13 @@ Before starting the transition, you will need to inventory your current software
 * All the libraries, frameworks and runtimes used by the application.
 * Tools used to build, deploy and test your application (e.g. compilers, test suites, CI/CD pipelines, provisioning tools and scripts). Note there are language specific sections in the getting started guide with useful pointers to getting the best performance from Graviton2 processors.
 * Tools and/or agents used to deploy and manage the application in production (e.g. monitoring tools or security agents)
+* This guide contains language specifics sections where you'll find additional per-language guidance:
+  * [C/C++](c-c++.md)
+  * [Go](golang.md)
+  * [Java](java.md)
+  * [.NET](dotnet.md) 
+  * [Python](python.md)
+  * [Rust](rust.md)
 
 As a rule the more current your software environment the more likely you will obtain the full performance entitlement from Graviton2.
 
