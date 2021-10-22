@@ -70,7 +70,7 @@ You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon E
 Please refer [here](containers.md) for information about running container-based workloads on Graviton.
 
 # Lambda
-[Graviton can run Lambda functions](https://aws.amazon.com/blogs/aws/aws-lambda-functions-powered-by-aws-graviton2-processor-run-your-functions-on-arm-and-get-up-to-34-better-price-performance/)! This [script](https://github.com/aws/aws-graviton-getting-started/blob/main/sample-code/lambda_region_finder.sh) provides an easy way to identify if existing Lambda functions are use Graviton2 compatible runtime versions.
+[Graviton can run Lambda functions](https://aws.amazon.com/blogs/aws/aws-lambda-functions-powered-by-aws-graviton2-processor-run-your-functions-on-arm-and-get-up-to-34-better-price-performance/)! This [script](https://github.com/aws/aws-graviton-getting-started/blob/main/sample-code/lambda_region_finder.sh) provides an easy way to identify if existing Lambda functions use Graviton2 compatible runtime versions.
 
 # Operating Systems
 
