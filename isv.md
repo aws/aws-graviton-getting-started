@@ -2,7 +2,7 @@
 We have compiled a list of Independent Software Vendor (ISV) products publicly listing arm64/Graviton support.
 If your favorite ISV product isn't listed below, it doesn't mean it's not supported.
 
-We welcome your feedback at ec2-arm-dev-feedback@amazon.com or by opening an issue in this GitHub repo.
+We welcome your feedback at ec2-arm-dev-feedback@amazon.com or by opening an issue in this GitHub repo. We also welcome your Pull Requests updating this list.
 
 Additionally:
 - If you are a developer looking for ISV product support for arm64, please also reach out to your ISV.
