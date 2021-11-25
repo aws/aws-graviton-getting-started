@@ -21,10 +21,10 @@ def sar(time):
     Measure sar into a buffer for parsing
     """
     try:
-        env = dict(os.environ, S_TIME_FORMAT="ISO")
-        res = subprocess.run(["sar", "-o", "out.dat", "-A", "1", f"{time}"], timeout = time+5, env = env,
-                             check = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-        res = subprocess.run(["sar", "-f", "out.dat", "-A", "1"], env = env, check = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+        env = dict(os.environ, S_TIME_FORMAT="ISO", LC_TIME="ISO")
+        res = subprocess.run(["sar", "-o", "out.dat", "-A", "1", f"{time}"], timeout=time+5, env=env,
+                             check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        res = subprocess.run(["sar", "-f", "out.dat", "-A", "1"], env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         os.remove("out.dat")
         return io.StringIO(res.stdout.decode('utf-8'))
     except subprocess.CalledProcessError:
@@ -38,9 +38,9 @@ def mpstat(time):
     Measure mpstat into a buffer for parsing
     """
     try:
-        env = dict(os.environ, S_TIME_FORMAT="ISO")
-        res = subprocess.run(["mpstat", "-I", "ALL", "-o", "JSON", "1", f"{time}"], timeout = time+5, env = env,
-                              check = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+        env = dict(os.environ, S_TIME_FORMAT="ISO", LC_TIME="ISO")
+        res = subprocess.run(["mpstat", "-I", "ALL", "-o", "JSON", "1", f"{time}"], timeout=time+5, env=env,
+                              check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return io.StringIO(res.stdout.decode('utf-8'))
     except subprocess.CalledProcessError:
         print("Failed to measure statistics with mpstat")
