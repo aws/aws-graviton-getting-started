@@ -120,7 +120,10 @@ A developer wanting to build an application or library that can detect the suppo
   has_lse_feature = hwcaps & HWCAP_ATOMICS ? true : false;
   has_fp16_feature = hwcaps & HWCAP_FPHP ? true : false;
   has_dotprod_feature = hwcaps & HWCAP_ASIMDDP ? true : false;
+  has_sve_feature = hwcaps & HWCAP_SVE ? true : false;
 ```
+
+The full list of arm64 hardware capabilities is defined in [glibc header file](https://github.com/bminor/glibc/blob/master/sysdeps/unix/sysv/linux/aarch64/bits/hwcap.h) and in the [Linux kernel](https://github.com/torvalds/linux/blob/master/arch/arm64/include/asm/hwcap.h).
 
 ## Porting codes with SSE/AVX intrinsics to NEON
 
