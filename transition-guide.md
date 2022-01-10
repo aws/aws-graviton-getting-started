@@ -89,7 +89,7 @@ Now that you have your application stack on Graviton2, you should run your test 
 
 With your fully functional application its time to establish a performance baseline on Graviton2. In most cases, you should expect performance gains. When comparing to existing x86-64 instances, we recommend running tests by fully loading both systems to determine the maximum possible price/performance. You can then determine and configure an appropriate load level for your production environment before performing the deployment.
 
-Important: This repository has sections dedicated to [Optimization](optimizing.md) and a [Performance Runbook](graviton_perfrunbook.md) for you to follow during this stage.
+Important: This repository has sections dedicated to [Optimization](optimizing.md) and a [Performance Runbook](perfrunbook/graviton_perfrunbook.md) for you to follow during this stage.
 
 If after reading the documentation in this repository and following the recommendations you do not observe expected performance then please reach out to your AWS account team, or send email to [ec2-arm-dev-feedback@amazon.com](mailto:ec2-arm-dev-feedback@amazon.com) with details so we can assist you with your performance observations.
 
