@@ -35,7 +35,5 @@ Some application, written with the x86 architecture in mind, set the active dpdk
 
 ## Known issues
 
-* **rte_eth_stats_get:** The function rte_eth_stats_get does not work properly on C6gn instances. Applications, such as testpmd, that use this function to report statistics will report 0 instead of actual packet counts. This is a known issue and will be addressed soon.
-
 * **testpmd:** The flowgen function of testpmd does not work correctly when compiled with GCC 9 and above. It generates IP packets with wrong checksum which are dropped when transmitted between AWS instances (including Graviton2). This is a known issue and there is a [patch](https://patches.dpdk.org/patch/84772/) that fixes it.
 
