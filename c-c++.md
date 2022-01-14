@@ -13,10 +13,16 @@ Note: GCC-7 does not support `+rcpc+dotprod`.
 
 ### Core Specific Tuning
 
-CPU      | GCC < 9              | GCC >=9
----------|----------------------|-------------
-Graviton | `-mtune=cortex-a72`  | `-mtune=cortex-a72`
+When compiling code for Graviton processors, we recommend to use by default
+Graviton2 tuning `-mtune=neoverse-n1`.  With this flag the compiler will produce
+fast code for all Graviton processors.  In case the target processor is known
+ahead of compilation time, one can use the following flags:
+
+CPU       | GCC < 9              | GCC >=9
+----------|----------------------|-------------
+Graviton  | `-mtune=cortex-a72`  | `-mtune=cortex-a72`
 Graviton2 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
+Graviton3 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
 
 ### Compilers
 
