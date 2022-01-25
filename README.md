@@ -3,29 +3,21 @@
 This repository is meant to help new users start using the Arm-based AWS Graviton and Graviton2 processors which power the latest generation of Amazon EC2 instances. While it calls out specific features of the Graviton processors themselves, this repository is also generically useful for anyone running code on Arm.
 
 # Contents
-* [Transitioning to Graviton](#transitioning-to-graviton)
-* [Building for Graviton](#building-for-graviton-and-graviton2)
-* [Optimizing for Graviton](optimizing.md)
-* [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
-* [Recent software updates relevant to Graviton](#recent-software-updates-relevant-to-graviton)
-* Language-specific considerations
-	* [C/C++](c-c++.md)
-	* [Go](golang.md)
-	* [Java](java.md)
-	* [.NET](dotnet.md)
-	* [Python](python.md)
-	* [Rust](rust.md)
-* [Containers on Graviton](containers.md)
-* [Lambda on Graviton](#lambda)
-* [Operating Systems support](os.md)
-* [Third-party Software Vendors](isv.md)
-* [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
-* [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
-* [TensorFlow](tensorflow.md)
-* [Known issues and workarounds](#known-issues-and-workarounds)
-* [AWS Managed Services available on Graviton](managed_services.md)
-* [Graviton Performance Runbook](perfrunbook/graviton_perfrunbook.md)
-* [Additional resources](#additional-resources)
+- [Getting started with AWS Graviton](#getting-started-with-aws-graviton)
+- [Contents](#contents)
+- [Transitioning to Graviton](#transitioning-to-graviton)
+- [Building for Graviton and Graviton2](#building-for-graviton-and-graviton2)
+- [Optimizing for Graviton](#optimizing-for-graviton)
+- [Recent software updates relevant to Graviton](#recent-software-updates-relevant-to-graviton)
+- [Containers on Graviton](#containers-on-graviton)
+- [Lambda](#lambda)
+- [Operating Systems](#operating-systems)
+- [Known issues and workarounds](#known-issues-and-workarounds)
+  - [Postgres](#postgres)
+  - [Python installation on some Linux distros](#python-installation-on-some-linux-distros)
+  - [Bazel on Linux](#bazel-on-linux)
+  - [zlib on Linux](#zlib-on-linux)
+- [Additional resources](#additional-resources)
 
 # Transitioning to Graviton
 If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton2 and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton2 based Amazon EC2 instances](transition-guide.md)
@@ -73,8 +65,10 @@ zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloud
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
 Please refer [here](containers.md) for information about running container-based workloads on Graviton.
 
-# Lambda
-[Graviton can run Lambda functions](https://aws.amazon.com/blogs/aws/aws-lambda-functions-powered-by-aws-graviton2-processor-run-your-functions-on-arm-and-get-up-to-34-better-price-performance/)! This [script](https://github.com/aws/aws-graviton-getting-started/blob/main/sample-code/lambda_region_finder.sh) provides an easy way to identify if existing Lambda functions use Graviton2 compatible runtime versions.
+# [Lambda](/aws-lambda/README.md)
+[AWS Lambda](https://aws.amazon.com/lambda/) now allows you to configure new and existing functions to run on Arm-based AWS Graviton2 processors in addition to x86-based functions. Using this processor architecture option allows you to get up to 34% better price performance. Duration charges are 20 percent lower than the current pricing for x86 with [millisecond granularity](https://aws.amazon.com/blogs/aws/new-for-aws-lambda-1ms-billing-granularity-adds-cost-savings/). This also applies to duration charges when using [Provisioned Concurrency](https://aws.amazon.com/blogs/aws/new-provisioned-concurrency-for-lambda-functions/). Compute [Savings Plans](https://aws.amazon.com/blogs/aws/savings-plan-update-save-up-to-17-on-your-lambda-workloads/) supports Lambda functions powered by Graviton2.
+
+The [Lambda](/aws-lambda/README.md) page highlights some of the migration considerations and also provides some simple to deploy demos you can use to explore how to build and migrate to Lambda functions using Arm/Graviton2.
 
 # Operating Systems
 
