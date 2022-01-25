@@ -25,7 +25,7 @@ For compiled languages like Rust and Go, you can use the `provided.al2` [custom 
 
 When compiling for Go, set `GOARCH` to `arm`.
 ```
-GOOS=linux GOARCH=arm go build
+GOOS=linux GOARCH=arm64 go build
 ```
 When compiling for Rust, set the `target`.
 ```
