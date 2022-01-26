@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Transform:
+- AWS::Serverless-2016-10-31
+
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+  LambdaNumberFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Architectures:
+        - arm64
+      MemorySize: 128
+      Timeout: 100
+      Description: A Lambda function that returns a static string.           
+      Events:
+        Proxy:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: post
+            ApiId: !Ref HttpApi      
+
+Outputs:
+  ApiBasePath:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com" 
