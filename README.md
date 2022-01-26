@@ -40,10 +40,6 @@ across large systems. In addition, it has support for fp16 and 8-bit dot
 product for machine learning, and relaxed consistency-processor consistent
 (RCpc) memory ordering.
 
-In addition, to make it easier to develop, test, and run your applications on T4g instances, all AWS customers are automatically enrolled in a free trial on the t4g.micro size. 
-Starting September 2020 until December 31, 2021, you can run a t4g.micro instance and automatically get 750 free hours per month deducted from your bill, including any [CPU credits](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/burstable-performance-instances-unlimited-mode-concepts.html#unlimited-mode-surplus-credits) during the free 750 hours of usage.
- The 750 hours are calculated in aggregate across all regions. For details on terms and conditions of the free trial, please refer to the [EC2 FAQs](https://aws.amazon.com/ec2/faqs/).
-
 # Optimizing for Graviton
 Please refer [here](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/graviton_perfrunbook.md).
 
