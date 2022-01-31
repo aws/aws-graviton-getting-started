@@ -23,7 +23,7 @@ If your functions don’t use architecture-specific dependencies or binaries, yo
 ### Building function code for Graviton2
 For compiled languages like Rust and Go, you can use the `provided.al2` [custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html), which supports Arm. You provide a binary that communicates with the [Lambda Runtime API](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-api.html).
 
-When compiling for Go, set `GOARCH` to `arm`.
+When compiling for Go, set `GOARCH` to `arm64`.
 ```
 GOOS=linux GOARCH=arm64 go build
 ```
@@ -55,10 +55,10 @@ Demo requirements:
 Clone the repository and change into the demo directory
 ```
 git clone https://github.com/aws/aws-graviton-getting-started
-cd aws-lambda/GravitonLambdaNumber
+cd aws-graviton-getting-started/aws-lambda/GravitonLambdaNumber
 ```
 ### Migrating a Lambda function from x86 to arm64
-This demo shows how to migrate an existing Lambda function from x86 to arm64.
+This demo shows how to migrate an existing Lambda function from x86 to arm64 using an x86 based workstation.
 The Node.js function code in [`/src/app.js`](/src/app.js) uses the [axios](https://www.npmjs.com/package/axios) client to connect to a third part service, [http://numbersapi.com/](http://numbersapi.com/), to find interesting facts about numbers. As the axios library is not a binary file, it can seamlessly work on Graviton2 without compilation.
 
 The existing application consists of an API endpoint which invokes the Lambda function, retrieves the number fact, and returns the response.
@@ -119,7 +119,7 @@ The function has seamlessly migrated from x86 to arm64.
 ### Building a Lambda function with binary dependencies
 
 This function has no binary dependencies. If you do have a function that required compilation for arm64, AWS SAM can use an arm64 build container image to create the artifacts for arm64.
-This allows you to build arm64 specific dependencies on an x86 workstation.
+This functionality works both ways. You can build arm64 specific dependencies on an x86 workstation and also build x86 specific dependencies on an arm64 workstation.
 
 Specify `--use-container` to use the build container.
 ```
