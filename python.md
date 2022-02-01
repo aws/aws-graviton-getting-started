@@ -66,6 +66,17 @@ numerical applications NumPy and SciPy provide an interface to high performance
 computing libraries such as ATLAS, BLAS, BLIS, OpenBLAS, etc.  These libraries
 contain code tuned for Graviton processors.
 
+It is recommended to use the latest software versions as much as possible. If the latest
+version migration is not feasible, please ensure that it is atleast the minimum version
+recommended below because multiple fixes related to data precision and correctness on
+aarch64 went into OpenBLAS between v0.3.9 and v0.3.17 and the below SciPy and NumPy versions
+upgraded OpenBLAS from v0.3.9 to OpenBLAS v0.3.17.
+
+OpenBLAS:  >= v0.3.17
+SciPy: >= v1.7.2
+NumPy: >= 1.21.1
+
+
 ### 2.1 BLIS may be a faster BLAS
 
 The default SciPy and NumPy binary installations with `pip3 install numpy scipy`
