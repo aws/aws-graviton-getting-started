@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Graviton2 demo to show how to compare x86 and arm64 Lamda functions using AWS Lambda Power Tuning
+Globals:
+  Function:
+    Timeout: 30
+Resources:
+  PythonPrimeArmFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - arm64
+  PythonPrimeX86Function:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+
+Outputs:
+  PythonPrimeX86Function:
+    Description: "Python Prime Lambda Function ARN"
+    Value: !GetAtt PythonPrimeX86Function.Arn
+  PythonPrimeArmFunction:
+    Description: "Python Prime Lambda Function ARN"
+    Value: !GetAtt PythonPrimeArmFunction.Arn

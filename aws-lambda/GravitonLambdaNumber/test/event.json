@@ -1,0 +1,40 @@
+{
+    "version":"2.0",
+    "routeKey":"POST /",
+    "rawPath":"/",
+    "rawQueryString":"",
+    "headers":{
+       "accept":"*/*",
+       "accept-encoding":"gzip, deflate, br",
+       "cache-control":"no-cache",
+       "content-length":"35",
+       "content-type":"text/plain",
+       "host":"9g3ig6efh4.execute-api.us-east-1.amazonaws.com",
+       "postman-token":"0cfffa2a-1a7f-45fc-aca3-f6f5a5a82b4c",
+       "user-agent":"PostmanRuntime/7.28.4",
+       "x-amzn-trace-id":"Root=1-61659828-37b7998625b8c6ce454b6f3a",
+       "x-forwarded-for":"90.201.252.231",
+       "x-forwarded-port":"443",
+       "x-forwarded-proto":"https"
+    },
+    "requestContext":{
+       "accountId":"978558897928",
+       "apiId":"9g3ig6efh4",
+       "domainName":"9g3ig6efh4.execute-api.us-east-1.amazonaws.com",
+       "domainPrefix":"9g3ig6efh4",
+       "http":{
+          "method":"POST",
+          "path":"/",
+          "protocol":"HTTP/1.1",
+          "sourceIp":"90.201.252.231",
+          "userAgent":"PostmanRuntime/7.28.4"
+       },
+       "requestId":"HGS2Zg9IoAMESFA=",
+       "routeKey":"POST /",
+       "stage":"$default",
+       "time":"12/Oct/2021:14:14:00 +0000",
+       "timeEpoch":1634048040709
+    },
+    "body":"{ \"number\": \"234\", \"type\": \"date\" }",
+    "isBase64Encoded":false
+ }
