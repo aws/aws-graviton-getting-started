@@ -120,9 +120,44 @@ A developer wanting to build an application or library that can detect the suppo
   has_lse_feature = hwcaps & HWCAP_ATOMICS ? true : false;
   has_fp16_feature = hwcaps & HWCAP_FPHP ? true : false;
   has_dotprod_feature = hwcaps & HWCAP_ASIMDDP ? true : false;
+  has_sve_feature = hwcaps & HWCAP_SVE ? true : false;
 ```
 
+The full list of arm64 hardware capabilities is defined in [glibc header file](https://github.com/bminor/glibc/blob/master/sysdeps/unix/sysv/linux/aarch64/bits/hwcap.h) and in the [Linux kernel](https://github.com/torvalds/linux/blob/master/arch/arm64/include/asm/hwcap.h).
+
 ## Porting codes with SSE/AVX intrinsics to NEON
+
+### Detecting arm64 systems
+
+Projects may fail to build on arm64 with `error: unrecognized command-line
+option '-msse2'`, or `-mavx`, `-mssse3`, etc.  These compiler flags enable x86
+vector instructions.  The presence of this error means that the build system may
+be missing the detection of the target system, and continues to use the x86
+target features compiler flags when compiling for arm64.
+
+To detect an arm64 system, the build system can use:
+```
+# (test $(uname -m) = "aarch64" && echo "arm64 system") || echo "other system"
+```
+
+Another way to detect an arm64 system is to compile, run, and check the return
+value of a C program:
+```
+# cat << EOF > check-arm64.c
+int main () {
+#ifdef __aarch64__
+  return 0;
+#else
+  return 1;
+#endif
+}
+EOF
+
+# gcc check-arm64.c -o check-arm64
+# (./check-arm64 && echo "arm64 system") || echo "other system"
+```
+
+### Translating x86 intrinsics to NEON
 
 When programs contain code with x64 intrinsics, the following procedure can help
 to quickly obtain a working program on Arm, assess the performance of the
