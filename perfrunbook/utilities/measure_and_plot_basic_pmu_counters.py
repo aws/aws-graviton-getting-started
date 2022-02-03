@@ -116,6 +116,7 @@ counter_mapping = {
                         "inst-tlb-tw-pki": ["armv8_pmuv3_0/event=0x35/", "armv8_pmuv3_0/event=0x8/", 1000],
                         "data-tlb-mpki": ["armv8_pmuv3_0/event=0x5/", "armv8_pmuv3_0/event=0x8/", 1000],
                         "data-tlb-tw-pki": ["armv8_pmuv3_0/event=0x34/", "armv8_pmuv3_0/event=0x8/", 1000],
+                        "code-sparsity": ["armv8_pmuv3_0/event=0x11c/", "armv8_pmuv3_0/event=0x8/", 1000],
                         },
                       "CXL":
                       {
@@ -140,7 +141,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--stat", default="ipc", type=str, choices=["ipc", "branch-mpki", "data-l1-mpki", "inst-l1-mpki", "l2-mpki", "l3-mpki",
                                                                     "stall_frontend_pkc", "stall_backend_pkc", "inst-tlb-mpki", "inst-tlb-tw-pki",
-                                                                    "data-tlb-mpki", "data-tlb-tw-pki"]) #, "l2-tlb-mpki"])
+                                                                    "data-tlb-mpki", "data-tlb-tw-pki", "code-sparsity"]) #, "l2-tlb-mpki"])
     parser.add_argument("--plot", default="terminal", type=str, choices=["terminal", "matplotlib"],
                         help="What display type to use, terminal (ascii art!) or matplotlib (for Jupyter notebooks)")
     parser.add_argument("--uarch", default="Graviton2", type=str, choices=["Graviton2", "CXL"],
