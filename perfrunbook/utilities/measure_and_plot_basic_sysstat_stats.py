@@ -49,13 +49,18 @@ def mpstat(time):
 
 def plot_terminal(data, title, xlabel, yrange):
     """
-    Plot data to the terminal using gnuplot
+    Plot data to the terminal using plotext
     """
-    import gnuplotlib as gp
-    x = data.index.to_numpy()
-    y = data[title].to_numpy()
-    gp.plot(x, y, _with = 'lines', terminal = 'dumb 160,40', unset = 'grid', set = f"yrange [{yrange[0]}:{yrange[1]}]", title = title, xlabel = xlabel)
+    import plotext as plt
+    x = data.index.tolist()
+    y = data[title].tolist()
 
+    plt.scatter(x, y)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylim(*yrange)
+    plt.plot_size(100, 30)
+    plt.show()
 
 def plot_matplotlib(data, title, xlabel, yrange):
     import seaborn as sb

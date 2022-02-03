@@ -97,6 +97,7 @@ Front end stalls commonly occur if the CPU cannot fetch the proper instructions,
 2. Measure `inst-l1-mpki`.  A value >20 indicates the working-set code footprint is large and is spilling out of the fastest cache on the processor and is potentially a bottleneck.
 3. Measure `inst-tlb-mpki`. A value >0 indicates the CPU has to do extra stalls to translate the virtual addresses of instructions into physical addresses before fetching them and the footprint is too large.
 4. Measure `inst-tlb-tw-pki` . A value >0 indicates the instruction footprint might be too large.
+5. Measure `code-sparsity` . A number >0.5 indicates the code being executed by the CPU is very sparse. This counter is only available on Graviton 16xlarge or metal instances. If the number is >0.5 for please see [Optimizing For Large Instruction Footprints](./optimization_recommendation.md#optimizing-for-large-instruction-footprint).
 5. If front-end stalls are the root cause, the instruction footprint needs to be made smaller, proceed to [Section 6](./optimization_recommendation.md) for suggestions on how to reduce front end stalls for your application..
 
 ### Drill down back-end stalls
