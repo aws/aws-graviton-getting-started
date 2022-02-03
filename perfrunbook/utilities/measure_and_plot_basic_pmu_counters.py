@@ -38,12 +38,17 @@ def perfstat(time, counter_numerator, counter_denominator, __unused__):
 
 def plot_terminal(data, title, xtitle):
     """
-    Plot data to the terminal using gnuplotlib
+    Plot data to the terminal using plotext
     """
-    import gnuplotlib as gp
-    x = data.index.to_numpy()
-    y = data[title].to_numpy()
-    gp.plot(x, y, _with = 'lines', terminal = 'dumb 160,40', unset = 'grid', title = title, xlabel = xtitle)
+    import plotext as plt
+    x = data.index.tolist()
+    y = data[title].tolist()
+
+    plt.scatter(x, y)
+    plt.title(title)
+    plt.xlabel(xtitle)
+    plt.plot_size(100, 30)
+    plt.show()
 
 
 def plot_matplotlib(data, title, xtitle):

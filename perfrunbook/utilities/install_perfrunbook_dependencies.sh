@@ -12,9 +12,9 @@ install_al2_dependencies () {
   yum install -y -q perf kernel-devel-$(uname -r) bcc
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
-  yum install -y -q python3 python3-pip gnuplot
+  yum install -y -q python3 python3-pip
   python3 -m pip install --upgrade pip
-  python3 -m pip install pandas numpy gnuplotlib scipy matplotlib sh
+  python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
@@ -32,9 +32,9 @@ install_ubuntu2004_dependencies () {
   apt-get install -y -q linux-tools-$(uname -r) linux-headers-$(uname -r) bpfcc-tools
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
-  apt-get install -y -q python3-dev python3-pip gnuplot
+  apt-get install -y -q python3-dev python3-pip
   python3 -m pip install --upgrade pip
-  python3 -m pip install pandas numpy gnuplotlib scipy matplotlib sh
+  python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
