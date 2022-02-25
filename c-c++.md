@@ -1,22 +1,30 @@
 # C/C++ on Graviton
 
 ### Enabling Arm Architecture Specific Features
-To build code with the optimal processor features use the following. If you want to support both Graviton
-and Graviton2 you'll have to limit yourself to the Graviton features.
 
-CPU      | GCC                  | LLVM
----------|----------------------|-------------
-Graviton | `-march=armv8-a+crc+crypto` | `-march=armv8-a+crc+crypto`
+To build code with the optimal processor features use the following.
+We recommend using Graviton2 processor features when targeting both Graviton2 and Graviton3.
+
+CPU       | GCC                         | LLVM
+----------|-----------------------------|-------------
+Graviton  | `-march=armv8-a+crc+crypto` | `-march=armv8-a+crc+crypto`
 Graviton2 | `-march=armv8.2-a+fp16+rcpc+dotprod+crypto` |`-march=armv8.2-a+fp16+rcpc+dotprod+crypto`
+Graviton3 | `-march=armv8.2-a+fp16+rcpc+dotprod+crypto` |`-march=armv8.2-a+fp16+rcpc+dotprod+crypto`
 
 Note: GCC-7 does not support `+rcpc+dotprod`.
 
 ### Core Specific Tuning
 
-CPU      | GCC < 9              | GCC >=9
----------|----------------------|-------------
-Graviton | `-mtune=cortex-a72`  | `-mtune=cortex-a72`
+When compiling code for Graviton processors, we recommend to use by default
+Graviton2 tuning `-mtune=neoverse-n1`.  With this flag the compiler will produce
+fast code for all Graviton processors.  In case the target processor is known
+ahead of compilation time, one can use the following flags:
+
+CPU       | GCC < 9              | GCC >=9
+----------|----------------------|-------------
+Graviton  | `-mtune=cortex-a72`  | `-mtune=cortex-a72`
 Graviton2 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
+Graviton3 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
 
 ### Compilers
 
