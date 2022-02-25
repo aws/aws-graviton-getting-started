@@ -45,10 +45,10 @@ sudo systemctl start docker
 sudo usermod -a -G docker ubuntu
 
 # pull the tensorflow docker container with onednn-acl optimizations enabled
-docker pull armswdev/tensorflow-arm-neoverse-n1:r21.11-tf-2.7.0-onednn-acl
+docker pull armswdev/tensorflow-arm-neoverse
 
 # launch the docker image
-docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/tensorflow-arm-neoverse-n1:r21.11-tf-2.7.0-onednn-acl
+docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/tensorflow-arm-neoverse
 
 # Graviton3 (eg: c7g instances) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
 export DNNL_DEFAULT_FPMATH_MODE=BF16
