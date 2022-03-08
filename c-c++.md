@@ -46,10 +46,9 @@ SUSE Linux ES15 | 7*, 9, 10            | 7
 
 ### Large-System Extensions (LSE)
 
-The Graviton2 processor in C6g, M6g, and R6g instances has support for the
-Armv8.2 instruction set.  Armv8.2 specification includes the large-system
-extensions (LSE) introduced in Armv8.1. LSE provides low-cost atomic operations.
-LSE improves system throughput for CPU-to-CPU communication, locks, and mutexes.
+The Graviton2 and Graviton3 processors have support for the Large-System Extensions (LSE)
+which was first introduced in vArmv8.1. LSE provides low-cost atomic operations which can
+improve system throughput for CPU-to-CPU communication, locks, and mutexes.
 The improvement can be up to an order of magnitude when using LSE instead of
 load/store exclusives.
 
@@ -57,8 +56,10 @@ POSIX threads library needs LSE atomic instructions.  LSE is important for
 locking and thread synchronization routines.  The following systems distribute
 a libc compiled with LSE instructions:
 - Amazon Linux 2,
+- Amazon Linux 2022,
 - Ubuntu 18.04 (needs `apt install libc6-lse`),
-- Ubuntu 20.04.
+- Ubuntu 20.04,
+- Ubuntu 22.04.
 
 The compiler needs to generate LSE instructions for applications that use atomic
 operations.  For example, the code of databases like PostgreSQL contain atomic
