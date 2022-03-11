@@ -49,7 +49,7 @@ We have compiled a list of popular software within the container ecosystem that 
 |CNI	 | 	https://github.com/containernetworking/plugins/releases/	| | 	  
 |Cri-o	 | 	https://github.com/cri-o/cri-o/blob/master/README.md#installing-crio | tested on Ubuntu 18.04 and 20.04	|
 |Trivy	 | 	https://github.com/aquasecurity/trivy/releases/	 	 | |
-|Argo	 | 	https://github.com/argoproj/argo/releases/	 	 	 | |
+|Argo	 | 	https://github.com/argoproj/argo/releases/	 	 	 | arm64 images published as of 2.3.0 |
 |Cilium	| https://docs.cilium.io/en/stable/contributing/development/images/ |  Multi arch supported from v 1.10.0 |	 
 |Calico	| https://hub.docker.com/r/calico/node/tags?page=1&ordering=last_updated |  Multi arch supported on master |	 
 |Tanka	 | 	https://github.com/grafana/tanka/releases	 	 | |
@@ -81,6 +81,7 @@ We have compiled a list of popular software within the container ecosystem that 
 | AWS Systems Manager SSM Agent | https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-manual-agent-install.html | |
 | AWS CLI |	https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-linux.html#ARM	| v1 and v2 both supported|
 | FireLens for Amazon ECS | https://github.com/aws/aws-for-fluent-bit/issues/44 | arm64 support as of v2.9.0 | |
+| Flatcar Container Linux | https://www.flatcar.org | arm64 support in Stable channel as of 3033.2.0 |
 
 
 **If your software isn't listed above, it doesn't mean it won't work!**
@@ -116,5 +117,3 @@ If using the Kubernetes [Cluster Autoscaler](https://github.com/kubernetes/autos
 * [Unifying Arm software development with Docker](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/unifying-arm-software-development-with-docker)
 * [Modern multi-arch builds with docker](https://duske.me/posts/modern-multiarch-builds-with-docker/)
 * [Leveraging Spot and Graviton2 with EKS](https://spot.io/blog/eks-simplified-on-ec2-graviton2-instances/)
-
-
