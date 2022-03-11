@@ -9,8 +9,6 @@ We've documented ways to leverage these products below:
 
 | Name                      | URL / Github issue            | Workaround/Status             | Existing image? |
 | :-----                    |:-----                         | :-----                 | :-----          |
-| ArgoCD | https://github.com/argoproj/argo-cd/issues/3956 | build arm64 images from source / existing arm64 binaries | |
-| Flatcar Linux | https://github.com/kinvolk/Flatcar/issues/97 | arm64 support for alpha/edge | |
 | Istio | | [Build instruction below](#Istio) | |
 
 ### Istio
