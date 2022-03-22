@@ -49,7 +49,7 @@ We have compiled a list of popular software within the container ecosystem that 
 |CNI	 | 	https://github.com/containernetworking/plugins/releases/	| | 	  
 |Cri-o	 | 	https://github.com/cri-o/cri-o/blob/master/README.md#installing-crio | tested on Ubuntu 18.04 and 20.04	|
 |Trivy	 | 	https://github.com/aquasecurity/trivy/releases/	 	 | |
-|Argo	 | 	https://github.com/argoproj/argo/releases/	 	 	 | arm64 images published as of 2.3.0 |
+|Argo	 | 	https://github.com/argoproj/argo-cd/releases 	 	 | arm64 images published as of 2.3.0 |
 |Cilium	| https://docs.cilium.io/en/stable/contributing/development/images/ |  Multi arch supported from v 1.10.0 |	 
 |Calico	| https://hub.docker.com/r/calico/node/tags?page=1&ordering=last_updated |  Multi arch supported on master |	 
 |Tanka	 | 	https://github.com/grafana/tanka/releases	 	 | |
