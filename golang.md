@@ -4,6 +4,19 @@ Go is a statically typed, compiled programming language originally designed at G
 
 Here are some noteworthy performance upgrades:
 
+
+## Go 1.18 \[released 2022/03/14\]
+The main implementation of the Go compiler, [golang/go](https://github.com/golang/go), has improved
+performance on Arm by implementing a new way of passing function arguments and results using registers instead of the stack. This change has been available on x86-64 since 1.17, where it brought performance improvements of about 5%. On Arm this change typically gives even higher performance improvements of 10% or more.
+
+## Go 1.17 \[released 2021/08/16\]
+The main implementation of the Go compiler, [golang/go](https://github.com/golang/go), has improved
+performance for the following standard library packages:
+
+- crypto/ed25519 - the package has been rewritten, and all operations are now approximately twice as fast on both arm64 and amd64.
+- crypto/elliptic - CurveParams methods now automatically invoke faster and safer dedicated implementations for known curves (P-224, P-256, and P-521) when available. The P521 curve implementation has also been rewritten and is now constant-time and three times faster on amd64 and arm64.
+
+
 ## Go 1.16 \[released 2021/02/16\]
 The main implementation of the Go compiler, [golang/go](https://github.com/golang/go), has improved
 performance on Arm with couple of changes listed below. Building your project with Go 1.16 will give you these improvements:
