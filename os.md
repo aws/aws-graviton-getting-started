@@ -22,7 +22,7 @@ Rocky Linux | 8.4 or later | Yes (*) | 64KB (*) | [ISOs](https://rockylinux.org/
 
 OS Name | Minimum recommended Linux kernel version for Graviton2
 ------ | ------
-Amazon Linux 2 | >= 4.14.209-160.339.amzn2, >= 5.4.110-54.189.amzn2, or >= 5.10.29-27.128.amzn2
+Amazon Linux 2 | >= 4.14.273-207.502.amzn2, >= 5.4.186-102.354.amzn2, or >= 5.10.106-102.504.amzn2
 Ubuntu 20.04 | >= 5.4.0-1047-aws, >= 5.8.0-1034-aws, >= 5.11.0-1009-aws
 Ubuntu 18.04 | >= 4.15.0-1101-aws, >= 5.4.0-1047-aws
 Redhat Entreprise Linux 8 | >= 4.18.0-305.10
