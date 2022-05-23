@@ -30,15 +30,27 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 # Transitioning to Graviton
 If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton2 and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton2 based Amazon EC2 instances](transition-guide.md)
 
-# Building for Graviton and Graviton2
-The Graviton CPU (powering [A1](https://aws.amazon.com/ec2/instance-types/a1/) instances) supports Arm V8.0 and includes support for CRC and crypto extensions.
+# Building for Graviton2 and Graviton3
 
-The Graviton2 CPU (powering [M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6/), [T4g](https://aws.amazon.com/ec2/instance-types/t4), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/) instances uses the Neoverse-N1 core and supports Arm V8.2 (include CRC and crypto extensions) plus several
-other architectural extensions. In particular, Graviton2 supports the Large
-System Extensions (LSE) which improve locking and synchronization performance
-across large systems. In addition, it has support for fp16 and 8-bit dot
-product for machine learning, and relaxed consistency-processor consistent
-(RCpc) memory ordering.
+|Processor	|Graviton2	|Graviton3	|
+|---	|---	|---	|
+|Instances	|[M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6/), [T4g](https://aws.amazon.com/ec2/instance-types/t4), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/)	|[C7g](https://aws.amazon.com/ec2/instance-types/c7g/)	|
+|Core	|[Neoverse-N1](https://developer.arm.com/documentation/100616/0301)	|[Neoverse-V1](https://developer.arm.com/documentation/101427/latest/)	|
+|Instruction latencies	|[Instruction Latencies](https://developer.arm.com/documentation/PJDOC-466751330-9707/r4p1/?lang=en)	|[Instruction Latencies](https://developer.arm.com/documentation/pjdoc466751330-9685/latest/)	|
+|Interconnect	|CMN-600	|CMN-700	|
+|Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|
+|Additional  features	|fp16, rcpc, dotprod, crypto	|sve, rng, bf16, int8, crypto	|
+|Recommended -mcpu flag	|neoverse-n1	|neoverse-512tvb	|
+|RNG Instructions	|Yes	|Yes	|
+|SIMD instructions	|2x Neon 128bit vectors	|4x Neon 128bit vectors / 2x SVE 256bit	|
+|LSE (atomic mem operations)	|yes	|yes	|
+|Pointer Authentication	|no	|yes	|
+|Cores	|64	|64	|
+|L1 cache (per core)	|64KB inst / 64KB data	|64KB inst / 64KB data	|
+|L2 cache (per core)	|1MB	|1MB	|
+|LLC (shared)	|32MB	|32MB	|
+|DRAM	|8x DDR4	|8x DDR5	|
+|DDR Encryption	|yes	|yes	|
 
 # Optimizing for Graviton
 Please refer [here](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/graviton_perfrunbook.md).
