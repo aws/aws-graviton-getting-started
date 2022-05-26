@@ -3,28 +3,23 @@
 ### Enabling Arm Architecture Specific Features
 
 To build code with the optimal processor features use the following.
-We recommend using Graviton2 processor features when targeting both Graviton2 and Graviton3.
+We recommend using Graviton2 processor features when targeting both Graviton2
+and Graviton3 as code compiled for Graviton3 will only run on Graviton3 and not
+on Graviton2.  On arm64 `-mcpu=` acts as both specifying the appropriate
+architecture and tuning and it's generally better to use that vs `-march` if
+you're building for a specific CPU.
 
-CPU       | GCC                         | LLVM
-----------|-----------------------------|-------------
-Graviton  | `-march=armv8-a+crc+crypto` | `-march=armv8-a+crc+crypto`
-Graviton2 | `-march=armv8.2-a+fp16+rcpc+dotprod+crypto` |`-march=armv8.2-a+fp16+rcpc+dotprod+crypto`
-Graviton3 | `-march=armv8.2-a+fp16+rcpc+dotprod+crypto` |`-march=armv8.2-a+fp16+rcpc+dotprod+crypto`
 
-Note: GCC-7 does not support `+rcpc+dotprod`.
+CPU       | Flag    | GCC version      | LLVM verison
+----------|---------|-------------------|-------------
+Graviton2 | `-mcpu=neoverse-n1`\* | GCC-9^ | Clang/LLVM 10+
+Graviton3 | `-mcpu=neoverse-512tvb`% | GCC 11+ | Clang/LLVM 14+
 
-### Core Specific Tuning
+^ Also present in Amazon Linux2 GCC-7
 
-When compiling code for Graviton processors, we recommend to use by default
-Graviton2 tuning `-mtune=neoverse-n1`.  With this flag the compiler will produce
-fast code for all Graviton processors.  In case the target processor is known
-ahead of compilation time, one can use the following flags:
+\* Requires GCC-9 or later; otherwise we suggest using `-mcpu=cortex-a72`
 
-CPU       | GCC < 9              | GCC >=9
-----------|----------------------|-------------
-Graviton  | `-mtune=cortex-a72`  | `-mtune=cortex-a72`
-Graviton2 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
-Graviton3 | `-mtune=cortex-a72`  | `-mtune=neoverse-n1`
+% If your compiler doesn't support `neoverse-512tvb`, please use the Graviton2 tuning.
 
 ### Compilers
 
@@ -37,7 +32,8 @@ Starred version marks the default system compiler.
 Distribution    | GCC                  | Clang/LLVM
 ----------------|----------------------|-------------
 Amazon Linux 2  | 7*, 10               | 7, 11*
-Ubuntu 20.04    | 7, 8, 9*, 10         | 6, 7, 8, 9, 10, 11
+Ubuntu 22.04    | 9, 10, 11*, 12         | 11, 12, 13, 14*
+Ubuntu 20.04    | 7, 8, 9*, 10         | 6, 7, 8, 9, 10, 11, 12
 Ubuntu 18.04    | 4.8, 5, 6, 7*, 8     | 3.9, 4, 5, 6, 7, 8, 9, 10
 Debian10        | 7, 8*                | 6, 7, 8
 Red Hat EL8     | 8*, 9, 10            | 10
@@ -117,7 +113,14 @@ or compile with `-fsigned-char`.
 
 Graviton2 processors been optimized for performance and power efficient machine learning by enabling [Arm dot-product instructions](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/exploring-the-arm-dot-product-instructions) commonly used for Machine Learning (quantized) inference workloads, and enabling [Half precision floating point - \_float16](https://developer.arm.com/documentation/100067/0612/Other-Compiler-specific-Features/Half-precision-floating-point-intrinsics) to double the number of operations per second, reducing the memory footprint compared to single precision floating point (\_float32), while still enjoying large dynamic range.
 
-### Using Graviton2 Arm instructions to speed-up common code sequences
+### Using SVE
+
+The scalable vector extensions (SVE) require both a new enough tool-chain to
+auto-vectorize to SVE (GCC 11+, LLVM 14+) and a 4.15+ kernel that supports SVE.
+One notable exception is that Amazon Linux 2 with a 4.14 kernel doesn't support SVE;
+please upgrade to a 5.4+ AL2 kernel.
+
+### Using Arm instructions to speed-up common code sequences
 The Arm instruction set includes instructions that can be used to speedup common
 code sequences. The table below lists common operations and links to code sequences:
 
