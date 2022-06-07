@@ -165,15 +165,21 @@ program running on Graviton processors, profile hot paths, and improve the
 quality of code on the hot paths.
 
 To quickly get a prototype running on Arm, one can use
-https://github.com/DLTcollab/sse2neon a translator of x64 intrinsics to NEON.
-sse2neon provides a quick starting point in porting performance critical codes
+[SIMDe (SIMD everywhere)](https://github.com/simd-everywhere/simde)
+a translator of x64 intrinsics to NEON.
+
+For example, to port code using AVX2 intrinsics to Graviton,
+a developer could add the following code:
+```
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include "simde/x86/avx2.h"
+```
+
+SIMDe provides a quick starting point to port performance critical codes
 to Arm.  It shortens the time needed to get an Arm working program that then
-can be used to extract profiles and to identify hot paths in the code.  A header
-file `sse2neon.h` contains several of the functions provided by standard x64
-include files like `xmmintrin.h`, only implemented with NEON instructions to
-produce the exact semantics of the x64 intrinsic.  Once a profile is
-established, the hot paths can be rewritten directly with NEON intrinsics to
-avoid the overhead of the generic sse2neon translation.
+can be used to extract profiles and to identify hot paths in the code.
+Once a profile is established, the hot paths can be rewritten directly with
+NEON intrinsics to avoid the overhead of the generic translation.
 
 ## Additional resources
 
