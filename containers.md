@@ -33,7 +33,7 @@ We have compiled a list of popular software within the container ecosystem that 
 | Envoy	| https://www.envoyproxy.io/docs/envoy/v1.18.3/start/docker ||
 | Tensorflow | https://hub.docker.com/r/armswdev/tensorflow-arm-neoverse |  |
 | Tensorflow serving | 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.7.0-cpu-py38-ubuntu20.04-e3-v1.0 ||
-| PyTorch | https://hub.docker.com/r/armswdev/pytorch-arm-neoverse ||
+| PyTorch | https://hub.docker.com/r/armswdev/pytorch-arm-neoverse |Use tags with *-openblas* for performance reasons until confirmed otherwise|
 | Traefik | https://github.com/containous/traefik/releases	|| 	 
 | Flannel | https://github.com/coreos/flannel/releases	 ||	 
 | Helm | https://github.com/helm/helm/releases/tag/v2.16.9 || 
