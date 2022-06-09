@@ -32,6 +32,25 @@ If you see that Graviton is consuming more CPU-time than expected, on-cpu profil
 1. Look for the most expensive functions and then compare with a flamegraph gathered from the x86 test system.
 2. If you find an expensive function that is not expensive on your x86 system, proceed to [Section 6](./optimization_recommendation.md) for Optimization recommendations.
 
+### On-cpu profiling using Psuedo Non-maskable-interrupts (NMI)
+
+If your on-cpu profiling reveals the hot code is in the kernel, you may see issues with measuring code-paths that run in non-preemptible sections of Linux.  This usually manifests as small functions such as `arch_local_irq_restore` in the kernel showing high overhead.  Functions like this are un-masking interrupts, such as the interrupt `perf` uses to trigger taking a sample stack trace, and since the interrupt may have
+already been queued, `perf` will record IRQ unmasking functions as hot because that is when IRQs are re-enabled.  To collect profiles of kernel functions that are inside interrupt masked portions of code on Graviton you can enable `perf` to use a pseudo Non-maskable-interrupt to measure inside non-preemptible regions. To enable this, do the following:
+
+1. Ensure `CONFIG_ARM64_PSEUDO_NMI` is enabled in your kernel configuration
+2. Enable `irqchip.gicv3_pseudo_nmi=1` on the kernel command line and reboot.
+3. Collect a Flamegraph:
+  ```bash
+  # In terminal on SUT
+  cd ~/aws-graviton-getting-started/perfrunbook/utilities
+  # Use a custome event from the PMU such as r11 (cycles) or r8 (instructions)
+  sudo ./capture_flamegraphs.sh r11 300
+  ```
+4. Double check you are using a PMU hardware-event, if you do not see a change in your profiles. Events that do not come from the cpu PMU, such as `cpu-clock`, can not utilize the pseudo-NMI feature on Graviton.
+5. Be aware code using hardware events such as cycles (r11) will under-count idle time as Graviton uses a clock-gated sleep state during idle on Linux, meaning hardware events will not tick. 
+
+You may see a small single-digit percent increase in overhead with pseudo-NMI enabled, but this is expected.  We recommend only turning on pseudo-NMI when needed.
+
 ## Off-cpu profiling
 
 If Graviton2 is consuming less CPU-time than expected, it is useful to find call-stacks that are putting *threads* to sleep via the OS.  Lock contention, IO Bottlenecks, OS scheduler issues can all lead to cases where performance is lower, but the CPU is not being fully utilized.   The method to look for what might be causing more off-cpu time is the same as with looking for functions consuming more on-cpu time: generate a flamegraph and compare.  In this case, the differences are more subtle to look for as small differences can mean large swings in performance as more thread sleeps can induce milli-seconds of wasted execution time.  
