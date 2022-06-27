@@ -101,3 +101,39 @@ If you find a specific function that is mis-behaving, either putting the CPU to 
 4. Review the statistics and compare against the x86 SUT to compare.
 
 Example eBPF programs can be found: https://github.com/iovisor/bcc.
+
+## Using git bisect -- "To identify bad commit between kernel versions"
+
+Whenever we want to find bad commit in repository, we usually checkout some old commit, make sure the broken code isn't there, then checkout a newer commit, check if it's broken or not, and repeat this process again and again until we find the bad commit. This is really time consuming.
+
+Using git bisect helps a lot here.
+`git bisect` command uses binary search algorithm to find which commit in your project's history introduced a bug. You use it by first telling it a `bad` commit that is known to contain the bug, and a `good` commit that is known to be before the bug was introduced.
+
+1. Go to your git repository.
+2. Use `git log` to identify `good` and `bad` commits
+
+3. Checkout a bad commit:
+   `git checkout <commit-d>`
+
+3. Now start git bisect: `git bisect start`
+
+4. Let git bisect know of good and bad commits and mark them:
+    ```
+    git bisect bad
+    git bisect good <good-commit-id>
+    ```
+5. This will kick off the git bisect process and git will checkout a `commit-id` to test on. Verify if that `commit-id` is good or bad
+
+6. If tested commit is bad, continue with git bisect by marking this commit as bad: `git bisect bad`
+
+   Else, mark this commit as good: `git bisect good`. You can also skip a commit by doing: `git bisect skip`
+
+   git bisect will continue and checkout another commit to test on.
+8. Continue with this process until you have tested all git bisect revisions and in the end it will return a message stating:
+   `<commit-id> is the first bad commit`.
+
+9. Exit out of git bisect mode: `git bisect reset`
+
+This will enable identifying the first point/commit where the issue started.
+We can further verify if reverting this `commit-id`, does fix the error or issue by doing: `git revert <first-bad-commit-id>`.
+From this point, we can further work on reverting or fixing changes in that commit.

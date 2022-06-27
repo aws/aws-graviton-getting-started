@@ -197,6 +197,28 @@ class ParseCpuTime(ParseInterface):
             self.parquet_name = "sar_cpu.parquet"
 
 
+# class that embodies the state machine for parsing SAR logs for memory stats
+class ParseMemoryStats(ParseInterface):
+
+    def __init__(self, start_date, parquet=None):
+        super().__init__(start_date)
+        self.regex_hdr = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+kbmemfree\s+'''
+                                    r'''kbmemused\s+%memused\s+kbbuffers\s+kbcached\s+kbcommit\s+%commit\s+kbactive\s+kbinact\s+kbdirty''')
+        self.regex_data = re.compile(r'''(?P<time>\d+:\d+:\d+)\s+(?P<kbmemfree>[\d+]+)\s+'''
+                                     r'''(?P<kbmemused>\d+)\s+(?P<memused>\d+\.\d+'''
+                                     r''')\s+(?P<kbbuffers>\d+)\s+(?P<kbcached>\d+)'''
+                                     r'''\s+(?P<kbcommit>\d+)\s+(?P<commit>\d+\.\d+)\s+'''
+                                     r'''(?P<kbactive>\d+)\s+(?P<kbinact>\d+)\s+(?P<kbdirty>\d+)\s+''')
+
+        self.fields = [('time', None), ('kbdirty', int), ('kbcached', int)]
+        self.start = start_date
+        self.last_date = None
+        if parquet:
+            self.parquet_name = "sar_memory_{}.parquet".format(parquet)
+        else:
+            self.parquet_name = "sar_memory.parquet"
+
+
 class ParseCSwitchTime(ParseInterface):
 
     def __init__(self, start_date, parquet=None):
@@ -230,7 +252,7 @@ def parse_sysstat(file_name, suffix=None):
         parseIface = ParseIfaceUtil(start_date, parquet=suffix)
         parseTcpTime = ParseTcpTime(start_date, parquet=suffix)
         parseCswitch = ParseCSwitchTime(start_date, parquet=suffix)
-
+        parseMemoryStats = ParseMemoryStats(start_date, parquet=suffix)
         line = f.readline()
         while (line):
             parseCPU.parse_for_header(line, f)
@@ -239,6 +261,7 @@ def parse_sysstat(file_name, suffix=None):
             parseIface.parse_for_header(line, f)
             parseTcpTime.parse_for_header(line, f)
             parseCswitch.parse_for_header(line, f)
+            parseMemoryStats.parse_for_header(line, f)
             line = f.readline()
     return 0
 

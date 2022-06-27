@@ -62,12 +62,61 @@ When debugging performance, start by measuring high level system behavior to pin
     0 ++-----------------------+------------------------+------------------------+------------------------+------------------------+-----------------------++
       0                        10                       20                       30                       40                       50                       60
                                                                              Time (s)
+
+```
+
 3. If CPU usage is higher or equal to the x86 system, proceed to profile for hot-functions in [Section 5.b](./debug_code_perf.md).
 4. If CPU usage is lower, proceed to [Section 5.b](./debug_code_perf.md) to profile which functions are putting threads to sleep and causing the CPU to go idle more than the x86 system.
 
 ## Check system memory usage
 
 It is also advisable to check memory consumption using `sysstat -r ALL` or `htop`.  Verify the system is not under memory pressure during testing. 
+
+## Check Memory behavior via `sar -r`
+
+If your benchmark involves reading and writing to file, for example database workloads, check for "dirty pages" and "page cache" via `kbdirty`, `kbcached` respectively between two systems. This gives important information if your system is getting limited by page cache or not compared to other.
+1. Run `sar -r 1` or `sar -r 1 <time-duration>` on SUT while your workload is running
+2. Compare sar output between systems, generally we would look for `kbdirty` and `kbcached` For example:
+
+x86:
+```
+Average:    kbmemfree kbmemused  %memused kbbuffers  kbcached  kbcommit   %commit  kbactive   kbinact   kbdirty
+Average:       434307  63912121     99.33         0  36520768  28487352     44.27   7885479  55620730   4356711
+```
+
+Grv2:
+```
+Average:    kbmemfree kbmemused  %memused kbbuffers  kbcached  kbcommit   %commit  kbactive   kbinact   kbdirty
+Average:       455597  63957955     99.29        28  37074495  28984843     45.00  10659548  52898270   2550847
+```
+From above example, it's quite evident Grv2's `kbdirty` is almost half x86's average `kbdirty` but `kbcached` is almost equal on both systems so there isn’t any obvious gap in how memory is getting used, but grv2 is not able to hold as many dirty pages as x86.
+Keeping around less data in the "dirty" page cache means the system is writing to disk more often, which blocks other disk accesses such as reads from completing as quickly.
+
+**Dirty Pages**: Is the data stored in page cached waiting to be written to the underlying storage device.
+
+**kbdirty**: Is the amount of memory in kilobytes waiting to get written back to the disk.
+
+To compare "dirty" pages related settings between systems, we can use the below command:
+
+```
+sysctl -a | grep dirty
+vm.dirty_background_ratio = 10
+vm.dirty_background_bytes = 0
+vm.dirty_ratio = 20
+vm.dirty_bytes = 0
+vm.dirty_writeback_centisecs = 500
+vm.dirty_expire_centisecs = 3000
+```
+`vm.dirty_background_ratio` is the percentage of system memory which when dirty, causes the system to start writing data to the disk.
+
+`vm.dirty_ratio` is the percentage of system memory which when dirty, causes the process doing writes to block and write out dirty pages to the disk.
+
+Depending on requirement, we may want to retest workload by increasing or decreasing dirty pages(kbdirty), in cases of large databases, it's recommended to keep these values low, to avoid I/O bottlenecks when the system load increases.
+We either tune`vm.dirty_bytes` and `vm.dirty_background_bytes` or `vm.dirty_ratio` and `vm.dirty_background_ratio`.
+If you set the `_bytes` version, the `_ratio` version will become 0, and vice-versa.
+
+`dirty_writeback_centisecs` can also be tuned to decide when to periodically wake up and write old data out to disk. Setting this to zero disables periodic writeback altogether.
+
 
 ## Check network usage
 
@@ -124,4 +173,3 @@ When running Java applications, monitor for differences in behavior using JFR (J
   %> java -XX:+PrintFlagsFinal -version
   # Capture output from x86 and Graviton2 and then diff the files
   ```
-

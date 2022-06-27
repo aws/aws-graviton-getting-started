@@ -161,3 +161,28 @@ Finally as part of checking the systems-under-test verify the application is con
 4. If using the Java Virtual Machine to execute your service, ensure it is a recent version based off at least JDK11. We recommend using [Corretto11](https://docs.aws.amazon.com/corretto/latest/corretto-11-ug/downloads-list.html) or [Corretto15](https://docs.aws.amazon.com/corretto/latest/corretto-15-ug/downloads-list.html).  Corretto is a free and actively maintained OpenJDK distribution that contains optimizations for AWS Graviton based instances.
 
 
+## Check performance between kernel versions
+
+There can be regression in performance from one kernel version to another on same system, possibly due to:
+
+###1. Change in kernel config
+
+During performance deep dive, another aspect to look at are kernel configs. We seen have performance degradation on Grv2 due to missing config in kernel or changed config value from one kernel version to another.
+Configs can be compared at two levels:
+1. Comparing configs between two different architecture but on same kernel version. For example:
+   We saw 30% degradation in MongoDB performance between x86 vs Grv2 on same distribution and kernel version due to missing config.
+   `CONFIG_BLK_WBT=y` and `CONFIG_BLK_WBT_MQ=y` configs were missing on Grv2 AL2 v4.14, v5.4 and v5.10 which caused the degradation but were enabled on x86.
+2. Comparing configs on same system but between different kernel versions. For example:
+   We saw 18% regression in MongoDB performance from kernel version 5.4 to v5.10 on Grv2 due to change in timer tick frequency from `CONFIG_HZ=100` to `CONFIG_HZ=250`
+
+Kernel configs can be found at `/boot/config-<kernel-version>`.
+You may want to recompile kernel to test any config changes, for which refer [Compile Kernel](./appendix.md) section.
+
+###2. Change in kernel code
+
+Apart from kernel configs, changes in kernel code from one to version can result in performance degradation. To identify what kernel code change has bought that degradation, we use `git bisect`.
+
+`git bisect` command uses binary search algorithm to find which commit in your project's history introduced a bug. You use it by first telling it a `bad` commit that is known to contain the bug, and a `good` commit that is known to be before the bug was introduced.
+
+For more details on how to run `git bisect`, please refer [Using git bisect](./appendix.md) section.
+

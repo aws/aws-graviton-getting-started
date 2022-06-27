@@ -143,6 +143,16 @@ def plot_cpu(buf, stat, plot_format):
     calc_stats_and_plot(data, stat, plot_format, yaxis_range=YAXIS_RANGE)
 
 
+def plot_memory_stats(buf, stat, plot_format):
+    """
+    Plot the dirty pages and cache bytes over time
+    """
+    from sar_parse import ParseMemoryStats
+    df = parse_sar(ParseMemoryStats, buf)
+
+    calc_stats_and_plot(df, stat, plot_format)
+
+
 def plot_tcp(buf, stat, plot_format):
     """
     Plot the numer of new connections being recieved over time
@@ -197,6 +207,8 @@ stat_mapping = {
   "cpu-user": (sar, plot_cpu, "usr"),
   "cpu-kernel": (sar, plot_cpu, "sys"),
   "cpu-iowait": (sar, plot_cpu, "iowait"),
+  "kbdirty": (sar, plot_memory_stats, "kbdirty"),
+  "kbcached": (sar, plot_memory_stats, "kbcached"),
   "new-connections": (sar, plot_tcp, "passive"),
   "tcp-in-segments": (sar, plot_tcp, "iseg"),
   "tcp-out-segments": (sar, plot_tcp, "oseg"),
@@ -207,7 +219,7 @@ stat_mapping = {
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stat", default="cpu-user", type=str, choices=["cpu-user", "cpu-kernel", "cpu-iowait", 
+    parser.add_argument("--stat", default="cpu-user", type=str, choices=["cpu-user", "cpu-kernel", "cpu-iowait", "kbdirty", "kbcached",
                                                                          "new-connections", "tcp-in-segments", "tcp-out-segments",
                                                                          "cswitch","all-irqs","single-irq"])
     parser.add_argument("--irq", type=str, help="Specific IRQ to measure if single-irq chosen for stat")
