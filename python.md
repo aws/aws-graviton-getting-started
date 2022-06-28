@@ -6,9 +6,15 @@ Python is an interpreted, high-level, general-purpose programming language, with
 
 When *pip* (the standard package installer for Python) is used, it pulls the packages from [Python Package Index](https://pypi.org) and other indexes.
 
+AWS is actively working to make pre-compiled packages available for Graviton. You can see a current list of the over 200 popular python packages we track nightly
+for AL2 and Ubuntu for Graviton support status at our [Python wheel tester](https://geoffreyblake.github.io/arm64-python-wheel-tester/).  
+
 In the case *pip* could not find a pre-compiled package, it automatically downloads, compiles, and builds the package from source code. 
-Normally it may take a few more minutes to install the package from source code than from pre-built.  For some large packages (i.e. *pandas*)
-it may take up to 20 minutes. AWS is actively working to make pre-compiled packages available to avoid this in near future. In some cases, compilation may fail due to missing dependencies.
+Normally it may take a few more minutes to install the package from source code than from pre-built.  For some large packages,
+it may take up to 20 minutes. In some cases, compilation may fail due to missing dependencies.  Before trying to build a python package from source, try
+`python3 -m pip install --prefer-binary <package>` to attempt to install a wheel that is not the latest version.  Sometimes automated package builders
+will push a release without all the wheels due to failures during a build that will be corrected at a later date.  If this is not an option, follow
+the following instructions to build a python package from source.
 
 ### 1.1 Prerequisites for installing Python packages from source
 
@@ -37,19 +43,19 @@ Python 2.7 is EOL since January the 1st 2020, it is definitely recommended to up
 
 Python 3.6 will reach [EOL in December, 2021](https://www.python.org/dev/peps/pep-0494/#lifespan), so when starting to port an application to Graviton2, it is recommended to target at least Python 3.7.
 
-### 1.3 Python on Centos 8 and RHEL 8
+### 1.3 Python on AL2 and RHEL 8
 
-Centos 8 and RHEL 8 distribute Python 3.6 which is
-[scheduled for end of life in December, 2021](https://www.python.org/dev/peps/pep-0494/#lifespan).
-However as of May 2021, some package maintainers have already begun dropping support for
-Python 3.6 by ommitting prebuilt wheels published to [pypi.org](https://pypi.org).
-For some packages, it is still possible to use Python 3.6 by using the distribution
+AL2 and RHEL 8 distribute older Pythons by default: 3.7 and 3.6 respectively.  Python 3.6 is EOL 
+[since December, 2021](https://endoflife.date/python) and Python 3.7 will be EOL [on June 2023](https://endoflife.date/python).
+Therefore, some package maintainers have already begun dropping support for
+Python 3.6 and 3.7 by ommitting prebuilt wheels published to [pypi.org](https://pypi.org).
+For some packages, it is still possible to use the default Python by using the distribution
 from the package manager. For example `numpy` no longer publishes Python 3.6 wheels,
 but can be installed from the package manager: `yum install python3-numpy`.
 
 Another option is to use Python 3.8 instead of the default Python pacakge. You can
-install Python 3.8 with pip: `yum install python38-pip`. Then use pip to install
-the latest versions of packages: `pip3 install numpy`.
+install Python 3.8 and pip: `yum install python38-pip`. Then use pip to install
+the latest versions of packages: `pip3 install numpy`.  On AL2, you will need to use `amazon-linux-extras enable python3.8` to expose Python 3.8 packages.
 
 Some common Python packages that are distributed by the package manager are:
 1. python3-numpy
@@ -75,6 +81,10 @@ upgraded OpenBLAS from v0.3.9 to OpenBLAS v0.3.17.
 OpenBLAS:  >= v0.3.17
 SciPy: >= v1.7.2
 NumPy: >= 1.21.1
+
+Both [SciPy>=1.5.3](https://pypi.org/project/scipy/1.5.3/#files) and [NumPy>=1.19.0](https://pypi.org/project/numpy/1.19.0/#files)
+vend binary wheel packages for Aarch64, but if you need better performance, then
+compiling the best performance numerical library is an option.  To do so, follow the below instructions.
 
 
 ### 2.1 BLIS may be a faster BLAS
@@ -105,8 +115,6 @@ sudo update-alternatives --config liblapack.so.3-aarch64-linux-gnu
 ```
 
 ### 2.3 Install NumPy and SciPy with BLIS on AmazonLinux2 (AL2) and RedHat
-
-As of June 20th, 2020, NumPy now [provides binaries](https://pypi.org/project/numpy/#files) for arm64.
 
 Prerequisites to build SciPy and NumPy with BLIS on arm64 AL2 and RedHat:
 ```
@@ -199,21 +207,6 @@ The next step is to instanciate the environment from that definition:
 $ conda env create -f graviton-example.yml
 ```
 
-And you can now use numpy and pandas for Python 3.9.
-
-## 3. Other common Python packages
-
-### 3.1 Pillow
-
-As of October 30, 2020, Pillow 8.x or later have a binary wheel for all Arm64 platforms, included OSes with 64kB pages lile Redhat/Centos8.
-
-```
-pip3 install --user pillow
-```
-
-should work across all platforms we tested.
-
-
 ## 4. Machine Learning Python packages
 
 
@@ -238,37 +231,7 @@ Follow the [install from source](https://github.com/dmlc/dgl/blob/master/docs/so
 
 ### 4.3 Sentencepiece
 
-Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](#41-pytorch)
-
-On **Ubuntu**:
-
-```
-# git the source and build/install the libraries.
-git clone https://github.com/google/sentencepiece
-cd sentencepiece
-mkdir build
-cd build
-cmake ..
-make -j 8
-sudo make install
-sudo ldconfig -v
-
-# move to python directory to build the wheel
-cd ../python
-vi make_py_wheel.sh
-# change the manylinux1_{$1} to manylinux2014_{$1}
-
-sudo python3 setup.py install
-```
-
-With the above steps, the wheel should be installed.
-
-*Important* Before calling any python script or starting python, one of the libraries need to be set as preload for python.
-
-```
-export LD_PRELOAD=/lib/aarch64-linux-gnu/libtcmalloc_minimal.so.4:/$LD_PRELOAD
-python3
-```
+[Sentencepiece>=1.94 now has pre-compiled binary wheels available for Graviton](https://pypi.org/project/sentencepiece/0.1.94/#history).
 
 ### 4.4	Morfeusz
 
