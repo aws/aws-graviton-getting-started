@@ -1,12 +1,12 @@
 # .NET on Graviton
-.NET 5 is open-source platform for writing different types of applications. Software engineers can write .NET based applications in multiple languages such as C#, F#, and Visual Basic. .NET applications are compiled into Common Intermediate Language (CIL). When an application is executed, the Common Language Runtime (CLR) loads that application binary and uses a just-in-time (JIT) compiler to generate machine code for the architecture being executed on. For more information, please see [what is .NET](https://dotnet.microsoft.com/learn/dotnet/what-is-dotnet).
+.NET is an open-source platform for writing different types of applications. Software engineers can write .NET based applications in multiple languages such as C#, F#, and Visual Basic. .NET applications are compiled into Common Intermediate Language (CIL). When an application is executed, the Common Language Runtime (CLR) loads that application binary and uses a just-in-time (JIT) compiler to generate machine code for the architecture being executed on. For more information, please see [what is .NET](https://dotnet.microsoft.com/learn/dotnet/what-is-dotnet).
 
 
 ## .NET Versions
 
 Version            | Linux Arm32   | Linux Arm64   | Notes
 ------------------|-----------|-----------|-------------
-[.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Yes | Yes |  Preview releases provide early access to features that are currently under development. These releases are generally not supported for production use.
+[.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Yes | Yes |  V6.0.0 released on November 8, 2021 with Arm64 Linux builds. For more details check out this [Blog: .NET 6 on AWS](https://aws.amazon.com/blogs/developer/net-6-on-aws/) and [Video: AWS re:Invent 2021 - Accelerate .NET 6 performance with Arm64 on AWS Graviton2](https://www.youtube.com/watch?v=iMlyZI9NhFw)
 [.NET 5](https://dotnet.microsoft.com/download/dotnet/5.0) | Yes | Yes | Arm64-specific optimizations in the .NET libraries and the code produced by RyuJIT. [Arm64 Performance in .NET 5](https://devblogs.microsoft.com/dotnet/arm64-performance-in-net-5/) 
 [.NET Framework 4.x](https://dotnet.microsoft.com/learn/dotnet/what-is-dotnet-framework) | No | No | The original implementation of the .NET Framework does not support Linux hosts, and Windows hosts are not suported on Graviton. 
 [.NET Core 3.1](https://dotnet.microsoft.com/download/dotnet/3.1) | Yes | Yes | .NET Core 3.0 added support for [Arm64 for Linux](https://docs.microsoft.com/en-us/dotnet/core/whats-new/dotnet-core-3-0#linux-improvements). 
