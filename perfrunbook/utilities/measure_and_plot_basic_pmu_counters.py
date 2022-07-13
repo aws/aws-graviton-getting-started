@@ -75,7 +75,7 @@ def plot_counter_stat(csv, plot_format, stat_name, counter_numerator,
     Process the returned csv file into a time-series statistic to plot and
     also calculate some useful aggregate stats.
     """
-    df = pd.read_csv(csv, sep='|', header=0,
+    df = pd.read_csv(csv, sep='|',
                      names=['time', 'count', 'rsrvd1', 'event',
                             'rsrvd2', 'frac', 'rsrvd3', 'rsrvd4'],
                      dtype={'time': np.float64, 'count': np.float64,
