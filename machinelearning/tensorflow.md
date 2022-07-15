@@ -35,7 +35,7 @@ To launch a Graviton instance with a DLAMI via EC2 console:
 
 Here is the awscli snippet to find the latest AMI and launch it:
 ```
-graviton_dlami=$((aws ec2 describe-images --region us-west-2 --filters  Name=architecture,Values=arm64 Name=name,Values="*Deep Learning AMI*" Name=owner-alias,Values=amazon  --query 'Images[] | sort_by(@, &CreationDate)[-1] | ImageId') | tr -d '"')
+graviton_dlami=$((aws ec2 describe-images --region us-west-2 --filters  Name=architecture,Values=arm64 Name=name,Values="*Deep Learning AMI Graviton TensorFlow*" Name=owner-alias,Values=amazon  --query 'Images[] | sort_by(@, &CreationDate)[-1] | ImageId') | tr -d '"')
 
 aws ec2 run-instances --region us-west-2 --image-id $graviton_dlami --instance-type c7g.4xlarge --count 1  --key-name <key name> --subnet-id <subnet_id> --block-device-mappings 'DeviceName=/dev/sda1,Ebs={VolumeSize=256}'
 ```
@@ -63,7 +63,8 @@ export TF_ENABLE_ONEDNN_OPTS=1
 # Graviton3 (e.g. c7g instance) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
 grep -q bf16 /proc/cpuinfo && export DNNL_DEFAULT_FPMATH_MODE=BF16
 
-# Make sure the openmp threads are distributed across all the processes for multi process applications to avoid over subscription for the vcpus.
+# Make sure the openmp threads are distributed across all the processes for multi process applications to avoid over subscription for the vcpus. For example if there is a single application process, then num_processes should be set to '1' so that all the vcpus are assigned to it with one-to-one mapping to omp threads
+
 num_vcpus=$(getconf _NPROCESSORS_ONLN)
 num_processes=<number of processes>
 export OMP_NUM_THREADS=$((1 > ($num_vcpus/$num_processes) ? 1 : ($num_vcpus/$num_processes)))
@@ -103,7 +104,7 @@ sudo apt install -y build-essential cmake libgl1-mesa-glx libglib2.0-0 libsm6 li
 
 git clone https://github.com/mlcommons/inference.git --recursive
 cd inference
-git checkout 5ec3ac922556107ce0f6ca63c175d379017ba3d8
+git checkout v2.0
 cd loadgen
 CFLAGS="-std=c++14" python3 setup.py bdist_wheel
 pip install <dist/*.whl>
@@ -116,21 +117,17 @@ ck pull repo:ck-env
 
 # Download ImageNet's validation set
 # These will be installed to ${HOME}/CK_TOOLS/
-# Select option 1: val-min data set.
-ck install package --tags=image-classification,dataset,imagenet,aux
-ck install package --tags=image-classification,dataset,imagenet,val
+echo 0 | ck install package --tags=image-classification,dataset,imagenet,aux
+echo 1 | ck install package --tags=image-classification,dataset,imagenet,val
 
 # Copy the labels into the image location
-cp ${HOME}/CK-TOOLS/dataset-imagenet-ilsvrc2012-aux/val.txt ${HOME}/CK-TOOLS/dataset-imagenet-ilsvrc2012-val-min/val_map.txt
+cp ${HOME}/CK-TOOLS/dataset-imagenet-ilsvrc2012-aux-from.berkeley/val.txt ${HOME}/CK-TOOLS/dataset-imagenet-ilsvrc2012-val-min/val_map.txt
 
 cd inference/vision/classification_and_detection
 wget https://zenodo.org/record/2535873/files/resnet50_v1.pb
 
 # Install the additional packages required for resnet50 inference
-pip install opencv-python
-pip install pycocotools
-pip install psutil
-pip install tqdm
+pip install opencv-python pycocotools psutil tqdm
 
 # Set the data and model path
 export DATA_DIR=${HOME}/CK-TOOLS/dataset-imagenet-ilsvrc2012-val-min
@@ -143,13 +140,16 @@ num_vcpus=$(getconf _NPROCESSORS_ONLN)
 num_processes=<number of processes>
 export MLPERF_NUM_INTRA_THREADS=$((1 > ($num_vcpus/$num_processes) ? 1 : ($num_vcpus/$num_processes)))
 
+./run_local.sh tf resnet50 cpu --scenario=SingleStream
 ./run_local.sh tf resnet50 cpu --scenario=Offline
 ```
 
 3. Benchmark natual language processing with Bert
 ```
+pip install transformers boto3
 cd inference/language/bert
 make setup
+python3 run.py --backend=tf --scenario=SingleStream
 python3 run.py --backend=tf --scenario=Offline
 ```
 
@@ -219,6 +219,15 @@ OPENMP DISPLAY ENVIRONMENT END
 
 While the packages for python wheel/docker container/DLAMI provide stable baseline for ML application development and production, they lack the latest fixes and optimizations from the development branches. This section provides instructions for building TensorFlow from sources, to build the master branch or to incorporate the downstream optimizations.
 ```
+# This step is required if gcc-10 is not the default version on the OS distribution, e.g. Ubuntu 20.04
+# Install gcc-10 and g++-10 as it is required for Arm Compute Library build.
+sudo apt install -y gcc-10 g++-10
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
+
+# Install the required pip packages
+pip3 install numpy packaging
+
 # Install bazel for aarch64
 mkdir bazel
 cd bazel
@@ -279,9 +288,6 @@ As of 2.9.0 version, TensorFlow Serving for aarch64 supports TensorFlow with Eig
 git clone https://github.com/tensorflow/serving.git
 cd serving
 
-# Pull https://github.com/tensorflow/serving/pull/1953
-git fetch origin pull/1953/head:tfs_aarch64
-
 # Pull https://github.com/tensorflow/serving/pull/1954
 git fetch origin pull/1954/head:tfs_docker_aarch64
 
@@ -300,11 +306,29 @@ docker run -p 8501:8501 --name tfserving_resnet --mount type=bind,source=/tmp/re
 
 While the Grappler optimizer covers majority of the networks, there are few scenarios where either the Grappler optimizer can't optimize the generic graph or the runtime kernel launch overhead is simply not acceptable. XLA addresses these gaps by providing an alternative mode of running models: it compiles the TensorFlow graph into a sequence of computation kernels generated specifically for the given model. TensorFlow-2.9.0 supports aarch64 xla backend with Eigen runtime. For the best performance please cherrypick the [PR](https://github.com/tensorflow/tensorflow/pull/55534) and rebuild the TensorFlow libraries.
 ```
+# This step is required if gcc-10 is not the default version on the OS distribution, e.g. Ubuntu 20.04
+# Install gcc-10 and g++-10 as it is required for Arm Compute Library build
+sudo apt install -y gcc-10 g++-10
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
+
+# Install the required pip packages
+pip3 install numpy packaging
+
+# Install bazel for aarch64
+mkdir bazel
+cd bazel
+wget https://github.com/bazelbuild/bazel/releases/download/5.1.1/bazel-5.1.1-linux-arm64
+mv bazel-5.1.1-linux-arm64 bazel
+chmod a+x bazel
+export PATH=/home/ubuntu/bazel/:$PATH
+
 # Clone the tensorflow repository
 git clone https://github.com/tensorflow/tensorflow.git
 cd tensorflow
 
-# Pulll https://github.com/tensorflow/tensorflow/pull/55534
+# Pull the below PR if building from TensorFlow 2.9.0
+# If building from the tensorflow master no need to pull any PR
 git fetch origin pull/55534/head:xla_acl
 git checkout xla_acl
 
