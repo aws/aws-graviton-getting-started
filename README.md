@@ -21,7 +21,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 * [Third-party Software Vendors](isv.md)
 * [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
 * [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
-* [TensorFlow](tensorflow.md)
+* [TensorFlow](machinelearning/tensorflow.md)
 * [Known issues and workarounds](#known-issues-and-workarounds)
 * [AWS Managed Services available on Graviton](managed_services.md)
 * [Graviton Performance Runbook](perfrunbook/graviton_perfrunbook.md)
