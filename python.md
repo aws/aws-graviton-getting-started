@@ -129,7 +129,7 @@ make -j4;  sudo make install
 # Install OpenBLAS
 git clone https://github.com/xianyi/OpenBLAS.git $HOME/OpenBLAS
 cd $HOME/OpenBLAS
-make -j4 BINARY=64 FC=gfortran USE_OPENMP=1
+make -j4 BINARY=64 FC=gfortran USE_OPENMP=1 NUM_THREADS=64
 sudo make PREFIX=/usr install
 ```
 
@@ -212,15 +212,16 @@ $ conda env create -f graviton-example.yml
 
 ### 4.1 PyTorch
 
-PyTorch wheels for nightly builds (cpu builds) are are available for Graviton2/Arm64 since PyTorch 1.8.
-
-
 ```
 pip install numpy
-pip install --pre torch torchvision  -f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
+pip install torch torchvision
 ```
+### 4.2 TensorFlow
 
-### 4.2 DGL
+```
+pip install tensorflow-cpu-aws
+```
+### 4.3 DGL
 
 Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](#41-pytorch)
 
@@ -229,11 +230,11 @@ On **Ubuntu**:
 Follow the [install from source](https://github.com/dmlc/dgl/blob/master/docs/source/install/index.rst#install-from-source) instructions.
 
 
-### 4.3 Sentencepiece
+### 4.4 Sentencepiece
 
 [Sentencepiece>=1.94 now has pre-compiled binary wheels available for Graviton](https://pypi.org/project/sentencepiece/0.1.94/#history).
 
-### 4.4	Morfeusz
+### 4.5	Morfeusz
 
 On **Ubuntu**:
 
