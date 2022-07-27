@@ -57,7 +57,7 @@ If you are new to Graviton and want to understand how to identify target workloa
 # Optimizing for Graviton
 Please refer [here](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/graviton_perfrunbook.md).
 
-Different architectures and systems have differing capabilities, which means some tools you might be familiar with on one architecture don't have equivalent on AWS Graviton. We document some of these utilities/ tools [here](https://github.com/RamaMalladiAWS/aws-graviton-getting-started/blob/main/Graviton_monitoring_differences.md) and the differences.
+Different architectures and systems have differing capabilities, which means some tools you might be familiar with on one architecture don't have equivalent on AWS Graviton. Documented [here](https://github.com/RamaMalladiAWS/aws-graviton-getting-started/blob/main/Monitoring_Tools_on_Graviton.md) are some of these utilities.
 
 # Recent software updates relevant to Graviton
 There is a huge amount of activity in the Arm software ecosystem and improvements are being
