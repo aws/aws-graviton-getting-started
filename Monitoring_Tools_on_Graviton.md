@@ -1,7 +1,7 @@
 # Monitoring tools for AWS Graviton
 Listed below are some monitoring and profiling tools supported on AWS Gravtion. Also listed are some differences when compared to the tools available on x86 processor architectures.
 
-Some of the most commonly used tools such as _top, htop, iostat, lstopo, hwloc, dmidecode, lmbench, Linux perf_ are supported on AWS Graviton processors. There are some tools such as Intel MLC, Intel VTune Profiler, PCM, _turbostat_ are only supported on Intel processors.
+Some of the most commonly used tools such as _top, htop, iostat, lstopo, hwloc, dmidecode, lmbench, Linux perf_ are supported on AWS Graviton processors. There are some tools such as Intel MLC, Intel VTune Profiler, PCM that are supported only on Intel processors and tools such as _turbostat_ supported on x86 processors.
 
 ## Details
 ### Info utilities
@@ -121,5 +121,6 @@ More details on how to use Linux perf utility on AWS Graviton processors is avai
 
 Utilities such as *lmbench* are available [here](http://lmbench.sourceforge.net/) and can be built for AWS Graviton processors to obtain latency and bandwidth stats.
 
-**Note:** On AWS Graviton 2/3 processors, Turbo isn’t supported. So, utilities such as ‘turbostat’ aren’t supported/ relevant for Arm architecture (and not on AWS Graviton processor either). Also, tools such as *[i7z](https://code.google.com/archive/p/i7z/)* for discovering CPU frequency, turbo, sockets and other information are only supported on Intel architecture/ processors. Intel *MLC* is a memory latency checker utility that is only supported on Intel processors.
-
+**Notes**:
+**1.** The ARM Linux kernel community has decided not to put CPU frequency in _/proc/cpuinfo_ which can be read by tools such as _lscpu_ or directly.
+**2.** On AWS Graviton 2/3 processors, Turbo isn’t supported. So, utilities such as ‘turbostat’ aren’t supported/ relevant for Arm architecture (and not on AWS Graviton processor either). Also, tools such as *[i7z](https://code.google.com/archive/p/i7z/)* for discovering CPU frequency, turbo, sockets and other information are only supported on Intel architecture/ processors. Intel *MLC* is a memory latency checker utility that is only supported on Intel processors.
