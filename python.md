@@ -4,7 +4,13 @@ Python is an interpreted, high-level, general-purpose programming language, with
 
 ## 1. Installing Python packages
 
-When *pip* (the standard package installer for Python) is used, it pulls the packages from [Python Package Index](https://pypi.org) and other indexes.
+When *pip* (the standard package installer for Python) is used, it pulls the packages from [Python Package Index](https://pypi.org) and other indexes. To ensure you
+can install binary packages from [Python Package Index](https://pypi.org), make sure to update your pip installation to a new enough version \(>19.3\).
+
+```
+# To ensure an up-to-date pip version
+sudo python3 -m pip install --upgrade pip
+```
 
 AWS is actively working to make pre-compiled packages available for Graviton. You can see a current list of the over 200 popular python packages we track nightly
 for AL2 and Ubuntu for Graviton support status at our [Python wheel tester](https://geoffreyblake.github.io/arm64-python-wheel-tester/).  
