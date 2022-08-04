@@ -29,7 +29,7 @@ We have compiled a list of popular software within the container ecosystem that 
 
 | Name                      | URL                           | Comment                |
 | :-----                    |:-----                         | :-----                 |
-| Istio	| https://github.com/istio/istio/releases/	| 1) arm64 binaries as of 1.6.x release series<br>2) [Istio container build instructions](https://github.com/aws/aws-graviton-getting-started/blob/main/containers-workarounds.md#Istio)|
+| Istio	| https://github.com/istio/istio/releases/	| 1) [Arm64 support is now available via the master branch](https://github.com/istio/istio/issues/26652). To try it out follow: https://github.com/istio/istio/wiki/Dev-Builds#dev-release-information. Support will be included in the upcoming 1.15 release ETA ~1 month.<br>2) [Istio container build instructions](https://github.com/aws/aws-graviton-getting-started/blob/main/containers-workarounds.md#Istio)|
 | Envoy	| https://www.envoyproxy.io/docs/envoy/v1.18.3/start/docker ||
 | Tensorflow | https://hub.docker.com/r/armswdev/tensorflow-arm-neoverse |  |
 | Tensorflow serving | 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.7.0-cpu-py38-ubuntu20.04-e3-v1.0 ||
