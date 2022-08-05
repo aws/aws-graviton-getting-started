@@ -12,8 +12,8 @@ io.netty | [netty-transport-native-epoll](https://github.com/netty/netty) | yes 
 io.netty | [netty-tcnative](https://github.com/netty/netty-tcnative) | yes | [yes](https://mvnrepository.com/artifact/io.netty/netty-tcnative) | 2.0.31
 org.fusesource.jansi | [jansi-native](https://github.com/fusesource/jansi-native) | yes | no |
 org.fusesource.leveldbjni | [leveldbjni-all](https://github.com/fusesource/leveldbjni) | no | no |
-org.fusesource.sigar | [sigar](https://github.com/hyperic/sigar) | yes (refer https://github.com/hyperic/sigar/pull/140) | no |
+org.fusesource.sigar | [sigar](https://github.com/hyperic/sigar) | yes (refer https://github.com/hyperic/sigar/pull/140) | [debian](https://pkgs.org/download/libhyperic-sigar-java) | 1.6.4
 org.apache.hadoop | [hadoop-lzo](https://github.com/twitter/hadoop-lzo) | yes | no |
 
 ---
-Updated on 2020-06-16
+Updated on 2022-08-02

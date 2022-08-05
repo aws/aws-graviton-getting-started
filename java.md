@@ -159,7 +159,7 @@ $ perf script -i perf.data.jit | ./FlameGraph/stackcollapse-perf.pl | ./FlameGra
 ```
 
 ### Build libperf-jvmti.so on Amazon Linux 2
-Amazon Linux 2 does not package `libperf-jvmti.so` by default with the `perf` yum package.  
+Amazon Linux 2 does not package `libperf-jvmti.so` by default with the `perf` yum package for kernel versions <5.10.
 Build the `libperf-jvmti.so` shared library using the following steps:
 
 ```bash
