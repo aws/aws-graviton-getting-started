@@ -1,15 +1,12 @@
 # System Load and Compute Headroom
 
-The typical pricing model for cloud computing services centers on the amount of hardware resources set aside
-for the customer. With this, ideally such resources should be utilized fully, to operate at peak economy.
-In the ideal world the performance of a system should be linear up to 100% load.
+From an economical perspective compute resources should be utilized fully.
+Ideally the system's performance should increase linearly up to 100% CPU load.
 This can be in the context of pure compute or peak load and fail-over resilience.
-However, depending on workloads, systems that employ simultaneous multithreading (SMT), 
-aka 'Hyperthreading', incur non-linear performance degradation when the system is 
-loaded beyond 50%.
-Systems that don't use SMT will degrade as well, to some extent, because of shared resource contention.
-In the following the extent of this degradation is investigated with a few illustrative workloads.
-
+Graviton instances and x86-type instances, such as c6i, behave fundamentally different under load.
+Any initial x86 advantage over Graviton starts to disappear beyond 50% system load.
+This effect is caused by symmetric multithreading and the Linux kernel's preferrence of CPU cores over CPU threads.
+In the following this behavior is investigated with a few illustrative workloads.
 
 ### Experimental Setup
 
@@ -28,44 +25,10 @@ An ideal system would take the exact same time for each compile run.
 
 Results:
 
-```
-Graviton 3 System
- 
-Number of compiles, CPU use [%], time to complete [s]
-
-1, 16, 244
-2, 26, 249
-3, 38, 247
-4, 51, 250
-5, 63, 251
-6, 75, 255
-7, 88, 251
-8, 100, 253
-```
-
 The Graviton 3 achieves 96% of the single compile time performance, single CPU baseline when using 100% of the available CPUs.
-244/253=0.964
-
-
-```
-Intel SMT system
-
-Number of compiles, CPU use [%], time to complete [s]
-
-1, 20, 223
-2, 26, 226
-3, 38, 224
-4, 51, 225
-5, 63, 265
-6, 76, 301
-7, 88, 327
-8, 100, 354
-```
-
-
 The Intel system achieves 63% of the compile time performance of the single compile, single CPU baseline when loaded to 100%.
-223/354=0.63
-![](images/system-load/GccC7gC6i.png)
+
+![](images/system-load/c7g-compared-to-c6i.png)
 
 Note: 
 The average compile time of the c6i instance is 268s, close to the 250s on c7g. 
@@ -152,6 +115,6 @@ Experiment one and two also indicate this, if not as clearly.
 
 #### Conclusions
 
-The results show that systems that do not employ SMT have more compute headroom than systems with SMT-enabled CPUs. In other words: Graviton instances compute performance increases linear with CPU load, the SMT enabled c6i performance increases less after 50% CPU load. Based on the above, load balancer thresholds can, in many cases, be set higher on c7g-type instances than on c6i-type instances and thus lead to significant savings in the size of the required server fleet, as the Netty example shows. 
+Graviton instances compute performance increases linear with CPU load, x86 performance increases less after 50% CPU load. This is because x86-type CPUs employ symmetric multithreading, aka. 'Hyperthreading'. Based on the above, load balancer thresholds can, in many cases, be set higher on Graviton instances than on x86-type instances and thus lead to significant savings in the size of the required server fleet, as the Netty example shows. 
 Since every workload has different demands on the system, a full load sweep should done to determine best system type and at which threshold additional instances need to be added to maintain performance.
 
