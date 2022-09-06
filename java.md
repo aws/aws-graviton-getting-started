@@ -154,6 +154,9 @@ $ perf record -g -k 1 -a -o perf.data sleep 5
 # Inject the generated methods information into the perf.data file
 $ perf inject -j -i perf.data -o perf.data.jit
 
+# View the perf report with symbol info
+$ perf report -i perf.data.jit
+
 # Process the new file, for instance via Brendan Gregg's Flamegraph tools
 $ perf script -i perf.data.jit | ./FlameGraph/stackcollapse-perf.pl | ./FlameGraph/flamegraph.pl > ./flamegraph.svg
 ```
