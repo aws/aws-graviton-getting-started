@@ -25,6 +25,7 @@ This repository is meant to help new users start using the Arm-based AWS Gravito
 * [Known issues and workarounds](#known-issues-and-workarounds)
 * [AWS Managed Services available on Graviton](managed_services.md)
 * [Graviton Performance Runbook](perfrunbook/graviton_perfrunbook.md)
+* [Assembly Optimization Guide for Graviton Arm64 Processors](arm64-assembly-optimization.md)
 * [Additional resources](#additional-resources)
 
 # Transitioning to Graviton
