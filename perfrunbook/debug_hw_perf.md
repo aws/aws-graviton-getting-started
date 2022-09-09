@@ -32,16 +32,15 @@ PMU counters are available on all Graviton2 instances (a limited subset is avail
   # Cut down vCPUs needed on Graviton
   %> sudo ./configure_vcpus.sh <# vcpus> cores
   ```
-3. Measure a set of hardware counters with our helper script. It will plot a time-series curve of the counter's behavior over time and provide geomean and percentile statistics.
+3. Measure individual hardware counters with our helper script. It will plot a time-series curve of the counter's behavior over time and provide geomean and percentile statistics.
   ```bash
   # In terminal 1
   %> <start load generator or benchmark>
     
   # In terminal 2
   %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
-  # Use --uarch Graviton2 for Graviton2 instances, and --uarch CXL for c/m/r5 instances
   # C5a instances not supported currently.
-  %> sudo python3 ./measure_and_plot_basic_pmu_counters.py --stat ipc --uarch Graviton2
+  %> sudo python3 ./measure_and_plot_basic_pmu_counters.py --stat ipc
     
   # Example Output
   1.6 ++-----------------------+------------------------+------------------------+-----------------------+------------------------+-----------------------++
@@ -80,6 +79,31 @@ PMU counters are available on all Graviton2 instances (a limited subset is avail
    1.1 ++-----------------------+------------------------+------------------------+-----------------------+------------------------+-----------------------++
        0                        10                       20                       30                      40                       50                       60
                                                            gmean:   1.50 p50:   1.50 p90:   1.50 p99:   1.61
+  ```
+4. You can also measure all relevant counters at once using our aggregate PMU measuring script if you do not need a time-series view.  It prints out a table of measured PMU ratios at the end and supports the same counters.
+  ```bash
+  # In terminal 1
+  %> <start load generator or benchmark>
+    
+  # In terminal 2
+  %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
+  # C5a instances not supported currently.
+  %> sudo python3 ./measure_aggregated_pmu_stats.py --timeout 300
+  |Ratio               |   geomean|       p10|       p50|       p90|       p95|       p99|     p99.9|      p100|
+  |ipc                 |      1.00|      0.84|      1.00|      1.13|      1.32|      2.46|      2.48|      2.48|
+  |branch-mpki         |      2.43|      1.67|      2.64|      4.74|      5.69|      7.23|      8.45|      8.45|
+  |code_sparsity       |      0.00|      0.00|      0.01|      0.02|      0.04|      0.10|      0.10|      0.10|
+  |data-l1-mpki        |     11.60|     10.29|     11.67|     14.99|     15.76|     16.94|     19.68|     19.68|
+  |inst-l1-mpki        |     13.23|     11.14|     13.47|     20.56|     25.50|     34.01|     35.12|     35.12|
+  |l2-mpki             |      7.00|      5.70|      6.62|     11.02|     13.74|     18.99|     24.56|     24.56|
+  |l3-mpki             |      1.64|      1.23|      1.47|      3.09|      3.60|     11.90|     14.61|     14.61|
+  |core-rdBw-MBs       |      0.00|      0.00|      0.00|      0.02|      0.04|      0.15|      1.17|      1.50|
+  |stall_frontend_pkc  |    384.50|    326.27|    404.82|    451.50|    475.00|    571.48|    571.98|    571.98|
+  |stall_backend_pkc   |    265.24|    230.51|    266.60|    335.77|    350.70|    384.22|    395.24|    395.24|
+  |inst-tlb-mpki       |      0.36|      0.23|      0.40|      0.65|      0.74|      1.69|      1.75|      1.75|
+  |inst-tlb-tw-pki     |      0.22|      0.14|      0.25|      0.43|      0.45|      0.53|      0.70|      0.70|
+  |data-tlb-mpki       |      2.18|      1.74|      2.01|      3.60|      4.54|      6.12|      6.19|      6.19|
+  |data-tlb-tw-pki     |      1.36|      1.10|      1.48|      1.82|      2.06|      3.01|      4.71|      4.71|
   ```
 
 ## Top-down method to debug hardware performance

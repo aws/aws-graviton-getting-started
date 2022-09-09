@@ -51,25 +51,7 @@ def plot_terminal(data, title, xtitle):
     plt.show()
 
 
-def plot_matplotlib(data, title, xtitle):
-    """
-    Plot the data using matplotlib via pandas to either a jupyter notebook frame or GUI window
-    """
-    import seaborn as sb
-    import matplotlib
-
-    sb.set(style="whitegrid")
-    matplotlib.rc('xtick', labelsize=12)
-    matplotlib.rc('ytick', labelsize=12)
-    matplotlib.rc('axes', titlesize=16)
-    matplotlib.rc('axes', labelsize=12)
-    matplotlib.rc('figure', titlesize=18)
-    matplotlib.rc('legend', fontsize=14)
-
-    data.plot(y=title, figsize=(16, 8), xlabel=xtitle, title=title)
-
-
-def plot_counter_stat(csv, plot_format, stat_name, counter_numerator,
+def plot_counter_stat(csv, stat_name, counter_numerator,
                       counter_denominator, scale):
     """
     Process the returned csv file into a time-series statistic to plot and
@@ -93,59 +75,79 @@ def plot_counter_stat(csv, plot_format, stat_name, counter_numerator,
     p99 = stats.scoreatpercentile(df_processed[stat_name], 99)
     xtitle = f"gmean:{geomean:>6.2f} p50:{p50:>6.2f} p90:{p90:>6.2f} p99:{p99:>6.2f}"
 
-    if plot_format == "terminal":
-        plot_terminal(df_processed, stat_name, xtitle)
-    elif plot_format == "matplotlib":
-        plot_matplotlib(df_processed, stat_name, xtitle)
-    else:
-        print(f"Do not know how to plot {plot_format}")
+    plot_terminal(df_processed, stat_name, xtitle)
 
 
-counter_mapping = {
-                      "Graviton2":
-                      {
-                        "ipc": ["armv8_pmuv3_0/event=0x8/", "armv8_pmuv3_0/event=0x11/", 1],
-                        "branch-mpki": ["armv8_pmuv3_0/event=0x10/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "data-l1-mpki": ["armv8_pmuv3_0/event=0x3/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "inst-l1-mpki": ["armv8_pmuv3_0/event=0x1/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "l2-mpki": ["armv8_pmuv3_0/event=0x17/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "l3-mpki": ["armv8_pmuv3_0/event=0x37/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "stall_frontend_pkc": ["armv8_pmuv3_0/event=0x23/", "armv8_pmuv3_0/event=0x11/", 1000],
-                        "stall_backend_pkc": ["armv8_pmuv3_0/event=0x24/", "armv8_pmuv3_0/event=0x11/", 1000],
-                        "inst-tlb-mpki": ["armv8_pmuv3_0/event=0x2/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "inst-tlb-tw-pki": ["armv8_pmuv3_0/event=0x35/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "data-tlb-mpki": ["armv8_pmuv3_0/event=0x5/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "data-tlb-tw-pki": ["armv8_pmuv3_0/event=0x34/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        "code-sparsity": ["armv8_pmuv3_0/event=0x11c/", "armv8_pmuv3_0/event=0x8/", 1000],
-                        },
-                      "CXL":
-                      {
-                        "ipc": ["cpu/event=0xc0,umask=0x0/", "cpu/event=0x3c,umask=0x0/", 1],
-                        "branch-mpki": ["cpu/event=0xC5,umask=0x0/", "cpu/event=0xc0,umask=0x0/", 1000],
-                        "data-l1-mpki": ["cpu/event=0x51,umask=0x1/", "cpu/event=0xc0,umask=0x0/", 1000],
-                        "inst-l1-mpki": ["cpu/event=0x83,umask=0x2/", "cpu/event=0xc0,umask=0x0/", 1000],
-                        "l2-mpki": ["cpu/event=0x24,umask=0x27/", "cpu/event=0xc0,umask=0x0/", 1000],
-                        "l3-mpki": ["cpu/event=0xB0,umask=0x10/", "cpu/event=0xc0,umask=0x0/", 1000],
-                        "stall_frontend_pkc": ["cpu/event=0x9C,umask=0x1,cmask=0x4/", "cpu/event=0x3c,umask=0x0/", 1000],
-                        "stall_backend_pkc": ["cpu/event=0xA2,umask=0x1/", "cpu/event=0x3c,umask=0x0/", 1000],
-                        "inst-tlb-mpki": ["cpu/event=0x85,umask=0x20/", "cpu/event=0x3c,umask=0x0/", 1000],
-                        "inst-tlb-tw-pki": ["cpu/event=0x85,umask=0x01/", "cpu/event=0x3c,umask=0x0/", 1000],
-                        # This counter just counts misses from loads, need to add stores here too...
-                        "data-tlb-mpki": ["cpu/event=0x08,umask=0x20/", "cpu/event=0x3c,umask=0x0/", 1000],
-                        "data-tlb-tw-pki": ["cpu/event=0x08,umask=0x01/", "cpu/event=0x3c,umask=0x0/", 1000],
-                        # L2 TLB misses need to be calculated from multiple counters, this helper script does not support that.
-                      }
-                  }
+def get_cpu_type():
+    GRAVITON_MAPPING = {"0xd0c": "Graviton2", "0xd40": "Graviton3"}
+    with open("/proc/cpuinfo", "r") as f:
+        for line in f.readlines():
+            if "model name" in line:
+                return line.split(":")[-1].strip()
+            elif "CPU part" in line:
+                cpu = line.split(":")[-1].strip()
+                return GRAVITON_MAPPING[cpu]
+
+
+UNIVERSAL_GRAVITON_CTRS = {
+    "ipc": ["armv8_pmuv3_0/event=0x8/", "armv8_pmuv3_0/event=0x11/", 1],
+    "branch-mpki": ["armv8_pmuv3_0/event=0x10/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "data-l1-mpki": ["armv8_pmuv3_0/event=0x3/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "inst-l1-mpki": ["armv8_pmuv3_0/event=0x1/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "l2-mpki": ["armv8_pmuv3_0/event=0x17/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "l3-mpki": ["armv8_pmuv3_0/event=0x37/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "stall_frontend_pkc": ["armv8_pmuv3_0/event=0x23/", "armv8_pmuv3_0/event=0x11/", 1000],
+    "stall_backend_pkc": ["armv8_pmuv3_0/event=0x24/", "armv8_pmuv3_0/event=0x11/", 1000],
+    "inst-tlb-mpki": ["armv8_pmuv3_0/event=0x2/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "inst-tlb-tw-pki": ["armv8_pmuv3_0/event=0x35/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "data-tlb-mpki": ["armv8_pmuv3_0/event=0x5/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "data-tlb-tw-pki": ["armv8_pmuv3_0/event=0x34/", "armv8_pmuv3_0/event=0x8/", 1000],
+    "code-sparsity": ["armv8_pmuv3_0/event=0x11c/", "armv8_pmuv3_0/event=0x8/", 1000],
+}
+GRAVITON3_CTRS = {
+    "stall_backend_mem_pkc": ["armv8_pmuv3_0/event=0x4005/", "armv8_pmuv3_0/event=0x11/", 1000],
+}
+UNIVERSAL_INTEL_CTRS = {
+    "ipc": ["cpu/event=0xc0,umask=0x0/", "cpu/event=0x3c,umask=0x0/", 1],
+    "branch-mpki": ["cpu/event=0xC5,umask=0x0/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-l1-mpki": ["cpu/event=0x51,umask=0x1/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "inst-l1-mpki": ["cpu/event=0x24,umask=0xe4/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "l2-mpki": ["cpu/event=0xf1,umask=0x1f/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "l3-mpki": ["cpu/event=0x2e,umask=0x41/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "stall_frontend_pkc": ["cpu/event=0x9C,umask=0x1,cmask=0x4/", "cpu/event=0x3c,umask=0x0/", 1000],
+    "stall_backend_pkc": ["cpu/event=0xA2,umask=0x1/", "cpu/event=0x3c,umask=0x0/", 1000],
+    "inst-tlb-mpki": ["cpu/event=0x85,umask=0x20/", "cpu/event=0x3c,umask=0x0/", 1000],
+    "inst-tlb-tw-pki": ["cpu/event=0x85,umask=0x01/", "cpu/event=0x3c,umask=0x0/", 1000],
+    "data-tlb-mpki": ["cpu/event=0x08,umask=0x20/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-st-tlb-mpki": ["cpu/event=0x49,umask=0x20/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-tlb-tw-pki": ["cpu/event=0x08,umask=0x01/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-st-tlb-tw-pki": ["cpu/event=0x49,umask=0x01/", "cpu/event=0xc0,umask=0x0/", 1000],
+}
+ICX_CTRS = {
+    "stall_frontend_pkc": ["cpu/event=0x9C,umask=0x1,cmask=0x5/", "cpu/event=0x3c,umask=0x0/", 1000],
+    "stall_backend_pkc": ["cpu/event=0xa4,umask=0x2/", "cpu/event=0xa4,umask=0x01/", 1000], 
+}
+
+filter_proc = {
+    "Graviton2": UNIVERSAL_GRAVITON_CTRS,
+    "Graviton3": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON3_CTRS},
+    "Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz": UNIVERSAL_INTEL_CTRS,
+    "Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz": UNIVERSAL_INTEL_CTRS,
+    "Intel(R) Xeon(R) Platinum 8275CL CPU @ 3.00GHz": UNIVERSAL_INTEL_CTRS,
+    "Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz": UNIVERSAL_INTEL_CTRS,
+    "Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz": {**UNIVERSAL_INTEL_CTRS, **ICX_CTRS}
+}
 
 if __name__ == "__main__":
+    processor_version = get_cpu_type()
+    try:
+        stat_choices = list(filter_proc[processor_version].keys())
+    except:
+        print(f"{processor_version} is not supported")
+        exit(1)
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stat", default="ipc", type=str, choices=["ipc", "branch-mpki", "data-l1-mpki", "inst-l1-mpki", "l2-mpki", "l3-mpki",
-                                                                    "stall_frontend_pkc", "stall_backend_pkc", "inst-tlb-mpki", "inst-tlb-tw-pki",
-                                                                    "data-tlb-mpki", "data-tlb-tw-pki", "code-sparsity"]) #, "l2-tlb-mpki"])
-    parser.add_argument("--plot", default="terminal", type=str, choices=["terminal", "matplotlib"],
-                        help="What display type to use, terminal (ascii art!) or matplotlib (for Jupyter notebooks)")
-    parser.add_argument("--uarch", default="Graviton2", type=str, choices=["Graviton2", "CXL"],
-                        help="What micro-architecture to use to define our events")
+    parser.add_argument("--stat", default="ipc", type=str, choices=stat_choices)
     parser.add_argument("--time", default=60, type=int, help="How long to measure for in seconds")
     parser.add_argument("--custom_ctr", type=str,
                         help="Specify a custom counter ratio and scaling factor as 'ctr1|ctr2|scale'"
@@ -162,8 +164,7 @@ if __name__ == "__main__":
         ctrs = args.custom_ctr.split("|")
         counter_info = [ctrs[0], ctrs[1], int(ctrs[2])]
     else:
-        counter_info = counter_mapping[args.uarch][args.stat]
+        counter_info = filter_proc[processor_version][args.stat]
 
     csv = perfstat(args.time, *counter_info)
-    plot_counter_stat(csv, args.plot, args.stat, *counter_info)
-
+    plot_counter_stat(csv, args.stat, *counter_info)

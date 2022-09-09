@@ -46,14 +46,11 @@ if [[ $(id -u) -ne 0 ]]; then
   exit 1
 fi
 
-if [[ $# -lt 1 ]]; then
+# Test perf exists
+test_perf=$(perf list &> /dev/null)
+if [[ $? -ne 0 ]]; then
   help_msg
   exit 1
-fi
-
-capture_time=300
-if [[ $# -gt 1 ]]; then
-  capture_time=$2
 fi
 
 date=$(date "+%Y-%m-%d_%H:%M:%S")
@@ -61,13 +58,6 @@ date=$(date "+%Y-%m-%d_%H:%M:%S")
 token=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 instance_type=$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-type)
 instance_id=$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)
-
-# Test perf exists
-test_perf=$(perf list &> /dev/null)
-if [[ $? -ne 0 ]]; then
-  help_msg
-  exit 1
-fi
 
 POSITIONAL=()
 while [[ $# -gt 0 ]]
@@ -82,6 +72,10 @@ do
       sr_filter="$2"
       shift; shift
       ;;
+    -h|--help)
+      help_msg
+      exit 1
+      ;;
     *)
       POSITIONAL+=("$1")
       shift
@@ -89,6 +83,16 @@ do
   esac
 done
 set -- "${POSITIONAL[@]}"
+
+if [[ $# -lt 1 ]]; then
+  help_msg
+  exit 1
+fi
+
+capture_time=300
+if [[ $# -gt 1 ]]; then
+  capture_time=$2
+fi
 
 if [[ "$1" == "oncpu" ]]; then
   capture_on_cpu $capture_time $date $instance_type $instance_id
