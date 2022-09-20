@@ -62,22 +62,8 @@ def plot_terminal(data, title, xlabel, yrange):
     plt.plot_size(100, 30)
     plt.show()
 
-def plot_matplotlib(data, title, xlabel, yrange):
-    import seaborn as sb
-    import matplotlib
 
-    sb.set(style="whitegrid")
-    matplotlib.rc('xtick', labelsize=12)
-    matplotlib.rc('ytick', labelsize=12)
-    matplotlib.rc('axes', titlesize=16)
-    matplotlib.rc('axes', labelsize=12)
-    matplotlib.rc('figure', titlesize=18)
-    matplotlib.rc('legend', fontsize=14)
-
-    data.plot(figsize=(24,8), xlabel=xlabel, ylim=(yrange[0], yrange[1]), title=title)
-
-
-def calc_stats_and_plot(df, stat, plot_format, yaxis_range=None):
+def calc_stats_and_plot(df, stat, yaxis_range=None):
     """
     Function that calculates the common stats and 
     plots the data.
@@ -97,12 +83,7 @@ def calc_stats_and_plot(df, stat, plot_format, yaxis_range=None):
     p99 = stats.scoreatpercentile(df[stat], 99)
     xtitle = f"gmean:{geomean:>6.2f} p50:{p50:>6.2f} p90:{p90:>6.2f} p99:{p99:>6.2f}"
 
-    if plot_format == "terminal":
-        plot_terminal(df, stat, xtitle, limit)
-    elif plot_format == "matplotlib":
-        plot_matplotlib(df, stat, xtitle, limit)
-    else:
-        print(f"Do not know how to plot {plot_format}")
+    plot_terminal(df, stat, xtitle, limit)
 
 
 def parse_sar(sar_parse_class, buf):
@@ -128,7 +109,7 @@ def parse_sar(sar_parse_class, buf):
     return df
 
 
-def plot_cpu(buf, stat, plot_format):
+def plot_cpu(buf, stat):
     """
     Plot cpu usage data from sar
     """
@@ -140,30 +121,30 @@ def plot_cpu(buf, stat, plot_format):
     group = df.groupby('cpu')
     data = group.get_group('all')
 
-    calc_stats_and_plot(data, stat, plot_format, yaxis_range=YAXIS_RANGE)
+    calc_stats_and_plot(data, stat, yaxis_range=YAXIS_RANGE)
 
 
-def plot_tcp(buf, stat, plot_format):
+def plot_tcp(buf, stat):
     """
     Plot the numer of new connections being recieved over time
     """
     from sar_parse import ParseTcpTime
     df = parse_sar(ParseTcpTime, buf)
 
-    calc_stats_and_plot(df, stat, plot_format)
+    calc_stats_and_plot(df, stat)
 
 
-def plot_cswitch(buf, stat, plot_format):
+def plot_cswitch(buf, stat):
     """
     Plot cpu usage data from sar
     """
     from sar_parse import ParseCSwitchTime
     df = parse_sar(ParseCSwitchTime, buf)
 
-    calc_stats_and_plot(df, stat, plot_format)
+    calc_stats_and_plot(df, stat)
 
 
-def plot_irq(buf, stat, plot_format):
+def plot_irq(buf, stat):
     """
     Plot irq per second data from mpstat
     """
@@ -173,10 +154,10 @@ def plot_irq(buf, stat, plot_format):
 
     df = parse_mpstat_json_all_irqs(irqs)
 
-    calc_stats_and_plot(df, stat, plot_format)
+    calc_stats_and_plot(df, stat)
 
 
-def plot_specific_irq(buf, stat, plot_format):
+def plot_specific_irq(buf, stat):
     """
     Plot a specific IRQ source
     """
@@ -190,7 +171,7 @@ def plot_specific_irq(buf, stat, plot_format):
     from mpstat_parse import parse_mpstat_json_single_irq
     df = parse_mpstat_json_single_irq(irqs, stat)
 
-    calc_stats_and_plot(df, stat, plot_format)
+    calc_stats_and_plot(df, stat)
 
 
 stat_mapping = {
@@ -211,8 +192,6 @@ if __name__ == "__main__":
                                                                          "new-connections", "tcp-in-segments", "tcp-out-segments",
                                                                          "cswitch","all-irqs","single-irq"])
     parser.add_argument("--irq", type=str, help="Specific IRQ to measure if single-irq chosen for stat")
-    parser.add_argument("--plot", default="terminal", type=str, choices=["terminal", "matplotlib"],
-                        help="What display type to use, terminal (ascii art!) or matplotlib (for Jupyter notebooks)")
     parser.add_argument("--time", default=60, type=int, help="How long to measure for in seconds")
 
     args = parser.parse_args()
@@ -226,4 +205,4 @@ if __name__ == "__main__":
         exit(1)
 
     text = gather(args.time)
-    plot(text, stat, args.plot)
+    plot(text, stat)
