@@ -23,14 +23,24 @@ GC time in some workloads, and avoids contention in net-intensive workloads like
 
 Versions of Corretto11 (>=11.0.12) come with additional enhancements to improve
 performance on workloads with light to moderate lock-contention: improved spin-lock behavior inside the JVM,
-enhanced implementation of `Thread.onSpinWait()` on Graviton2.
+enhanced implementation of `Thread.onSpinWait()` on Graviton.
 
 ### Java JVM Options
-There are numerous options that control the JVM and may lead to better performance. Three that
-have shown large (1.5x) improvements in some Java workloads are eliminating tiered compilation
-and restricting the size of the code cache which allows the Graviton2 cores to better predict
-branches. These are helpful on some workloads but can hurt on others so testing with and without
-them is essential: `-XX:-TieredCompilation -XX:ReservedCodeCacheSize=64M -XX:InitialCodeCacheSize=64M`.
+There are numerous options that control the JVM and may lead to better performance.
+
+- Three flags `-XX:-TieredCompilation -XX:ReservedCodeCacheSize=64M -XX:InitialCodeCacheSize=64M`
+have shown large (1.5x) improvements in some Java workloads.
+The flags are eliminating tiered compilation and are restricting the size of
+the code cache which allows the Graviton cores to better predict branches.
+These are helpful on some workloads but can hurt on others so testing with and without
+them is essential.
+
+- Crypto algorithm AES/GCM used by TLS has been optimized for Graviton.
+On Graviton2 GCM encrypt/decrypt
+[performance improves by 3.5x to 5x](https://github.com/aws/aws-graviton-getting-started/issues/110#issuecomment-989442948).
+The optimization is enabled by default in Corretto and OpenJDK 18 and later.
+The optimization has been backported to Corretto and OpenJDK 11 and 17
+and can be enabled with the flags `-XX:+UnlockDiagnosticVMOptions -XX:+UseAESCTRIntrinsics`.
 
 ### Java Stack Size
 The default stack size for Java threads (i.e. `ThreadStackSize`) is 2mb on aarch64 (compared to 1mb on x86_64). You can check the default with:
