@@ -2,7 +2,7 @@
 
 **Introduction**
 
-HPC is a field where either high throughput and low latency is desired. Arm processor has its unique advantage in power efficiency and can find wide applications in HPC filed. Here is the instruction on how to get started with HPC on parallel clusters using Graviton CPUs.
+This document describes how to get started running HPC applications on parallel clusters using Graviton EC2 instances.
 
 **How to get started running HPC workload on Graviton CPUs**
 First, follow the instructions here to setup a parallel cluster - https://docs.aws.amazon.com/parallelcluster/latest/ug/install-v3-configuring.html. OpenMPI is the default MPI and already installed on AWS parallel cluster. For compilers, arm compiler for linux and gcc 10.2 or later are recommended for better auto-vectorization. Arm performance library includes a dense and sparse linear algebra library, fft library and optimized math library that can also improve the throughput of HPC applications.  The arm compiler and library can be downloaded at https://developer.arm.com/downloads/-/arm-compiler-for-linux. 
