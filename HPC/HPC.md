@@ -65,7 +65,7 @@ git clone https://github.com/Mantevo/HPCCG.git
 cd HPCCG/
 git pull origin pull/3/head
 ```
-- The recommended flags for compilation is "-Ofast -mcpu=native". 
+- The recommended flags for compilation is "-O3 -mcpu=native". For HPCCG case, it computes conjugate gradients on multiple nodes with double precision and it is safe to use "-Ofast -mcpu=native" for a bit more performance.
 Or you can use the presets defined in the config file.  
 ```
 make COMPILER=arm LIBRARY=armpl (use armclang and armPL)
