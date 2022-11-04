@@ -71,12 +71,12 @@ Or you can use the presets defined in the config file.
 make COMPILER=arm LIBRARY=armpl (use armclang and armPL)
 make COMPILER=gnu LIBRARY=none (use gcc and no external library)
 ```
-- to run the benchmark using the default mode which will generate intial matrix based on user given sizes (nx, ny, nz). A rule of sum is to make sure total memory allocation (depends on sparsematrix used for problem) on each node is not over the system memory.
+- to run the benchmark using the default mode which will generate intial matrix based on user given sizes (nx, ny, nz). A rule of thumb is to make sure total memory allocation (depends on sparsematrix used for problem) on each node is not over the system memory.
 total grid points on each rank: nx * ny * nz
 total grid points on each node: num_ranks_per_node * nx * ny * nz
 sparse matrix size: 
-  - 27 * sizeof(double) per grid point (for 27pt stencil, each grid point interacts with neighbors including diagonal ones)
-  - 7 * size of (double) per grid point (for 7pt stencil, each grid point interacts with direct neighbors)
+  - 27 * sizeof(double) * num_grid_point_per_node (for 27pt stencil, each grid point interacts with neighbors including diagonal ones)
+  - 7 * size of (double) * num_grid_point_per_node (for 7pt stencil, each grid point interacts with direct neighbors)
 
 - For alternate usage, to use a general sparse matrix; nx, ny, nz should be defined in the input file.
 ```
