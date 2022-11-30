@@ -60,7 +60,7 @@ Once the TensorFlow setup is ready, enable the below runtime configurations to a
 # The default runtime backend for tensorflow is Eigen, but typically onednn+acl provides better performance and this can be enabled by setting the below TF environment variable
 export TF_ENABLE_ONEDNN_OPTS=1
 
-# Graviton3 (e.g. c7g instance) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
+# Graviton3(E) (e.g. c7g, c7gn, and hpc7g instances) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
 grep -q bf16 /proc/cpuinfo && export DNNL_DEFAULT_FPMATH_MODE=BF16
 
 # Make sure the openmp threads are distributed across all the processes for multi process applications to avoid over subscription for the vcpus. For example if there is a single application process, then num_processes should be set to '1' so that all the vcpus are assigned to it with one-to-one mapping to omp threads

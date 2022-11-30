@@ -48,7 +48,7 @@ docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/pytorch-arm-neoverse:r22.1
 # Runtime configurations for optimal performance
 Once the PyTorch setup is ready, enable the below runtime configurations to achieve the best performance.
 ```
-# Graviton3 (e.g. c7g instance) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
+# Graviton3(E) (e.g. c7g, c7gn and HPC7g instances) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
 grep -q bf16 /proc/cpuinfo && export DNNL_DEFAULT_FPMATH_MODE=BF16
 
 # Enable Transparent huge pages to minimize the memory allocation overhead for batched inference

@@ -4,7 +4,7 @@
 
 To build code with the optimal processor features use the following.
 We recommend using Graviton2 processor features when targeting both Graviton2
-and Graviton3 as code compiled for Graviton3 will only run on Graviton3 and not
+and Graviton3(E) as code compiled for Graviton3(E) will only run on Graviton3(E) and not
 on Graviton2.  On arm64 `-mcpu=` acts as both specifying the appropriate
 architecture and tuning and it's generally better to use that vs `-march` if
 you're building for a specific CPU.
@@ -13,7 +13,7 @@ you're building for a specific CPU.
 CPU       | Flag    | GCC version      | LLVM verison
 ----------|---------|-------------------|-------------
 Graviton2 | `-mcpu=neoverse-n1`\* | GCC-9^ | Clang/LLVM 10+
-Graviton3 | `-mcpu=neoverse-512tvb`% | GCC 11+ | Clang/LLVM 14+
+Graviton3(E) | `-mcpu=neoverse-512tvb`% | GCC 11+ | Clang/LLVM 14+
 
 ^ Also present in Amazon Linux2 GCC-7
 
@@ -42,7 +42,7 @@ SUSE Linux ES15 | 7*, 9, 10            | 7
 
 ### Large-System Extensions (LSE)
 
-The Graviton2 and Graviton3 processors have support for the Large-System Extensions (LSE)
+The Graviton2 and Graviton3(E) processors have support for the Large-System Extensions (LSE)
 which was first introduced in vArmv8.1. LSE provides low-cost atomic operations which can
 improve system throughput for CPU-to-CPU communication, locks, and mutexes.
 The improvement can be up to an order of magnitude when using LSE instead of

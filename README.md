@@ -30,11 +30,11 @@ This repository provides technical guidance for users and developers using [Amaz
 # Transitioning to Graviton
 If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton2 and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton2 based Amazon EC2 instances](transition-guide.md)
 
-# Building for Graviton2 and Graviton3
+# Building for Graviton2, Graviton3 and Graviton3E
 
-|Processor	|Graviton2	|Graviton3	|
+|Processor	|Graviton2	|Graviton3(E)	|
 |---	|---	|---	|
-|Instances	|[M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6/), [T4g](https://aws.amazon.com/ec2/instance-types/t4), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/)	|[C7g](https://aws.amazon.com/ec2/instance-types/c7g/)	|
+|Instances	|[M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6g/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6g/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6g/), [T4g](https://aws.amazon.com/ec2/instance-types/t4g), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/)	|[C7g/C7gn](https://aws.amazon.com/ec2/instance-types/c7g/) and [HPC7g](https://aws.amazon.com/ec2/instance-types/)	|
 |Core	|[Neoverse-N1](https://developer.arm.com/documentation/100616/0301)	|[Neoverse-V1](https://developer.arm.com/documentation/101427/latest/)	|
 |Frequency	|2500MHz	|2600MHz	|
 |Turbo supported	|No	|No	|
