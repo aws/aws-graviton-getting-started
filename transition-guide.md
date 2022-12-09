@@ -87,7 +87,7 @@ Now that you have your application stack on Graviton, you should run your test s
 
 **Step 6 - Performance testing**
 
-With your fully functional application its time to establish a performance baseline on Graviton. In most cases, you should expect performance gains. When comparing to existing x86-64 instances, we recommend running tests by fully loading both systems to determine the maximum possible price/performance. You can then determine and configure an appropriate load level for your production environment before performing the deployment.
+With your fully functional application its time to establish a performance baseline on Graviton. In most cases, you should expect performance gains. One of the major differences between AWS Graviton instance types and other instance types is their vCPU to physical processor core mapping. Every vCPU on a Graviton processor is a physical core. This means there is no Simultaneous Multi-Threading (SMT) and Graviton gives better linear performance scalability in most cases. When comparing to existing x86-64 instances, we recommend running tests by fully loading both systems to determine the maximum possible price/performance. You can then determine and configure an appropriate load level for your production environment before performing the deployment. If you are using Amazon EC2 Auto Scaling, consider to adjust the threshold values for the CloudWatch alarms that invoke the scaling process. This will optimise the number of EC2 instances according to the new load level that has been determined.
 
 Important: This repository has sections dedicated to [Optimization](optimizing.md) and a [Performance Runbook](perfrunbook/graviton_perfrunbook.md) for you to follow during this stage.
 
