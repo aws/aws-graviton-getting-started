@@ -87,7 +87,11 @@ Now that you have your application stack on Graviton, you should run your test s
 
 **Step 6 - Performance testing**
 
-With your fully functional application its time to establish a performance baseline on Graviton. In most cases, you should expect performance gains. One of the major differences between AWS Graviton instance types and other instance types is their vCPU to physical processor core mapping. Every vCPU on a Graviton processor is a physical core. This means there is no Simultaneous Multi-Threading (SMT) and Graviton gives better linear performance scalability in most cases. When comparing to existing x86-64 instances, we recommend running tests by fully loading both systems to determine the maximum possible price/performance. You can then determine and configure an appropriate load level for your production environment before performing the deployment. If you are using Amazon EC2 Auto Scaling, consider to adjust the threshold values for the CloudWatch alarms that invoke the scaling process. This will optimise the number of EC2 instances according to the new load level that has been determined.
+With your fully functional application, it is time to establish a performance baseline on Graviton. In many cases, Graviton will provide performance and/or capacity improvements over x86-based instances.
+
+One of the major differences between AWS Graviton instances and other Amazon EC2 instances is their vCPU-to-physical-core mappings. Every vCPU on a Graviton processor maps to a physical core, and there is no Simultaneous Multi-Threading (SMT). Consequently, Graviton provides better linear performance scalability in most cases. When comparing to existing x86 instances, we recommend fully loading both instance types to determine the maximum sustainable load before the latency or error rate exceeds acceptable bounds. For horizontally-scalable, multi-threaded workloads that are CPU bound, you may find that the Graviton instances are able to sustain a significantly higher transaction rate before unacceptable latencies or error rates occur.
+
+During the transition to Graviton, if you are using Amazon EC2 Auto Scaling, you may be able to increase the threshold values for the CloudWatch alarms that invoke the scaling process. This may reduce the number of EC2 instances now needed to serve a given level of demand.
 
 Important: This repository has sections dedicated to [Optimization](optimizing.md) and a [Performance Runbook](perfrunbook/graviton_perfrunbook.md) for you to follow during this stage.
 
