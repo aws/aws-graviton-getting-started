@@ -32,8 +32,10 @@ There are numerous options that control the JVM and may lead to better performan
 have shown large (1.5x) improvements in some Java workloads. Corretto 17 needs two additional flags:
 `-XX:CICompilerCount=2 -XX:CompilationMode=high-only`. `ReservedCodeCacheSize`/`InitialCodeCacheSize`
 should be equal and can be in range: 64M...127M.
-The flags are eliminating tiered compilation and are restricting the size of
-the code cache which allows the Graviton cores to better predict branches.
+The JIT compiler stores generated code in the code cache. The flags change the size of the code cache
+from the default 240M to the smaller one. The smaller code cache may help CPU
+to improve the caching and prediction of jitted code. The flags disable the tiered compilation
+to make the JIT compiler able to use the smaller code cache.
 These are helpful on some workloads but can hurt on others so testing with and without
 them is essential.
 
