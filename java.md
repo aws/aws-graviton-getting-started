@@ -28,8 +28,10 @@ enhanced implementation of `Thread.onSpinWait()` on Graviton.
 ### Java JVM Options
 There are numerous options that control the JVM and may lead to better performance.
 
-- Three flags `-XX:-TieredCompilation -XX:ReservedCodeCacheSize=64M -XX:InitialCodeCacheSize=64M`
-have shown large (1.5x) improvements in some Java workloads.
+- Flags `-XX:-TieredCompilation -XX:ReservedCodeCacheSize=64M -XX:InitialCodeCacheSize=64M`
+have shown large (1.5x) improvements in some Java workloads. Corretto 17 needs two additional flags:
+`-XX:CICompilerCount=2 -XX:CompilationMode=high-only`. `ReservedCodeCacheSize`/`InitialCodeCacheSize`
+should be equal and can be in range: 64M...127M.
 The flags are eliminating tiered compilation and are restricting the size of
 the code cache which allows the Graviton cores to better predict branches.
 These are helpful on some workloads but can hurt on others so testing with and without
