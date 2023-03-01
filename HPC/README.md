@@ -4,7 +4,7 @@
 * [HPC Examples](examples)
   * [WRF](examples/wrf/wrf.md)
   * [GROMACS](examples/gromacs/gromacs.md)
-  * [OpenFoam](examples/openfoam/openfoam.md)
+  * [OpenFoam](examples/openfoam.md)
   * [Other HPC applications](examples/other_HPC_applications.md)
 * [Dependent software and libraries](software/software.md)
   * [Parallel cluster](software/software.md#parallel-cluster)
