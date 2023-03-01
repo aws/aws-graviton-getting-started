@@ -1,0 +1,60 @@
+This is the benchmark case for a 12km CONUS simulation
+The code used was WPSV4.2 and WRFV4.2.2
+
+The original simulation was a 12 hour simulation from
+2019-11-26_12 to 2019-11-27_00
+and then a restart simulation from 
+2019-11-26_23 to 2019-11-27_00
+
+Data are GFS 0.25 degree analysis (https://rda.ucar.edu/datasets/ds084.1/)
+real.exe was run with 36 processors on a single node
+wrf.exe was run with 144 processors on 4 nodes
+
+
+---------------------------------------------------------------------------------------------
+Included files:
+	namelist.input - set up to run a 1 hour restart, using the files provided
+	wrfbdy_d01 - boundary conditions created by the real program
+	wrfout_d01_2019-11-27_00:00:00.orig - final wrf output file from the original 12 hour wrf simulation
+	wrfrst_d01_2019-11-26_23:00:00 - restart file created during the original 12 hour wrf simulation
+	rsl.out.0000 - simulation log file/output from the original 12 hour wrf simulation
+	runwrf.csh - batch script used to run wrf for the original simulation and the restart simulation
+	*.dat - data files needed for Thompson microphysics (these are usually generated during wrf, but takes a while to produce)
+	diffwrf.py - script to compare original wrfout file with new wrfout file that will be generated with a restart simulation
+	*.png - sample PNG files of acceptable differences
+
+---------------------------------------------------------------------------------------------
+HOW TO RUN
+
+Ensure necessary files are in the runn directory - wrfrst*, wrfbdy_d01, namelist.input, and *.dat
+Run wrf.exe (using the necessary requirements of the system - e.g., batch script, mpirun, etc.)
+When the simulation completes, there should be a new wrfout_d01_2019-11-27_00:00:00 file
+
+---------------------------------------------------------------------------------------------
+HOW TO COMPARE OUTPUT
+
+Make sure python is installed on the system
+issue the command:
+> python diffwrf.py wrfout_d01_2019-11-27_00:00:00.orig wrfout_d01_2019-11-27_00:00:00
+
+Below is a sample of the differences between a simulation using an Intel compiler and a simulation using a GNU compiler.
+The means should be about zero. The listed standard deviations are reasonable and what would be expected between identical
+simulations on different systems, or using different compiler/library options.
+
+Found wrfout_d01_2019-11-27_00:00:00
+Found wrfout_d01_2019-11-27_00:00:00.orig
+
+Differences of the output from two WRF model simulations for a few important fields
+Variable Name                Minimum      Maximum      Average      Std Dev        Skew
+=========================================================================================
+U                            -1.79398      2.05906 -3.29039e-06   0.00801758     -1.82315
+V                            -1.65026      1.49875  1.24396e-06   0.00926235     -2.48834
+W                           -0.234907     0.156116 -3.20934e-08   0.00110361      -5.9561
+T                            -1.40268     0.718475  2.03398e-06   0.00411143     -27.5665
+PH                           -28.3988       13.885  4.59311e-05     0.148311      -10.591
+QVAPOR                    -0.00295619   0.00156136  3.07555e-11  4.50673e-06     -77.5439
+TSLB                        -0.126404     0.195251  2.16068e-06   0.00145834      3.94419
+MU                           -14.5748      30.4495  0.000270607     0.262767      15.8329
+TSK                          -2.04883      1.96512 -3.06375e-05     0.065356    -0.761843
+RAINC                       -0.850861     0.596337 -1.15568e-05   0.00576554     -27.6912
+RAINNC                      -0.140511     0.184808  1.77533e-06   0.00131469      10.0259

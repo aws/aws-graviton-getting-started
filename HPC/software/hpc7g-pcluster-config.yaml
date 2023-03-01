@@ -1,0 +1,50 @@
+Region: us-east-1
+Imds:
+  ImdsSupport: v2.0
+Image:
+  Os: ubuntu1804
+HeadNode:
+  InstanceType: c7g.4xlarge
+  Networking:
+    SubnetId: 
+  Ssh:
+    KeyName: 
+  Dcv:
+    Enabled: true
+    Port: 8443
+    AllowedIps: 0.0.0.0/0
+  Iam:
+    S3Access:
+      - EnableWriteAccess: true
+        BucketName: '*'
+Scheduling:
+  Scheduler: slurm
+  SlurmQueues:
+  - Name: compute
+    ComputeResources:
+    - Name: c7gn16xlarge
+      InstanceType: c7gn.16xlarge
+      MinCount: 0
+      MaxCount: 128
+      Efa:
+        Enabled: true
+        GdrSupport: true
+    Networking:
+      SubnetIds:
+      - 
+      PlacementGroup:
+       Enabled: true
+    Iam:
+      AdditionalIamPolicies:
+      - Policy: arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+SharedStorage:
+  - Name: FsxLustre0
+    StorageType: FsxLustre
+    MountDir: /shared
+    FsxLustreSettings:
+      StorageCapacity: 1200
+      DeploymentType: PERSISTENT_2
+      PerUnitStorageThroughput: 125
+      DataCompressionType: LZ4
+
+
