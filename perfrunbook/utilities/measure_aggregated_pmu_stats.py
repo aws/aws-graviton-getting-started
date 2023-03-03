@@ -480,7 +480,7 @@ counter_mapping = {
         IntelCounterConfig("l3-mpki", PMUEventCounter("longest_lat_cache_miss", "event=0x2e,umask=0x41"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
         IntelCounterConfig("core-rdBw-MBs", PMUEventCounter("longest_lat_cache_miss", "event=0x2e,umask=0x41"), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),  
         IntelCounterConfig("inst-tlb-mpki", PMUEventCounter("inst_tlb_miss", "event=0x85,umask=0x20"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("inst-tlb-tw-pki", PMUEventCounter("inst_tlb_miss_tw", "event=0x85,umask=0x1"), PMUEventCounter("insts", "event=0x0c,umask=0x0"), 1000),
+        IntelCounterConfig("inst-tlb-tw-pki", PMUEventCounter("inst_tlb_miss_tw", "event=0x85,umask=0x1"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
         IntelCounterConfig("data-rd-tlb-mpki", PMUEventCounter("data_tlb_miss_rd", "event=0x08,umask=0x20"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
         IntelCounterConfig("data-st-tlb-mpki", PMUEventCounter("data_tlb_miss_st", "event=0x49,umask=0x20"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
         IntelCounterConfig("data-rd-tlb-tw-pki", PMUEventCounter("data_tlb_miss_rd_tw", "event=0x08,umask=0x01"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
