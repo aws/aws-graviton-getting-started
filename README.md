@@ -29,13 +29,13 @@ This repository provides technical guidance for users and developers using [Amaz
 * [Additional resources](#additional-resources)
 
 # Transitioning to Graviton
-If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton2 and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton2 based Amazon EC2 instances](transition-guide.md)
+If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton based Amazon EC2 instances](transition-guide.md).
 
 # Building for Graviton2, Graviton3 and Graviton3E
 
 |Processor	|Graviton2	|Graviton3(E)	|
 |---	|---	|---	|
-|Instances	|[M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6g/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6g/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6g/), [T4g](https://aws.amazon.com/ec2/instance-types/t4g), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/)	|[C7g/C7gn](https://aws.amazon.com/ec2/instance-types/c7g/) and [HPC7g](https://aws.amazon.com/ec2/instance-types/)	|
+|Instances	|[M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6g/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6g/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6g/), [T4g](https://aws.amazon.com/ec2/instance-types/t4g), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/)	|[C7g/C7gn](https://aws.amazon.com/ec2/instance-types/c7g/), [M7g](https://aws.amazon.com/ec2/instance-types/m7g/), [R7g](https://aws.amazon.com/ec2/instance-types/r7g/), and [HPC7g](https://aws.amazon.com/ec2/instance-types/)	|
 |Core	|[Neoverse-N1](https://developer.arm.com/documentation/100616/0301)	|[Neoverse-V1](https://developer.arm.com/documentation/101427/latest/)	|
 |Frequency	|2500MHz	|2600MHz	|
 |Turbo supported	|No	|No	|
@@ -56,9 +56,9 @@ If you are new to Graviton and want to understand how to identify target workloa
 |DDR Encryption	|yes	|yes	|
 
 # Optimizing for Graviton
-Please refer [here](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/graviton_perfrunbook.md).
+Please refer to [optimizing](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/graviton_perfrunbook.md).
 
-Different architectures and systems have differing capabilities, which means some tools you might be familiar with on one architecture don't have equivalent on AWS Graviton. Documented [here](Monitoring_Tools_on_Graviton.md) are some of these utilities.
+Different architectures and systems have differing capabilities, which means some tools you might be familiar with on one architecture don't have equivalent on AWS Graviton. Documented [Monitoring Tools](Monitoring_Tools_on_Graviton.md) with some of these utilities.
 
 # Recent software updates relevant to Graviton
 There is a huge amount of activity in the Arm software ecosystem and improvements are being
@@ -78,13 +78,13 @@ OpenH264 | [2.1.1+](https://github.com/cisco/openh264/releases/tag/v2.1.1) | Pre
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x. This fixed version of the library now is shipping with Ubuntu 20.04 and PHP 8.
 PHP     | 7.4+    | PHP 7.4 includes a number of performance improvements that increase perf by up to 30%
 pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
-PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Install from source](https://github.com/aws/aws-graviton-getting-started/blob/master/python.md#41-pytorch). **Note:** *Requires GCC9 or later for now. recommend to use Ubuntu 20.xx*
+PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Install from source](https://github.com/aws/aws-graviton-getting-started/blob/master/python.md#41-pytorch). **Note:** *Requires GCC9 or later for now. Recommend to use Ubuntu 20.xx*
 ruby    | 3.0+ | Enable arm64 optimizations that improve performance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
-zlib    | 1.2.8+  | For the best performance on Graviton2 please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
+zlib    | 1.2.8+  | For the best performance on Graviton please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
 
 # Containers on Graviton
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
-Please refer [here](containers.md) for information about running container-based workloads on Graviton.
+Please refer to [containers](containers.md) for information about running container-based workloads on Graviton.
 
 # [Lambda on Graviton](/aws-lambda/README.md)
 [AWS Lambda](https://aws.amazon.com/lambda/) now allows you to configure new and existing functions to run on Arm-based AWS Graviton2 processors in addition to x86-based functions. Using this processor architecture option allows you to get up to 34% better price performance. Duration charges are 20 percent lower than the current pricing for x86 with [millisecond granularity](https://aws.amazon.com/blogs/aws/new-for-aws-lambda-1ms-billing-granularity-adds-cost-savings/). This also applies to duration charges when using [Provisioned Concurrency](https://aws.amazon.com/blogs/aws/new-provisioned-concurrency-for-lambda-functions/). Compute [Savings Plans](https://aws.amazon.com/blogs/aws/savings-plan-update-save-up-to-17-on-your-lambda-workloads/) supports Lambda functions powered by Graviton2.
@@ -93,7 +93,7 @@ The [Lambda](/aws-lambda/README.md) page highlights some of the migration consid
 
 # Operating Systems
 
-Please check [here](os.md) for more information about which operating system to run on Graviton based instances.
+Please check [os.md](os.md) for more information about which operating system to run on Graviton based instances.
 
 # Known issues and workarounds
 
@@ -147,7 +147,7 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
 
 # Additional resources
 
- * [AWS Graviton2](https://aws.amazon.com/ec2/graviton/)
+ * [AWS Graviton](https://aws.amazon.com/ec2/graviton/)
  * [Neoverse N1 Software Optimization Guide](https://documentation-service.arm.com/static/5f05e93dcafe527e86f61acd)
  * [Armv8 reference manual](https://documentation-service.arm.com/static/60119835773bb020e3de6fee)
  * [Package repository search tool](https://pkgs.org/)
