@@ -16,7 +16,7 @@
 * [Additional resources](#additional-resources)
 
 ## Introduction
-The performance of HPC applications heavily depends on compute, network and IO. The Graviton3E  based HPC7g instance has the right configuration to deliver the best performance for multi-node cluster HPC applications: 35% higher vector bandwidth (no power throttling), 200 Gbps of network bandwidth. For several most used HPC applications on cloud, we are able to achieve same results (correctness), comparable performances and lower simulation costs. This document provides a walkthrough on how to install HPC softwares and obtain the best performance on Graviton EC2 instances. 
+The performance of HPC applications heavily depends on compute, network and IO. The Graviton3E  based HPC7g instance has the right configuration to deliver the best performance for multi-node cluster HPC applications: 35% higher vector bandwidth (no power throttling), 200 Gbps of network bandwidth. For several most used HPC applications on cloud, we are able to achieve same results (correctness) as popular x86 instances, comparable performances and lower simulation costs. This document provides a walkthrough on how to install HPC softwares and obtain the best performance on Graviton EC2 instances. 
 
 ## Additional resources
 

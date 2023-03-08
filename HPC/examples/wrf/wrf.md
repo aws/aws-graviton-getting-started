@@ -3,19 +3,27 @@
 The Weather Research and Forecasting (WRF) model is one of the most used numerical weather prediction (NWP) system. WRF is used extensively for research and real-time forecasting with over 52,570 registered users in over 184 countries throughout the world as of Dec 2020. Large amount of computation resources are required for each simulation, especially for high resolution simulations. Compute and MPI performance are very important for WRF performance.
 
 ## WRF correctness fix
-We have recently fixed [a correctness issue with WRF simulation](https://github.com/wrf-model/WRF/pull/1773) on Arm64.  The issue is caused by rounding error from transcendental functions and several compiler optimization options. With the fix (included in WRF release 4.5), We are able to achieve bit-by-bit matching results on Graviton and intel processors for Ubuntu 18.04 and GCC 10.2 compiler.
+We have observed small numeric differences between WRF output models (v4.2.2) generated on Arm64 and intel platforms. The issue is caused by rounding error at last position (1ulp) from transcendental functions and several compiler optimization options. After identifying the root cause, we implemented [a patch](https://github.com/wrf-model/WRF/pull/1773) that allows bit-by-bit matching results on Graviton and intel processors for Ubuntu 18.04 with GCC 10.2 compiler. This patch works for both v4.2.2 and v4.5 (latest version). 
 
 ## Build and run WRF with GCC on arm64
   * Follow [this instruction](../../software/software.md#parallel-cluster) to set up a Parallel cluster.
   * Install [GCC](../../software/software.md#gcc) and [openMPI](../../software/software.md#openmpi). 
   * Build [zlib](../../software/software.md#zlib), [Hdf5](../../software/software.md#hdf5), and [netCDF](../../software/software.md#netcdf).
-  * Fetch WRF code (release-v4.5)
+  * Build WRF 4.2.2
+```
+git clone https://github.com/wrf-model/WRF.git
+git checkout release-v4.2.2
+```
+use [patch](WRF-v422-patch-correctness.diff)
+```
+git apply WRF-v422-patch-correctness.diff
+```
+
+  * Build WRF 4.5 - Fetch WRF code (release-v4.5), configure and compile
 ```
 git clone https://github.com/wrf-model/WRF.git
 git checkout release-v4.5
-```
-  * Configure and Compile WRF
-```
+
 export INSTALLDIR=/shared
 export GCC_VERSION=10.2.0
 export OPENMPI_VERSION=4.1.4
@@ -260,7 +268,13 @@ cd netcdf-fortran-4.5.4
 ./configure --prefix=$NCDIR --disable-static --enable-shared --with-pic --enable-parallel-tests --enable-large-file-tests --enable-largefile
 make -j$(nproc) && make install
 
-# get WRF source (release-4.5)
+# Build WRF 4.2.2
+git clone https://github.com/wrf-model/WRF.git
+git checkout release-v4.2.2
+# use [patch](WRF-v422-patch-correctness.diff)
+git apply WRF-v422-patch-correctness.diff
+
+# or get WRF source (release-4.5)
 git clone https://github.com/wrf-model/WRF.git
 git checkout release-v4.5
 # uncomment line 793 to turn on AARCH64_X86_CORRECTNESS_FIX flag
