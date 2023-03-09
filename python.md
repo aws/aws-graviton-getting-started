@@ -265,3 +265,18 @@ If you run into issue with the last command (_make install-builder_), please try
 ```
 sudo PYTHONPATH=`which python3` make install-builder
 ```
+
+## 5. Other Python packages
+
+### confluent_kafka
+
+First, install librdkafka and its development libraries by following the
+instructions on [this page](software/librdkafka.md). As part of this process,
+you will install `gcc`, `pip` for Python3, and Python development headers.
+
+Once complete, you can then install the `confluent_kafka` module directly from
+source:
+
+```
+python3 -m pip install --user --no-binary confluent-kafka confluent-kafka
+```
