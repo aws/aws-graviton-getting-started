@@ -96,7 +96,7 @@ The instructions are defined in *arm_neon.h*.
 A portable code that would detect (at compile-time) an Arm CPU and compiler would look like:
 
 ```
-#if (defined(__clang__) || (defined(__GCC__)) && (defined(__ARM_NEON__) || defined(__aarch64__))
+#if (defined(__clang__) || (defined(__GCC__)) && (defined(__ARM_NEON) || defined(__aarch64__))
 /* compatible compiler, targeting arm neon */
 #include <arm_neon.h>
 #include <arm_acle.h>
