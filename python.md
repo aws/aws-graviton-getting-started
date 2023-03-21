@@ -213,21 +213,21 @@ The next step is to instanciate the environment from that definition:
 $ conda env create -f graviton-example.yml
 ```
 
-## 4. Machine Learning Python packages
+## 3. Machine Learning Python packages
 
 
-### 4.1 PyTorch
+### 3.1 PyTorch
 
 ```
 pip install numpy
 pip install torch torchvision
 ```
-### 4.2 TensorFlow
+### 3.2 TensorFlow
 
 ```
 pip install tensorflow-cpu-aws
 ```
-### 4.3 DGL
+### 3.3 DGL
 
 Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](#41-pytorch)
 
@@ -236,11 +236,11 @@ On **Ubuntu**:
 Follow the [install from source](https://github.com/dmlc/dgl/blob/master/docs/source/install/index.rst#install-from-source) instructions.
 
 
-### 4.4 Sentencepiece
+### 3.4 Sentencepiece
 
 [Sentencepiece>=1.94 now has pre-compiled binary wheels available for Graviton](https://pypi.org/project/sentencepiece/0.1.94/#history).
 
-### 4.5	Morfeusz
+### 3.5	Morfeusz
 
 On **Ubuntu**:
 
@@ -266,7 +266,7 @@ If you run into issue with the last command (_make install-builder_), please try
 sudo PYTHONPATH=`which python3` make install-builder
 ```
 
-## 5. Other Python packages
+## 4. Other Python packages
 
 ### confluent_kafka
 
