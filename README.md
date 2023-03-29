@@ -21,6 +21,7 @@ This repository provides technical guidance for users and developers using [Amaz
 * [Third-party Software Vendors](isv.md)
 * [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
 * [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
+* [PyTorch](machinelearning/pytorch.md)
 * [TensorFlow](machinelearning/tensorflow.md)
 * [Spark on Graviton](DataAnalytics.md)
 * [Known issues and workarounds](#known-issues-and-workarounds)
@@ -78,7 +79,7 @@ OpenH264 | [2.1.1+](https://github.com/cisco/openh264/releases/tag/v2.1.1) | Pre
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x. This fixed version of the library now is shipping with Ubuntu 20.04 and PHP 8.
 PHP     | 7.4+    | PHP 7.4 includes a number of performance improvements that increase perf by up to 30%
 pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
-PyTorch | 1.7+    | Enable Arm64 compilation, Neon optimization for fp32. [Install from source](https://github.com/aws/aws-graviton-getting-started/blob/master/python.md#41-pytorch). **Note:** *Requires GCC9 or later for now. Recommend to use Ubuntu 20.xx*
+PyTorch | 2.0+    | Optimize Inference latency and throughput on Graviton. [AWS DLCs and python wheels are available](machinelearning/pytorch.md).
 ruby    | 3.0+ | Enable arm64 optimizations that improve performance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
 zlib    | 1.2.8+  | For the best performance on Graviton please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
 

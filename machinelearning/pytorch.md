@@ -5,54 +5,74 @@
 PyTorch is an open-source machine learning framework based on the Torch library, used for applications such as computer vision and natural language processing. It can be used across training and inference of deep neural networks. This document covers how to use PyTorch based machine learning inference on Graviton CPUs, what runtime configurations are important and how to debug any performance issues. The document also covers instructions for source builds and how to enable some of the downstream features.
 
 # How to use PyTorch on Graviton CPUs
-There are multiple levels of software package abstractions available: Python wheel (easiest option but multiple wheels to be installed), AWS DLC (Deep Learning Container, comes with all the packages installed) and the Docker hub images (additionally comes with MLPerf benchmarks). Examples of using each method are below.
-
-**Using Python wheel**
-
-PyTorch wheel, starting 1.13 release, supports OneDNN+Arm Compute Library backend for Graviton CPUs that improve the performance by ~2.5x for Resnet50 and Bert inference compared to PyTorch 1.12 wheel.
-```
-pip install torch
-
-pip install torchvision
-
-pip install torch-xla
-
-pip install torchaudio
-
-pip install torchtext
-```
+There are multiple levels of software package abstractions available: AWS DLC (Deep Learning Container, gives the best performance, comes with additional optimizations on top of the official wheels, and all the packages installed), Python wheel (easiest option to get the release features but multiple wheels to be installed), and the Docker hub images (comes with downstream experimental features). Examples of using each method are below.
 
 **AWS Graviton PyTorch DLC**
 
-3Q'22 DLCs are PyTorch1.12 based but include the optimizations that were included in PyTorch1.13, so the performance is nearly identical.
+1Q'23 AWS Graviton DLCs are based on PyTorch2.0, but they also include additional optimizations from PyTorch development branch. The DLCs improve the PyTorch inference performance on Graviton by 2x to 4x compared to the previous releases, including up to 4x improvement for Resnet50 and up to 3x for Bert, making Graviton3 the most cost effective CPU platform on the AWS cloud for these models.
 
 ```
-# Login and pull the AWS DLC for pytorch
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
+sudo apt-get update
+sudo apt-get -y install awscli docker
 
-docker pull 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference-graviton:1.12.1-cpu-py38-ubuntu20.04-ec2
+# Login to ECR to avoid image download throttling
+aws ecr get-login-password --region us-east-1 \
+| docker login --username AWS \
+  --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
+
+# Pull the AWS DLC for pytorch
+docker pull 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference-graviton:2.0.0-cpu-py310-ubuntu20.04-ec2
+```
+
+**Using Python wheels**
+
+PyTorch 2.0 python wheels improve inference performance on Graviton up to 3.5x compared to the previous releases.
+
+```
+# Install Python
+sudo apt-get update
+sudo apt-get install -y python3 python3-pip
+
+# Upgrade pip3 to the latest version
+python3 -m pip install --upgrade pip
+
+# Install PyTorch and extensions
+python3 -m pip install torch
+python3 -m pip install torchvision torchaudio torchtext
 ```
 
 **Using Docker hub container**
 
-As of Oct'22 the docker images are PyTorch1.12 based but include the optimizations that were included in PyTorch1.13, so the performance is nearly identical.
+1Q'23 Docker hub images from armswdev are based on PyTorch 1.13.0, but also include additional downstream optimizations and experimental features. These are avaiable for trying out the experimental downstream features and provide early feedback.
 
 ```
-# pull pytorch docker container with onednn-acl and xla optimizations enabled
-docker pull armswdev/pytorch-arm-neoverse:r22.10-torch-1.12.0-onednn-acl
+# Pull pytorch docker container with onednn-acl optimizations enabled
+docker pull armswdev/pytorch-arm-neoverse:r23.03-torch-1.13.0-onednn-acl
 
-# launch the docker image
-docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/pytorch-arm-neoverse:r22.10-torch-1.12.0-onednn-acl
+# Launch the docker image
+docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/pytorch-arm-neoverse:r23.03-torch-1.13.0-onednn-acl
 ```
+
+# Prerequisites
+
+1. It is highly recommended to use the AMIs based on Linux Kernel 5.10 and beyond for the best PyTorch inference performance on Graviton3 instances
+2. Python 3.8 is the minimum supported python version starting PyTorch 2.0.0. For more details, please refer to PyTorch 2.0 [release note](https://github.com/pytorch/pytorch/releases/tag/v2.0.0)
 
 # Runtime configurations for optimal performance
-Once the PyTorch setup is ready, enable the below runtime configurations to achieve the best performance.
+
+AWS DLCs come with all the optimizations enabled, so, there are no additional runtime configurations required. Where as for the python wheels and the docker hub images, enable the below runtime configurations to achieve the best performance.
 ```
 # Graviton3(E) (e.g. c7g, c7gn and HPC7g instances) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
 grep -q bf16 /proc/cpuinfo && export DNNL_DEFAULT_FPMATH_MODE=BF16
 
-# Enable Transparent huge pages to minimize the memory allocation overhead for batched inference
-echo always > /sys/kernel/mm/transparent_hugepage/enabled
+# Enable primitive caching to avoid the redundant primitive allocation
+# latency overhead. Please note this caching feature increases the
+# memory footprint. Tune this cache capacity to a lower value to
+# reduce the additional memory requirement.
+export LRU_CACHE_CAPACITY=1024
+
+# Enable Transparent huge page allocations from PyTorch C10 allocator
+export THP_MEM_ALLOC_ENABLE=1
 
 # Make sure the openmp threads are distributed across all the processes for multi process applications to avoid over subscription for the vcpus. For example if there is a single application process, then num_processes should be set to '1' so that all the vcpus are assigned to it with one-to-one mapping to omp threads
 
@@ -63,70 +83,50 @@ export OMP_PROC_BIND=false
 export OMP_PLACES=cores
 ```
 
-# Evaluate performance with PyTorch benchmark and the standard MLPerf inference benchmarks
+# Evaluate performance with PyTorch benchmark
 
 1. Resnet50 benchmarking
 
-(a) Setup PyTorch benchmark
 ```
-https://github.com/pytorch/benchmark
-
+# Clone PyTorch benchmark repo
 git clone https://github.com/pytorch/benchmark.git
 
+# Setup Resnet50 benchmark
 cd benchmark
-sudo python3 install.py --continue_on_fail
-```
-(b) Run inference with torch script
-```
+python3 install.py resnet50
+
+# Install the dependent wheels
+python3 -m pip install numba
+
+# Run Resnet50 inference in jit mode. On successful completion of the inference runs,
+# the script prints the inference latency and accuracy results
+
+# Batch mode, the default batch size is 32
 python3 run.py resnet50 -d cpu -m jit -t eval --use_cosine_similarity
+
+# Single inference mode
+python3 run.py resnet50 -d cpu -m jit -t eval --use_cosine_similarity --bs 1
+
 ```
 
 2. Bert benchmarking
 
-(a) Setup MLPerf inference benchmark
 ```
-git clone https://github.com/mlcommons/inference.git --recursive
-cd inference
-git checkout v2.0
-cd loadgen
-CFLAGS="-std=c++14" python3 setup.py bdist_wheel
-pip install dist/*.whl
+# Clone PyTorch benchmark repo
+git clone https://github.com/pytorch/benchmark.git
 
-pip install transformers boto3
-cd inference/language/bert
-make setup
-```
-(b) Enable torch-xla device for inference
-```
-export XRT_DEVICE_MAP="CPU:0;/job:localservice/replica:0/task:0/device:XLA_CPU:0"
-export XRT_WORKERS="localservice:0;grpc://localhost:9002"
-```
-cd inference/language/bert
-vi pytorch_SUT.py
+# Setup Bert benchmark
+cd benchmark
+python3 install.py bert
 
-```python
-import torch_xla
-import torch_xla.core.xla_model as xm
-.
-.
-.
-.
-# self.dev = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu"). --> standard way to get cuda or cpu device. Instead of this, use the below to get xla_device.
-self.dev = xm.xla_device()
-.
-.
-.
-for i in range(len(query_samples)):
-   eval_features = self.qsl.get_features(query_samples[i].index)
-   model_output = self.model.forward(input_ids=torch.LongTensor(eval_features.input_ids).unsqueeze(0).to(self.dev),
-         attention_mask=torch.LongTensor(eval_features.input_mask).unsqueeze(0).to(self.dev),
-         token_type_ids=torch.LongTensor(eval_features.segment_ids).unsqueeze(0).to(self.dev))
-   xm.mark_step()
-```
+# Run BERT_pytorch inference in jit mode. On successful completion of the inference runs,
+# the script prints the inference latency and accuracy results
 
-(c) Execute Bert Singlestream scenario
-```
-python3 run.py --backend=pytorch --scenario=SingleStream
+# Batch mode
+python3 run.py BERT_pytorch -d cpu -m jit -t eval --use_cosine_similarity --bs 32
+
+# Single inference mode
+python3 run.py BERT_pytorch -d cpu -m jit -t eval --use_cosine_similarity --bs 1
 ```
 
 # Troubleshooting performance issues
@@ -150,32 +150,87 @@ If the tensor ops and shapes are still not executed with ACL gemm kernels, pleas
 
 2. Once the tensor ops are executed with ACL gemm kernels, enable fast math mode, 'export DNNL_DEFAULT_FPMATH_MODE=BF16', to pick bfloat16 hybrid gemm kernels.
 
-3. Make sure transparent huge pages are enabled
+3. Linux thp (transparent huge pages) improve the memory allocation latencies for large tensors. This is important especially for batched inference use cases where the tensors are typically larger than 30MB. To take advantage of the thp allocations, make sure PyTorch C10 memory allocator optimizations are enabled. Most of the Linux based OS distributions come with "madvise" as the default thp allocation mode, if it comes with "never" then set it to "madvise" mode first.
 ```
-echo always > /sys/kernel/mm/transparent_hugepage/enabled
+# Check the default thp mode in kernel
 cat /sys/kernel/mm/transparent_hugepage/enabled
-[always] madvise never
+
+# If the thp mode is [never], then set it to 'madvise'
+echo madvise > /sys/kernel/mm/transparent_hugepage/enabled
+cat /sys/kernel/mm/transparent_hugepage/enabled
+always [madvise] never
+
+# Enable THP allocations from C10 memory allocator
+export THP_MEM_ALLOC_ENABLE=1
 ```
 
-4. The above triaging steps cover typical issues due to the missing runtime configurations. If you are stuck with any of these steps or if the performance is still not meeting the target, please raise an issue on [aws-graviton-getting-started](https://github.com/aws/aws-graviton-getting-started) github.
+4. Starting PyTorch 1.13.0 release, mkldnn (OneDNN) backend is enabled for 'matmul' operator. While mkldnn along with ACL provides the best performance across several tensor shapes, the runtime setup overhead may not be acceptable for smaller tensor shapes. For light weight models with smaller tensor, check the performance by disabling the mkldnn backend and switching back to openBLAS gemm kernels. This has shown improvement for shapes like "12x12x64:12x64x12:12x12x12" and "12x16x16:12x16x64:12x16x64".
+```
+export TORCH_MKLDNN_MATMUL_ENABLE=0
+```
+
+5. The above triaging steps cover typical issues due to the missing runtime configurations. If you are stuck with any of these steps or if the performance is still not meeting the target, please raise an issue on [aws-graviton-getting-started](https://github.com/aws/aws-graviton-getting-started) github.
 
 # Building PyTorch from source
 
-While the packages for docker container and wheels provide stable baseline for ML application development and production, they lack the latest fixes and optimizations from the master branch. The scripts for building the torch, torch-xla and torchvision wheels are avaiable in torch-xla repo. This section provides instructions for using those scripts.
+With AWS Graviton DLCs and python wheels available for every official PyTorch release, there may not be a need for customers to build PyTorch from sources. However, to make the user guide complete, this section provides instructions for building the torch wheels from sources.
+
+For more automated single step building of pytorch wheels from a release tag, please use the pyTorch builder repo [scripts](https://github.com/pytorch/builder/blob/main/aarch64_linux/build_aarch64_wheel.py). For building torch wheel alone with the downstream experimental features, please use the below steps.
+
+```
+# This step is required if gcc-10 is not the default version on the OS distribution, e.g. Ubuntu 20.04
+# Install gcc-10 and g++-10 as it is required for Arm Compute Library build.
+sudo apt install -y gcc-10 g++-10
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
+
+# Install the required tools
+sudo apt install -y scons cmake
+
+# Build Arm Compute Library (ACL)
+cd $HOME
+git clone https://github.com/ARM-software/ComputeLibrary.git
+cd ComputeLibrary
+git checkout v22.11
+scons Werror=1 -j8 debug=0 neon=1 opencl=0 os=linux openmp=1 cppthreads=0 arch=armv8.2-a multi_isa=1 build=native
+
+# Build PyTorch from the tip of the tree
+cd $HOME
+git clone https://github.com/pytorch/pytorch.git
+cd pytorch
+git submodule sync
+git submodule update --init --recursive
+
+# Set the ACL root directory and enable MKLDNN backend
+export ACL_ROOT_DIR=$HOME/ComputeLibrary
+export USE_MKLDNN=ON USE_MKLDNN_ACL=ON
+
+python3 setup.py bdist_wheel
+
+# Install the wheel
+pip3 install <dist/*.whl>
+
+```
+
+# Using Torch XLA for model inference
+
+While the PyTorch torchscript and the runtime backend covers majority of the networks, there are few scenarios where either the default optimizer can't optimize the generic graph or the runtime kernel launch overhead is simply not acceptable. XLA addresses these gaps by providing an alternative mode of running models: it compiles the PyTorch graph into a sequence of computation kernels generated specifically for the given model.
+
+**How to build torach-xla wheel**
+
+The scripts for building the torch and torch-xla wheels are avaiable in torch-xla repo. This section provides instructions for using those scripts.
 ```
 # The PyTorch and torch-xla build scripts are available in torch-xla repo
 git clone https://github.com/pytorch/xla.git
 cd xla
 
-# To build and install PyTorch 1.12 release version
-./scripts/build_torch_wheels.sh 3.8 v1.12.0
-
-# To build and install PyTorch master branch
+# To build and install PyTorch from the tip of the tree
 ./scripts/build_torch_wheels.sh 3.8 nightly
 
 ```
 
-# How to enable torch-xla for model inferece
+**How to enable torch-xla for model inferece**
+
 PyTorch/XLA creates a TensorFlow local server everytime a new PyTorch/XLA program is run. The XRT (XLA Runtime) client connects to the local TensorFlow server. So, to enable XLA device, set the XRT device map and worker as beolow
 ```
 export XRT_DEVICE_MAP="CPU:0;/job:localservice/replica:0/task:0/device:XLA_CPU:0"
