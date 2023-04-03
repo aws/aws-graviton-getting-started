@@ -45,6 +45,7 @@ On Graviton2 GCM encrypt/decrypt
 The optimization is enabled by default in Corretto and OpenJDK 18 and later.
 The optimization has been backported to Corretto and OpenJDK 11 and 17
 and can be enabled with the flags `-XX:+UnlockDiagnosticVMOptions -XX:+UseAESCTRIntrinsics`.
+As an alternative, you can use [Amazon Corretto Crypto Provider](https://github.com/corretto/amazon-corretto-crypto-provider) JNI libraries.
 
 ### Java Stack Size
 The default stack size for Java threads (i.e. `ThreadStackSize`) is 2mb on aarch64 (compared to 1mb on x86_64). You can check the default with:
