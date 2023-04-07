@@ -101,3 +101,43 @@ If you find a specific function that is mis-behaving, either putting the CPU to 
 4. Review the statistics and compare against the x86 SUT to compare.
 
 Example eBPF programs can be found: https://github.com/iovisor/bcc.
+
+### Capturing Coherent Mesh Network hardware event counters
+
+The CMN PMU counts events such as requests to DRAM (memory bandwidth), virtual memory manangement events,
+I/O bus requests and coherence snoop events. These metrics can be used to assess an application's utilization
+of such system level resources and if resources are used efficiently.
+CMN counters are only accessible on metal-type instances and certain OSes and kernels.
+
+
+|Distro      |Kernel   | Graviton2 (c6g) | Graviton3 (c7g) | Note                               |
+|------------|---------|-----------------|-----------------|------------------------------------|
+|Ubuntu-20.04| 5.15    |  yes            |    no           |                                    |
+|Ubuntu-20.04| >=5.19  |  yes            |    yes          |                                    |
+|Ubuntu-22.04| >=5.19  |  yes            |    yes          |                                    |
+|AL2023      | 6.1.2   |  yes            |    yes          |                                    |
+
+
+General procedure on Ubuntu
+```
+sudo apt install linux-modules-extra-aws
+sudo modprobe arm-cmn
+ls /sys/devices/arm_cmn_0/events
+```
+On AL2023/AL2:
+```
+sudo modprobe arm_cmn
+ls /sys/devices/arm_cmn_0/events
+```
+Examples for capturing events:
+```
+sudo perf stat -e /arm_cmn_0/hnf_mc_reqs/ sleep 15 #count of memory request
+sudo perf stat -e /arm_cmn_0/rnid_rxdat_flits/ sleep 15 #count AXI 'master' read requests
+sudo perf stat -e /arm_cmn_0/rnid_txdat_flits/ sleep 15 #count AXI 'master' write requests
+```
+For further information about specific events and useful ratios, please refer to:
+
+[ARM documentation for Graviton2's CMN-600](https://developer.arm.com/documentation/100180/0302/?lang=en)
+
+[ARM documentation for Graviton3's CMN-650](https://developer.arm.com/documentation/101481/0200/?lang=en)
+
