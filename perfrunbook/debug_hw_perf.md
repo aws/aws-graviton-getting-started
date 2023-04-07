@@ -136,3 +136,44 @@ Backend stalls are caused when the CPU is unable to make forward progress execut
 6. If back-end stalls due to the cache-system and memory system are the problem, the data-set size and layout needs to be optimized.
 7. Proceed to [Section 6](./optimization_recommendation.md) to view optimization recommendations for working with a large data-set causing backend stalls.
 
+### Capturing Coherent Mesh Network hardware event counters
+
+The CMN connects the CPUs to each other, to the memory controller, the I/O subsystem and provides System Level Cache.
+Its PMU counts events such as requests to SLC, DRAM (memory bandwidth), IO bus requests or coherence snoop events.
+These metrics can be used to assess an application's utilization of such system level resources and if resources are used efficiently.
+CMN counters are only accessible on metal-type instances and certain OSes and kernels.
+
+
+|Distro      |Kernel   | Graviton2 (c6g) | Graviton3 (c7g) |
+|------------|---------|-----------------|-----------------|
+|Ubuntu-20.04| 5.15    |  yes            |    no           |
+|Ubuntu-20.04| >=5.19  |  yes            |    yes          |
+|Ubuntu-22.04| 5.15    |  no             |    no           |
+|Ubuntu-22.04| >=5.19  |  yes            |    yes          |
+|AL2         | 5.10    |  no             |    no           |
+|AL2023      | 6.1.2   |  yes            |    yes          |
+
+
+General procedure on Ubuntu
+```
+sudo apt install linux-modules-extra-aws
+sudo modprobe arm-cmn
+ls /sys/devices/arm_cmn_0/events
+```
+On AL2023/AL2:
+```
+sudo modprobe arm_cmn
+ls /sys/devices/arm_cmn_0/events
+```
+Examples for capturing events:
+```
+sudo perf stat -C 0 -e /arm_cmn_0/hnf_mc_reqs/ sleep 15 #count of memory request
+sudo perf stat -C 0 -e /arm_cmn_0/rnid_rxdat_flits/ sleep 15 #count AXI 'master' read requests
+sudo perf stat -C 0 -e /arm_cmn_0/rnid_txdat_flits/ sleep 15 #count AXI 'master' write requests
+```
+Further information about capturing fabric events is available here:
+
+[ARM documentation for Graviton2's CMN-600](https://developer.arm.com/documentation/100180/0302/?lang=en)
+
+[ARM documentation for Graviton3's CMN-650](https://developer.arm.com/documentation/101481/0200/?lang=en)
+
