@@ -7,6 +7,9 @@ install_al2_dependencies () {
   echo "------ INSTALLING HIGH LEVEL PERFORMANCE TOOLS ------"
   yum install -y -q sysstat dstat htop hwloc tcpdump
 
+  # Update sysstat to the latest version
+  yum update -y -q sysstat
+
   echo "------ INSTALLING LOW LEVEL PERFORAMANCE TOOLS ------"
   amazon-linux-extras enable BCC
   yum install -y -q perf kernel-devel-$(uname -r) bcc
@@ -19,6 +22,7 @@ install_al2_dependencies () {
 
   echo "------ DONE ------"
 }
+
 
 install_ubuntu2004_dependencies () {
   echo "------ INSTALLING UTILITIES ------"
