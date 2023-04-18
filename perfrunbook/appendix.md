@@ -110,13 +110,12 @@ of such system level resources and if resources are used efficiently.
 CMN counters are only accessible on metal-type instances and certain OSes and kernels.
 
 
-|Distro      |Kernel   | Graviton2 (c6g) | Graviton3 (c7g) | Note                               |
-|------------|---------|-----------------|-----------------|------------------------------------|
-|Ubuntu-20.04| 5.15    |  yes            |    no           |                                    |
-|Ubuntu-20.04| >=5.19  |  yes            |    yes          |                                    |
-|Ubuntu-22.04| >=5.19  |  yes            |    yes          |                                    |
-|Ubuntu-22.04| >=5.19  |  yes            |    yes          |                                    |
-|AL2023      | 6.1.2   |  yes            |    yes          |                                    |
+|Distro      |Kernel   | Graviton2 (c6g) | Graviton3 (c7g) |
+|------------|---------|-----------------|-----------------|
+|Ubuntu-20.04| 5.15    |  yes            |    no           |
+|Ubuntu-20.04| >=5.19  |  yes            |    yes          |
+|Ubuntu-22.04| >=5.19  |  yes            |    yes          |
+|AL2023      | 6.1.2   |  yes            |    yes          |
 
 
 General procedure on Ubuntu
