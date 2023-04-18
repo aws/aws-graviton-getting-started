@@ -115,6 +115,7 @@ CMN counters are only accessible on metal-type instances and certain OSes and ke
 |Ubuntu-20.04| 5.15    |  yes            |    no           |                                    |
 |Ubuntu-20.04| >=5.19  |  yes            |    yes          |                                    |
 |Ubuntu-22.04| >=5.19  |  yes            |    yes          |                                    |
+|Ubuntu-22.04| >=5.19  |  yes            |    yes          |                                    |
 |AL2023      | 6.1.2   |  yes            |    yes          |                                    |
 
 
