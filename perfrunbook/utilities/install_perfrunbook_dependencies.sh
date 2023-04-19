@@ -2,16 +2,16 @@
 
 install_al2023_dependencies () {
   echo "------ INSTALLING UTILITIES ------"
-  yum install -y -q vim unzip git
+  dnf install -y -q vim unzip git
 
   echo "------ INSTALLING HIGH LEVEL PERFORMANCE TOOLS ------"
-  yum install -y -q sysstat htop hwloc tcpdump
+  dnf install -y -q sysstat htop hwloc tcpdump
 
   echo "------ INSTALLING LOW LEVEL PERFORAMANCE TOOLS ------"
-  yum install -y -q perf kernel-devel-$(uname -r) bcc
+  dnf install -y -q perf kernel-devel-$(uname -r) bcc
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
-  yum install -y -q python3 python3-pip
+  dnf install -y -q python3 python3-pip
   python3 -m pip install --upgrade pip
   python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
