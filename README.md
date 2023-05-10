@@ -149,7 +149,7 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
 # Additional resources
 
  * [AWS Graviton](https://aws.amazon.com/ec2/graviton/)
- * [Neoverse N1 Software Optimization Guide](https://documentation-service.arm.com/static/5f05e93dcafe527e86f61acd)
+ * [Neoverse N1 Software Optimization Guide](https://developer.arm.com/documentation/pjdoc466751330-9707/latest)
  * [Armv8 reference manual](https://documentation-service.arm.com/static/60119835773bb020e3de6fee)
  * [Package repository search tool](https://pkgs.org/)
 
