@@ -43,11 +43,11 @@ On all distributions, additionnal compile time dependencies might be needed depe
 
 ### 1.2 Recommended versions
 
-When adopting Graviton2, it is recommended to use recent software versions as much as possible, and Python is no exception.
+When adopting Graviton, it is recommended to use recent software versions as much as possible, and Python is no exception.
 
-Python 2.7 is EOL since January the 1st 2020, it is definitely recommended to upgrade to a Python 3.x version before moving to Graviton2.
+Python 2.7 is EOL since January the 1st 2020, it is definitely recommended to upgrade to a Python 3.x version before moving to Graviton.
 
-Python 3.6 will reach [EOL in December, 2021](https://www.python.org/dev/peps/pep-0494/#lifespan), so when starting to port an application to Graviton2, it is recommended to target at least Python 3.7.
+Python 3.7 will reach [EOL in July, 2023](https://devguide.python.org/versions/), so when starting to port an application to Graviton, it is recommended to target at least Python 3.8.
 
 ### 1.3 Python on AL2 and RHEL 8
 
@@ -180,10 +180,10 @@ To enable parallelism with BLIS, one needs to both configure with
 `--enable-threading=openmp` and set the environment variable `BLIS_NUM_THREADS`
 to the number of threads to use, the default is to use a single thread.
 
-### 2.6 Graviton2 support in Conda / Anaconda
+### 2.6 Graviton support in Conda / Anaconda
 Anaconda is a distribution of the Python and R programming languages for scientific computing, that aims to simplify package management and deployment.
 
-Anaconda has announced [support for AWS Graviton2 on May 14, 2021](https://www.anaconda.com/blog/anaconda-aws-graviton2).
+Anaconda has announced [support for AWS Graviton on May 14, 2021](https://www.anaconda.com/blog/anaconda-aws-graviton2).
 
 Instructions to install the full Anaconda package installer can be found at https://docs.anaconda.com/anaconda/install/graviton2/ .
 
