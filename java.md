@@ -1,6 +1,6 @@
 # Java on Graviton
 
-Java is a general-purpose programming language. Compiled Java code can run on all platforms that support Java, without the need for recompilation. Java applications are typically compiled to bytecode that can run on any Java virtual machine (JVM) regardless of the underlying computer architecture. _[Wikipedia](https://en.wikipedia.org/wiki/Java_(programming_language))_
+Java is a general-purpose programming language. Compiled Java code can run on all platforms that support Java, without the need for recompilation. Java applications are typically compiled to bytecode that can run on any Java virtual machine (JVM) regardless of the underlying computer architecture. Note: there are multiple programming languages such as Kotlin, Scala, and Groovy that compile to byte code and run on top of the JVM, so those also tend to be highly portable across architectures. _[Wikipedia](https://en.wikipedia.org/wiki/Java_(programming_language))_
 
 Java is well supported and generally performant out-of-the-box on arm64. [Amazon Corretto](https://aws.amazon.com/corretto/), a no-cost, multiplatform, production-ready distribution of the Open Java Development Kit (OpenJDK) supports Graviton-powered instances.
 While Java 8 is fully supported on Arm
