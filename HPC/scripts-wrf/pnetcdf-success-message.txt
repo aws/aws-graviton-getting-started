@@ -1,0 +1,33 @@
++----------------------------------------------------------------------------+
+|
+|  PnetCDF has been successfully installed under
+|          /shared/pnetcdf-acfl
+|
+|  * PnetCDF header files have been installed in
+|          /shared/pnetcdf-acfl/include
+|  * PnetCDF library files have been installed in
+|          /shared/pnetcdf-acfl/lib
+|  * PnetCDF utility programs have been installed in
+|          /shared/pnetcdf-acfl/bin
+|  * PnetCDF man pages have been installed in
+|          /shared/pnetcdf-acfl/share/man
+|
+|  To compile your PnetCDF programs, please add the following to the command
+|  line, so the compiler can find the PnetCDF header files:
+|      -I/shared/pnetcdf-acfl/include
+|
+|  Add the following line to link your program to PnetCDF library:
+|      -L/shared/pnetcdf-acfl/lib -lpnetcdf
+|
+|  Add the following to your run-time environment variable LD_LIBRARY_PATH,
+|  when linking your executable with the PnetCDF shared libraries.
+|      /shared/pnetcdf-acfl/lib
+|
+|
+|  PnetCDF is jointly developed by a team at Northwestern University and
+|  Argonne National Laboratory.
+|
+|  Visit PnetCDF project web site for more information
+|      https://parallel-netcdf.github.io
+|
++----------------------------------------------------------------------------+

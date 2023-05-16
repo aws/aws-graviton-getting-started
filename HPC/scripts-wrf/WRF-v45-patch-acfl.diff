@@ -1,0 +1,53 @@
+diff --git a/arch/configure.defaults b/arch/configure.defaults
+index e7a98362..f3c97669 100644
+--- a/arch/configure.defaults
++++ b/arch/configure.defaults
+@@ -2126,14 +2126,14 @@ NETCDFPAR_BUILD =       CONFIGURE_NETCDFPAR_BUILD
+ ###########################################################
+ #ARCH    Linux aarch64, GCC compiler OpenMPI # serial smpar dmpar dm+sm
+ #
+-DESCRIPTION     =      GCC ($SFC/$SCC): Aarch64
++DESCRIPTION     =      armclang ($SFC/$SCC): Aarch64
+ DMPARALLEL      =
+ OMPCPP          =      -fopenmp
+ OMP             =      -fopenmp
+ OMPCC           =      -fopenmp
+-SFC             =      gfortran
+-SCC             =      gcc
+-CCOMP           =      gcc
++SFC             =      armflang
++SCC             =      armclang
++CCOMP           =      armclang
+ DM_FC           =      mpif90
+ DM_CC           =      mpicc -DMPI2_SUPPORT
+ FC              =      CONFIGURE_FC
+@@ -2141,17 +2141,15 @@ CC              =      CONFIGURE_CC
+ LD              =      $(FC)
+ RWORDSIZE       =      CONFIGURE_RWORDSIZE
+ PROMOTION       =
+-ARCH_LOCAL      =      -DAARCH64_X86_CORRECTNESS_FIX
++ARCH_LOCAL      =
+ CFLAGS_LOCAL    =      -w -O3 -c
+ LDFLAGS_LOCAL   =      -fopenmp
+-FCOPTIM         =      -Ofast -mcpu=native -funroll-loops -fno-expensive-optimizations -fno-reciprocal-math -fsigned-zeros -fno-unsafe-math-optimizations
+-# for graviton 2 use the folowing flag
+-#FCOPTIM         =      -Ofast -march=armv8.2-a+fp16+rcpc+dotprod -funroll-loops -fno-expensive-optimizations -fno-reciprocal-math -fsigned-zeros -fno-unsafe-math-optimizations
++FCOPTIM         =      -Ofast -mcpu=native -funroll-loops
+ FCREDUCEDOPT    =      $(FCOPTIM)
+ FCNOOPT         =      -O0 -fopenmp -frecursive
+ FCDEBUG         =      -g $(FCNOOPT)
+-FORMAT_FIXED    =      -ffixed-form -ffixed-line-length-0 -fallow-argument-mismatch -fallow-invalid-boz
+-FORMAT_FREE     =      -ffree-form -ffree-line-length-0 -fallow-argument-mismatch -fallow-invalid-boz
++FORMAT_FIXED    =      -ffixed-form -ffixed-line-length-0  
++FORMAT_FREE     =      -ffree-form -ffree-line-length-0 
+ FCSUFFIX        =
+ BYTESWAPIO      =      -fconvert=big-endian -frecord-marker=4
+ FCBASEOPTS      =      -w $(FORMAT_FREE) $(BYTESWAPIO)
+@@ -2165,6 +2163,7 @@ RANLIB          =      ranlib
+ RLFLAGS         =
+ CC_TOOLS        =      $(SCC)
+ 
++
+ ###########################################################
+ #ARCH    Linux aarch64, NVHPC compiler with nvc # serial smpar dmpar dm+sm
+ #

@@ -1,0 +1,89 @@
+diff --git a/etc/bashrc b/etc/bashrc
+index 1b24ab2b2b..2c5bcbc3cf 100644
+--- a/etc/bashrc
++++ b/etc/bashrc
+@@ -69,7 +69,7 @@ export WM_COMPILER_TYPE=system
+ # = Gcc | Clang | Icc | Icx | Amd | Arm | Cray | Fujitsu |
+ #   Gcc<digits> | Clang<digits>
+ #   [Not well tested: Pgi | Nvidia]
+-export WM_COMPILER=Gcc
++export WM_COMPILER=Arm
+ 
+ # [WM_PRECISION_OPTION] - Floating-point precision:
+ # = DP | SP | SPDP
+diff --git a/src/OpenFOAM/db/IOstreams/hashes/OSHA1stream.H b/src/OpenFOAM/db/IOstreams/hashes/OSHA1stream.H
+index 763745aa25..28c84a64b3 100644
+--- a/src/OpenFOAM/db/IOstreams/hashes/OSHA1stream.H
++++ b/src/OpenFOAM/db/IOstreams/hashes/OSHA1stream.H
+@@ -32,8 +32,8 @@ Description
+ 
+ \*---------------------------------------------------------------------------*/
+ 
+-#ifndef OSHA1stream_H
+-#define OSHA1stream_H
++#ifndef Foam_OSHA1stream_H
++#define Foam_OSHA1stream_H
+ 
+ #include "OSstream.H"
+ #include "SHA1.H"
+@@ -63,10 +63,17 @@ class osha1stream
+ 
+     protected:
+ 
++        //- Handle overflow
++        virtual int overflow(int c = EOF)
++        {
++            if (c != EOF) sha1_.append(c);
++            return c;
++        }
++
+         //- Put sequence of characters
+         virtual std::streamsize xsputn(const char* s, std::streamsize n)
+         {
+-            sha1_.append(s, n);
++            if (n) sha1_.append(s, n);
+             return n;
+         }
+ 
+diff --git a/src/OpenFOAM/primitives/hashes/SHA1/SHA1.H b/src/OpenFOAM/primitives/hashes/SHA1/SHA1.H
+index 9d9e617a48..f7dc764860 100644
+--- a/src/OpenFOAM/primitives/hashes/SHA1/SHA1.H
++++ b/src/OpenFOAM/primitives/hashes/SHA1/SHA1.H
+@@ -42,8 +42,8 @@ SourceFiles
+ 
+ \*---------------------------------------------------------------------------*/
+ 
+-#ifndef SHA1_H
+-#define SHA1_H
++#ifndef Foam_SHA1_H
++#define Foam_SHA1_H
+ 
+ #include <string>
+ #include <cstdint>
+@@ -113,6 +113,9 @@ public:
+         //- Reset the hashed data before appending more
+         void clear() noexcept;
+ 
++        //- Append single character
++        inline void append(char c);
++
+         //- Append data for processing
+         inline SHA1& append(const char* str);
+ 
+diff --git a/src/OpenFOAM/primitives/hashes/SHA1/SHA1I.H b/src/OpenFOAM/primitives/hashes/SHA1/SHA1I.H
+index b04b3b6161..d5587a1cdc 100644
+--- a/src/OpenFOAM/primitives/hashes/SHA1/SHA1I.H
++++ b/src/OpenFOAM/primitives/hashes/SHA1/SHA1I.H
+@@ -52,6 +52,12 @@ inline Foam::SHA1::SHA1(const std::string& str)
+ 
+ // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+ 
++inline void Foam::SHA1::append(char c)
++{
++    processBytes(&c, 1);
++}
++
++
+ inline Foam::SHA1& Foam::SHA1::append(const char* data, size_t len)
+ {
+     processBytes(data, len);

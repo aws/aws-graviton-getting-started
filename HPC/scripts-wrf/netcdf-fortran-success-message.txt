@@ -1,0 +1,30 @@
++-------------------------------------------------------------+
+| Congratulations! You have successfully installed the netCDF |
+| Fortran libraries.                                          |
+|                                                             |
+| You can use script "nf-config" to find out the relevant     |
+| compiler options to build your application. Enter           |
+|                                                             |
+|     nf-config --help                                        |
+|                                                             |
+| for additional information.                                 |
+|                                                             |
+| CAUTION:                                                    |
+|                                                             |
+| If you have not already run "make check", then we strongly  |
+| recommend you do so. It does not take very long.            |
+|                                                             |
+| Before using netCDF to store important data, test your      |
+| build with "make check".                                    |
+|                                                             |
+| NetCDF is tested nightly on many platforms at Unidata       |
+| but your platform is probably different in some ways.       |
+|                                                             |
+| If any tests fail, please see the netCDF web site:          |
+| https://www.unidata.ucar.edu/software/netcdf/                |
+|                                                             |
+| NetCDF is developed and maintained at the Unidata Program   |
+| Center. Unidata provides a broad array of data and software |
+| tools for use in geoscience education and research.         |
+| https://www.unidata.ucar.edu                                 |
++-------------------------------------------------------------+
