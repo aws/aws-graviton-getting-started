@@ -141,9 +141,13 @@ class CounterConfig:
             idx = df[(df["group"] == group)].index
 
             s = self._compute_stat(ctr1_df, ctr2_df, idx)
-            if (s is not None):
+            if s is not None and s.size:
                 series.append(s)
-        return pd.concat(series)
+
+        if len(series):
+            return pd.concat(series)
+        else:
+            return None
 
 
 # Specializations of the CounterConfig class
@@ -261,7 +265,7 @@ def calculate_counter_stat(platforms):
             "rsrvd3": str,
             "rsrvd4": str,
         },
-        na_values="<not counted>",
+        na_values=["<not counted>", "<not supported>"],
     )
 
     # Filter counter event names into a group id and back
@@ -304,10 +308,11 @@ def calculate_counter_stat(platforms):
         for counter in counter_list:
             stat_name = counter.get_name()
             series_res = counter.create_stat(df)
-            series_res.replace([np.inf, -np.inf], np.nan, inplace=True)
-            series_res.dropna(inplace=True)
 
             try:
+                series_res.replace([np.inf, -np.inf], np.nan, inplace=True)
+                series_res.dropna(inplace=True)
+
                 # Calculate some meaningful aggregate stats for comparisons
                 geomean = stats.gmean(series_res)
                 p10 = stats.scoreatpercentile(series_res, 10)
@@ -329,7 +334,16 @@ def calculate_counter_stat(platforms):
                     "p100": p100,
                 }
             except:  # noqa
-                pass
+                data[stat_name] = {
+                    "geomean": 0,
+                    "p10": 0,
+                    "p50": 0,
+                    "p90": 0,
+                    "p95": 0,
+                    "p99": 0,
+                    "p99.9": 0,
+                    "p100": 0,
+                }
     with open(RESULTS_JSON, "w") as f:
         json.dump(data, f)
     return data
@@ -460,16 +474,25 @@ counter_mapping = {
     "Graviton3": [
         ArmCounterConfig("stall_backend_mem_pkc", PMUEventCounter("stall_backend_mem_cycles", "event=0x4005"), PMUEventCounter("cycles", "event=0x11"), 1000),
     ],
-    "CMN600": [
+    "CMN": [
         ArmCMNCounterConfig("DDR-BW-MBps", PMUEventCounter("hnf_mc_reqs", "type=0x5,eventid=0xd", per_cpu=False), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
         ArmCMNCounterConfig("DDR-retry-rate", PMUEventCounter("hnf_mc_retries", "type=0x5,eventid=0xc", per_cpu=False), PMUEventCounter("hnf_mc_reqs", "type=0x5,eventid=0xd", per_cpu=False), 100),
         ArmCMNCounterConfig("LLC-miss-rate", PMUEventCounter("hnf_cache_miss", "type=0x5,eventid=0x1", per_cpu=False), PMUEventCounter("hnf_slc_sf_cache_access", "type=0x5,eventid=0x2", per_cpu=False), 100),
         ArmCMNCounterConfig("SF-back-inval-pka", PMUEventCounter("hnf_snf_eviction", "type=0x5,eventid=0x7", per_cpu=False), PMUEventCounter("hnf_slc_sf_cache_access", "type=0x5,eventid=0x2", per_cpu=False), 1000),
         ArmCMNCounterConfig("SF-snoops-pka", PMUEventCounter("hnf_sf_snps", "type=0x5,eventid=0x18", per_cpu=False), PMUEventCounter("hnf_slc_sf_cache_access", "type=0x5,eventid=0x2", per_cpu=False), 1000),
-        ArmCMNCounterConfig("DVM-BW-Ops/s", PMUEventCounter("dn_dvmops", "type=0x1,eventid=0x1", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
-        ArmCMNCounterConfig("DVMSync-BW-Ops/s", PMUEventCounter("dn_dvmsyncops", "type=0x1,eventid=0x2", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
         ArmCMNCounterConfig("PCIe-Read-MBps", PMUEventCounter("rni_rx_flits", "type=0xa,eventid=0x4", per_cpu=False), None, (32.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
         ArmCMNCounterConfig("PCIe-Write-MBps", PMUEventCounter("rni_tx_flits", "type=0xa,eventid=0x5", per_cpu=False), None, (32.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
+    ],
+    "CMN600": [
+        ArmCMNCounterConfig("DVM-BW-Ops/s", PMUEventCounter("dn_dvmops", "type=0x1,eventid=0x1", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMNCounterConfig("DVMSync-BW-Ops/s", PMUEventCounter("dn_dvmsyncops", "type=0x1,eventid=0x2", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+    ],
+    "CMN650": [
+        ArmCMNCounterConfig("DVM-TLBI-BW-Ops/s", PMUEventCounter("dn_dvmops", "type=0x1,eventid=0x1", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMNCounterConfig("DVM-BPI-BW-Ops/s", PMUEventCounter("dn_bpi_dvmops", "type=0x1,eventid=0x2", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMNCounterConfig("DVM-PICI-BW-Ops/s", PMUEventCounter("dn_pici_dvmops", "type=0x1,eventid=0x3", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMNCounterConfig("DVM-VICI-BW-Ops/s", PMUEventCounter("dn_vici_dvmops", "type=0x1,eventid=0x4", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMNCounterConfig("DVMSync-BW-Ops/s", PMUEventCounter("dn_dvmsyncops", "type=0x1,eventid=0x5", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
     ],
     "Intel_SKX_CXL_ICX": [
         IntelCounterConfig("ipc", PMUEventCounter("insts", "event=0xc0,umask=0x0"), PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1),
@@ -498,25 +521,36 @@ counter_mapping = {
 }
 
 
-def create_graviton2_counter_mapping():
+def create_graviton_counter_mapping(cpu_type):
     """
     Depending on the PMUs available on the current node,
     return the proper PMU counter set.
     """
-    if os.path.isdir("/sys/devices/arm_cmn_0") and os.path.isdir("/sys/devices/armv8_pmuv3_0"):
-        return [PlatformDetails(counter_mapping["Graviton"], 6),
-                PlatformDetails(counter_mapping["CMN600"], 2)]
-    elif os.path.isdir("/sys/devices/armv8_pmuv3_0"):
-        return [PlatformDetails(counter_mapping["Graviton"], 6)]
-    else:
-        return []
+    have_cmn = os.path.isdir("/sys/devices/arm_cmn_0")
+    have_pmu = os.path.isdir("/sys/devices/armv8_pmuv3_0")
+
+    mesh_mapping = {
+        "Graviton2": "CMN600",
+        "Graviton3": "CMN650"
+    }
+
+    pmu_groups = []
+    if have_pmu:
+        pmu_groups.append(PlatformDetails(counter_mapping["Graviton"], 6))
+        if cpu_type in counter_mapping:
+            pmu_groups.append(PlatformDetails(counter_mapping[cpu_type], 6))
+    if have_cmn:
+        pmu_groups.append(PlatformDetails(counter_mapping["CMN"], 2))
+        if cpu_type in mesh_mapping:
+            pmu_groups.append(PlatformDetails(counter_mapping[mesh_mapping[cpu_type]], 2))
+
+    return pmu_groups
 
 
 # CPU and PMU mappings and # counter mappings, need to make this extensible to more CPUs
 filter_proc = {
-    "Graviton2": create_graviton2_counter_mapping(),
-    "Graviton3": [PlatformDetails(counter_mapping["Graviton"], 6),
-                  PlatformDetails(counter_mapping["Graviton3"], 6)],
+    "Graviton2": create_graviton_counter_mapping("Graviton2"),
+    "Graviton3": create_graviton_counter_mapping("Graviton3"),
     "Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz": [
         PlatformDetails(counter_mapping["Intel_SKX_CXL_ICX"], 4),
         PlatformDetails(counter_mapping["Intel_SKX_CXL"], 4)],
