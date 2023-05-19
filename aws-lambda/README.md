@@ -137,10 +137,10 @@ sam local invoke LambdaNumberFunction -e ./test/event.json
 ![sam local invoke](/aws-lambda/img/samlocalinvoke.png)
 
 ### Building arm64 Lambda functions as container images
-You can build arm64 functions as container images. You  can use [AWS SAM natively]([./src/Dockerfile](https://aws.amazon.com/blogs/compute/using-container-image-support-for-aws-lambda-with-aws-sam/)) to build container images.
+You can build arm64 functions as container images. You  can use [AWS SAM natively](https://aws.amazon.com/blogs/compute/using-container-image-support-for-aws-lambda-with-aws-sam/) to build container images.
 
 You can also use Docker native commands instead of AWS SAM.
-To build a container image of this function using Docker, use the [Dockerfile](./src/Dockerfile) and specify the `nodejs:12-arm64` base image.
+To build a container image of this function using Docker, use the [Dockerfile](./GravitonLambdaNumber/src/Dockerfile) and specify the `nodejs:12-arm64` base image.
 ```
 FROM public.ecr.aws/lambda/nodejs:12-arm64
 COPY app.js package*.json $LAMBDA_TASK_ROOT
