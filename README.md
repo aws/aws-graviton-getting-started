@@ -41,7 +41,7 @@ If you are new to Graviton and want to understand how to identify target workloa
 |Frequency	|2500MHz	|2600MHz	|
 |Turbo supported	|No	|No	|
 |Instruction latencies	|[Instruction Latencies](https://developer.arm.com/documentation/PJDOC-466751330-9707/r4p1/?lang=en)	|[Instruction Latencies](https://developer.arm.com/documentation/pjdoc466751330-9685/latest/)	|
-|Interconnect	|CMN-600	|CMN-700	|
+|Interconnect	|CMN-600	|CMN-650	|
 |Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|
 |Additional  features	|fp16, rcpc, dotprod, crypto	|sve, rng, bf16, int8, crypto	|
 |Recommended -mcpu flag	|neoverse-n1	|neoverse-512tvb	|
