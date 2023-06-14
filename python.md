@@ -280,3 +280,9 @@ source:
 ```
 python3 -m pip install --user --no-binary confluent-kafka confluent-kafka
 ```
+
+### open3d
+
+Open3d required glibc version 2.27 or higher. Amazon Linux 2 include glibc 2.26, which is not sufficient. In order to
+use open3d, please use Amazon Linux 2023 or later, Ubuntu Bionic (18.04) or later, or another supported distribution.
+See [open3d documentation](http://www.open3d.org/docs/release/getting_started.html) for more information.
