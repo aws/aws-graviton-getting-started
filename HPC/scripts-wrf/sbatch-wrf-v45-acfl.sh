@@ -19,7 +19,7 @@ export FI_EFA_FORK_SAFE=1
 wrf_root=/shared
 wrf_install=${wrf_root}
 module use /shared/arm/modulefiles
-module load armpl/23.04.0 acfl/23.04
+module load acfl armpl
 
 export PATH=${wrf_install}/openmpi-4.1.4-acfl/bin:$PATH
 export LD_LIBRARY_PATH=${wrf_install}/openmpi-4.1.4-acfl/lib:$LD_LIBRARY_PATH

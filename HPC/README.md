@@ -80,7 +80,7 @@ tar xf arm-compiler-for-linux_23.04_Ubuntu-20.04_aarch64.tar
 
 # load the module to use Arm Compiler for Linux (ACfL)
 module use /shared/arm/modulefiles
-module load acfl/23.04
+module load acfl
 ```
 You will see the following message if ACfL installation is successful.
 ```
@@ -139,7 +139,7 @@ For applications that use the Message Passing Interface (MPI) to communicate, we
 export INSTALLDIR=/shared
 export OPENMPI_VERSION=4.1.4
 module use /shared/arm/modulefiles
-module load acfl/23.04
+module load acfl
 export CC=armclang
 export CXX=armclang++
 export FC=armflang
@@ -152,7 +152,7 @@ tar -xzvf openmpi-4.1.4.tar.gz
 cd openmpi-4.1.4
 mkdir build-acfl
 cd build-acfl
-../configure --prefix=${INSTALLDIR}/openmpi-${OPENMPI_VERSION}-acfl --enable-mpirun-prefix-by-default --with-sge --without-verbs --disable-man-pages --enable-builtin-atomics --with-libfabric=/opt/amazon/efa  --with-libfabric-libdir=/opt/amazon/efa/lib
+../configure --prefix=${INSTALLDIR}/openmpi-${OPENMPI_VERSION}-acfl --enable-mpirun-prefix-by-default --without-verbs --disable-man-pages --enable-builtin-atomics --with-libfabric=/opt/amazon/efa  --with-libfabric-libdir=/opt/amazon/efa/lib
 make -j$(nproc) && make install
 ```
 
@@ -247,7 +247,7 @@ mkdir -p /shared/tools/openfoam-root && cd /shared/tools/openfoam-root
 export PATH=/shared/openmpi-4.1.4-acfl/bin:$PATH
 export LD_LIBRARY_PATH=/shared/openmpi-4.1.4-acfl/lib:$LD_LIBRARY_PATH
 module use /shared/arm/modulefiles 
-module load acfl/23.04 armpl/23.04.0
+module load acfl armpl
 
 [ -d openfoam ] || git clone -b OpenFOAM-v2112 https://develop.openfoam.com/Development/openfoam.git
 [ -d ThirdParty-common ] || git clone -b v2112 https://develop.openfoam.com/Development/ThirdParty-common.git
@@ -259,7 +259,7 @@ popd
 cd openfoam
 
 # a patch required for ACfL or GCC-12 (https://develop.openfoam.com/Development/openfoam/-/commit/91198eaf6a0c11b57446374d97a079ca95cf1412)
-wget https://raw.githubusercontent.com/aws/aws-graviton-getting-started/graviton-hpc-guide/HPC/scripts-openfoam/openfoam-v2112-patch.diff
+wget https://raw.githubusercontent.com/aws/aws-graviton-getting-started/main/HPC/scripts-openfoam/openfoam-v2112-patch.diff
 git apply openfoam-v2112-patch.diff
 
 sed -i -e "s/WM_COMPILER=Gcc/WM_COMPILER=Arm/g" etc/bashrc

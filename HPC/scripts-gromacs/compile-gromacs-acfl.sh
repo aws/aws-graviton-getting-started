@@ -17,8 +17,7 @@ CURDIR=${ROOT}/gromacs-${gromacs_version}-acfl
 export PATH=/shared/openmpi-4.1.4-acfl/bin:$PATH
 export LD_LIBRARY_PATH=/shared/openmpi-4.1.4-acfl/lib:$LD_LIBRARY_PATH
 module use /shared/arm/modulefiles
-module load acfl/23.04
-module load armpl/23.04.0
+module load acfl armpl
 
 export LDFLAGS="-lgfortran -lamath -lm -lastring"
 cmake .. -DGMX_BUILD_OWN_FFTW=OFF \
