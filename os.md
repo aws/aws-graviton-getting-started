@@ -4,8 +4,10 @@
 ------ | ------ | ----- | ----- | ----- | ----- | -----
 Amazon Linux 2023 | All versions | Yes | 4KB | [AMIs](amis_cf_sm.md) | Yes | Pointer Authentication enabled on Graviton3
 Amazon Linux 2 | 2.26-35 or later| Yes | 4KB | [AMIs](amis_cf_sm.md) | Yes | End of Life (EOL) scheduled 2025-06-30
-Ubuntu | 20.04 LTS or later | Yes | 4KB | [focal](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
-Ubuntu | 18.04 LTS | Yes (*) | 4KB | [bionic](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | (*) needs `apt install libc6-lse`
+Ubuntu Pro | 22.04 LTS | Yes | 4KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/prodview-uy7jg4dds3qjw) | Yes | 
+Ubuntu | 22.04 LTS | Yes | 4KB | [jammy](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
+Ubuntu | 20.04 LTS | Yes | 4KB | [focal](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
+Ubuntu | 18.04 LTS | Yes (*) | 4KB | [bionic](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | (*) needs `apt install libc6-lse`. Free support ended 2023/05/31.
 SuSE | 15 SP2 or later| Planned | 4KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07SPTXBDX) | Yes | 
 Redhat Enterprise Linux | 8.2 or later | Yes | 64KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07T2NH46P) | Yes | 
 ~~Redhat Enterprise Linux~~ | ~~7.x~~ | ~~No~~ | ~~64KB~~ | ~~[MarketPlace](https://aws.amazon.com/marketplace/pp/B07KTFV2S8)~~ | | Supported on A1 instances but not on Graviton2 based ones
@@ -25,6 +27,7 @@ Rocky Linux | 8.4 or later | Yes (*) | 64KB (*) | [ISOs](https://rockylinux.org/
 OS Name | Minimum recommended Linux kernel version for Graviton2
 ------ | ------
 Amazon Linux 2 | >= 4.14.273-207.502.amzn2, >= 5.4.186-102.354.amzn2, or >= 5.10.106-102.504.amzn2
+Ubuntu 22.04 | All supported kernels 
 Ubuntu 20.04 | >= 5.4.0-1047-aws, >= 5.8.0-1034-aws, >= 5.11.0-1009-aws
 Ubuntu 18.04 | >= 4.15.0-1101-aws, >= 5.4.0-1047-aws
 Redhat Entreprise Linux 8 | >= 4.18.0-305.10
