@@ -71,6 +71,21 @@ Some common Python packages that are distributed by the package manager are:
 To see a full list run: `yum search python3`
 
 
+### Python wheel glibc requirements
+
+Some python wheel packages installed with `pip` require newer libc versions implicitly and will fail to import properly in some cases with a similar
+error message as below:
+
+```
+ImportError: /lib64/libm.so.6: version `GLIBC_2.27' not found
+```
+
+This can be a problem on distributions such as Amazon Linux 2 that ship with an relatively old glibc (v2.26 in case of Amazon Linux 2).
+This happens because  `pip` does a simple string match on the wheel filename to determine if a wheel will be compatible with the system.
+In these cases, it is recommended to first identify if a version of the package is available through the distro's package manager,
+install an older version of the package if able, or finally upgrade to a distro that uses a newer glibc -- such as AL2023, Ubuntu 20.04, or Ubuntu 22.04.
+
+
 ## 2. Scientific and numerical application (NumPy, SciPy, BLAS, etc)
 
 Python relies on native code to achieve high performance.  For scientific and
@@ -286,3 +301,4 @@ python3 -m pip install --user --no-binary confluent-kafka confluent-kafka
 Open3d required glibc version 2.27 or higher. Amazon Linux 2 include glibc 2.26, which is not sufficient. In order to
 use open3d, please use Amazon Linux 2023 or later, Ubuntu Bionic (18.04) or later, or another supported distribution.
 See [open3d documentation](http://www.open3d.org/docs/release/getting_started.html) for more information.
+
