@@ -101,8 +101,8 @@ In our `capture_flamegraphs.sh` helper script, we use `perf record` to gather tr
   perf script -f -i perf.data > grv_script.out
   ./FlameGraph/stackcollapse-perf.pl --kernel --jit grv_script.out > grv_folded.out
   # Copy x86_folded.out to Graviton SUT
-  ./Flamegraph/difffolded.pl grv_folded.out x86_folded.out > diff.out
-  ./Flamegraph/flamegraph.pl --colors java diff.out > flamegraph-diff.svg
+  ./FlameGraph/difffolded.pl grv_folded.out x86_folded.out > diff.out
+  ./FlameGraph/flamegraph.pl --colors java diff.out > flamegraph-diff.svg
   ```
 2. View the diff — red regions indicate an increase in the proportion of execution time, blue a decrease. Note: diffing call-stacks between different architectures can lead to peculiar artifacts due to machine specific functions being named differently.
 3. Create flame-graphs from `perf record`  that use different events than the cpu-clock to determine when to sample stack traces. This can help uncover different root causes and potential optimization opportunities.  Examples below:
