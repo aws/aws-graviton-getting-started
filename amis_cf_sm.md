@@ -19,6 +19,7 @@ There's a good article about it on the AWS Compute blog: [Query for the latest A
 |Amazon Linux 2023 minimal|`/aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-default-arm64`|
 |Amazon Linux 2|`/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2`|
 |Debian 11|`/aws/service/debian/release/11/latest/arm64`|
+|Debian 12|`/aws/service/debian/release/12/latest/arm64`|
 |Ubuntu 23.04|`/aws/service/canonical/ubuntu/server/23.04/stable/current/arm64/hvm/ebs-gp2/ami-id`|
 |Ubuntu 22.04|`/aws/service/canonical/ubuntu/server/22.04/stable/current/arm64/hvm/ebs-gp2/ami-id`|
 |Ubuntu 21.04|`/aws/service/canonical/ubuntu/server/21.04/stable/current/arm64/hvm/ebs-gp2/ami-id`|
