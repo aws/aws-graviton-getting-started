@@ -193,7 +193,7 @@ git clone https://github.com/wrf-model/WRF.git
 cd WRF && git checkout release-v4.5
 
 # apply a patch that includes ACfL compiler options
-wget https://raw.githubusercontent.com/aws/aws-graviton-getting-started/graviton-hpc-guide/HPC/scripts-wrf/WRF-v45-patch-acfl.diff
+wget https://raw.githubusercontent.com/aws/aws-graviton-getting-started/main/HPC/scripts-wrf/WRF-v45-patch-acfl.diff
 git apply WRF-v45-patch-acfl.diff
 
 # choose option '12. (dm+sm)   armclang (armflang/armclang): Aarch64' and '1=basic'
