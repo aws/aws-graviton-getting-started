@@ -2,7 +2,7 @@
 
 export WRF_INSTALL=/shared
 module use /shared/arm/modulefiles
-module load acfl/23.04 armpl/23.04.0
+module load acfl armpl
 export OPENMPI_VERSION=4.1.4
 export PATH=${WRF_INSTALL}/openmpi-${OPENMPI_VERSION}-acfl/bin:$PATH
 export LD_LIBRARY_PATH=${WRF_INSTALL}/openmpi-${OPENMPI_VERSION}-acfl/lib:$LD_LIBRARY_PATH

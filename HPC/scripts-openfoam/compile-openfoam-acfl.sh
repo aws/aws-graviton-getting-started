@@ -12,7 +12,7 @@ mkdir -p /shared/tools/openfoam-root && cd /shared/tools/openfoam-root
 export PATH=/shared/openmpi-4.1.4-acfl/bin:$PATH
 export LD_LIBRARY_PATH=/shared/openmpi-4.1.4-acfl/lib:$LD_LIBRARY_PATH
 module use /shared/arm/modulefiles 
-module load acfl/23.04 armpl/23.04.0
+module load acfl armpl
 
 [ -d openfoam ] || git clone -b OpenFOAM-${openfoam_version} https://develop.openfoam.com/Development/openfoam.git
 [ -d ThirdParty-common ] || git clone -b ${openfoam_version} https://develop.openfoam.com/Development/ThirdParty-common.git
@@ -24,7 +24,7 @@ popd
 cd openfoam
 
 # a patch required for ACfL or GCC-12 (https://develop.openfoam.com/Development/openfoam/-/commit/91198eaf6a0c11b57446374d97a079ca95cf1412)
-wget https://raw.githubusercontent.com/aws/aws-graviton-getting-started/graviton-hpc-guide/HPC/scripts-openfoam/openfoam-v2112-patch.diff
+wget https://raw.githubusercontent.com/aws/aws-graviton-getting-started/main/HPC/scripts-openfoam/openfoam-v2112-patch.diff
 git apply openfoam-v2112-patch.diff
 
 sed -i -e "s/WM_COMPILER=Gcc/WM_COMPILER=Arm/g" etc/bashrc

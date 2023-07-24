@@ -5,7 +5,7 @@
 export WRF_INSTALL=/shared
 export CURDIR=/shared/wrf-arm-v45-acfl
 module use /shared/arm/modulefiles
-module load acfl/23.04 armpl/23.04.0
+module load acfl armpl
 export OPENMPI_VERSION=4.1.4
 export PATH=${WRF_INSTALL}/openmpi-${OPENMPI_VERSION}-acfl/bin:$PATH
 export LD_LIBRARY_PATH=${WRF_INSTALL}/openmpi-${OPENMPI_VERSION}-acfl/lib:$LD_LIBRARY_PATH
@@ -35,7 +35,7 @@ git clone https://github.com/wrf-model/WRF.git
 cd WRF && git checkout release-v4.5
 
 # apply a patch for ACFL compiler options
-wget https://raw.githubusercontent.com/aws/aws-graviton-getting-started/graviton-hpc-guide/HPC/scripts-wrf/WRF-v45-patch-acfl.diff
+wget https://raw.githubusercontent.com/aws/aws-graviton-getting-started/main/HPC/scripts-wrf/WRF-v45-patch-acfl.diff
 git apply WRF-v45-patch-acfl.diff
 
 # choose option '12. (dm+sm)   armclang (armflang/armclang): Aarch64' and '1=basic'
