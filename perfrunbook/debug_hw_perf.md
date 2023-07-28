@@ -16,7 +16,7 @@ There are hundreds of counters in a server CPU today which is many times more th
 
 ## How to Collect PMU counters
 
-PMU counters are available on all Graviton2 instances (a limited subset is available on *6g sizes <16xl, we recommend using a 16xl for experiments needing PMU counters to get access to all of them), and on 5th generation instances >c5.9xl, >c/m/r5.12xl, and >c5a.24xl.  To measure performance counters, do the following:
+A limited subset of PMU events are available on Graviton *6g, *7g sizes <16xl, we recommend using a 16xl for experiments needing PMU events to get access to all of them. On x86 instances use a single socket instance to have access to PMUs >c5.9xl, >*5.12xl, >*6i.16xl, and >c5a.24xl.  To measure performance counters, do the following:
 
 1. Reserve SUT instances, i.e. a m6g.16xl and c5.12xl to get access to all counters
 2. Cut memory and vCPUs down to the size you need to represent your intended instance sizes
