@@ -9,36 +9,22 @@ HeadNode:
     SubnetId: subnet-xxxxxxxxxxxxxxxxx
   Ssh:
     KeyName: xxxxxxxxx
-  Iam:
-    S3Access:
-      - EnableWriteAccess: true
-        BucketName: '*'
-  CustomActions:
-    OnNodeConfigured:
-      Script: https://github.com/aws/aws-graviton-getting-started/blob/main/HPC/scripts-setup/install-gcc-11.sh     
 Scheduling:
   Scheduler: slurm
   SlurmQueues:
   - Name: compute
     ComputeResources:
     - Name: hpc7g
-      InstanceType: c7gn.16xlarge
+      InstanceType: hpc7g.16xlarge
       MinCount: 0
       MaxCount: 64
       Efa:
         Enabled: true
-        GdrSupport: true
-    CustomActions:
-      OnNodeConfigured:
-        Script: https://github.com/aws/aws-graviton-getting-started/blob/main/HPC/scripts-setup/install-gcc-11.sh
     Networking:
       SubnetIds:
       - subnet-xxxxxxxxxxxxxxxxx
       PlacementGroup:
        Enabled: true
-    Iam:
-      AdditionalIamPolicies:
-      - Policy: arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 SharedStorage:
   - Name: FsxLustre0
     StorageType: FsxLustre
