@@ -9,6 +9,13 @@ HeadNode:
     SubnetId: subnet-xxxxxxxxxxxxxxxxx
   Ssh:
     KeyName: xxxxxxxxx
+  Iam:
+    S3Access:
+      - EnableWriteAccess: true
+        BucketName: '*'
+  CustomActions:
+    OnNodeConfigured:
+      Script: s3://<s3_bucket>/install-gcc-11.sh
 Scheduling:
   Scheduler: slurm
   SlurmQueues:
@@ -25,6 +32,12 @@ Scheduling:
       - subnet-xxxxxxxxxxxxxxxxx
       PlacementGroup:
        Enabled: true
+    Iam:
+      AdditionalIamPolicies:
+      - Policy: arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+    CustomActions:
+      OnNodeConfigured:
+        Script: s3://<s3_bucket>/install-gcc-11.sh
 SharedStorage:
   - Name: FsxLustre0
     StorageType: FsxLustre
