@@ -2,7 +2,7 @@
 
 [Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
 
-Sometimes, hardware, not code, is the reason for worse than expected performance. This may show up in the on-cpu profiles as every function is slightly slower on Graviton as more CPU time is consumed, but no obvious hot-spot function exists.  If this is the case, then measuring how the hardware performs can offer insight.  To do this requires measuring special counters in the CPU to understand which component of the CPU is bottlenecking the code from executing as fast as possible.
+Sometimes, hardware, not code, is the reason for worse than expected performance. This may show up in the on-cpu profiles as every function is slightly slower on Graviton as more CPU time is consumed, but no obvious hot-spot function exists.  If this is the case, then measuring how the hardware performs can offer insight.  To do this requires counting special events in the CPU to understand which component of the CPU is bottlenecking the code from executing as fast as possible.
 
 Modern server CPUs, whether they are from Intel, AMD or AWS all attempt to execute as many instructions as possible in a fixed amount of time by doing the following 4 fundamental operations in addition to executing at high frequencies: 
   * Executing instructions using multiple steps (pipelining)
@@ -10,15 +10,17 @@ Modern server CPUs, whether they are from Intel, AMD or AWS all attempt to execu
   * Predicting what instructions are needed next (speculation)
   * Predicting what values from DRAM should be cached nearby the processor (caching).   
 
-The PMU counters give statistics on how aspects of those 4 fundamental operations are behaving.  When one aspect of the CPU starts becoming a bottleneck, for instance if caching starts to store the wrong values, then the CPU will execute instructions more slowly as it will be forced to access the correct values in main memory which is many times slower compared to a cache. 
+The PMU (Performance Monitoring Unit) on modern CPUs have counters that can be programmed to count a set of events to give statistics on how aspects of those 4 fundamental operations are behaving.  When one aspect of the CPU starts becoming a bottleneck, for instance if caching starts to store the wrong values, then the CPU will execute instructions more slowly as it will be forced to access the correct values in main memory which is many times slower compared to a cache. 
 
-There are hundreds of counters in a server CPU today which is many times more than the 4 fundamental underpinnings of a modern CPU. This is because hundreds of components work together to enable a modern CPU to execute instructions quickly. The guide below describes the primary counters to collect and explains their meaning to enable a first level root cause analysis of the observed performance issue.
+There are hundreds of events available to monitor in a server CPU today which is many times more than the 4 fundamental underpinnings of a modern CPU. This is because hundreds of components work together to enable a modern CPU to execute instructions quickly. The guide below describes the primary events to count with the PMU and explains their meaning to enable a first level root cause analysis of the observed performance issue.
 
 ## How to Collect PMU counters
 
-A limited subset of PMU events are available on Graviton *6g, *7g sizes <16xl, we recommend using a 16xl for experiments needing PMU events to get access to all of them. On x86 instances use a single socket instance to have access to PMUs >c5.9xl, >*5.12xl, >*6i.16xl, and >c5a.24xl.  To measure performance counters, do the following:
+A limited subset of PMU events for the CPU are available on Graviton \*6g, \*7g sizes <16xl, we recommend using a 16xl for experiments needing PMU events to get access to all of them. On 5th and 6th generation x86 instances use a single socket instance is needed to have access to the CPU PMU events: >c5.9xl, >\*5.12xl, >\*6i.16xl, >c5a.12xl, and >\*6a.24xl.  On 7th generation x86 instances *7a and *7i, all sizes get access to a limited number of CPU PMU events, just like on Graviton instances, and full socket or larger instances (>\*7\*.24xl) get access to all PMU events. 
 
-1. Reserve SUT instances, i.e. a m6g.16xl and c5.12xl to get access to all counters
+To measure the standard CPU PMU events, do the following:
+
+1. Reserve SUT instances, i.e. a m6g.16xl and c5.12xl to get access to all events
 2. Cut memory and vCPUs down to the size you need to represent your intended instance sizes
   ```bash
   # Cut memory down to the required size
@@ -32,14 +34,14 @@ A limited subset of PMU events are available on Graviton *6g, *7g sizes <16xl, w
   # Cut down vCPUs needed on Graviton
   %> sudo ./configure_vcpus.sh <# vcpus> cores
   ```
-3. Measure individual hardware counters with our helper script. It will plot a time-series curve of the counter's behavior over time and provide geomean and percentile statistics.
+3. Measure individual hardware events or useful ratios (i.e. instruction commit event count over cycle tick counts to get instruction throughput per cycle) with our helper script. It will plot a time-series curve of the event count's behavior over time and provide geomean and percentile statistics.
   ```bash
   # In terminal 1
   %> <start load generator or benchmark>
     
   # In terminal 2
   %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
-  # C5a instances not supported currently.
+  # AMD (5a, 6a and 7a) instances not supported currently.
   %> sudo python3 ./measure_and_plot_basic_pmu_counters.py --stat ipc
     
   # Example Output
@@ -80,14 +82,14 @@ A limited subset of PMU events are available on Graviton *6g, *7g sizes <16xl, w
        0                        10                       20                       30                      40                       50                       60
                                                            gmean:   1.50 p50:   1.50 p90:   1.50 p99:   1.61
   ```
-4. You can also measure all relevant counters at once using our aggregate PMU measuring script if you do not need a time-series view.  It prints out a table of measured PMU ratios at the end and supports the same counters.
+1. You can also measure all relevant ratios at once using our aggregate PMU measuring script if you do not need a time-series view.  It prints out a table of measured PMU ratios at the end and supports the same events.
   ```bash
   # In terminal 1
   %> <start load generator or benchmark>
     
   # In terminal 2
   %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
-  # C5a instances not supported currently.
+  # AMD (5a, 6a, and 7a) instances not supported currently.
   %> sudo python3 ./measure_aggregated_pmu_stats.py --timeout 300
   |Ratio               |   geomean|       p10|       p50|       p90|       p95|       p99|     p99.9|      p100|
   |ipc                 |      1.00|      0.84|      1.00|      1.13|      1.32|      2.46|      2.48|      2.48|
@@ -108,7 +110,7 @@ A limited subset of PMU events are available on Graviton *6g, *7g sizes <16xl, w
 
 ## Top-down method to debug hardware performance
 
-This checklist describes the top-down method to debug whether the hardware is under-performing and what part is underperforming.  The checklist describes counters to check that are included in the helper-script.  All metrics are in terms of either misses-per-1000(kilo)-instruction or per-1000(kilo)-cycles.  This checklist aims to help guide whether a hardware slow down is coming from the front-end of the processor or the backend of the processor and then what particular part.  The front-end of the processor is responsible for fetching and supplying the instructions.  The back-end is responsible for executing the instructions provided by the front-end as fast as possible.  A bottleneck in either part will cause stalls and a decrease in performance.  After determining where the bottleneck may lie, you can proceed to [Section 6](./optimization_recommendation.md) to read suggested optimizations to mitigate the problem.
+This checklist describes the top-down method to debug whether the hardware is under-performing and what part is underperforming.  The checklist describes event ratios to check that are included in the helper-script.  All ratios are in terms of either misses-per-1000(kilo)-instruction or per-1000(kilo)-cycles.  This checklist aims to help guide whether a hardware slow down is coming from the front-end of the processor or the backend of the processor and then what particular part.  The front-end of the processor is responsible for fetching and supplying the instructions.  The back-end is responsible for executing the instructions provided by the front-end as fast as possible.  A bottleneck in either part will cause stalls and a decrease in performance.  After determining where the bottleneck may lie, you can proceed to [Section 6](./optimization_recommendation.md) to read suggested optimizations to mitigate the problem.
 
 1. Start by measuring `ipc` (Instructions per cycle) on each instance-type.  A higher IPC is better. A lower number for `ipc` on Graviton2 compared to x86 indicates *that* there is a performance problem.  At this point, proceed to attempt to root cause where the lower IPC bottleneck is coming from by collecting frontend and backend stall metrics.
 2. Next, measure `stall_frontend_pkc` and `stall_backend_pkc` (pkc = per kilo cycle) and determine which is higher.  If stalls in the frontend are higher, it indicates the part of the CPU responsible for predicting and fetching the next instructions to execute is causing slow-downs.  If stalls in the backend are higher, it indicates the machinery that executes the instructions and reads data from memory is causing slow-downs
@@ -121,7 +123,7 @@ Front end stalls commonly occur if the CPU cannot fetch the proper instructions,
 2. Measure `inst-l1-mpki`.  A value >20 indicates the working-set code footprint is large and is spilling out of the fastest cache on the processor and is potentially a bottleneck.
 3. Measure `inst-tlb-mpki`. A value >0 indicates the CPU has to do extra stalls to translate the virtual addresses of instructions into physical addresses before fetching them and the footprint is too large.
 4. Measure `inst-tlb-tw-pki` . A value >0 indicates the instruction footprint might be too large.
-5. Measure `code-sparsity` . A number >0.5 indicates the code being executed by the CPU is very sparse. This counter is only available on Graviton 16xlarge or metal instances. If the number is >0.5 for please see [Optimizing For Large Instruction Footprints](./optimization_recommendation.md#optimizing-for-large-instruction-footprint).
+5. Measure `code-sparsity` . A number >0.5 indicates the code being executed by the CPU is very sparse. This counter is only available on Graviton 16xlarge or metal instances. If the number is >0.5 for the workload under test please see [Optimizing For Large Instruction Footprints](./optimization_recommendation.md#optimizing-for-large-instruction-footprint).
 5. If front-end stalls are the root cause, the instruction footprint needs to be made smaller, proceed to [Section 6](./optimization_recommendation.md) for suggestions on how to reduce front end stalls for your application..
 
 ### Drill down back-end stalls
@@ -136,12 +138,20 @@ Backend stalls are caused when the CPU is unable to make forward progress execut
 6. If back-end stalls due to the cache-system and memory system are the problem, the data-set size and layout needs to be optimized.
 7. Proceed to [Section 6](./optimization_recommendation.md) to view optimization recommendations for working with a large data-set causing backend stalls.
 
-### Capturing Coherent Mesh Network hardware event counters
 
-The CMN connects the CPUs to each other, to the memory controller, the I/O subsystem and provides System Level Cache.
+## Additonal PMUs and PMU events
+
+On metal instances, all available hardware PMUs and their events are exposed to instances and can be accessed so long as driver support by the OS in use is available.  
+These extra PMUs help with diagnosing specific use cases, but are generally less applicable than the more widely used CPU PMU.
+These PMU and events include such things as the Coherent Mesh Network PMU on Graviton instances to measure system level event counts such as system wide DRAM bandwidth use.  
+These PMUs will be covered in this section with links to documentation and Linux kernel support. 
+
+### Capturing Coherent Mesh Network (CMN) hardware events on Graviton instances
+
+On Graviton the CMN connects the CPUs to each other, to the memory controller, the I/O subsystem and provides the System Level Cache.
 Its PMU counts events such as requests to SLC, DRAM (memory bandwidth), IO bus requests or coherence snoop events.
 These metrics can be used to assess an application's utilization of such system level resources and if resources are used efficiently.
-CMN counters are only accessible on metal-type instances and certain OSes and kernels.
+CMN counters are only accessible on Graviton metal-type instances and certain OSes and kernels.
 
 
 |Distro      |Kernel   | Graviton2 (c6g) | Graviton3 (c7g) |
