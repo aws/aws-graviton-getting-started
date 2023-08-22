@@ -1,18 +1,30 @@
 # Getting started with HPC on Graviton instances
-* [Introduction](#introduction)
-* [Summary of the recommended configuration](#summary-of-the-recommended-configuration)
-* [Instructions for setting up the HPC cluster for best performance](#instructions-for-setting-up-the-hpc-cluster-for-best-performance)
-  * [Compilers](#compilers)
-  * [Computation libraries](#computation-libraries)
-  * [EFA support](#efa-support)
-  * [Open MPI](#open-mpi)
-* [Running HPC applications](#running-hpc-applications)
-  * [HPC packages](#hpc-packages)
-  * [WRF](#wrf)
-  * [OpenFOAM](#openfoam)
-  * [Gromacs](#gromacs)
-* [MPI application profiling](#mpi-application-profiling)
-* [Appendix](#appendix)
+- [Getting started with HPC on Graviton instances](#getting-started-with-hpc-on-graviton-instances)
+  - [Introduction](#introduction)
+  - [Summary of the recommended configuration](#summary-of-the-recommended-configuration)
+  - [Instructions for setting up the HPC cluster for best performance](#instructions-for-setting-up-the-hpc-cluster-for-best-performance)
+    - [Compilers](#compilers)
+    - [Computation libraries](#computation-libraries)
+    - [EFA support](#efa-support)
+    - [Open MPI](#open-mpi)
+  - [Running HPC applications](#running-hpc-applications)
+    - [HPC packages](#hpc-packages)
+    - [WRF](#wrf)
+      - [Build WRF 4.5 with ACFL on Graviton](#build-wrf-45-with-acfl-on-graviton)
+      - [Setup the runtime configuration, download and run the benchmark](#setup-the-runtime-configuration-download-and-run-the-benchmark)
+      - [Build WPS 4.5 with ACFL on Graviton](#build-wps-45-with-acfl-on-graviton)
+    - [OpenFOAM](#openfoam)
+      - [Install and Build OpenFOAM v2112 on Graviton instances with ACfL](#install-and-build-openfoam-v2112-on-graviton-instances-with-acfl)
+      - [Setup the runtime configuration and run the benchmark](#setup-the-runtime-configuration-and-run-the-benchmark)
+      - [Sample output](#sample-output)
+    - [Gromacs](#gromacs)
+      - [Build Gromacs 2022.4](#build-gromacs-20224)
+      - [Run the benchmark](#run-the-benchmark)
+      - [Sample output](#sample-output-1)
+  - [MPI application profiling](#mpi-application-profiling)
+    - [Tau Performance System](#tau-performance-system)
+  - [Appendix](#appendix)
+    - [List of HPC compilers for Graviton](#list-of-hpc-compilers-for-graviton)
 
 ## Introduction
 [C7gn/Hpc7g](https://aws.amazon.com/blogs/aws/new-amazon-ec2-instance-types-in-the-works-c7gn-r7iz-and-hpc7g) instances are the latest additions to Graviton based EC2 instances, optimized for network and compute intensive High-Performance Computing (HPC) applications. This document is aimed to help HPC users get the optimal performance on Graviton instances. It covers the recommended compilers, libraries, and runtime configurations for building and running HPC applications. Along with the recommended software configuration, the document also provides example scripts to get started with 3 widely used open-source HPC applications: Weather Research and Forecasting (WRF), Open Source Field Operation And Manipulation (OpenFOAM) and Gromacs.
@@ -182,7 +194,9 @@ OpenFOAM (Computational Fluid Dynamics simulation)	| v2112+ |	ACfL	| 1 CPU per r
 Gromacs (Molecular Dynamics simulation) |	v2022.4+	| ACfL with SVE_SIMD option	| 1 CPU per rank
 
 ### WRF
-The WRF model is one of the most used numerical weather prediction (NWP) systems. WRF is used extensively for research and real-time forecasting. Large amount of computation resources are required for each simulation, especially for high resolution simulations. We recommend using [WRF 4.5](https://github.com/wrf-model/WRF/releases#wrf-version-4.5).
+The WRF model is one of the most used numerical weather prediction (NWP) systems. WRF is used extensively for research and real-time forecasting. Large amount of computation resources are required for each simulation, especially for high resolution simulations. We recommend using [WRF 4.5](https://github.com/wrf-model/WRF/releases#wrf-version-4.5). 
+
+The WRF Pre-Processing System (WPS) preapres a domain (region of the Earth) for input to WRF. We recommend using [WPS 4.5](https://github.com/wrf-model/WPS/releases/tag/v4.5).
 
 #### Build WRF 4.5 with ACFL on Graviton
 Use [this script](scripts-wrf/install-wrf-tools-acfl.sh) with command `./scripts-wrf/install-wrf-tools-acfl.sh` to install the required tools: zlib, hdf5, pnetcdf, netcdf-c, and netcdf-fortran. Or use [these scripts](scripts-wrf) in the numeric order to install the tools sequentially. You will get [this message](scripts-wrf/pnetcdf-success-message.txt) if pnetcdf installation is successful; [this message](scripts-wrf/netcdf-c-success-message.txt) if netcdf-c installation is successful; [this message](scripts-wrf/netcdf-fortran-success-message.txt) if netcdf-fortran installation is successful.
@@ -236,6 +250,49 @@ num_compute_time_steps=$( grep "Timing for main" rsl.error.0000 | awk 'NR>1' | w
 time_compute_steps=$( grep "Timing for main" rsl.error.0000 | awk 'NR>1' | awk '{ sum_comp += $9} END { print sum_comp }' )
 echo $time_compute_steps
 ```
+
+#### Build WPS 4.5 with ACFL on Graviton
+After compiling WRF 4.5, use [this script](scripts-wrf/scripts-wps/0-install-jasper.sh) with command `./scripts-wps/0-install-jasper.sh` to install the required tools, jasper. Then, use [this script](scripts-wps/compile-wps.sh) with command `./scripts-wps/compile-wps.sh` to configure and compile WPS.
+
+```
+# get WPS source 4.5
+wget https://github.com/wrf-model/WPS/archive/refs/tags/v4.5.tar.gz
+tar xf v4.5.tar.gz
+cd WPS-4.5
+
+# apply a patch that includes ACfL compiler options
+cat >> arch/configure.defaults << EOL
+########################################################################################################################
+#ARCH Linux aarch64, Arm compiler OpenMPI # serial smpar dmpar dm+sm
+#
+COMPRESSION_LIBS    = CONFIGURE_COMP_L
+COMPRESSION_INC     = CONFIGURE_COMP_I
+FDEFS               = CONFIGURE_FDEFS
+SFC                 = armflang
+SCC                 = armclang
+DM_FC               = mpif90
+DM_CC               = mpicc -DMPI2_SUPPORT
+FC                  = CONFIGURE_FC
+CC                  = CONFIGURE_CC
+LD                  = $(FC)
+FFLAGS              = -ffree-form -O -fconvert=big-endian -frecord-marker=4 -ffixed-line-length-0 -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=incompatible-function-pointer-types
+F77FLAGS            = -ffixed-form -O -fconvert=big-endian -frecord-marker=4 -ffree-line-length-0 -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=incompatible-function-pointer-types
+FCSUFFIX            =
+FNGFLAGS            = $(FFLAGS)
+LDFLAGS             =
+CFLAGS              = -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=incompatible-function-pointer-types
+CPP                 = /usr/bin/cpp -P -traditional
+CPPFLAGS            = -D_UNDERSCORE -DBYTESWAP -DLINUX -DIO_NETCDF -DBIT32 -DNO_SIGNAL CONFIGURE_MPI
+RANLIB              = ranlib
+EOL
+
+# configure (with option 2), and compile
+./configure <<< 2
+sed -i 's/-lnetcdf/-lnetcdf -lnetcdff -lgomp /g' configure.wps
+./compile | tee compile_wps.log
+```
+
+You will see the geogrid.exe, metgrid.exe, and ungrib.exe files in your directory if the WPS build is successful.
 
 ### OpenFOAM
 OpenFOAM is a free, open-source CFD software released and developed by OpenCFD Ltd since 2004. OpenFOAM has a large user base and is used for finite element analysis (FEA) in a wide variety of industries, including aerospace, automotive, chemical manufacturing, petroleum exploration, etc.
