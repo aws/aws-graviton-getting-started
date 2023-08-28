@@ -75,7 +75,7 @@ mkdir -p /shared/tools && cd /shared/tools
 wget -O arm-compiler-for-linux_23.04_Ubuntu-20.04_aarch64.tar <link to the tar ball>
 tar xf arm-compiler-for-linux_23.04_Ubuntu-20.04_aarch64.tar
 
-./arm-compiler-for-linux_23.04_Ubuntu-20.04/arm-compiler-for-linux_23.04_Ubuntu-20.04.sh \
+sudo ./arm-compiler-for-linux_23.04_Ubuntu-20.04/arm-compiler-for-linux_23.04_Ubuntu-20.04.sh \
 -i /shared/arm -a --force
 
 # load the module to use Arm Compiler for Linux (ACfL)
