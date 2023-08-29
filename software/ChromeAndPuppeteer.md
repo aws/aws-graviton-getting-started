@@ -5,7 +5,7 @@ Puppeteer runs in headless mode by default, but can be configured to run in full
 It can serve as a replacement for  Phantomjs.
 “PhantomJS (phantomjs.org) is a headless WebKit scriptable with JavaScript. The latest stable release is version 2.1.
 Important: PhantomJS development is suspended until further notice (see #15344 for more details).“
-The APIs are different, so the browser related code has to be adapted when moving from PhantomJS to Puppeteer.
+The APIs are different, so code targetting PhantomJS has to be rewritten when moving to Puppeteer (see Appendix).
 Puppeteer has 466 contributors and 364k users.
 
 ### Get a recent version of NodeJS.
@@ -23,7 +23,7 @@ sudo yum install -y nodejs
 
 ### Install Puppeteer.
 ```
-npm install -g puppeteer@21.1.0
+npm i puppeteer@21.1.0
 ```
 We now have a x86 version of Chrome thus:
 
@@ -58,7 +58,7 @@ sudo dnf -y install \
     https://kojipkgs.fedoraproject.org//packages/chromium/$CHROMEVER/1.el8/aarch64/chromium-headless-$CHROMEVER-1.el8.aarch64.rpm \
     https://kojipkgs.fedoraproject.org//packages/chromium/$CHROMEVER/1.el8/aarch64/chromedriver-$CHROMEVER-1.el8.aarch64.rpm
 ```
-The QT version above will become unavailable at some point and may need to be updated.
+As QT version above will be updated, and the old one become unavailable at some point, the version variable will need to be changed accordingly.
 If this is the case, check: https://mirror.stream.centos.org/9-stream/AppStream/aarch64/os/Packages/ to see which version is available.
 ```
 rm .cache/puppeteer/chrome/linux-116.0.5845.96/chrome-linux64/chrome
@@ -90,4 +90,35 @@ This can be tested with:
 node puppeteer/examples/oopif.js
 ```
 The oopif.js example invokes chrome in headful mode.
+
+
+## Appendix.
+
+### Code example to show the difference in API between PhantomJS and Puppeteer.
+
+
+Puppeteer Screenshot:
+```
+'use strict';
+
+const puppeteer = require('puppeteer');
+
+(async () => {
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  await page.goto('http://example.com');
+  await page.screenshot({path: 'example.png'});
+  await browser.close();
+})();
+```
+The same with PhantomJS:
+```
+var page = require('webpage').create();
+page.open('http://www.google.com', function() {
+    setTimeout(function() {
+        page.render('google.png');
+        phantom.exit();
+    }, 200);
+});
+```
 
