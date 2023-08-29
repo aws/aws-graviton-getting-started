@@ -23,7 +23,7 @@ sudo yum install -y nodejs
 
 ### Install Puppeteer.
 ```
-npm install -g puppeteer@21.1.0
+npm i puppeteer@21.1.0
 ```
 We now have a x86 version of Chrome thus:
 
