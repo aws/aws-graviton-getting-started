@@ -39,7 +39,7 @@ sudo apt-get install build-essential python3-pip python3-dev libblas-dev gfortra
 python3 -m pip install --user --upgrade pip
 ```
 
-On all distributions, additionnal compile time dependencies might be needed depending on the Python modules you are trying to install.
+On all distributions, additional compile time dependencies might be needed depending on the Python modules you are trying to install.
 
 ### 1.2 Recommended versions
 
@@ -54,7 +54,7 @@ Python 3.7 will reach [EOL in July, 2023](https://devguide.python.org/versions/)
 AL2 and RHEL 8 distribute older Pythons by default: 3.7 and 3.6 respectively.  Python 3.6 is EOL 
 [since December, 2021](https://endoflife.date/python) and Python 3.7 will be EOL [on June 2023](https://endoflife.date/python).
 Therefore, some package maintainers have already begun dropping support for
-Python 3.6 and 3.7 by ommitting prebuilt wheels published to [pypi.org](https://pypi.org).
+Python 3.6 and 3.7 by omitting prebuilt wheels published to [pypi.org](https://pypi.org).
 For some packages, it is still possible to use the default Python by using the distribution
 from the package manager. For example `numpy` no longer publishes Python 3.6 wheels,
 but can be installed from the package manager: `yum install python3-numpy`.
@@ -80,7 +80,7 @@ error message as below:
 ImportError: /lib64/libm.so.6: version `GLIBC_2.27' not found
 ```
 
-This can be a problem on distributions such as Amazon Linux 2 that ship with an relatively old glibc (v2.26 in case of Amazon Linux 2).
+This can be a problem on distributions such as Amazon Linux 2 that ship with a relatively old glibc (v2.26 in case of Amazon Linux 2).
 This happens because  `pip` does a simple string match on the wheel filename to determine if a wheel will be compatible with the system.
 In these cases, it is recommended to first identify if a version of the package is available through the distro's package manager,
 install an older version of the package if able, or finally upgrade to a distro that uses a newer glibc -- such as AL2023, Ubuntu 20.04, or Ubuntu 22.04.
@@ -94,7 +94,7 @@ computing libraries such as ATLAS, BLAS, BLIS, OpenBLAS, etc.  These libraries
 contain code tuned for Graviton processors.
 
 It is recommended to use the latest software versions as much as possible. If the latest
-version migration is not feasible, please ensure that it is atleast the minimum version
+version migration is not feasible, please ensure that it is at least the minimum version
 recommended below because multiple fixes related to data precision and correctness on
 aarch64 went into OpenBLAS between v0.3.9 and v0.3.17 and the below SciPy and NumPy versions
 upgraded OpenBLAS from v0.3.9 to OpenBLAS v0.3.17.
@@ -209,7 +209,7 @@ Here is an example on how to use it to install [numpy](https://numpy.org/) and [
 The first step is to install conda:
 ```
 $ wget https://repo.anaconda.com/miniconda/Miniconda3-py39_4.10.3-Linux-aarch64.sh
-$ chmod a+x chmod a+x Miniconda3-py39_4.10.3-Linux-aarch64.sh
+$ chmod a+x Miniconda3-py39_4.10.3-Linux-aarch64.sh
 $ ./Miniconda3-py39_4.10.3-Linux-aarch64.sh
 ```
 
@@ -223,7 +223,7 @@ dependencies:
   - pandas
 ```
 
-The next step is to instanciate the environment from that definition:
+The next step is to instantiate the environment from that definition:
 ```
 $ conda env create -f graviton-example.yml
 ```
@@ -298,7 +298,7 @@ python3 -m pip install --user --no-binary confluent-kafka confluent-kafka
 
 ### open3d
 
-Open3d required glibc version 2.27 or higher. Amazon Linux 2 include glibc 2.26, which is not sufficient. In order to
+Open3d required glibc version 2.27 or higher. Amazon Linux 2 includes glibc 2.26, which is not sufficient. In order to
 use open3d, please use Amazon Linux 2023 or later, Ubuntu Bionic (18.04) or later, or another supported distribution.
 See [open3d documentation](http://www.open3d.org/docs/release/getting_started.html) for more information.
 
