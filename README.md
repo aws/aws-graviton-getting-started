@@ -29,6 +29,7 @@ This repository provides technical guidance for users and developers using [Amaz
 * [AWS Managed Services available on Graviton](managed_services.md)
 * [Graviton Performance Runbook](perfrunbook/graviton_perfrunbook.md)
 * [Additional resources](#additional-resources)
+* [How To Resources](howtoresources.md)
 
 # Transitioning to Graviton
 If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton based Amazon EC2 instances](transition-guide.md).
