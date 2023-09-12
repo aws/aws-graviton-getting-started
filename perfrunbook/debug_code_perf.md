@@ -57,7 +57,7 @@ If Graviton2 is consuming less CPU-time than expected, it is useful to find call
 
 1. Verify native (i.e. C/C++/Rust) code is built with `-fno-omit-frame-``pointer`
 2. Verify java code is started with `-XX:+PreserveFramePointer -agentpath:/path/to/libperf-jvmti.so`
-    1. The `libperf-jvmit.so` library is usually provided when `perf` is installed.  If it is not, see [how to build the jvmti from source](https://github.com/aws/aws-graviton-getting-started/blob/main/java.md#build-libperf-jvmtiso-on-amazon-linux-2) in our getting-started guide.
+    1. The `libperf-jvmti.so` library is usually provided when `perf` is installed.  If it is not, see [how to build the jvmti from source](https://github.com/aws/aws-graviton-getting-started/blob/main/java.md#build-libperf-jvmtiso-on-amazon-linux-2) in our getting-started guide.
     2. Additional debugging information can be extracted by adding `-XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints` to the java command line.
 3. Verify NodeJS code is started with `--perf-basic-prof`
 4. Collect the Flamegraph:
