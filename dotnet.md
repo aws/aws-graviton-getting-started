@@ -6,11 +6,12 @@
 
 Version            | Linux Arm32   | Linux Arm64   | Notes
 ------------------|-----------|-----------|-------------
-[.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Yes | Yes |  V6.0.0 released on November 8, 2021 with Arm64 Linux builds. For more details check out this [Blog: .NET 6 on AWS](https://aws.amazon.com/blogs/developer/net-6-on-aws/) and [Video: AWS re:Invent 2021 - Accelerate .NET 6 performance with Arm64 on AWS Graviton2](https://www.youtube.com/watch?v=iMlyZI9NhFw)
-[.NET 5](https://dotnet.microsoft.com/download/dotnet/5.0) | Yes | Yes | Arm64-specific optimizations in the .NET libraries and the code produced by RyuJIT. [Arm64 Performance in .NET 5](https://devblogs.microsoft.com/dotnet/arm64-performance-in-net-5/) 
+.NET 7 | Yes | Yes | v7.0.0 released November 8, 2022 with Arm64 Linux builds. For more details check out this video: [Boosting .NET application performance with Arm64 and AWS Graviton 3](https://www.youtube.com/watch?v=V4Lxs5TbaFk)
+[.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Yes | Yes |  V6.0.0 released November 8, 2021 with Arm64 Linux builds. For more details check out this blog: [.NET 6 on AWS](https://aws.amazon.com/blogs/developer/net-6-on-aws/) and video: [AWS re:Invent 2021 - Accelerate .NET 6 performance with Arm64 on AWS Graviton2](https://www.youtube.com/watch?v=iMlyZI9NhFw)
+[.NET 5](https://dotnet.microsoft.com/download/dotnet/5.0) | Yes | Yes | Arm64-specific optimizations in the .NET libraries and the code produced by RyuJIT. [Arm64 Performance in .NET 5](https://devblogs.microsoft.com/dotnet/arm64-performance-in-net-5/). Note that .NET 5 is [out of support](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core#lifecycle). 
 [.NET Framework 4.x](https://dotnet.microsoft.com/learn/dotnet/what-is-dotnet-framework) | No | No | The original implementation of the .NET Framework does not support Linux hosts, and Windows hosts are not suported on Graviton. 
-[.NET Core 3.1](https://dotnet.microsoft.com/download/dotnet/3.1) | Yes | Yes | .NET Core 3.0 added support for [Arm64 for Linux](https://docs.microsoft.com/en-us/dotnet/core/whats-new/dotnet-core-3-0#linux-improvements). 
-[.NET Core 2.1](https://dotnet.microsoft.com/download/dotnet/2.1) | Yes* | No | Initial support was for [Arm32 was added to .NET Core 2.1](https://github.com/dotnet/announcements/issues/82). *Operating system support is limited, please see the [official documentation](https://github.com/dotnet/core/blob/main/release-notes/2.1/2.1-supported-os.md).
+[.NET Core 3.1](https://dotnet.microsoft.com/download/dotnet/3.1) | Yes | Yes | .NET Core 3.0 added support for [Arm64 for Linux](https://docs.microsoft.com/en-us/dotnet/core/whats-new/dotnet-core-3-0#linux-improvements). Note that .NET Core 3.1 is [out of support](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core#lifecycle).
+[.NET Core 2.1](https://dotnet.microsoft.com/download/dotnet/2.1) | Yes* | No | Initial support was for [Arm32 was added to .NET Core 2.1](https://github.com/dotnet/announcements/issues/82). *Operating system support is limited, please see the [official documentation](https://github.com/dotnet/core/blob/main/release-notes/2.1/2.1-supported-os.md). Note that .NET Core 2.1 is [out of support](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core#lifecycle).
 
 
 ## .NET 5
@@ -32,6 +33,3 @@ dotnet publish -c Release -r linux-arm64
 ```
 
 For more information about [publishing .NET apps with the .NET CLI](https://docs.microsoft.com/en-us/dotnet/core/deploying/deploy-with-cli) please see the offical documents.
-
-
-
