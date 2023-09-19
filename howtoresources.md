@@ -4,7 +4,7 @@ If you are just getting started with AWS Graviton-based instances, or even if yo
 
 ### Upcoming Events
 
-* [September 19th, 2023: AWS Graviton Developer Day](https://gravitonessentialsnycdeveloperday.splashthat.com/)
+* [AWS re:Invent](https://reinvent.awsevents.com/)
   
 ### Building / Running applications on AWS Graviton
 
