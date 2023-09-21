@@ -16,6 +16,7 @@ This repository provides technical guidance for users and developers using [Amaz
 	* [Python](python.md)
 	* [Rust](rust.md)
 * [Containers on Graviton](containers.md)
+* [Headless website testing with Chrome and Puppeteer on Graviton](software/ChromeAndPuppeteer.md)
 * [Lambda on Graviton](#lambda-on-graviton)
 * [Operating Systems support](os.md)
 * [Third-party Software Vendors](isv.md)
