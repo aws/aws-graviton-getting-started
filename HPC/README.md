@@ -21,7 +21,8 @@
       - [Build Gromacs 2022.4](#build-gromacs-20224)
       - [Run the benchmark](#run-the-benchmark)
       - [Sample output](#sample-output-1)
-  - [MPI application profiling](#mpi-application-profiling)
+- [Developer guide](#developer-guide)
+- [MPI application profiling](#mpi-application-profiling)
     - [Tau Performance System](#tau-performance-system)
   - [Appendix](#appendix)
     - [List of HPC compilers for Graviton](#list-of-hpc-compilers-for-graviton)
@@ -436,6 +437,91 @@ At the end of benchRIB output log, `/shared/data-gromacs/benchRIB/benchRIB.log`,
                  (ns/day)    (hour/ns)
 Performance:        6.149        3.903
 Finished mdrun on rank 0 Fri May 12 22:18:17 2023
+```
+
+## Developer guide
+If you are a developer who want to build and test your applications on Graviton. You can get started by launching a Ubuntu 20.04 C7g instance from the console. Follow the procedures below to set up the tools:
+```
+# get the build tools and upgrade GCC
+sudo apt update -y
+sudo apt install build-essential environment-modules cmake m4 zlib1g zlib1g-dev csh unzip flex -y
+
+sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+sudo apt install -y gcc-11 g++-11 gfortran-11 -y
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11 --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-11
+```
+You can check by `gcc --version` to confirm that you have gcc 11.4.0 installed.
+
+```
+# install Arm Compiler for Linux, Arm Performance Librariesunder /shared
+sudo mkdir -p /shared/tools/
+sudo chown -R ubuntu: /shared
+
+# check Arm's website for the latest link
+cd /shared/tools
+wget -O arm-compiler-for-linux_23.04.1_Ubuntu-20.04_aarch64.tar 'https://developer.arm.com/-/media/Files/downloads/hpc/arm-compiler-for-linux/23-04-1/arm-compiler-for-linux_23.04.1_Ubuntu-20.04_aarch64.tar'
+tar xf arm-compiler-for-linux_23.04.1_Ubuntu-20.04_aarch64.tar
+./arm-compiler-for-linux_23.04.1_Ubuntu-20.04/arm-compiler-for-linux_23.04.1_Ubuntu-20.04.sh \
+-i /shared/arm -a --force
+```
+
+You can check if the Arm Compiler and Armpl are installed and loaded properly by the following commands:
+```
+source /etc/profile.d/modules.sh
+module use /shared/arm/modulefiles
+module av
+module load acfl armpl
+module list
+```
+You should be getting the following messages if the installation is successful.
+```
+Currently Loaded Modulefiles:
+ 1) binutils/12.2.0   2) acfl/23.04.1   3) armpl/23.04.1  
+```
+
+```
+# install EFA, Open MPI under /shared
+cd /shared/tools
+curl -O https://efa-installer.amazonaws.com/aws-efa-installer-1.25.0.tar.gz
+tar xf aws-efa-installer-1.25.0.tar.gz
+cd aws-efa-installer
+sudo ./efa_installer.sh -y
+
+#compile Open MPI with ACFL
+export INSTALLDIR=/shared
+export OPENMPI_VERSION=4.1.4
+module use /shared/arm/modulefiles
+module load acfl
+export CC=armclang
+export CXX=armclang++
+export FC=armflang
+export CFLAGS="-mcpu=neoverse-512tvb"
+# use export CFLAGS="-mcpu=neoverse-n1" to build applications for Graviton 2
+
+EFA_LIB_DIR=/opt/amazon/efa/lib
+cd /shared/tools
+wget -N https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.4.tar.gz
+tar -xzvf openmpi-4.1.4.tar.gz
+cd openmpi-4.1.4
+mkdir build-acfl
+cd build-acfl
+../configure --prefix=${INSTALLDIR}/openmpi-${OPENMPI_VERSION}-acfl --enable-mpirun-prefix-by-default --without-verbs --disable-man-pages --enable-builtin-atomics --with-libfabric=/opt/amazon/efa  --with-libfabric-libdir=${EFA_LIB_DIR}
+make -j$(nproc) && make install
+```
+
+You can confirm Open MPI installation by
+```
+export PATH=/shared/openmpi-4.1.4-acfl/bin:$PATH
+export LD_LIBRARY_PATH=/shared/openmpi-4.1.4-acfl/lib:$LD_LIBRARY_PATH
+mpicc --version
+```
+You should be getting the following messages
+```
+$ mpicc --version
+Arm C/C++/Fortran Compiler version 23.04.1 (build number 14) (based on LLVM 16.0.2)
+Target: aarch64-unknown-linux-gnu
+Thread model: posix
+InstalledDir: /shared/arm/arm-linux-compiler-23.04.1_Ubuntu-20.04/bin
 ```
 
 ## MPI application profiling
