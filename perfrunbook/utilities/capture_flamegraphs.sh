@@ -3,6 +3,7 @@
 set -e
 
 let capture_freq=99
+reverse=
 
 # search replace filter that will combine thread names like 
 # GC-Thread-1 to GC-Thread- in perf-script sample header lines.
@@ -10,7 +11,7 @@ sr_filter='s/^([a-zA-Z\-]+)[0-9]*-?([a-zA-z]*) (.*?)$/\1\2 \3/g'
 
 help_msg() {
  echo "Requires perf to be installed and in your PATH"
- echo "usage: $0 oncpu|offcpu|<custom_event> [time seconds|default 300] --f|--frequency 99 -r|--regexfilter 's/hi/bye/g'"
+ echo "usage: $0 oncpu|offcpu|<custom_event> [time seconds|default 300] --f|--frequency 99 -R|--Reverse -r|--regexfilter 's/hi/bye/g'"
  echo "custom_event is any event listed in perf-list"
 }
 
@@ -22,7 +23,7 @@ process_perf_data () {
     perl -pi -e "${sr_filter}" script.out
   fi
   ./FlameGraph/stackcollapse-perf.pl --kernel --jit script.out > folded.out
-  ./FlameGraph/flamegraph.pl --colors java folded.out > flamegraph_$1_$4_$3_$2.svg
+  ./FlameGraph/flamegraph.pl ${reverse:+--reverse} --colors java folded.out > flamegraph_$1_$4_$3_$2.svg
   rm perf.data perf.data.jit script.out folded.out
 }
 
@@ -71,6 +72,10 @@ do
     -r|--regexfilter)
       sr_filter="$2"
       shift; shift
+      ;;
+    -R|--Reverse)
+      let reverse=1
+      shift;
       ;;
     -h|--help)
       help_msg
