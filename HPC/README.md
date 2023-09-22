@@ -453,7 +453,7 @@ sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 --slave 
 You can check by `gcc --version` to confirm that you have gcc 11.4.0 installed.
 
 ```
-# install Arm Compiler for Linux, Arm Performance Librariesunder /shared
+# install Arm Compiler for Linux, Arm Performance Libraries under /shared
 sudo mkdir -p /shared/tools/
 sudo chown -R ubuntu: /shared
 
@@ -476,9 +476,10 @@ module list
 You should be getting the following messages if the installation is successful.
 ```
 Currently Loaded Modulefiles:
- 1) binutils/12.2.0   2) acfl/23.04.1   3) armpl/23.04.1  
+ 1) binutils/12.2.0   2) acfl/23.04.1   3) armpl/23.04.1
 ```
 
+After that, you need to install EFA driver which is not installed on an EC2 instance by default and [Open MPI](#open-mpi).
 ```
 # install EFA, Open MPI under /shared
 cd /shared/tools
@@ -486,43 +487,8 @@ curl -O https://efa-installer.amazonaws.com/aws-efa-installer-1.25.0.tar.gz
 tar xf aws-efa-installer-1.25.0.tar.gz
 cd aws-efa-installer
 sudo ./efa_installer.sh -y
-
-#compile Open MPI with ACFL
-export INSTALLDIR=/shared
-export OPENMPI_VERSION=4.1.4
-module use /shared/arm/modulefiles
-module load acfl
-export CC=armclang
-export CXX=armclang++
-export FC=armflang
-export CFLAGS="-mcpu=neoverse-512tvb"
-# use export CFLAGS="-mcpu=neoverse-n1" to build applications for Graviton 2
-
-EFA_LIB_DIR=/opt/amazon/efa/lib
-cd /shared/tools
-wget -N https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.4.tar.gz
-tar -xzvf openmpi-4.1.4.tar.gz
-cd openmpi-4.1.4
-mkdir build-acfl
-cd build-acfl
-../configure --prefix=${INSTALLDIR}/openmpi-${OPENMPI_VERSION}-acfl --enable-mpirun-prefix-by-default --without-verbs --disable-man-pages --enable-builtin-atomics --with-libfabric=/opt/amazon/efa  --with-libfabric-libdir=${EFA_LIB_DIR}
-make -j$(nproc) && make install
 ```
 
-You can confirm Open MPI installation by
-```
-export PATH=/shared/openmpi-4.1.4-acfl/bin:$PATH
-export LD_LIBRARY_PATH=/shared/openmpi-4.1.4-acfl/lib:$LD_LIBRARY_PATH
-mpicc --version
-```
-You should be getting the following messages
-```
-$ mpicc --version
-Arm C/C++/Fortran Compiler version 23.04.1 (build number 14) (based on LLVM 16.0.2)
-Target: aarch64-unknown-linux-gnu
-Thread model: posix
-InstalledDir: /shared/arm/arm-linux-compiler-23.04.1_Ubuntu-20.04/bin
-```
 
 ## MPI application profiling
 Ideally, as you add more resources, the runtime of HPC applications should reduce linearly. When scaling is sub-linear or worse, it is usually because of the non-optimal communication patterns. To debug these cases, open-source tools such as the [Tau Performance System](http://www.cs.uoregon.edu/research/tau/home.php), can generate profiling and tracing reports to help you locate the bottlenecks.
