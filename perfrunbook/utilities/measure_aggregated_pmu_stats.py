@@ -155,15 +155,42 @@ class ArmCounterConfig(CounterConfig):
     def __init__(self, name, counter1, counter2, scale):
         super().__init__("armv8_pmuv3_0", name, counter1, counter2, scale)
 
+class ArmCounterPKC(ArmCounterConfig):
+    def __init__(self, name, event_name, event):
+        super().__init__(name, PMUEventCounter(event_name, event),
+                         PMUEventCounter("cycles", "event=0x11"), 1000)
+
+
+class ArmCounterPKI(ArmCounterConfig):
+    def __init__(self, name, event_name, event):
+        super().__init__(name, PMUEventCounter(event_name, event),
+                         PMUEventCounter("instructions", "event=0x8"), 1000)
 
 class ArmCMNCounterConfig(CounterConfig):
     def __init__(self, name, counter1, counter2, scale):
         super().__init__("arm_cmn_0", name, counter1, counter2, scale)
 
 
-class IntelCounterConfig(CounterConfig):
+class x86CounterConfig(CounterConfig):
     def __init__(self, name, counter1, counter2, scale):
         super().__init__("cpu", name, counter1, counter2, scale)
+
+
+class x86CounterPKI(x86CounterConfig):
+    def __init__(self, name, event_name, event):
+        super().__init__(name, PMUEventCounter(event_name, event),
+                         PMUEventCounter("instructions", "event=0xc0,umask=0x0"), 1000)
+
+class IntelCounterPKC(x86CounterConfig):
+    def __init__(self, name, event_name, event):
+        super().__init__(name, PMUEventCounter(event_name, event),
+                         PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1000)
+
+
+class AMDCounterPKC(x86CounterConfig):
+    def __init__(self, name, event_name, event):
+        super().__init__(name, PMUEventCounter(event_name, event),
+                         PMUEventCounter("cycles", "event=0x76,umask=0x0"), 1000)
 
 
 # function to mask signals for a child process, and catch them only in the parent.
@@ -430,10 +457,18 @@ def build_groups(platforms):
 
 def get_cpu_type():
     GRAVITON_MAPPING = {"0xd0c": "Graviton2", "0xd40": "Graviton3"}
+    AMD_MAPPING = {"7R13": "Milan", "9R14": "Genoa"}
+
     with open("/proc/cpuinfo", "r") as f:
         for line in f.readlines():
             if "model name" in line:
-                return line.split(":")[-1].strip()
+                ln = line.split(":")[-1].strip()
+                if "AMD EPYC" in ln:
+                    # Return the model number of the AMD CPU, its the 3rd entry in format
+                    # AMD EPYC <model>
+                    return AMD_MAPPING[ln.split(" ")[2]]
+                else:
+                    return ln
             elif "CPU part" in line:
                 cpu = line.split(":")[-1].strip()
                 return GRAVITON_MAPPING[cpu]
@@ -457,22 +492,22 @@ counter_mapping = {
                          PMUEventCounter("instructions", "event=0x8"), 
                          PMUEventCounter("cycles", "event=0x11"),
                          1),
-        ArmCounterConfig("branch-mpki", PMUEventCounter("branch_miss_predicts", "event=0x10"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("code_sparsity", PMUEventCounter("code_sparsity", "event=0x11c"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("data-l1-mpki", PMUEventCounter("data_l1_refills", "event=0x3"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("inst-l1-mpki", PMUEventCounter("inst_l1_refills", "event=0x1"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("l2-mpki", PMUEventCounter("l2_refills", "event=0x17"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("l3-mpki", PMUEventCounter("llc_cache_miss_rd", "event=0x37"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("core-rdBw-MBs", PMUEventCounter("llc_cache_miss_rd", "event=0x37"), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
-        ArmCounterConfig("stall_frontend_pkc", PMUEventCounter("stall_frontend_cycles", "event=0x23"), PMUEventCounter("cycles", "event=0x11"), 1000),
-        ArmCounterConfig("stall_backend_pkc", PMUEventCounter("stall_backend_cycles", "event=0x24"), PMUEventCounter("cycles", "event=0x11"), 1000),
-        ArmCounterConfig("inst-tlb-mpki", PMUEventCounter("inst_tlb_refill", "event=0x2"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("inst-tlb-tw-pki", PMUEventCounter("inst_tlb_walk", "event=0x35"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("data-tlb-mpki", PMUEventCounter("data_tlb_refill", "event=0x5"), PMUEventCounter("instructions", "event=0x8"), 1000),
-        ArmCounterConfig("data-tlb-tw-pki", PMUEventCounter("data_tlb_walk","event=0x34"), PMUEventCounter("instructions", "event=0x8"), 1000),
+        ArmCounterPKI("branch-mpki", "branch_miss_predicts", "event=0x10"),
+        ArmCounterPKI("code_sparsity", "code_sparsity", "event=0x11c"),
+        ArmCounterPKI("data-l1-mpki", "data_l1_refills", "event=0x3"),
+        ArmCounterPKI("inst-l1-mpki", "inst_l1_refills", "event=0x1"),
+        ArmCounterPKI("l2-ifetch-mpki", "l2_refills_ifetch", "event=0x108"),
+        ArmCounterPKI("l2-mpki", "l2_refills", "event=0x17"),
+        ArmCounterPKI("l3-mpki", "llc_cache_miss_rd", "event=0x37"),
+        ArmCounterPKC("stall_frontend_pkc", "stall_frontend_cycles", "event=0x23"),
+        ArmCounterPKC("stall_backend_pkc", "stall_backend_cycles", "event=0x24"),
+        ArmCounterPKI("inst-tlb-mpki", "inst_tlb_refill", "event=0x2"),
+        ArmCounterPKI("inst-tlb-tw-pki", "inst_tlb_walk", "event=0x35"),
+        ArmCounterPKI("data-tlb-mpki", "data_tlb_refill", "event=0x5"),
+        ArmCounterPKI("data-tlb-tw-pki", "data_tlb_walk", "event=0x34"),
     ],
     "Graviton3": [
-        ArmCounterConfig("stall_backend_mem_pkc", PMUEventCounter("stall_backend_mem_cycles", "event=0x4005"), PMUEventCounter("cycles", "event=0x11"), 1000),
+        ArmCounterPKC("stall_backend_mem_pkc", "stall_backend_mem_cycles", "event=0x4005"),
     ],
     "CMN": [
         ArmCMNCounterConfig("DDR-BW-MBps", PMUEventCounter("hnf_mc_reqs", "type=0x5,eventid=0xd", per_cpu=False), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
@@ -495,28 +530,97 @@ counter_mapping = {
         ArmCMNCounterConfig("DVMSync-BW-Ops/s", PMUEventCounter("dn_dvmsyncops", "type=0x1,eventid=0x5", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
     ],
     "Intel_SKX_CXL_ICX": [
-        IntelCounterConfig("ipc", PMUEventCounter("insts", "event=0xc0,umask=0x0"), PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1),
-        IntelCounterConfig("branch-mpki", PMUEventCounter("br_mispred", "event=0xC5,umask=0x0"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("data-l1-mpki", PMUEventCounter("l1_data_fill", "event=0x51,umask=0x1"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("inst-l1-mpki", PMUEventCounter("l2_inst_ifetch", "event=0x24,umask=0xe4"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("l2-mpki", PMUEventCounter("l2_fills", "event=0xf1,umask=0x1f"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("l3-mpki", PMUEventCounter("longest_lat_cache_miss", "event=0x2e,umask=0x41"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("core-rdBw-MBs", PMUEventCounter("longest_lat_cache_miss", "event=0x2e,umask=0x41"), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),  
-        IntelCounterConfig("inst-tlb-mpki", PMUEventCounter("inst_tlb_miss", "event=0x85,umask=0x20"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("inst-tlb-tw-pki", PMUEventCounter("inst_tlb_miss_tw", "event=0x85,umask=0x1"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("data-rd-tlb-mpki", PMUEventCounter("data_tlb_miss_rd", "event=0x08,umask=0x20"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("data-st-tlb-mpki", PMUEventCounter("data_tlb_miss_st", "event=0x49,umask=0x20"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("data-rd-tlb-tw-pki", PMUEventCounter("data_tlb_miss_rd_tw", "event=0x08,umask=0x01"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
-        IntelCounterConfig("data-st-tlb-tw-pki", PMUEventCounter("data_tlb_miss_st_tw", "event=0x49,umask=0x01"), PMUEventCounter("insts", "event=0xc0,umask=0x0"), 1000),
+        x86CounterConfig("ipc", PMUEventCounter("insts", "event=0xc0,umask=0x0"), PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1),
+        x86CounterPKI("branch-mpki", "br_mispred", "event=0xC5,umask=0x0"),
+        x86CounterPKI("data-l1-mpki", "l1_data_fill", "event=0x51,umask=0x1"),
+        x86CounterPKI("inst-l1-mpki", "l2_inst_ifetch", "event=0x24,umask=0xe4"),
+        x86CounterPKI("l3-mpki", "longest_lat_cache_miss", "event=0x2e,umask=0x41"),
+        x86CounterConfig("core-rdBw-MBs", PMUEventCounter("longest_lat_cache_miss", "event=0x2e,umask=0x41"), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),  
     ],
     "Intel_SKX_CXL" : [
-        IntelCounterConfig("stall_frontend_pkc", PMUEventCounter("idq_uops_not_delivered_cycles", "event=0x9c,umask=0x1,cmask=0x4"), PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1000),
-        IntelCounterConfig("stall_backend_pkc", PMUEventCounter("resource_stalls_any", "event=0xa2,umask=0x1"), PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1000),
+        x86CounterPKI("l2-mpki", "l2_fills", "event=0xf1,umask=0x1f"), 
+        IntelCounterPKC("stall_frontend_pkc", "idq_uops_not_delivered_cycles", "event=0x9c,umask=0x1,cmask=0x4"),
+        IntelCounterPKC("stall_backend_pkc", "resource_stalls_any", "event=0xa2,umask=0x1"),
+        x86CounterPKI("inst-tlb-mpki", "inst_tlb_miss", "event=0x85,umask=0x20"),
+        x86CounterPKI("inst-tlb-tw-pki", "inst_tlb_miss_tw", "event=0x85,umask=0x1"),
+        x86CounterPKI("data-rd-tlb-mpki", "data_tlb_miss_rd", "event=0x08,umask=0x20"),
+        x86CounterPKI("data-st-tlb-mpki", "data_tlb_miss_st", "event=0x49,umask=0x20"),
+        x86CounterPKI("data-rd-tlb-tw-pki", "data_tlb_miss_rd_tw", "event=0x08,umask=0x01"),
+        x86CounterPKI("data-st-tlb-tw-pki", "data_tlb_miss_st_tw", "event=0x49,umask=0x01"),
     ],
     "Intel_ICX": [
-        IntelCounterConfig("stall_frontend_pkc", PMUEventCounter("idq_uops_not_delivered_cycles", "event=0x9c,umask=0x1,cmask=0x5"), PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1000),
+        x86CounterPKI("l2-mpki", "l2_fills", "event=0xf1,umask=0x1f"),
+        x86CounterConfig("stall_frontend_pkc", PMUEventCounter("idq_uops_not_delivered_cycles", "event=0x9c,umask=0x1,cmask=0x5"), PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1000),
         # This is actually the fraction of execution slots that are backend stalled according to the TMA method, but it can be interpreted the same as stall_backend_pkc.
-        IntelCounterConfig("stall_backend_pkc", PMUEventCounter("slots_be_stall", "event=0xa4,umask=0x2"), PMUEventCounter("slots", "event=0xa4,umask=0x01"), 1000),
+        x86CounterConfig("stall_backend_pkc", PMUEventCounter("slots_be_stall", "event=0xa4,umask=0x2"), PMUEventCounter("slots", "event=0xa4,umask=0x01"), 1000),
+        x86CounterPKI("inst-tlb-mpki", "inst_tlb_miss", "event=0x85,umask=0x20"),
+        x86CounterPKI("inst-tlb-tw-pki", "inst_tlb_miss_tw", "event=0x85,umask=0x0e"),
+        x86CounterPKI("data-rd-tlb-mpki", "data_tlb_miss_rd", "event=0x08,umask=0x20"),
+        x86CounterPKI("data-st-tlb-mpki", "data_tlb_miss_st", "event=0x49,umask=0x20"),
+        x86CounterPKI("data-rd-tlb-tw-pki", "data_tlb_miss_rd_tw", "event=0x08,umask=0x0e"),
+        x86CounterPKI("data-st-tlb-tw-pki", "data_tlb_miss_st_tw", "event=0x49,umask=0x0e"),
+    ],
+    "Intel_SPR": [
+        x86CounterPKI("l2-mpki", "l2_fills", "event=0x25,umask=0x1f"),
+        x86CounterPKI("inst-tlb-mpki", "inst_tlb_miss", "event=0x11,umask=0x20"),
+        x86CounterPKI("inst-tlb-tw-pki", "inst_tlb_miss_tw", "event=0x11,umask=0x0e"),
+        x86CounterPKI("data-rd-tlb-mpki", "data_tlb_miss_rd", "event=0x12,umask=0x20"),
+        x86CounterPKI("data-st-tlb-mpki", "data_tlb_miss_st", "event=0x13,umask=0x20"),
+        x86CounterPKI("data-rd-tlb-tw-pki", "data_tlb_miss_rd_tw", "event=0x12,umask=0x0e"),
+        x86CounterPKI("data-st-tlb-tw-pki", "data_tlb_miss_st_tw", "event=0x13,umask=0x0e"),
+        IntelCounterPKC("stall_frontend_pkc", "idq_uops_not_delivered_cycles", "event=0x9c,umask=0x1,cmask=0x6"),
+        # This is actually the fraction of execution slots that are backend stalled according to the TMA method,
+        # but it can be interpreted the same as stall_backend_pkc as slots count per cycle.
+        x86CounterConfig(
+            "stall_backend_pkc",
+            PMUEventCounter("slots_be_stall", "event=0xa4,umask=0x2"),
+            PMUEventCounter("slots", "event=0xa4,umask=0x01"),
+            1000,
+        ),
+    ],
+    "Milan_Genoa": [
+        x86CounterConfig(
+            "ipc",
+            PMUEventCounter("insts", "event=0xc0,umask=0x0"),
+            PMUEventCounter("cycles", "event=0x76,umask=0x0"),
+            1,
+        ),
+        x86CounterPKI("branch-mpki", "br_mispred", "event=0xc3,umask=0x0"),
+        x86CounterPKI("data-l1-mpki", "l1_data_fill", "event=0x44,umask=0xff"),
+        x86CounterPKI("inst-l1-mpki", "l2_inst_request", "event=0x60,umask=0x10"),
+        x86CounterPKI("l2-ifetch-mpki", "l2_inst_miss", "event=0x64,umask=0x1"),
+        x86CounterPKI("l2-mpki", "l2_demand_miss", "event=0x64,umask=0x9"),
+        x86CounterPKI(
+            # This is sorta l3 mpki, but ellides Prefetch misses from L2
+            "l3-mpki", "l1_any_fills_dram", "event=0x44,umask=0x8"),
+        x86CounterConfig(
+            # This sort estimates core BW demand (plus prefetches), but need
+            # to also get L2 Prefetch BW, but need a new event def to do this
+            "core-rdBw-MBs",
+            PMUEventCounter("l1_any_fills_dram", "event=0x44,umask=0x8"),
+            None,
+            (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL),
+        ),
+        AMDCounterPKC("stall_frontend_pkc", "de_opq_empty", "event=0xa9,umask=0x0"),
+        x86CounterPKI(
+            # Technically misses in L1-iTLB that hit L2 STLB,
+            # need another counter to get the true number. But this is good enough for now
+            "inst-tlb-mpki", "inst_tlb_miss", "event=0x84,umask=0x0"),
+        x86CounterPKI("inst-tlb-tw-pki", "inst_tlb_miss", "event=0x85,umask=0x0f"),
+        x86CounterPKI("data-tlb-mpki", "data_tlb_miss", "event=0x45,umask=0xff"),
+        x86CounterPKI("data-tlb-tw-pki", "inst_tlb_miss", "event=0x45,umask=0xf0"),
+    ],
+    "Milan": [
+        AMDCounterPKC("stall_backend_pkc1", "dispatch_stall_token_1", "event=0xae,umask=0xf7"),
+        AMDCounterPKC("stall_backend_pkc2", "dispatch_stall_token_2", "event=0xaf,umask=0x27"),
+    ],
+    "Genoa": [
+        x86CounterConfig(
+            "stall_backend_pkc",
+            PMUEventCounter("dispatch_stall_backend_slots", "event=0x1a0,umask=0x1e"),
+            PMUEventCounter("cycles", "event=0x76,umask=0x0"),
+            1000 * (1.0 / 6.0),
+        ),
     ]
 }
 
@@ -566,6 +670,15 @@ filter_proc = {
     "Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz": [
         PlatformDetails(counter_mapping["Intel_SKX_CXL_ICX"], 6),
         PlatformDetails(counter_mapping["Intel_ICX"], 6)],
+    "Intel(R) Xeon(R) Platinum 8488C": [
+        PlatformDetails(counter_mapping["Intel_SKX_CXL_ICX"], 6),
+        PlatformDetails(counter_mapping["Intel_SPR"], 6)],
+    "Milan": [
+        PlatformDetails(counter_mapping["Milan_Genoa"], 6),
+        PlatformDetails(counter_mapping["Milan"], 6)],
+    "Genoa": [
+        PlatformDetails(counter_mapping["Milan_Genoa"], 5),
+        PlatformDetails(counter_mapping["Genoa"], 5)],
 }
 
 if __name__ == "__main__":
