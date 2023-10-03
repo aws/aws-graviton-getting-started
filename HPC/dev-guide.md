@@ -1,5 +1,5 @@
-## Compile instructions on an Ec2
-If you are a developer who want to build and test your applications on Graviton. You can get started by launching a Ubuntu 20.04 C7g instance from the console. Follow the procedures below to set up the tools:
+## Compile instructions on an EC2
+If you are a developer who want to build and test your applications on Graviton. You can get started by launching a Ubuntu 20.04 C7g instance (4xlarge or larger) from the console. Follow the procedures below to set up the tools:
 ```
 # get the build tools and upgrade GCC
 sudo apt update -y
