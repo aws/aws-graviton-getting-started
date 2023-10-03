@@ -80,10 +80,18 @@ def plot_counter_stat(csv, stat_name, counter_numerator,
 
 def get_cpu_type():
     GRAVITON_MAPPING = {"0xd0c": "Graviton2", "0xd40": "Graviton3"}
+    AMD_MAPPING = {"7R13": "Milan", "9R14": "Genoa"}
+
     with open("/proc/cpuinfo", "r") as f:
         for line in f.readlines():
             if "model name" in line:
-                return line.split(":")[-1].strip()
+                ln = line.split(":")[-1].strip()
+                if "AMD EPYC" in ln:
+                    # Return the model number of the AMD CPU, its the 3rd entry in format
+                    # AMD EPYC <model>
+                    return AMD_MAPPING[ln.split(" ")[2]]
+                else:
+                    return ln
             elif "CPU part" in line:
                 cpu = line.split(":")[-1].strip()
                 return GRAVITON_MAPPING[cpu]
@@ -127,6 +135,37 @@ ICX_CTRS = {
     "stall_frontend_pkc": ["cpu/event=0x9C,umask=0x1,cmask=0x5/", "cpu/event=0x3c,umask=0x0/", 1000],
     "stall_backend_pkc": ["cpu/event=0xa4,umask=0x2/", "cpu/event=0xa4,umask=0x01/", 1000], 
 }
+SPR_CTRS = {
+    "l2-mpki": ["cpu/event=0x25,umask=0x1f/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "inst-tlb-mpki": ["cpu/event=0x11,umask=0x20/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "inst-tlb-tw-pki": ["cpu/event=0x11,umask=0x0e/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-rd-tlb-mpki": ["cpu/event=0x12,umask=0x20/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-st-tlb-mpki": ["cpu/event=0x13,umask=0x20/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-rd-tlb-tw-pki": ["cpu/event=0x12,umask=0x0e/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-st-tlb-tw-pki": ["cpu/event=0x13,umask=0x0e/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "stall_frontend_pkc": ["cpu/event=0x9c,umask=0x1,cmask=0x6/", "cpu/event=0x3c,umask=0x0/", 1000],
+    "stall_backend_pkc": ["cpu/event=0xa4,umask=0x2/", "cpu/event=0xa4,umask=0x01/", 1000],
+}
+UNIVERSAL_AMD_CTRS = {
+    "ipc": ["cpu/event=0xc0,umask=0x0/", "cpu/event=0x76,umask=0x0/", 1],
+    "branch-mpki": ["cpu/event=0xc3,umask=0x0/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-l1-mpki": ["cpu/event=0x44,umask=0xff/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "inst-l1-mpki": ["cpu/event=0x60,umask=0x10/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "l2-mpki": ["cpu/event=0x64,umask=0x9/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "l3-mpki": ["cpu/event=0x44,umask=0x8/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "stall_frontend_pkc": ["cpu/event=0xa9,umask=0x0/", "cpu/event=0x76,umask=0x0/", 1000],
+    "inst-tlb-mpki": ["cpu/event=0x84,umask=0x0/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "inst-tlb-tw-pki": ["cpu/event=0x85,umask=0x0f/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-tlb-mpki": ["cpu/event=0x45,umask=0xff/", "cpu/event=0xc0,umask=0x0/", 1000],
+    "data-tlb-tw-pki": ["cpu/event=0x45,umask=0xf0/", "cpu/event=0xc0,umask=0x0/", 1000],
+}
+MILAN_CTRS = {
+    "stall_backend_pkc1": ["cpu/event=0xae,umask=0xf7/", "cpu/event=0x76,umask=0x0/", 1000],
+    "stall_backend_pkc2": ["cpu/event=0xaf,umask=0x27/", "cpu/event=0x76,umask=0x0/", 1000],
+}
+GENOA_CTRS = {
+    "stall_backend_pkc": ["cpu/event=0x1a0,umask=0x1e/", "cpu/event=0x76,umask=0x0/", 1000 * (1.0 / 6.0)]
+}
 
 filter_proc = {
     "Graviton2": UNIVERSAL_GRAVITON_CTRS,
@@ -135,14 +174,17 @@ filter_proc = {
     "Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8275CL CPU @ 3.00GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz": UNIVERSAL_INTEL_CTRS,
-    "Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz": {**UNIVERSAL_INTEL_CTRS, **ICX_CTRS}
+    "Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz": {**UNIVERSAL_INTEL_CTRS, **ICX_CTRS},
+    "Intel(R) Xeon(R) Platinum 8488C": {**UNIVERSAL_INTEL_CTRS, **SPR_CTRS},
+    "Milan": {**UNIVERSAL_AMD_CTRS, **MILAN_CTRS},
+    "Genoa": {**UNIVERSAL_AMD_CTRS, **GENOA_CTRS},
 }
 
 if __name__ == "__main__":
     processor_version = get_cpu_type()
     try:
         stat_choices = list(filter_proc[processor_version].keys())
-    except:
+    except Exception:
         print(f"{processor_version} is not supported")
         exit(1)
 
@@ -150,7 +192,7 @@ if __name__ == "__main__":
     parser.add_argument("--stat", default="ipc", type=str, choices=stat_choices)
     parser.add_argument("--time", default=60, type=int, help="How long to measure for in seconds")
     parser.add_argument("--custom_ctr", type=str,
-                        help="Specify a custom counter ratio and scaling factor as 'ctr1|ctr2|scale'"
+                        help="Specify a custom counter ratio and scaling factor as 'name|ctr1|ctr2|scale'"
                              ", calculated as ctr1/ctr2 * scale")
 
     res = subprocess.run(["id", "-u"], check=True, stdout=subprocess.PIPE)
@@ -162,9 +204,12 @@ if __name__ == "__main__":
 
     if args.custom_ctr:
         ctrs = args.custom_ctr.split("|")
-        counter_info = [ctrs[0], ctrs[1], int(ctrs[2])]
+        counter_info = [ctrs[1], ctrs[2], int(ctrs[3])]
+        # Override the name of the stat to a user defined name
+        stat_name = ctrs[0]
     else:
         counter_info = filter_proc[processor_version][args.stat]
+        stat_name = args.stat
 
     csv = perfstat(args.time, *counter_info)
-    plot_counter_stat(csv, args.stat, *counter_info)
+    plot_counter_stat(csv, stat_name, *counter_info)
