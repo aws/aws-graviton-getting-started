@@ -21,7 +21,7 @@
       - [Build Gromacs 2022.4](#build-gromacs-20224)
       - [Run the benchmark](#run-the-benchmark)
       - [Sample output](#sample-output-1)
-- [Compile instructions on an Ec2](dev-guide.md#compile-instructions-on-an-ec2)
+- [Compile instructions on an Ec2](setup-an-ec2-hpc-instance.md#compile-instructions-on-an-ec2)
 - [MPI application profiling](#mpi-application-profiling)
     - [Tau Performance System](#tau-performance-system)
   - [Appendix](#appendix)
