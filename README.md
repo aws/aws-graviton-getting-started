@@ -1,4 +1,4 @@
-# AWS Graviton Technical Guide
+# Getting Started with Ampere CPUs Technical Guide
 
 This repository provides technical guidance for users and developers using [Amazon EC2 instances powered by AWS Graviton processors](https://aws.amazon.com/ec2/graviton/) (including the latest generation Graviton3 processors). While it calls out specific features of the Graviton processors themselves, this repository is also generally useful for anyone running code on Arm-based systems.
 
