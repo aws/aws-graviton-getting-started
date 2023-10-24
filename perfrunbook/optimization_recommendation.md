@@ -17,10 +17,17 @@ This section describes multiple different optimization suggestions to try on Gra
 A TLB (translation lookaside buffer) is a cache that holds recent virtual address to physical address translations for the CPU to use.  Making sure this cache never misses can improve application performance.
 
 1. Enable Transparent Huge Pages (THP)
-     `echo always > /sys/kernel/mm/transparent_hugepage/enabled` 
+     `echo always > /sys/kernel/mm/transparent_hugepage/enabled` -or- `echo madvise > /sys/kernel/mm/transparent_hugepage/enabled` 
 2. If your application can use pinned hugepages because it uses mmap directly, try reserving huge pages directly via the OS.  This can be done by two methods.
     1. At runtime: `sysctl -w vm.nr_hugepages=X`
     2. At boot time by specifying on the kernel command line in `/etc/default/grub`: `hugepagesz=2M hugepages=512`
+3. For Java, hugepages can be used for both the code-heap and data-heap by adding the below flags to your JVM command line
+   1. `-XX:+UseTransparentHugePages` when THP is set to at least `madvise`
+   2. `-XX:+UseLargePages` if you have pre-allocated huge pages through `sysctl` or the kernel command line.
+
+Using huge-pages should generally improve performance on all EC2 instance types, but there can be cases where using exclusively
+huge-pages may lead to performance degradation.  Therefore, it is always recommended to fully test your application after enabling and/or
+allocating huge-pages.
 
 ## Porting and optimizing assembly routines
 
