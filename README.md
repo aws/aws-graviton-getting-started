@@ -28,8 +28,8 @@ This repository provides technical guidance for users and developers using insta
 * [Additional resources](#additional-resources)
 * [How To Resources](howtoresources.md)
 
-# Transitioning to Graviton
-If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton based Amazon EC2 instances](transition-guide.md).
+# Transitioning to Ampere Processors
+If you are new to Ampere processors and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on any Ampere based instances, and finally how to deploy in production, please read [the key considerations to take into account when transitioning workloads to Ampere instances](transition-guide.md).
 
 # Building for Graviton2, Graviton3 and Graviton3E
 
