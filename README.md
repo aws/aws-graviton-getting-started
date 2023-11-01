@@ -29,6 +29,7 @@ This repository provides technical guidance for users and developers using [Amaz
 * [Known issues and workarounds](#known-issues-and-workarounds)
 * [AWS Managed Services available on Graviton](managed_services.md)
 * [Graviton Performance Runbook](perfrunbook/graviton_perfrunbook.md)
+* [Assembly Optimization Guide for Graviton Arm64 Processors](arm64-assembly-optimization.md)
 * [Additional resources](#additional-resources)
 * [How To Resources](howtoresources.md)
 
@@ -43,7 +44,7 @@ If you are new to Graviton and want to understand how to identify target workloa
 |Core	|[Neoverse-N1](https://developer.arm.com/documentation/100616/0301)	|[Neoverse-V1](https://developer.arm.com/documentation/101427/latest/)	|
 |Frequency	|2500MHz	|2600MHz	|
 |Turbo supported	|No	|No	|
-|Instruction latencies	|[Instruction Latencies](https://developer.arm.com/documentation/PJDOC-466751330-9707/r4p1/?lang=en)	|[Instruction Latencies](https://developer.arm.com/documentation/pjdoc466751330-9685/latest/)	|
+|Software Optimization Guide (Instruction Throughput and Latency)|[SWOG](https://developer.arm.com/documentation/pjdoc466751330-9707/latest/)|[SWOG](https://developer.arm.com/documentation/pjdoc466751330-9685/latest/) |
 |Interconnect	|CMN-600	|CMN-650	|
 |Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|
 |Additional  features	|fp16, rcpc, dotprod, crypto	|sve, rng, bf16, int8, crypto	|
