@@ -5,11 +5,11 @@
 PyTorch is an open-source machine learning framework based on the Torch library, used for applications such as computer vision and natural language processing. It can be used across training and inference of deep neural networks. This document covers how to use PyTorch based machine learning inference on Graviton CPUs, what runtime configurations are important and how to debug any performance issues. The document also covers instructions for source builds and how to enable some of the downstream features.
 
 # How to use PyTorch on Graviton CPUs
-There are multiple levels of software package abstractions available: AWS DLC (Deep Learning Container, gives the best performance, comes with additional optimizations on top of the official wheels, and all the packages installed), Python wheel (easiest option to get the release features but multiple wheels to be installed), and the Docker hub images (comes with downstream experimental features). Examples of using each method are below.
+There are multiple levels of software package abstractions available: AWS DLC (Deep Learning Container, comes with all the packages installed), Python wheel (easier option for integrating pytorch inference into an existing service), and the Docker hub images (comes with downstream experimental features). Examples of using each method are below.
 
 **AWS Graviton PyTorch DLC**
 
-1Q'23 AWS Graviton DLCs are based on PyTorch2.0, but they also include additional optimizations from PyTorch development branch. The DLCs improve the PyTorch inference performance on Graviton by 2x to 4x compared to the previous releases, including up to 4x improvement for Resnet50 and up to 3x for Bert, making Graviton3 the most cost effective CPU platform on the AWS cloud for these models.
+4Q'23 AWS Graviton DLCs are based on PyTorch 2.1. These DLCs continue to deliver the best performance on Graviton for bert and roberta sentiment analysis and fill mask models, making Graviton3 the most cost effective CPU platform on the AWS cloud for these models.
 
 ```
 sudo apt-get update
@@ -21,12 +21,10 @@ aws ecr get-login-password --region us-east-1 \
   --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
 
 # Pull the AWS DLC for pytorch
-docker pull 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference-graviton:2.0.0-cpu-py310-ubuntu20.04-ec2
+docker pull 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference-graviton:2.1.0-cpu-py310-ubuntu20.04-ec2
 ```
 
 **Using Python wheels**
-
-PyTorch 2.0 python wheels improve inference performance on Graviton up to 3.5x compared to the previous releases.
 
 ```
 # Install Python
@@ -38,19 +36,19 @@ python3 -m pip install --upgrade pip
 
 # Install PyTorch and extensions
 python3 -m pip install torch
-python3 -m pip install torchvision torchaudio torchtext
+python3 -m pip install torchvision torchaudio
 ```
 
 **Using Docker hub container**
 
-1Q'23 Docker hub images from armswdev are based on PyTorch 1.13.0, but also include additional downstream optimizations and experimental features. These are avaiable for trying out the experimental downstream features and provide early feedback.
+4Q'23 Docker hub images from armswdev are based on PyTorch 2.0.0, but also include additional downstream optimizations and experimental features. These are avaiable for trying out the experimental downstream features and provide early feedback.
 
 ```
 # Pull pytorch docker container with onednn-acl optimizations enabled
-docker pull armswdev/pytorch-arm-neoverse:r23.03-torch-1.13.0-onednn-acl
+docker pull armswdev/pytorch-arm-neoverse:r23.10-torch-2.0.0-onednn-acl
 
 # Launch the docker image
-docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/pytorch-arm-neoverse:r23.03-torch-1.13.0-onednn-acl
+docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/pytorch-arm-neoverse:r23.10-torch-2.0.0-onednn-acl
 ```
 
 # Prerequisites
@@ -164,9 +162,9 @@ always [madvise] never
 export THP_MEM_ALLOC_ENABLE=1
 ```
 
-4. Starting PyTorch 1.13.0 release, mkldnn (OneDNN) backend is enabled for 'matmul' operator. While mkldnn along with ACL provides the best performance across several tensor shapes, the runtime setup overhead may not be acceptable for smaller tensor shapes. For light weight models with smaller tensor, check the performance by disabling the mkldnn backend and switching back to openBLAS gemm kernels. This has shown improvement for shapes like "12x12x64:12x64x12:12x12x12" and "12x16x16:12x16x64:12x16x64".
+4. Starting with the release of PyTorch 1.13.0, mkldnn (OneDNN) backend is enabled for 'matmul' operator. While mkldnn along with ACL provides the best performance across several tensor shapes, the runtime setup overhead may not be acceptable for smaller tensor shapes. For use cases with fewer input tokens, check the performance by disabling the mkldnn backend and switching to openBLAS gemm kernels. This has shown improvement for shapes like "12x12x64:12x64x12:12x12x12" and "12x16x16:12x16x64:12x16x64".
 ```
-export TORCH_MKLDNN_MATMUL_ENABLE=0
+export TORCH_MKLDNN_MATMUL_MIN_DIM=1024
 ```
 
 5. The above triaging steps cover typical issues due to the missing runtime configurations. If you are stuck with any of these steps or if the performance is still not meeting the target, please raise an issue on [aws-graviton-getting-started](https://github.com/aws/aws-graviton-getting-started) github.
@@ -191,8 +189,8 @@ sudo apt install -y scons cmake
 cd $HOME
 git clone https://github.com/ARM-software/ComputeLibrary.git
 cd ComputeLibrary
-git checkout v22.11
-scons Werror=1 -j8 debug=0 neon=1 opencl=0 os=linux openmp=1 cppthreads=0 arch=armv8.2-a multi_isa=1 build=native
+git checkout v23.05.1
+scons Werror=1 -j8 debug=0 neon=1 opencl=0 os=linux openmp=1 cppthreads=0 arch=armv8a multi_isa=1 build=native
 
 # Build PyTorch from the tip of the tree
 cd $HOME
