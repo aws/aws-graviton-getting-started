@@ -8,15 +8,20 @@ If you are just getting started with AWS Graviton-based instances, or even if yo
   * **Monday November 27th**
     * [CMP409-R: AI/ML inference on AWS Graviton3–based instances](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP409-R) - Chalk Talk
     * [CMP412: Running containerized workloads on AWS Graviton–based instances](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP412) - Chalk Talk
+    * [CMP413-R1: Exploring performance analysis with AWS Graviton instances](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP413-R1) - Code Talk
+  * **Tuesday November 28th**
+    * [CMP407-R1: Optimizing Amazon EC2 workload footprint using AWS Graviton](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP407-R1) - Workshop
   * **Wednesday November 29th**
-    * [CMP411: Optimize your CI/CD pipeline to accelerate AWS Graviton adoption](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP411) - Chalk Talk
+    * [CMP404: Migrating to AWS Graviton with AWS container services](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP404) - Breakout  
+    * [CMP407-R: Optimizing Amazon EC2 workload footprint using AWS Graviton](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP407-R) - Workshop
+    * [CMP409-R1: AI/ML inference on AWS Graviton3–based instances](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP409-R1) - Chalk Talk
     * [CMP410: Learnings from developers adopting AWS Graviton at scale](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP410) - Chalk Talk
-    * [CMP404: Migrating to AWS Graviton with AWS container services](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP404) - Breakout
+    * [CMP411: Optimize your CI/CD pipeline to accelerate AWS Graviton adoption](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP411) - Chalk Talk
   * **Thursday November 30th**
-    * [CMP413-R: Exploring performance analysis with AWS Graviton instances](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP413-R) - Code Talk
-    * [CMP406: Reduce costs and improve sustainability with AWS Graviton](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP406) - Workshop
     * [CMP315: Migrating critical business applications to AWS Graviton with ease](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP315) - Breakout
-  
+    * [CMP406: Reduce costs and improve sustainability with AWS Graviton](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP406) - Workshop
+    * [CMP413-R: Exploring performance analysis with AWS Graviton instances](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP413-R) - Code Talk
+    
 ### Building / Running applications on AWS Graviton
 
 * Tech Talk - [AWS Graviton and EC2 - a bit of history](https://www.youtube.com/watch?v=yAf6-A8Zso4)
