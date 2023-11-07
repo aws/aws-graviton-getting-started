@@ -48,6 +48,8 @@ ArmPL: v23.04 & later (included in the ACfL compiler)
 
 MPI: Open MPI v4.1.4 & later (the latest official release)
 
+Storage: [FSx for Lustre](https://docs.aws.amazon.com/fsx/latest/LustreGuide/getting-started.html) for shared file system.  HPC instance types have limited EBS bandwidth, and using FSx for Lustre avoids a bottleneck at the headnode.
+
 ## Instructions for setting up the HPC cluster for best performance
 We recommend using [AWS ParallelCluster](https://docs.aws.amazon.com/parallelcluster/latest/ug/what-is-aws-parallelcluster.html) (previously known as [CfnCluster](http://cfncluster.readthedocs.io)) to deploy and manage HPC clusters  on AWS EC2. AWS ParallelCluster 3.5.1 is a tool that can automatically set up the required compute resources, job scheduler, and shared filesystem commonly needed to run HPC applications. This section covers step-by-step instructions on how to set up or upgrade the tools and software packages to the recommended versions on a new ParallelCluster. Please refer to the individual sub-sections if you need to update certain software package on an existing cluster. For a new cluster setup, you can use [this template](scripts-setup/hpc7g-ubuntu2004-useast1.yaml) and replace the subnet, S3 bucket name for [custom action script](scripts-setup/install-gcc-11.sh), and ssh key information from your account to create a Ubuntu 20.04 cluster. The command to create a new cluster is
 ```
@@ -183,6 +185,11 @@ Target: aarch64-unknown-linux-gnu
 Thread model: posix
 InstalledDir: /shared/arm/arm-linux-compiler-23.04_Ubuntu-20.04/bin
 ```
+
+### Storage
+Some HPC applications require significant amounts of file I/O, however HPC instance types (Graviton instances included) don't have local storage, and have limited EBS bandwidth and IOPS.  Relying on EBS on each node can cause surprise slow-downs when the instance runs out of EBS burst credits.  This is one reason we don't recommend using an Hpc7g (or any HPC instance type) for headnodes, since the headnode performs additional I/O as the scheduler, and often serves a home directory to the compute nodes.  For these reasons the following recommendations are made:
+ - Use FSx for Lustre to serve data and configuration files to compute nodes.  FSx for Lustre file systems can be configured in a variety of sizes and throughputs to meet your specific needs.  See the SharedStorage section in the example [cluster configuration](scripts-setup/hpc7g-ubuntu2004-useast1.yaml).
+ - Headnodes should be compute-optimized instances (such as C7gn or C7g), and sized with both compute needs and EBS/networking needs in mind.
 
 ## Running HPC applications
 Once the HPC cluster is setup following the above steps, you can run the following sample HPC applications on Graviton and check their performance. If there are any challenges in running these sample applications on Graviton instances, please raise an issue on [aws-graviton-getting-started](https://github.com/aws/aws-graviton-getting-started) github page.
