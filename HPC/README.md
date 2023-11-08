@@ -31,7 +31,7 @@
 [C7gn/Hpc7g](https://aws.amazon.com/blogs/aws/new-amazon-ec2-instance-types-in-the-works-c7gn-r7iz-and-hpc7g) instances are the latest additions to Graviton based EC2 instances, optimized for network and compute intensive High-Performance Computing (HPC) applications. This document is aimed to help HPC users get the optimal performance on Graviton instances. It covers the recommended compilers, libraries, and runtime configurations for building and running HPC applications. Along with the recommended software configuration, the document also provides example scripts to get started with 3 widely used open-source HPC applications: Weather Research and Forecasting (WRF), Open Source Field Operation And Manipulation (OpenFOAM) and Gromacs.
 
 ## Summary of the recommended configuration
-Instance type: C7gn and HPC7g (Graviton3E processor, max 200 Gbps network bandwidth, 2 GB RAM/vCPU)
+Instance type: C7gn and Hpc7g (Graviton3E processor, max 200 Gbps network bandwidth, 2 GB RAM/vCPU)
 
 Cluster manager: AWS ParallelCluster
 * Base AMI: aws-parallelcluster-3.5.1-ubuntu-2004-lts-hvm-arm64
@@ -388,7 +388,7 @@ Finalising parallel run
 ```
 
 ### Gromacs
-Gromacs is a widely used molecular dynamics software package. Gromacs is a computation heavy software, and can get better performance with the modern processors' SIMD (single instruction multiple data) capabilities. We recommend using Gromacs 2022.4 or later releases because they implement performance critical routines using the SVE instruction set found on HPC7g/C7gn.
+Gromacs is a widely used molecular dynamics software package. Gromacs is a computation heavy software, and can get better performance with the modern processors' SIMD (single instruction multiple data) capabilities. We recommend using Gromacs 2022.4 or later releases because they implement performance critical routines using the SVE instruction set found on Hpc7g/C7gn.
 
 #### Build Gromacs 2022.4 
 Ue [this script](scripts-gromacs/compile-gromacs-acfl.sh) with command `./scripts-gromacs/compile-gromacs-acfl.sh` to build Gromacs with ACfL
