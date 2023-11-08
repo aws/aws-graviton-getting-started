@@ -31,7 +31,7 @@
 [C7gn/Hpc7g](https://aws.amazon.com/blogs/aws/new-amazon-ec2-instance-types-in-the-works-c7gn-r7iz-and-hpc7g) instances are the latest additions to Graviton based EC2 instances, optimized for network and compute intensive High-Performance Computing (HPC) applications. This document is aimed to help HPC users get the optimal performance on Graviton instances. It covers the recommended compilers, libraries, and runtime configurations for building and running HPC applications. Along with the recommended software configuration, the document also provides example scripts to get started with 3 widely used open-source HPC applications: Weather Research and Forecasting (WRF), Open Source Field Operation And Manipulation (OpenFOAM) and Gromacs.
 
 ## Summary of the recommended configuration
-Instance type: C7gn and HPC7g (Graviton3E processor, max 200 Gbps network bandwidth, 2 GB RAM/vCPU)
+Instance type: C7gn and Hpc7g (Graviton3E processor, max 200 Gbps network bandwidth, 2 GB RAM/vCPU)
 
 Cluster manager: AWS ParallelCluster
 * Base AMI: aws-parallelcluster-3.5.1-ubuntu-2004-lts-hvm-arm64
@@ -47,6 +47,8 @@ Compiler: Arm Compiler for Linux (ACfL) v23.04 & later ([see below for other com
 ArmPL: v23.04 & later (included in the ACfL compiler)
 
 MPI: Open MPI v4.1.4 & later (the latest official release)
+
+Storage: [FSx for Lustre](https://docs.aws.amazon.com/fsx/latest/LustreGuide/getting-started.html) for shared file system.  HPC instance types have limited EBS bandwidth, and using FSx for Lustre avoids a bottleneck at the headnode.
 
 ## Instructions for setting up the HPC cluster for best performance
 We recommend using [AWS ParallelCluster](https://docs.aws.amazon.com/parallelcluster/latest/ug/what-is-aws-parallelcluster.html) (previously known as [CfnCluster](http://cfncluster.readthedocs.io)) to deploy and manage HPC clusters  on AWS EC2. AWS ParallelCluster 3.5.1 is a tool that can automatically set up the required compute resources, job scheduler, and shared filesystem commonly needed to run HPC applications. This section covers step-by-step instructions on how to set up or upgrade the tools and software packages to the recommended versions on a new ParallelCluster. Please refer to the individual sub-sections if you need to update certain software package on an existing cluster. For a new cluster setup, you can use [this template](scripts-setup/hpc7g-ubuntu2004-useast1.yaml) and replace the subnet, S3 bucket name for [custom action script](scripts-setup/install-gcc-11.sh), and ssh key information from your account to create a Ubuntu 20.04 cluster. The command to create a new cluster is
@@ -183,6 +185,11 @@ Target: aarch64-unknown-linux-gnu
 Thread model: posix
 InstalledDir: /shared/arm/arm-linux-compiler-23.04_Ubuntu-20.04/bin
 ```
+
+### Storage
+Some HPC applications require significant amounts of file I/O, however HPC instance types (Graviton instances included) don't have local storage, and have limited EBS bandwidth and IOPS.  Relying on EBS on each node can cause surprise slow-downs when the instance runs out of EBS burst credits.  This is one reason we don't recommend using an Hpc7g (or any HPC instance type) for headnodes, since the headnode performs additional I/O as the scheduler, and often serves a home directory to the compute nodes.  For these reasons the following recommendations are made:
+ - Use FSx for Lustre to serve data and configuration files to compute nodes.  FSx for Lustre file systems can be configured in a variety of sizes and throughputs to meet your specific needs.  See the SharedStorage section in the example [cluster configuration](scripts-setup/hpc7g-ubuntu2004-useast1.yaml).
+ - Headnodes should be compute-optimized instances (such as C7gn or C7g), and sized with both compute needs and EBS/networking needs in mind.
 
 ## Running HPC applications
 Once the HPC cluster is setup following the above steps, you can run the following sample HPC applications on Graviton and check their performance. If there are any challenges in running these sample applications on Graviton instances, please raise an issue on [aws-graviton-getting-started](https://github.com/aws/aws-graviton-getting-started) github page.
@@ -381,7 +388,7 @@ Finalising parallel run
 ```
 
 ### Gromacs
-Gromacs is a widely used molecular dynamics software package. Gromacs is a computation heavy software, and can get better performance with the modern processors' SIMD (single instruction multiple data) capabilities. We recommend using Gromacs 2022.4 or later releases because they implement performance critical routines using the SVE instruction set found on HPC7g/C7gn.
+Gromacs is a widely used molecular dynamics software package. Gromacs is a computation heavy software, and can get better performance with the modern processors' SIMD (single instruction multiple data) capabilities. We recommend using Gromacs 2022.4 or later releases because they implement performance critical routines using the SVE instruction set found on Hpc7g/C7gn.
 
 #### Build Gromacs 2022.4 
 Ue [this script](scripts-gromacs/compile-gromacs-acfl.sh) with command `./scripts-gromacs/compile-gromacs-acfl.sh` to build Gromacs with ACfL

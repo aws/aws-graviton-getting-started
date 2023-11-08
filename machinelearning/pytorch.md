@@ -60,7 +60,7 @@ docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/pytorch-arm-neoverse:r23.1
 
 AWS DLCs come with all the optimizations enabled, so, there are no additional runtime configurations required. Where as for the python wheels and the docker hub images, enable the below runtime configurations to achieve the best performance.
 ```
-# Graviton3(E) (e.g. c7g, c7gn and HPC7g instances) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
+# Graviton3(E) (e.g. c7g, c7gn and Hpc7g instances) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
 grep -q bf16 /proc/cpuinfo && export DNNL_DEFAULT_FPMATH_MODE=BF16
 
 # Enable primitive caching to avoid the redundant primitive allocation
