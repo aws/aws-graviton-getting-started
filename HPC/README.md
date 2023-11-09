@@ -492,3 +492,17 @@ GCC	| 11	| -O3 -mcpu=neoverse-v1	| -fopenmp	| -ffast-math
 CLang/LLVM |	14 | -O3 -mcpu=neoverse-512tvb	| -fopenmp	| -ffast-math
 Arm Compiler for Linux |	23.04 |	-O3 -mcpu=neoverse-512tvb |	-fopenmp |	-ffast-math
 Nvidia HPC SDK |	23.1	| -O3 -tp=neoverse-v1	| -mp |	-fast
+
+### Common HPC Applications on Graviton
+Below is a list of some common HPC applications that run on Graviton.
+ISV                   | Application   | Release of support  | Additional Notes
+----------------------|---------------|---------------------|-----------------
+Ansys                 | Fluent        | v221                | [Graviton Applications (AWS)](https://aws.amazon.com/blogs/hpc/application-deep-dive-into-the-graviton3e-based-amazon-ec2-hpc7g-instance/)
+Ansys                 | LS-Dyna       | 12.1                | [Graviton Applications (AWS)](https://aws.amazon.com/blogs/hpc/application-deep-dive-into-the-graviton3e-based-amazon-ec2-hpc7g-instance/), [ANYS Deployment (Rescale)](https://rescale.com/blog/rescale-automates-the-deployment-of-ansys-ls-dyna-and-ansys-fluent-workloads-on-amazon-ec2-hpc7g-instances/)
+Ansys                 | RedHawk-SC    | 2023R1              | [Release Notes](https://www.ansys.com/content/dam/it-solutions/platform-support/arm-64-processor-support-announcement-january-2023.pdf)
+Fritz Haber Institute | FHIaims       | 21.02               | [Quantum Chemistry (AWS)](https://aws.amazon.com/blogs/hpc/quantum-chemistry-calculation-on-aws/)
+National Center for Atmospheric Research | WRF | WRFV4.5    | [Weather on Graviton (AWS)](https://aws.amazon.com/blogs/hpc/numerical-weather-prediction-on-aws-graviton2/), [WRF on Graviton2 (ARM)](https://community.arm.com/arm-community-blogs/b/high-performance-computing-blog/posts/assessing-aws-graviton2-for-running-wrf)
+OpenFOAM Foundation / ESI | OpenFOAM  | OpenFOAM7           | [Getting Best Performance (AWS)](https://aws.amazon.com/blogs/hpc/getting-the-best-openfoam-performance-on-aws/), [Graviton Applications (AWS)](https://aws.amazon.com/blogs/hpc/application-deep-dive-into-the-graviton3e-based-amazon-ec2-hpc7g-instance/), [Instructions (AWS)](https://github.com/aws/aws-graviton-getting-started/tree/main/HPC#openfoam)
+Sentieon              | DNAseq , TNseq, DNAscope | 202112.02 | [Release Notes](https://support.sentieon.com/manual/appendix/releasenotes/#release-202112-02), [Cost Effective Genomics (AWS)](https://aws.amazon.com/blogs/hpc/cost-effective-and-accurate-genomics-analysis-with-sentieon-on-aws/)
+Siemens               | StarCCM++     | 2023.2              | [Release Notes](https://blogs.sw.siemens.com/simcenter/simcenter-star-ccm-2302-released/#section_3)
+Université de Genève  | Palabos       | 2010                | [Lattice-Boltzmann Palabos (AWS)](https://aws.amazon.com/blogs/hpc/lattice-boltzmann-simulation-with-palabos-on-aws-using-graviton-based-amazon-ec2-hpc7g-instances/)
