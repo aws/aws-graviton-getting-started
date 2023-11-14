@@ -156,15 +156,15 @@ class ArmCounterConfig(CounterConfig):
         super().__init__("armv8_pmuv3_0", name, counter1, counter2, scale)
 
 class ArmCounterPKC(ArmCounterConfig):
-    def __init__(self, name, event_name, event):
+    def __init__(self, name, event_name, event, scale=1):
         super().__init__(name, PMUEventCounter(event_name, event),
-                         PMUEventCounter("cycles", "event=0x11"), 1000)
+                         PMUEventCounter("cycles", "event=0x11"), scale*1000)
 
 
 class ArmCounterPKI(ArmCounterConfig):
-    def __init__(self, name, event_name, event):
+    def __init__(self, name, event_name, event, scale=1):
         super().__init__(name, PMUEventCounter(event_name, event),
-                         PMUEventCounter("instructions", "event=0x8"), 1000)
+                         PMUEventCounter("instructions", "event=0x8"), scale*1000)
 
 class ArmCMNCounterConfig(CounterConfig):
     def __init__(self, name, counter1, counter2, scale):
@@ -177,14 +177,14 @@ class x86CounterConfig(CounterConfig):
 
 
 class x86CounterPKI(x86CounterConfig):
-    def __init__(self, name, event_name, event):
+    def __init__(self, name, event_name, event, scale=1):
         super().__init__(name, PMUEventCounter(event_name, event),
-                         PMUEventCounter("instructions", "event=0xc0,umask=0x0"), 1000)
+                         PMUEventCounter("instructions", "event=0xc0,umask=0x0"), scale*1000)
 
 class IntelCounterPKC(x86CounterConfig):
-    def __init__(self, name, event_name, event):
+    def __init__(self, name, event_name, event, scale=1):
         super().__init__(name, PMUEventCounter(event_name, event),
-                         PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1000)
+                         PMUEventCounter("cycles", "event=0x3c,umask=0x0"), scale*1000)
 
 
 class AMDCounterPKC(x86CounterConfig):
@@ -505,9 +505,22 @@ counter_mapping = {
         ArmCounterPKI("inst-tlb-tw-pki", "inst_tlb_walk", "event=0x35"),
         ArmCounterPKI("data-tlb-mpki", "data_tlb_refill", "event=0x5"),
         ArmCounterPKI("data-tlb-tw-pki", "data_tlb_walk", "event=0x34"),
+        ArmCounterPKC("inst-neon-pkc", "ASE_SPEC", "event=0x74"),
+        ArmCounterPKC("inst-scalar-fp-pkc", "VFP_SPEC", "event=0x75"),
+
     ],
+
     "Graviton3": [
         ArmCounterPKC("stall_backend_mem_pkc", "stall_backend_mem_cycles", "event=0x4005"),
+        ArmCounterPKC("inst-sve-pkc", "SVE_INST_SPEC", "event=0x8006"),
+        ArmCounterPKC("inst-sve-empty-pkc", "SVE_PRED_EMPTY_SPEC", "event=0x8075"),
+        ArmCounterPKC("inst-sve-full-pkc", "SVE_PRED_FULL_SPEC", "event=0x8076"),
+        ArmCounterPKC("inst-sve-partial-pkc", "SVE_PRED_PARTIAL_SPEC", "event=0x8077"),
+        # SCALE OPS: number of SVE ops, counting size of vector
+        # See The A-profile achitecture reference manual (DDI 0487J.a) in Sec D12.11.1 tells us these are in ALU operations per 128-bits,
+        ArmCounterPKC("flop-sve-pkc", "FP_SCALE_OPS_SPEC", "event=0x80C0", scale=256/128),
+        # FP FIXED OPS: number of NEON and Scalar ops, counting NEON vector width (128-bit)
+        ArmCounterPKC("flop-nonsve-pkc", "FP_FIXED_OPS_SPEC", "event=0x80C1"),
     ],
     "CMN": [
         ArmCMNCounterConfig("DDR-BW-MBps", PMUEventCounter("hnf_mc_reqs", "type=0x5,eventid=0xd", per_cpu=False), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
@@ -536,6 +549,15 @@ counter_mapping = {
         x86CounterPKI("inst-l1-mpki", "l2_inst_ifetch", "event=0x24,umask=0xe4"),
         x86CounterPKI("l3-mpki", "longest_lat_cache_miss", "event=0x2e,umask=0x41"),
         x86CounterConfig("core-rdBw-MBs", PMUEventCounter("longest_lat_cache_miss", "event=0x2e,umask=0x41"), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),  
+        IntelCounterPKC("flop-scalar-sp-pkc", "FP_ARITH_INST_RETIRED.SCALAR_SINGLE", "event=0xc7,umask=0x2"),
+        IntelCounterPKC("flop-scalar-dp-pkc", "FP_ARITH_INST_RETIRED.SCALAR_DOUBLE", "event=0xc7,umask=0x1"),
+        # we'll scale these so they count total flops, rather than packed flops:
+        IntelCounterPKC("flop-128b-sp-pkc", "FP_ARITH_INST_RETIRED.128B_PACKED_SINGLE", "event=0xc7,umask=0x8", scale=128/32),
+        IntelCounterPKC("flop-256b-sp-pkc", "FP_ARITH_INST_RETIRED.256B_PACKED_SINGLE", "event=0xc7,umask=0x20", scale=256/32),
+        IntelCounterPKC("flop-512b-sp-pkc", "FP_ARITH_INST_RETIRED.512B_PACKED_SINGLE", "event=0xc7,umask=0x80", scale=512/32),
+        IntelCounterPKC("flop-128b-dp-pkc", "FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE", "event=0xc7,umask=0x4", scale=128/64),
+        IntelCounterPKC("flop-256b-dp-pkc", "FP_ARITH_INST_RETIRED.256B_PACKED_DOUBLE", "event=0xc7,umask=0x10", scale=256/64),
+        IntelCounterPKC("flop-512b-dp-pkc", "FP_ARITH_INST_RETIRED.512B_PACKED_DOUBLE", "event=0xc7,umask=0x40", scale=512/64),
     ],
     "Intel_SKX_CXL" : [
         x86CounterPKI("l2-mpki", "l2_fills", "event=0xf1,umask=0x1f"), 
