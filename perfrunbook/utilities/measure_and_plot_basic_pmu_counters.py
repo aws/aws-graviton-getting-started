@@ -194,11 +194,14 @@ if __name__ == "__main__":
     parser.add_argument("--custom_ctr", type=str,
                         help="Specify a custom counter ratio and scaling factor as 'name|ctr1|ctr2|scale'"
                              ", calculated as ctr1/ctr2 * scale")
+    parser.add_argument("--no-root", action="store_true", help="Allow running without root privileges")
 
-    res = subprocess.run(["id", "-u"], check=True, stdout=subprocess.PIPE)
-    if int(res.stdout) > 0:
-        print("Must be run under sudo privileges")
-        exit(1)
+
+    if not args.no_root:
+        res = subprocess.run(["id", "-u"], check=True, stdout=subprocess.PIPE)
+        if int(res.stdout) > 0:
+            print("Must be run with root privileges (or with --no-root)")
+            exit(1)
 
     args = parser.parse_args()
 

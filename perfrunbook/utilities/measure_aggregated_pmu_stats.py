@@ -683,7 +683,7 @@ filter_proc = {
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--no-root", action="store_true")
+    parser.add_argument("--no-root", action="store_true", help="Allow running without root privileges")
     parser.add_argument("--cpu-list", action="store", type=str)
     parser.add_argument("--timeout", action="store", type=int, default=300)
     args = parser.parse_args()
@@ -691,7 +691,7 @@ if __name__ == "__main__":
     if not args.no_root:
         res = subprocess.run(["id", "-u"], check=True, stdout=subprocess.PIPE)
         if int(res.stdout) > 0:
-            print("Must be run under sudo privileges")
+            print("Must be run with root privileges (or with --no-root)")
             exit(1)
 
     # Remove temporary files
