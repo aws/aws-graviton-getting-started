@@ -24,8 +24,8 @@ If you are just getting started with AWS Graviton-based instances, or even if yo
     
 ### Development Tools
 
-* Peformance Analysis - [APerf]{https://github.com/aws/aperf}
-* Source Code Analysis - [Porting Advisor for Graviton]{https://github.com/aws/porting-advisor-for-graviton}
+* Peformance Analysis - [APerf](https://github.com/aws/aperf)
+* Source Code Analysis - [Porting Advisor for Graviton](https://github.com/aws/porting-advisor-for-graviton)
 
 ### Building / Running applications on AWS Graviton
 
