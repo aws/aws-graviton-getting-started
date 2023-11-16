@@ -22,6 +22,11 @@ If you are just getting started with AWS Graviton-based instances, or even if yo
     * [CMP406: Reduce costs and improve sustainability with AWS Graviton](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP406) - Workshop
     * [CMP413-R: Exploring performance analysis with AWS Graviton instances](https://hub.reinvent.awsevents.com/attendee-portal/catalog/?search=CMP413-R) - Code Talk
     
+### Development Tools
+
+* Peformance Analysis - [APerf](https://github.com/aws/aperf)
+* Source Code Analysis - [Porting Advisor for Graviton](https://github.com/aws/porting-advisor-for-graviton)
+
 ### Building / Running applications on AWS Graviton
 
 * Tech Talk - [AWS Graviton and EC2 - a bit of history](https://www.youtube.com/watch?v=yAf6-A8Zso4)
