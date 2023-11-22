@@ -5,7 +5,6 @@ This repository provides technical guidance for users and developers using insta
 # Contents
 * [Transitioning to Ampere processors](#transitioning-to-graviton)
 * [Optimizing for Ampere processors](optimizing.md)
-* [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
 * [Recent software updates relevant to Ampere processors](#recent-software-updates-relevant-to-graviton)
 * Language-specific considerations
 	* [C/C++](c-c++.md)
