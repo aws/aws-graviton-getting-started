@@ -4,7 +4,6 @@ This repository provides technical guidance for users and developers using insta
 
 # Contents
 * [Transitioning to Ampere processors](#transitioning-to-graviton)
-* [Building for Ampere processors](#building-for-graviton-and-graviton2)
 * [Optimizing for Ampere processors](optimizing.md)
 * [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
 * [Recent software updates relevant to Ampere processors](#recent-software-updates-relevant-to-graviton)
@@ -30,30 +29,6 @@ This repository provides technical guidance for users and developers using insta
 
 # Transitioning to Ampere Processors
 If you are new to Ampere processors and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on any Ampere based instances, and finally how to deploy in production, please read [the key considerations to take into account when transitioning workloads to Ampere instances](transition-guide.md).
-
-# Building for Graviton2, Graviton3 and Graviton3E
-
-|Processor	|Graviton2	|Graviton3(E)	|
-|---	|---	|---	|
-|Instances	|[M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6g/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6g/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6g/), [T4g](https://aws.amazon.com/ec2/instance-types/t4g), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [I4g/Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/)	|[C7g/C7gd/C7gn](https://aws.amazon.com/ec2/instance-types/c7g/), [M7g/M7gd](https://aws.amazon.com/ec2/instance-types/m7g/), [R7g/R7gd](https://aws.amazon.com/ec2/instance-types/r7g/), and [HPC7g](https://aws.amazon.com/ec2/instance-types/)	|
-|Core	|[Neoverse-N1](https://developer.arm.com/documentation/100616/0301)	|[Neoverse-V1](https://developer.arm.com/documentation/101427/latest/)	|
-|Frequency	|2500MHz	|2600MHz	|
-|Turbo supported	|No	|No	|
-|Instruction latencies	|[Instruction Latencies](https://developer.arm.com/documentation/PJDOC-466751330-9707/r4p1/?lang=en)	|[Instruction Latencies](https://developer.arm.com/documentation/pjdoc466751330-9685/latest/)	|
-|Interconnect	|CMN-600	|CMN-650	|
-|Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|
-|Additional  features	|fp16, rcpc, dotprod, crypto	|sve, rng, bf16, int8, crypto	|
-|Recommended -mcpu flag	|neoverse-n1	|neoverse-512tvb	|
-|RNG Instructions	|No	|Yes	|
-|SIMD instructions	|2x Neon 128bit vectors	|4x Neon 128bit vectors / 2x SVE 256bit	|
-|LSE (atomic mem operations)	|yes	|yes	|
-|Pointer Authentication	|no	|yes	|
-|Cores	|64	|64	|
-|L1 cache (per core)	|64KB inst / 64KB data	|64KB inst / 64KB data	|
-|L2 cache (per core)	|1MB	|1MB	|
-|LLC (shared)	|32MB	|32MB	|
-|DRAM	|8x DDR4	|8x DDR5	|
-|DDR Encryption	|yes	|yes	|
 
 # Optimizing for Graviton
 Please refer to [optimizing](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/graviton_perfrunbook.md).
