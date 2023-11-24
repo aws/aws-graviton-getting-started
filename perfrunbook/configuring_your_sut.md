@@ -1,6 +1,6 @@
 # Configuring your system-under-test environment
 
-[Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
+[Graviton Performance Runbook toplevel](./README.md)
 
 This section documents multiple checklists to use to verify your Graviton System-under-test (SUT) is up-to-date and as code-equivalent as possible to the systems and instances you are comparing against.   Please perform these tests on each SUT to vet your experimental setup and eliminate as many potential unknown variables as possible.
 

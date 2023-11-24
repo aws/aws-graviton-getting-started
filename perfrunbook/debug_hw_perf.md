@@ -1,6 +1,6 @@
 # Debugging performance — “What part of the hardware is slow?”
 
-[Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
+[Graviton Performance Runbook toplevel](./README.md)
 
 Sometimes, hardware, not code, is the reason for worse than expected performance. This may show up in the on-cpu profiles as every function is slightly slower on Graviton as more CPU time is consumed, but no obvious hot-spot function exists.  If this is the case, then measuring how the hardware performs can offer insight.  To do this requires counting special events in the CPU to understand which component of the CPU is bottlenecking the code from executing as fast as possible.
 

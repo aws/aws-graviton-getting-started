@@ -1,6 +1,6 @@
 # Appendix:
 
-[Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
+[Graviton Performance Runbook toplevel](./README.md)
 
 This Appendix contains additional information for engineers that want to go deeper on a particular topic, such as using different PMU counters to understand how the code is executing on the hardware, discussion on load generators, and additional tools to help with code observability.
 

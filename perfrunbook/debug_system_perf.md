@@ -1,6 +1,6 @@
 # Debugging performance — “What part of the system is slow?”
 
-[Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
+[Graviton Performance Runbook toplevel](./README.md)
 
 When debugging performance, start by measuring high level system behavior to pinpoint what part of the system performs differently when compared with a control instance.  Are the CPUs being saturated or under-saturated?  Is the network or disk behaving differently than expected?  Did a mis-configuration creep in that went undetected when validating the SUT application setup?
 

@@ -94,7 +94,7 @@ One of the major differences between AWS Graviton instances and other Amazon EC2
 
 During the transition to Graviton, if you are using Amazon EC2 Auto Scaling, you may be able to increase the threshold values for the CloudWatch alarms that invoke the scaling process. This may reduce the number of EC2 instances now needed to serve a given level of demand.
 
-Important: This repository has sections dedicated to [Optimization](optimizing.md) and a [Performance Runbook](perfrunbook/graviton_perfrunbook.md) for you to follow during this stage.
+Important: This repository has sections dedicated to [Optimization](optimizing.md) and a [Performance Runbook](perfrunbook/README.md) for you to follow during this stage.
 
 If after reading the documentation in this repository and following the recommendations you do not observe expected performance then please reach out to your AWS account team, or send email to [ec2-arm-dev-feedback@amazon.com](mailto:ec2-arm-dev-feedback@amazon.com) with details so we can assist you with your performance observations.
 
