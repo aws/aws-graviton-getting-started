@@ -1,6 +1,6 @@
 # Debugging performance — “What part of the hardware is slow?”
 
-[Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
+[Graviton Performance Runbook toplevel](./README.md)
 
 Sometimes, hardware, not code, is the reason for worse than expected performance. This may show up in the on-cpu profiles as every function is slightly slower on Graviton as more CPU time is consumed, but no obvious hot-spot function exists.  If this is the case, then measuring how the hardware performs can offer insight.  To do this requires counting special events in the CPU to understand which component of the CPU is bottlenecking the code from executing as fast as possible.
 
@@ -91,21 +91,30 @@ To measure the standard CPU PMU events, do the following:
   %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
   # AMD (5a, 6a, and 7a) instances not supported currently.
   %> sudo python3 ./measure_aggregated_pmu_stats.py --timeout 300
-  |Ratio               |   geomean|       p10|       p50|       p90|       p95|       p99|     p99.9|      p100|
-  |ipc                 |      1.00|      0.84|      1.00|      1.13|      1.32|      2.46|      2.48|      2.48|
-  |branch-mpki         |      2.43|      1.67|      2.64|      4.74|      5.69|      7.23|      8.45|      8.45|
-  |code_sparsity       |      0.00|      0.00|      0.01|      0.02|      0.04|      0.10|      0.10|      0.10|
-  |data-l1-mpki        |     11.60|     10.29|     11.67|     14.99|     15.76|     16.94|     19.68|     19.68|
-  |inst-l1-mpki        |     13.23|     11.14|     13.47|     20.56|     25.50|     34.01|     35.12|     35.12|
-  |l2-mpki             |      7.00|      5.70|      6.62|     11.02|     13.74|     18.99|     24.56|     24.56|
-  |l3-mpki             |      1.64|      1.23|      1.47|      3.09|      3.60|     11.90|     14.61|     14.61|
-  |core-rdBw-MBs       |      0.00|      0.00|      0.00|      0.02|      0.04|      0.15|      1.17|      1.50|
-  |stall_frontend_pkc  |    384.50|    326.27|    404.82|    451.50|    475.00|    571.48|    571.98|    571.98|
-  |stall_backend_pkc   |    265.24|    230.51|    266.60|    335.77|    350.70|    384.22|    395.24|    395.24|
-  |inst-tlb-mpki       |      0.36|      0.23|      0.40|      0.65|      0.74|      1.69|      1.75|      1.75|
-  |inst-tlb-tw-pki     |      0.22|      0.14|      0.25|      0.43|      0.45|      0.53|      0.70|      0.70|
-  |data-tlb-mpki       |      2.18|      1.74|      2.01|      3.60|      4.54|      6.12|      6.19|      6.19|
-  |data-tlb-tw-pki     |      1.36|      1.10|      1.48|      1.82|      2.06|      3.01|      4.71|      4.71|
+|Ratio               |   geomean|       p10|       p50|       p90|       p95|       p99|     p99.9|      p100|
+|ipc                 |      1.81|      1.72|      1.81|      1.90|      1.93|      1.95|      1.95|      1.95|
+|branch-mpki         |      0.01|      0.01|      0.01|      0.01|      0.01|      0.02|      0.02|      0.02|
+|code_sparsity       |      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|
+|data-l1-mpki        |     11.24|     10.48|     11.25|     12.05|     12.21|     12.62|     12.62|     12.62|
+|inst-l1-mpki        |      0.08|      0.07|      0.08|      0.09|      0.10|      0.15|      0.15|      0.15|
+|l2-ifetch-mpki      |      0.06|      0.05|      0.06|      0.06|      0.07|      0.12|      0.12|      0.12|
+|l2-mpki             |      0.71|      0.66|      0.70|      0.76|      0.77|      1.03|      1.03|      1.03|
+|l3-mpki             |      0.49|      0.42|      0.49|      0.55|      0.63|      0.67|      0.67|      0.67|
+|stall_frontend_pkc  |      1.97|      1.61|      1.90|      2.49|      2.68|      5.28|      5.28|      5.28|
+|stall_backend_pkc   |    425.00|    414.64|    424.81|    433.63|    435.82|    441.57|    441.57|    441.57|
+|inst-tlb-mpki       |      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|
+|inst-tlb-tw-pki     |      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|
+|data-tlb-mpki       |      1.49|      1.23|      1.55|      1.65|      1.66|      1.78|      1.78|      1.78|
+|data-tlb-tw-pki     |      0.00|      0.00|      0.00|      0.01|      0.01|      0.01|      0.01|      0.01|
+|inst-neon-pkc       |      0.31|      0.30|      0.30|      0.31|      0.31|      0.40|      0.40|      0.40|
+|inst-scalar-fp-pkc  |      2.43|      2.37|      2.44|      2.49|      2.51|      2.52|      2.52|      2.52|
+|stall_backend_mem_pkc|     90.73|     83.97|     90.71|     97.67|     97.98|    100.98|    100.98|    100.98|
+|inst-sve-pkc        |    419.00|    409.92|    419.83|    426.79|    430.73|    433.08|    433.08|    433.08|
+|inst-sve-empty-pkc  |      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|      0.00|
+|inst-sve-full-pkc   |    180.89|    176.99|    181.24|    184.31|    185.91|    187.16|    187.16|    187.16|
+|inst-sve-partial-pkc|      2.39|      2.27|      2.38|      2.50|      2.53|      2.58|      2.58|      2.58|
+|flop-sve-pkc        |   1809.47|   1768.84|   1813.91|   1842.77|   1860.45|   1871.86|   1871.86|   1871.86|
+|flop-nonsve-pkc     |      2.48|      2.41|      2.48|      2.54|      2.56|      2.57|      2.57|      2.57|
   ```
 
 ## Top-down method to debug hardware performance
@@ -138,6 +147,19 @@ Backend stalls are caused when the CPU is unable to make forward progress execut
 6. If back-end stalls due to the cache-system and memory system are the problem, the data-set size and layout needs to be optimized.
 7. Proceed to [Section 6](./optimization_recommendation.md) to view optimization recommendations for working with a large data-set causing backend stalls.
 
+### Drill down Vectorization
+
+Vectorization is accomplished either by SVE or NEON instructions.  SVE vectorization will use 256-bit vectors on Graviton 3 processors, but the scalable nature of SVE makes both the code and binary vector-length agnostic.  NEON vectorization is always a 128-bit vector size, and does not have the predicate feature of SVE.
+
+For SVE instructions there are metrics which describe how many SVE instructions had empty, full and partially-filled SVE predicates: `inst-sve-empty-pkc`, `inst-sve-partial-pkc`, and `inst-sve-full-pkc`.  These metrics apply to all SVE instructions (loads, stores, integer, and floating-point operations).  The `pkc` term indicates the counters are in units of "per kilo cycle".
+
+A single SVE instruction can execute multiple (vectorized) floating point operations in the ALU.  These are counted individually by `flop-sve-pkc`.  For example: a single SVE `FMUL` instruction on 32-bit floats on Graviton 3's 256-bit vector will increment the `flop-sve-pkc` counter by eight because the operation is executed on the eight 32-bit floats that fit in the 256-bit vector.  Some instructions, such as `FMA` and (Fused Multiply Add) excute two floating point operations per item in the vector and increment the counter accordingly.  The `flop-sve-pkc` counter is incremented assuming a full SVE predicate.
+
+Floating point operations for NEON and scalar instructions are counted together in the `flop-nonsve-pkc` counter.  For a single NEON `FMUL` instruction on 32-bit floats, the `inst-neon-pkc` counter will increment by one, and the `flop-nonsve-pkc` counter will increment by four (the number of 32-bit floats in a 128-bit NEON register).  For a single scalar `FMUL` instruction, the `flop-nonsve-pkc` counter will increment by one.  Some instructions (e.g., Fused Multiply Add) will increment the value by two.
+
+The total number of floating-point instructions retired every 1000 cycles is `inst-scalar-fp-pkc + (inst-neon-pkc + inst-sve-pkc)*<alpha>`, where `<alpha>` is a user-provided estimate of the fraction of SVE and NEON instructions which task the floating-point ALU vs loads, stores, or integer operations.  The total number of floating-point operations executed by those instructions is `flop-nonsve-pkc + flop-sve-pkc*<beta>`, where `<beta>` is a user-provided estimate of how often the predicate was full.  To calculate a maximum expected value for these metrics, consult the ARM Software Optimization Guide and determine a FLOP per kilocycle from the instruction throughput and element size of the operation.  A code with no loads, stores, or dependencies performing `FMUL` entirely in L1 cache on 32-bit floats could theoretically observe `flop-sve-pkc` of 16,000 with SVE, or `flop-nonsve-pkc` of 16,000 with NEON SIMD, or `flop-nonsve-pkc` of 4,000 with scalar operations.
+
+A footnote to readers of the ARM architecture PMU event description: SVE floating point operations are reported by hardware in units of "floating point operations per 128-bits of vector size", however the aggregation script we provide has already accounted for the Graviton 3 vector width before reporting.
 
 ## Additonal PMUs and PMU events
 

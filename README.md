@@ -29,7 +29,7 @@ This repository provides technical guidance for users and developers using [Amaz
 * [Spark on Graviton](DataAnalytics.md)
 * [Known issues and workarounds](#known-issues-and-workarounds)
 * [AWS Managed Services available on Graviton](managed_services.md)
-* [Graviton Performance Runbook](perfrunbook/graviton_perfrunbook.md)
+* [Graviton Performance Runbook](perfrunbook/README.md)
 * [Assembly Optimization Guide for Graviton Arm64 Processors](arm64-assembly-optimization.md)
 * [Additional resources](#additional-resources)
 * [How To Resources](howtoresources.md)
@@ -62,7 +62,7 @@ If you are new to Graviton and want to understand how to identify target workloa
 |DDR Encryption	|yes	|yes	|
 
 # Optimizing for Graviton
-Please refer to [optimizing](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/graviton_perfrunbook.md).
+Please refer to [optimizing](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/README.md).
 
 Different architectures and systems have differing capabilities, which means some tools you might be familiar with on one architecture don't have equivalent on AWS Graviton. Documented [Monitoring Tools](Monitoring_Tools_on_Graviton.md) with some of these utilities.
 

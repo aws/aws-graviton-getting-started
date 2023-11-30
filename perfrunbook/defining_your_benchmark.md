@@ -1,6 +1,6 @@
 # Defining your benchmark
 
-[Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
+[Graviton Performance Runbook toplevel](./README.md)
 
 To define a benchmark there are two things to consider, the software running on the System-under-test (SUT) and how to drive load.  We recommend the software running on the SUT should be your production application. There is no better benchmark to predict performance than the actual production code.  If a synthetic proxy must be used to break dependencies of your application on external services such as authentication layers, then that proxy should be derived from the production code as much as possible.  We recommend avoiding synthetic benchmarks not related to the production code.  They are generally poor at predicting performance for another application or helping optimize it as they can over-target specific attributes of a system or exercise different bottlenecks than your application code might.
 

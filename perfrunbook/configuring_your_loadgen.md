@@ -1,6 +1,6 @@
 # Configuring your load generator
 
-[Graviton Performance Runbook toplevel](./graviton_perfrunbook.md)
+[Graviton Performance Runbook toplevel](./README.md)
 
 The load generator setup is important to understand and verify: it generates the load that is expected.  An unknown load-generation setup can lead to not measuring the expected experiment and getting results that are hard to interpret. Below is a checklist to step through and verify the load generator is working as expected.
 
