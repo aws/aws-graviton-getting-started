@@ -26,6 +26,7 @@
     - [Tau Performance System](#tau-performance-system)
   - [Appendix](#appendix)
     - [List of HPC compilers for Graviton](#list-of-hpc-compilers-for-graviton)
+    - [Common HPC Applications on Graviton](#common-hpc-applications-on-graviton)
 
 ## Introduction
 [C7gn/Hpc7g](https://aws.amazon.com/blogs/aws/new-amazon-ec2-instance-types-in-the-works-c7gn-r7iz-and-hpc7g) instances are the latest additions to Graviton based EC2 instances, optimized for network and compute intensive High-Performance Computing (HPC) applications. This document is aimed to help HPC users get the optimal performance on Graviton instances. It covers the recommended compilers, libraries, and runtime configurations for building and running HPC applications. Along with the recommended software configuration, the document also provides example scripts to get started with 3 widely used open-source HPC applications: Weather Research and Forecasting (WRF), Open Source Field Operation And Manipulation (OpenFOAM) and Gromacs.
@@ -506,3 +507,4 @@ OpenFOAM Foundation / ESI | OpenFOAM  | OpenFOAM7           | [Getting Best Perf
 Sentieon              | DNAseq , TNseq, DNAscope | 202112.02 | [Release Notes](https://support.sentieon.com/manual/appendix/releasenotes/#release-202112-02), [Cost Effective Genomics (AWS)](https://aws.amazon.com/blogs/hpc/cost-effective-and-accurate-genomics-analysis-with-sentieon-on-aws/)
 Siemens               | StarCCM++     | 2023.2              | [Release Notes](https://blogs.sw.siemens.com/simcenter/simcenter-star-ccm-2302-released/#section_3)
 Université de Genève  | Palabos       | 2010                | [Lattice-Boltzmann Palabos (AWS)](https://aws.amazon.com/blogs/hpc/lattice-boltzmann-simulation-with-palabos-on-aws-using-graviton-based-amazon-ec2-hpc7g-instances/)
+Altair Engineering  | OpenRadioss       | 20231204                | [Presentations-Aachen270623 - OpenRadioss](https://www.openradioss.org/presentations-aachen270623/?wvideo=3ox1rtpco8), [Instructions](https://openradioss.atlassian.net/wiki/spaces/OPENRADIOSS/pages/47546369/HPC+Benchmark+Models)
