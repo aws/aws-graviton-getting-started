@@ -92,5 +92,102 @@ different types next to each other to take advantage of instruction level
 parallelism, ILP. For example, interleaving load instructions with vector or
 floating point instructions can keep both pipelines busy.
 
-Next we will discuss breaking data dependencies as a technique for improving performance. Check back
-again soon!
+
+## Split Data Dependency Chains
+
+As we saw in the last section, Graviton has multiple pipelines or execution units which can execute instructions. The instructions may execute in parallel if all of the input dependencies have been met but a series of instructions each of which depend on a result from the previous one will not be able to efficiently utilize the resources of the CPU.
+
+For example, a simple C function which takes 64 signed 8-bit integers and adds them all up into one value could be implemented like this:
+
+```
+int16_t add_64(int8_t *d) {
+    int16_t sum = 0;
+    for (int i = 0; i < 64; i++) {
+        sum += d[i];
+    }
+    return sum;
+}
+```
+
+We could write this in assembly using NEON SIMD instructions like this:
+
+```
+add_64_neon_01:
+    ld1     {v0.16b, v1.16b, v2.16b, v3.16b} [x0]   // load all 64 bytes into vector registers v0-v3
+    movi    v4.2d, #0                               // zero v4 for use as an accumulator
+    saddw   v4.8h, v4.8h, v0.8b                     // add bytes 0-7 of v0 to the accumulator
+    saddw2  v4.8h, v4.8h, v0.16b                    // add bytes 8-15 of v0 to the accumulator
+    saddw   v4.8h, v4.8h, v1.8b                     // ...
+    saddw2  v4.8h, v4.8h, v1.16b
+    saddw   v4.8h, v4.8h, v2.8b
+    saddw2  v4.8h, v4.8h, v2.16b
+    saddw   v4.8h, v4.8h, v3.8b
+    saddw2  v4.8h, v4.8h, v3.16b
+    addv    h0, v4.8h                               // horizontal add all values in the accumulator to h0
+    fmov    w0, h0                                  // copy vector registor h0 to general purpose register w0
+    ret                                             // return with the result in w0
+```
+
+In this example, we use a signed add-wide instruction which adds the top and bottom of each register to v4 which is used to accumulate the sum. This is the worst case for data dependency chains because every instruction depends on the result of the previous one which will make it impossible for the CPU to achieve any instruction level parallelism. If we use `llvm-mca` to evaluate it we can see this clearly.
+
+```
+Timeline view:
+                    0123456789
+Index     0123456789          0123456
+
+[0,0]     DeeER.    .    .    .    ..   movi    v4.2d, #0000000000000000
+[0,1]     D==eeER   .    .    .    ..   saddw   v4.8h, v4.8h, v0.8b
+[0,2]     D====eeER .    .    .    ..   saddw2  v4.8h, v4.8h, v0.16b
+[0,3]     D======eeER    .    .    ..   saddw   v4.8h, v4.8h, v1.8b
+[0,4]     D========eeER  .    .    ..   saddw2  v4.8h, v4.8h, v1.16b
+[0,5]     D==========eeER.    .    ..   saddw   v4.8h, v4.8h, v2.8b
+[0,6]     D============eeER   .    ..   saddw2  v4.8h, v4.8h, v2.16b
+[0,7]     D==============eeER .    ..   saddw   v4.8h, v4.8h, v3.8b
+[0,8]     D================eeER    ..   saddw2  v4.8h, v4.8h, v3.16b
+[0,9]     D==================eeeeER..   addv    h0, v4.8h
+[0,10]    D======================eeER   fmov    w0, h0
+[0,11]    DeE-----------------------R   ret
+```
+
+
+One way to break data dependency chains is to use commutative property of addition and change the order which the adds are completed. Consider the following alternative implementation which makes use of pairwise add instructions.
+
+```
+add_64_neon_02:
+    ld1     {v0.16b, v1.16b, v2.16b, v3.16b} [x0]
+
+    saddlp  v0.8h, v0.16b                   // signed add pairwise long
+    saddlp  v1.8h, v1.16b
+    saddlp  v2.8h, v2.16b
+    saddlp  v3.8h, v3.16b                   // after this instruction we have 32 16-bit values
+
+    addp    v0.8h, v0.8h, v1.8h             // add pairwise again v0 and v1
+    addp    v2.8h, v2.8h, v3.8h             // now we are down to 16 16-bit values
+
+    addp    v0.8h, v0.8h, v2.8h             // 8 16-bit values
+    addv    h0, v4.8h                       // add 8 remaining values across vector
+    fmov    w0, h0
+
+    ret
+```
+
+In this example the first 4 instructions after the load can execute independently and then the next 2 are also independent of each other.  However, the last 3 instructions do have data dependencies on each other. If we take a look with `llvm-mca` again, we can see that this implementation takes 10 cycles (excluding the initial load instruction common to both implementations) and the original takes 27 cycles.
+
+```
+Timeline view:
+Index     0123456789
+
+[0,0]     DeeER.   .   saddlp   v0.8h, v0.16b
+[0,1]     DeeER.   .   saddlp   v1.8h, v1.16b
+[0,2]     DeeER.   .   saddlp   v2.8h, v2.16b
+[0,3]     DeeER.   .   saddlp   v3.8h, v3.16b
+[0,4]     D==eeER  .   addp     v0.8h, v0.8h, v1.8h
+[0,5]     D==eeER  .   addp     v2.8h, v2.8h, v3.8h
+[0,6]     D====eeER.   addp     v0.8h, v0.8h, v2.8h
+[0,7]     D=eeeeE-R.   addv     h0, v4.8h
+[0,8]     D=====eeER   fmov     w0, h0
+[0,9]     DeE------R   ret
+```
+
+
+Next we will discuss modulo scheduling. Check back again soon!
