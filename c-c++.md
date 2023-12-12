@@ -108,9 +108,34 @@ avoid the overhead of the generic sse2neon translation.
 The C standard doesn't specify the signedness of char. On x86 char is signed by
 default while on Arm it is unsigned by default. This can be addressed by using
 standard int types that explicitly specify the signedness (e.g. `uint8_t` and `int8_t`)
-or compile with `-fsigned-char`. When using the `getchar` function, instead of checking 
-`if((c = getchar()) == EOF){...}`,  you should use an `int` type and the standard
-`feof` function to check for the end of file.
+or compile with `-fsigned-char`.
+When using the `getchar` function, instead of the commonly used but incorrect:
+ 
+```
+char c;
+while((c = getchar()) != EOF) {
+    // Do something with the character c
+}
+// Assume we have reached the end of file here
+```
+
+you should use an `int` type and the standard function `feof` and `ferror` to
+check for the end of file, as follows:
+
+```
+int c;
+
+while ((c = getchar()) != EOF) {
+    // Do something with the character c
+}
+// Once we get EOF, we should check if it is actually an EOF or an error
+
+if (feof(stdin)) {
+    // End of file has been reached
+} else if (ferror(stdin)) {
+    // Handle the error (check errno, etc)
+}
+```
 
 ### Using Graviton2 Arm instructions to speed-up Machine Learning
 
