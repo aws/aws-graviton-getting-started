@@ -4,7 +4,7 @@ This repository provides technical guidance for users and developers using [Amaz
 
 # Contents
 * [Transitioning to Graviton](#transitioning-to-graviton)
-* [Building for Graviton](#building-for-graviton-and-graviton2)
+* [Building for Graviton](#building-for-graviton2-graviton3-and-graviton3e)
 * [Optimizing for Graviton](optimizing.md)
 * [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
 * [Recent software updates relevant to Graviton](#recent-software-updates-relevant-to-graviton)
