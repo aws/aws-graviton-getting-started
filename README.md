@@ -49,7 +49,7 @@ If you are new to Graviton and want to understand how to identify target workloa
 |Interconnect	|CMN-600	|CMN-650	|
 |Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|
 |Additional  features	|fp16, rcpc, dotprod, crypto	|sve, rng, bf16, int8, crypto	|
-|Recommended -mcpu flag	|neoverse-n1	|neoverse-512tvb	|
+|Recommended `-mcpu` flag	([more information](c-c++.md#enabling-arm-architecture-specific-features))|`neoverse-n1` | `neoverse-512tvb` |
 |RNG Instructions	|No	|Yes	|
 |SIMD instructions	|2x Neon 128bit vectors	|4x Neon 128bit vectors / 2x SVE 256bit	|
 |LSE (atomic mem operations)	|yes	|yes	|
