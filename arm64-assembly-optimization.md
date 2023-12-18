@@ -15,7 +15,9 @@ the assembly level code. During the review of the hot code, software developers
 can reference this guide to find better ways to optimize inner loops.
 
 Some techniques for writing optimized assembly:
-1. Be aware of instruction level parallelism
+1. [Be aware of instruction level parallelism](#instruction-level-parallelism)
+1. [Split Data Dependency Chains](#split-data-dependency-chains)
+
 
 We will be adding more sections to this document soon, so check back!
 
@@ -171,22 +173,23 @@ add_64_neon_02:
     ret
 ```
 
-In this example the first 4 instructions after the load can execute independently and then the next 2 are also independent of each other.  However, the last 3 instructions do have data dependencies on each other. If we take a look with `llvm-mca` again, we can see that this implementation takes 10 cycles (excluding the initial load instruction common to both implementations) and the original takes 27 cycles.
+In this example the first 4 instructions after the load can execute independently and then the next 2 are also independent of each other.  However, the last 3 instructions do have data dependencies on each other. If we take a look with `llvm-mca` again, we can see that this implementation takes 17 cycles (excluding the initial load instruction common to both implementations) and the original takes 27 cycles.
 
 ```
 Timeline view:
+                    0123456
 Index     0123456789
 
-[0,0]     DeeER.   .   saddlp   v0.8h, v0.16b
-[0,1]     DeeER.   .   saddlp   v1.8h, v1.16b
-[0,2]     DeeER.   .   saddlp   v2.8h, v2.16b
-[0,3]     DeeER.   .   saddlp   v3.8h, v3.16b
-[0,4]     D==eeER  .   addp     v0.8h, v0.8h, v1.8h
-[0,5]     D==eeER  .   addp     v2.8h, v2.8h, v3.8h
-[0,6]     D====eeER.   addp     v0.8h, v0.8h, v2.8h
-[0,7]     D=eeeeE-R.   addv     h0, v4.8h
-[0,8]     D=====eeER   fmov     w0, h0
-[0,9]     DeE------R   ret
+[0,0]     DeeER.    .    ..   saddlp    v0.8h, v0.16b
+[0,1]     DeeER.    .    ..   saddlp    v1.8h, v1.16b
+[0,2]     D=eeER    .    ..   saddlp    v2.8h, v2.16b
+[0,3]     D=eeER    .    ..   saddlp    v3.8h, v3.16b
+[0,4]     D==eeER   .    ..   addp      v0.8h, v0.8h, v1.8h
+[0,5]     D===eeER  .    ..   addp      v2.8h, v2.8h, v3.8h
+[0,6]     D=====eeER.    ..   addp      v0.8h, v0.8h, v2.8h
+[0,7]     .D======eeeeeER..   addv      h0, v0.8h
+[0,8]     .D===========eeER   fmov      w0, h0
+[0,9]     .DeE------------R   ret
 ```
 
 
