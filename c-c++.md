@@ -2,24 +2,28 @@
 
 ### Enabling Arm Architecture Specific Features
 
-To build code with the optimal processor features use the following.
-We recommend using Graviton2 processor features when targeting both Graviton2
-and Graviton3(E) as code compiled for Graviton3(E) will only run on Graviton3(E) and not
-on Graviton2.  On arm64 `-mcpu=` acts as both specifying the appropriate
+C and C++ code can be built for Graviton with a variety of flags, depending on
+the goal. If the goal is to get the best performance for a specific generation,
+select a flag from the table column "performance". If the goal is to get a good
+compromise of feature availability and performance balanced across generations,
+select the flag from the "balanced" column. If you want to target multiple
+generations of Graiviton, select the "balanced" flag for the oldest generation
+planned for deployment, since code built for a newer generation may not run on
+an older generation. On arm64 `-mcpu=` acts as both specifying the appropriate
 architecture and tuning and it's generally better to use that vs `-march` if
 you're building for a specific CPU.
 
 
-CPU       | Flag    | GCC version      | LLVM verison
-----------|---------|-------------------|-------------
-Graviton2 | `-mcpu=neoverse-n1`\* | GCC-9^ | Clang/LLVM 10+
-Graviton3(E) | `-mcpu=neoverse-512tvb`% | GCC 11+ | Clang/LLVM 14+
+CPU          | Flag (performance)    | Flag (balanced)           | GCC version      | LLVM verison
+-------------|-----------------------|---------------------------|------------------|---------------
+Graviton2    | `-mcpu=neoverse-n1` ¹ | `-march=armv8.2-a`        | GCC-9            | Clang/LLVM 10+
+Graviton3(E) | `-mcpu=neoverse-v1`   | `-mcpu=neoverse-512tvb` ² | GCC 11           | Clang/LLVM 14+
 
-^ Also present in Amazon Linux2 GCC-7
+¹ Requires GCC-9 or later (or GCC-7 for Amazon Linux 2); otherwise we suggest
+using `-mcpu=cortex-a72`
 
-\* Requires GCC-9 or later; otherwise we suggest using `-mcpu=cortex-a72`
-
-% If your compiler doesn't support `neoverse-512tvb`, please use the Graviton2 tuning.
+² If your compiler doesn't support `neoverse-512tvb`, please use the Graviton2
+tuning.
 
 ### Compilers
 
