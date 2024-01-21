@@ -32,8 +32,8 @@ Ubuntu 20.04 | >= 5.4.0-1047-aws, >= 5.8.0-1034-aws, >= 5.11.0-1009-aws
 Ubuntu 18.04 | >= 4.15.0-1101-aws, >= 5.4.0-1047-aws
 Redhat Entreprise Linux 8 | >= 4.18.0-305.10
 
-# Operating Systems not supported by Graviton based instances
+# Operating systems which do not support Graviton based instances
 
- Name | Version | Support | Comment
------- | ------ | ----- | ----- | 
-Microsoft Windows | All versions | No |  Currently, Graviton instances do not support Microsoft Windows; however, this might change in the future.
+ Name | Version | 
+------ | ------ |
+Microsoft Windows | All versions 
