@@ -2,12 +2,15 @@
 
 ### Enabling Arm Architecture Specific Features
 
+TLDR: To target all current generation Graviton instances (Graviton2 and
+Graviton3), use `-march=arm8.2-a`.
+
 C and C++ code can be built for Graviton with a variety of flags, depending on
 the goal. If the goal is to get the best performance for a specific generation,
 select a flag from the table column "performance". If the goal is to get a good
 compromise of feature availability and performance balanced across generations,
 select the flag from the "balanced" column. If you want to target multiple
-generations of Graiviton, select the "balanced" flag for the oldest generation
+generations of Graviton, select the "balanced" flag for the oldest generation
 planned for deployment, since code built for a newer generation may not run on
 an older generation. On arm64 `-mcpu=` acts as both specifying the appropriate
 architecture and tuning and it's generally better to use that vs `-march` if
@@ -24,6 +27,14 @@ using `-mcpu=cortex-a72`
 
 ² If your compiler doesn't support `neoverse-512tvb`, please use the Graviton2
 tuning.
+
+For some applications, it may be necessary to support a broad range of Arm64
+targets while still making use of more advanced features such as LSE (Large
+System Extensions) or SVE (Scalable Vector Extension). For this case choose a
+more conservative build flag, such as `-march=armv8-a` and make use of runtime
+CPU support detection of features such as SVE. You can enable runtime detection
+and use of LSE atomics instructions by adding the additional compiler flag,
+`-moutline-atomics`.
 
 ### Compilers
 
