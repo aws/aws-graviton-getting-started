@@ -7,12 +7,12 @@ This page highlights some of the migration considerations and also provides some
 
 The architecture change does not affect the way your functions are invoked or how they communicate their responses back. Integrations with APIs, services, applications, or tools are not affected by the new architecture and continue to work as before.
 The following runtimes, which use [Amazon Linux 2](https://aws.amazon.com/amazon-linux-2/), are supported on Arm:
-*	Node.js 12 and 14
-*	Python 3.8 and 3.9
-*	Java 8 (java8.al2) and 11
-*	.NET Core 3.1
-*	Ruby 2.7
-*	[Custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html) (provided.al2)
+*	Node.js 12 and above
+*	Python 3.8 and above
+*	Java 8 (java8.al2) and above
+*	.NET Core 3.1 and above
+*	Ruby 2.7 and above
+*	[Custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html) (provided.al2) and above
 
 ## Migrating x86 Lambda functions to arm64
 ### Functions without architecture-specific dependencies or binaries
@@ -21,7 +21,7 @@ Many Lambda functions may only need a configuration change to take advantage of 
 If your functions don’t use architecture-specific dependencies or binaries, you can switch from one architecture to the other with a single configuration change. Many functions using interpreted languages such as Node.js and Python, or functions compiled to Java bytecode, can switch without any changes. Ensure you check binaries in dependencies, Lambda layers, and Lambda extensions.
 
 ### Building function code for Graviton2
-For compiled languages like Rust and Go, you can use the `provided.al2` [custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html), which supports Arm. You provide a binary that communicates with the [Lambda Runtime API](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-api.html).
+For compiled languages like Rust and Go, you can use the `provided.al2` or `provided.al2023`  [custom runtimes](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html), which supports Arm. You provide a binary that communicates with the [Lambda Runtime API](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-api.html).
 
 When compiling for Go, set `GOARCH` to `arm64`.
 ```
@@ -36,11 +36,11 @@ The default installation of Python `pip` on some Linux distributions is out of d
 sudo python3 -m pip install --upgrade pip
 ````
 
-Functions packaged as container images must be built for the architecture (x86 or arm64) they are going to use. There are arm64 architecture versions of the [AWS provided base images for Lambda](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-images.html#runtimes-images-lp). To specify a container image for arm64, use the arm64 specific image tag, for example, for Node.js 14:
+Functions packaged as container images must be built for the architecture (x86 or arm64) they are going to use. There are arm64 architecture versions of the [AWS provided base images for Lambda](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-images.html#runtimes-images-lp). To specify a container image for arm64, use the arm64 specific image tag, for example, for Node.js 20:
 ```
-public.ecr.aws/lambda/nodejs:14-arm64
+public.ecr.aws/lambda/nodejs:20-arm64
 public.ecr.aws/lambda/nodejs:latest-arm64
-public.ecr.aws/lambda/nodejs:14.2021.10.01.16-arm64
+public.ecr.aws/lambda/nodejs:20.2024.01.05.14-arm64
 ```
 Arm64 images are also available from [Docker Hub](https://hub.docker.com/u/amazon).
 You can also use arbitrary Linux base images in addition to the AWS provided Amazon Linux 2 images. Images that support arm64 include [Alpine](https://alpinelinux.org/) Linux 3.12.7 or later, [Debian](https://www.debian.org/) 10 and 11, Ubuntu 18.04 and 20.04. For more information and details of other supported Linux versions, see [Operating systems available for Graviton based instances](https://github.com/aws/aws-graviton-getting-started/blob/main/os.md#operating-systems-available-for-graviton-based-instances).
@@ -140,9 +140,9 @@ sam local invoke LambdaNumberFunction -e ./test/event.json
 You can build arm64 functions as container images. You  can use [AWS SAM natively](https://aws.amazon.com/blogs/compute/using-container-image-support-for-aws-lambda-with-aws-sam/) to build container images.
 
 You can also use Docker native commands instead of AWS SAM.
-To build a container image of this function using Docker, use the [Dockerfile](./GravitonLambdaNumber/src/Dockerfile) and specify the `nodejs:12-arm64` base image.
+To build a container image of this function using Docker, use the [Dockerfile](./GravitonLambdaNumber/src/Dockerfile) and specify the `nodejs:20-arm64` base image.
 ```
-FROM public.ecr.aws/lambda/nodejs:12-arm64
+FROM public.ecr.aws/lambda/nodejs:20-arm64
 COPY app.js package*.json $LAMBDA_TASK_ROOT
 RUN npm install
 CMD [ "app.lambdaHandler" ]
