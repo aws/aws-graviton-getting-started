@@ -165,10 +165,55 @@ A footnote to readers of the ARM architecture PMU event description: SVE floatin
 
 On metal instances, all available hardware PMUs and their events are exposed to instances and can be accessed so long as driver support by the OS in use is available.  
 These extra PMUs help with diagnosing specific use cases, but are generally less applicable than the more widely used CPU PMU.
-These PMU and events include such things as the Coherent Mesh Network PMU on Graviton instances to measure system level event counts such as system wide DRAM bandwidth use.  
-These PMUs will be covered in this section with links to documentation and Linux kernel support. 
+These PMU and events include: the Statistical Profiling Extension that provides precise data for sampled instructions, and
+the Coherent Mesh Network PMU on Graviton instances to measure system level events such as system wide DRAM bandwidth use.
+These PMUs will be covered in this section with links to documentation and Linux kernel support.
 
-### Capturing Coherent Mesh Network (CMN) hardware events on Graviton instances
+### Capturing Statistical Profiling Extension (SPE) hardware events on Graviton metal instances
+
+The SPE PMU on Graviton enables cores to precisely trace events for individual instructions and record them to a memory buffer with the
+linux `perf` tool.  It samples instructions from the executed instruction stream at random.  It is particularly useful for finding information
+about particular loads that are always long latency, false sharing of atomic variables, or branches that are often mis-predicted and causing slow-downs.
+Because SPE is precise, this information can be attributed back to individual code lines that need to be optimized.
+SPE is enabled Graviton 2 and 3 metal instances.  The below table shows for which Linux distributions and kernel versions SPE is known to be
+enabled.
+
+| Distro       | Kernel  |
+|--------------|---------|
+| AL2          | 5.10    |
+| AL2023       | >=6.1.2 |
+| Ubuntu 20.04 | >=5.15  |
+| Ubuntu 22.04 | >=6.2   |
+
+On Amazon Linux 2 and 2023, the SPE PMU is available by default on Graviton metal instances, you can check for its existence by verifying:
+```
+# Returns the directory exists
+ls /sys/devices/arm_spe_0
+```
+
+On Ubuntu to enable SPE requires four extra steps
+```
+# Install the arm_spe_pmu.ko module
+sudo apt install linux-modules-extra-$(uname -r)
+
+# Add kpti=off to the kernel boot command line
+# Reboot instance
+
+sudo modprobe arm_spe_pmu
+
+# Verify exists
+ls /sys/devices/arm_spe_0
+```
+
+SPE can be used via Linux `perf`. An example that samples every 1000'th branch on core 0 system wide is shown below:
+`perf record -C0 -c1000 -a -e arm_spe_0/branch_filter=1,ts_enable=1,pct_enable=1,pa_enable=1,jitter=1/ -- sleep 30`
+
+Processing the data can be done with `perf report` to inspect hot functions and annotate assembly. If you want to look at
+the samples directly, you can use the [Arm SPE Parser](https://gitlab.arm.com/telemetry-solution/telemetry-solution/-/tree/spe-parser-prototype/tools/spe-parser).
+
+Be aware that SPE produces a large of volume of data (many GBs) if the sampling period is low and you collect the data over a long time.
+
+### Capturing Coherent Mesh Network (CMN) hardware events on Graviton metal instances
 
 On Graviton the CMN connects the CPUs to each other, to the memory controller, the I/O subsystem and provides the System Level Cache.
 Its PMU counts events such as requests to SLC, DRAM (memory bandwidth), IO bus requests or coherence snoop events.
