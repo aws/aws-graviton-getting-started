@@ -5,7 +5,7 @@
 PyTorch is an open-source machine learning framework based on the Torch library, used for applications such as computer vision and natural language processing. It can be used across training and inference of deep neural networks. This document covers how to use PyTorch based machine learning inference on Graviton CPUs, what runtime configurations are important and how to debug any performance issues. The document also covers instructions for source builds and how to enable some of the downstream features.
 
 # How to use PyTorch on Graviton CPUs
-There are multiple levels of software package abstractions available: AWS DLC (Deep Learning Container, comes with all the packages installed), Python wheel (easier option for integrating pytorch inference into an existing service), and the Docker hub images (comes with downstream experimental features). Examples of using each method are below.
+There are multiple levels of software package abstractions available: AWS DLC (Deep Learning Container, comes with all the packages installed), Python wheel (easier option for integrating pytorch inference into an existing service), AWS DJL (Deep Java Library, provides JAVA interface along with native torch libraries), and the Docker hub images (comes with downstream experimental features). Examples of using each method are below.
 
 **AWS Graviton PyTorch DLC**
 
@@ -37,6 +37,16 @@ python3 -m pip install --upgrade pip
 # Install PyTorch and extensions
 python3 -m pip install torch
 python3 -m pip install torchvision torchaudio
+```
+
+**Using AWS Deep Java Library (DJL)**
+
+DJL is a high level JAVA API for Machine Learning and Deep Learning frameworks. It supports aarch64 linux platform with PyTorch backend. The DJL binaries package the native torch libraries from official libtorch distribution which are optimized for AWS Graviton3. The following sections explain how to install, enable runtime configuration, and benchmark pytorch inference with DJL interface on AWS Graviton3 instances. Please refer to [djl pytorch documentation](https://github.com/deepjavalibrary/djl/blob/master/docs/development/inference_performance_optimization.md#pytorch) for more details.
+
+```
+sudo snap install openjdk
+curl -O https://publish.djl.ai/djl-serving/djl-serving_0.25.0-1_all.deb
+sudo dpkg -i djl-serving_0.25.0-1_all.deb
 ```
 
 **Using Docker hub container**
@@ -125,6 +135,26 @@ python3 run.py BERT_pytorch -d cpu -m jit -t eval --use_cosine_similarity --bs 3
 
 # Single inference mode
 python3 run.py BERT_pytorch -d cpu -m jit -t eval --use_cosine_similarity --bs 1
+```
+
+3. Resnet benchmarking with PyTorch Java
+
+```
+# Install djl-bench
+curl -O https://publish.djl.ai/djl-bench/0.26.0/djl-bench_0.26.0-1_all.deb
+sudo dpkg -i djl-bench_0.26.0-1_all.deb
+
+git clone https://github.com/deepjavalibrary/djl-serving.git
+cd djl-serving
+
+# Make sure the runtime env for Bfloat16 and LRU Cache are setup before running the inference tests
+# Run Resnet18 with batch size of 16. On successful completion of the inference runs, the script
+# prints the inference results, throughput and latencies
+djl-bench -e PyTorch -u https://alpha-djl-demos.s3.amazonaws.com/model/djl-blockrunner/pytorch_resnet18.zip -n traced_resnet18 -c 10 -s 16,3,600,600
+
+# Run Resnet50 ssd with batch size of 16
+djl-bench -e PyTorch -c 2 -s 16,3,300,300 -u djl://ai.djl.pytorch/ssd/0.0.1/ssd_300_resnet50
+
 ```
 
 # Troubleshooting performance issues
