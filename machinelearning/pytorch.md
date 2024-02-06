@@ -96,14 +96,14 @@ python3 install.py resnet50
 # Install the dependent wheels
 python3 -m pip install numba
 
-# Run Resnet50 inference in jit mode. On successful completion of the inference runs,
+# Run Resnet50 inference in torchscript mode. On successful completion of the inference runs,
 # the script prints the inference latency and accuracy results
 
 # Batch mode, the default batch size is 32
-python3 run.py resnet50 -d cpu -m jit -t eval --use_cosine_similarity
+python3 run.py resnet50 -d cpu --backend torchscript -t eval --use_cosine_similarity
 
 # Single inference mode
-python3 run.py resnet50 -d cpu -m jit -t eval --use_cosine_similarity --bs 1
+python3 run.py resnet50 -d cpu --backend torchscript -t eval --use_cosine_similarity --bs 1
 
 ```
 
@@ -117,14 +117,14 @@ git clone https://github.com/pytorch/benchmark.git
 cd benchmark
 python3 install.py bert
 
-# Run BERT_pytorch inference in jit mode. On successful completion of the inference runs,
+# Run BERT_pytorch inference in torchscript mode. On successful completion of the inference runs,
 # the script prints the inference latency and accuracy results
 
 # Batch mode
-python3 run.py BERT_pytorch -d cpu -m jit -t eval --use_cosine_similarity --bs 32
+python3 run.py BERT_pytorch -d cpu --backend torchscript -t eval --use_cosine_similarity --bs 32
 
 # Single inference mode
-python3 run.py BERT_pytorch -d cpu -m jit -t eval --use_cosine_similarity --bs 1
+python3 run.py BERT_pytorch -d cpu --backend torchscript -t eval --use_cosine_similarity --bs 1
 ```
 
 # Troubleshooting performance issues
