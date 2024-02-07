@@ -237,14 +237,18 @@ $ conda env create -f graviton-example.yml
 pip install numpy
 pip install torch torchvision
 ```
+Please refer to the [Graviton PyTorch user guide](machinelearning/pytorch.md) for optimizing PyTorch inference performance on Graviton.
+
 ### 3.2 TensorFlow
 
 ```
-pip install tensorflow-cpu-aws
+pip install tensorflow
 ```
+Please refer to the [Graviton TensorFlow user guide](machinelearning/tensorflow.md) for the recommended configuration and best practices.
+
 ### 3.3 DGL
 
-Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](#41-pytorch)
+Make sure Pytorch is installed,  if not, follow [Pytorch installation steps](machinelearning/pytorch.md)
 
 On **Ubuntu**:
 
