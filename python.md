@@ -107,8 +107,43 @@ Both [SciPy>=1.5.3](https://pypi.org/project/scipy/1.5.3/#files) and [NumPy>=1.1
 vend binary wheel packages for Aarch64, but if you need better performance, then
 compiling the best performance numerical library is an option.  To do so, follow the below instructions.
 
+### 2.1 Install OpenBLAS
 
-### 2.1 BLIS may be a faster BLAS
+OpenBLAS is an optimized BLAS (Basic Linear Algebra Subprograms) library based on GotoBLAS2 1.13 BSD version. The library provides optimized "gemv" and "gemm" routines for Graviton architecture. Binary distribuiton is available for both "pthread" and "openmp" runtime, with "openblas" being the pthread version and "openblas-openmp" the openmp version. Install the appropriate version based on the execution runtime.
+
+#### 2.1.1 Install OpenBLAS on Ubuntu and Debian
+
+```
+# pthread version
+sudo apt -y install libopenblas-dev
+
+# openmp version
+sudo apt -y install libopenblas-openmp-dev
+```
+
+#### 2.1.2 Install OpenBLAS on AmazonLinux2023 (AL2023) and RedHat
+
+```
+# pthread version
+sudo yum -y install openblas
+
+# openmp version
+sudo yum -y install openblas-openmp
+```
+
+#### 2.1.3 Install OpenBLAS with Conda
+
+Please refer to the Graviton Support in Conda section to setup conda environment.
+
+```
+# pthread version
+conda install -y openblas
+
+# openmp version
+conda install -y openblas=*=*openmp*
+```
+
+### 2.2 BLIS may be a faster BLAS
 
 The default SciPy and NumPy binary installations with `pip3 install numpy scipy`
 are configured to use OpenBLAS.  The default installations of SciPy and NumPy
@@ -117,7 +152,7 @@ are easy to setup and well tested.
 Some workloads will benefit from using BLIS. Benchmarking SciPy and NumPy
 workloads with BLIS might allow to identify additional performance improvement.
 
-### 2.2 Install NumPy and SciPy with BLIS on Ubuntu and Debian
+### 2.3 Install NumPy and SciPy with BLIS on Ubuntu and Debian
 
 On Ubuntu and Debian `apt install python3-numpy python3-scipy` will install NumPy
 and SciPy with BLAS and LAPACK libraries. To install SciPy and NumPy with BLIS
@@ -135,7 +170,7 @@ sudo update-alternatives --config libblas.so.3-aarch64-linux-gnu
 sudo update-alternatives --config liblapack.so.3-aarch64-linux-gnu
 ```
 
-### 2.3 Install NumPy and SciPy with BLIS on AmazonLinux2 (AL2) and RedHat
+### 2.4 Install NumPy and SciPy with BLIS on AmazonLinux2 (AL2) and RedHat
 
 Prerequisites to build SciPy and NumPy with BLIS on arm64 AL2 and RedHat:
 ```
@@ -172,7 +207,7 @@ and scipy. The default is:
 `NPY_BLAS_ORDER=mkl,blis,openblas,atlas,accelerate,blas` and
 `NPY_LAPACK_ORDER=mkl,openblas,libflame,atlas,accelerate,lapack`.
 
-### 2.4 Testing NumPy and SciPy installation
+### 2.5 Testing NumPy and SciPy installation
 
 To test that the installed NumPy and SciPy are built with BLIS and OpenBLAS, the
 following commands will print native library dependencies:
@@ -184,7 +219,7 @@ python3 -c "import scipy as sp; sp.__config__.show()"
 In the case of Ubuntu and Debian these commands will print `blas` and `lapack`
 which are symbolic links managed by `update-alternatives`.
 
-### 2.5 Improving BLIS and OpenBLAS performance with multi-threading
+### 2.6 Improving BLIS and OpenBLAS performance with multi-threading
 
 When OpenBLAS is built with `USE_OPENMP=1` it will use OpenMP to parallelize the
 computations.  The environment variable `OMP_NUM_THREADS` can be set to specify
@@ -195,7 +230,7 @@ To enable parallelism with BLIS, one needs to both configure with
 `--enable-threading=openmp` and set the environment variable `BLIS_NUM_THREADS`
 to the number of threads to use, the default is to use a single thread.
 
-### 2.6 Graviton support in Conda / Anaconda
+### 2.7 Graviton support in Conda / Anaconda
 Anaconda is a distribution of the Python and R programming languages for scientific computing, that aims to simplify package management and deployment.
 
 Anaconda has announced [support for AWS Graviton on May 14, 2021](https://www.anaconda.com/blog/anaconda-aws-graviton2).
