@@ -277,6 +277,44 @@ bazel build --verbose_failures -s --config=mkl_aarch64  //tensorflow/tools/pip_p
 pip install <wheel-TF2.12.0-py3.8-aarch64/*.whl>
 ```
 
+# Building TensorFlow Java from sources
+
+This section outlines the recommended way to compile TensorFlow Java from source.
+
+Note: TensorFlow jar distribution for aarch64 linux platform is blocked on CI support for [tensorflow/java](https://github.com/tensorflow/java) repo.
+
+```
+sudo apt-get install pkg-config ccache clang ant python3-pip swig git file wget unzip tar bzip2 gzip patch autoconf-archive autogen automake make cmake libtool bison flex perl nasm curl gfortran libasound2-dev freeglut3-dev libgtk2.0-dev libusb-dev zlib1g libffi-dev libbz2-dev zlib1g-dev
+
+sudo apt install maven default-jdk
+
+# Install bazel for aarch64
+# Bazel version required depends on the TensorFlow version, please install the correct one
+# https://github.com/tensorflow/tensorflow/blob/master/.bazelversion captures the bazel version details
+mkdir bazel
+cd bazel
+wget https://github.com/bazelbuild/bazel/releases/download/5.1.1/bazel-5.1.1-linux-arm64
+mv bazel-5.1.1-linux-arm64 bazel
+chmod a+x bazel
+export PATH=/home/ubuntu/bazel/:$PATH
+
+# Build and install javacpp-presets.
+# Clone the following forked repo to exclude the libraries that are not supported and not required
+git clone https://github.com/snadampal/javacpp-presets.git
+cd javacpp-presets
+git checkout tfjava_aarch64
+mvn install -Djavacpp.platform=linux-arm64 -Dmaven.javadoc.skip=true -X -T 16
+
+# Build and install tensorflow java bindings
+git clone https://github.com/tensorflow/java.git
+cd java
+mvn install -X -T 16
+
+# Workaround for the native library path: copy the jni library to system path and issue rebuild
+sudo cp ~/java/tensorflow-core/tensorflow-core-api/target/native/org/tensorflow/internal/c_api/linux-arm64/libjnitensorflow.so /usr/lib/aarch64-linux-gnu/jni
+mvn install -X -T 16
+```
+
 # Enable XLA optimizations
 
 While the Grappler optimizer covers majority of the networks, there are few scenarios where either the Grappler optimizer can't optimize the generic graph or the runtime kernel launch overhead is simply not acceptable. XLA addresses these gaps by providing an alternative mode of running models: it compiles the TensorFlow graph into a sequence of computation kernels generated specifically for the given model.
