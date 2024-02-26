@@ -62,7 +62,7 @@ python3 -m pip install onnx onnxruntime
 python3 -m pip install transformers torch psutil
 
 # Clone onnxruntime repo to get the benchmarking scripts
-git clone https://github.com/microsoft/onnxruntime.git
+git clone --recursive https://github.com/microsoft/onnxruntime.git
 cd onnxruntime/onnxruntime/python/tools/transformers
 
 # The scripts download the models, export them to onnx format,
@@ -73,16 +73,16 @@ cd onnxruntime/onnxruntime/python/tools/transformers
 
 # Next run the benchmarks, select fp32 or int8 precision via -p argument
 # To run bert-large
-python3 benchmarking.py -m bert-large-uncased -p <fp32/int8>
+python3 benchmark.py -m bert-large-uncased -p <fp32/int8>
 
 # To run bert-base
-python3 benchmarking.py -m bert-base-cased -p <fp32/int8>
+python3 benchmark.py -m bert-base-cased -p <fp32/int8>
 
 # To run roberta-base
-python3 benchmarking.py -m roberta-base -p <fp32/int8>
+python3 benchmark.py -m roberta-base -p <fp32/int8>
 
 # To run gpt2
-python3 benchmarking.py -m gpt2 -p <fp32/int8>
+python3 benchmark.py -m gpt2 -p <fp32/int8>
 
 ```
 
