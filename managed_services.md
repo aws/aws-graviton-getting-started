@@ -1,4 +1,4 @@
-In addition to the AWS Graviton2-based Amazon EC2 instances, Graviton2 is also available via a growing list of AWS managed services as follows:
+In addition to the AWS Graviton-based Amazon EC2 instances, Graviton is also available via a growing list of AWS managed services as follows:
 
 Note: You can always find the latest Graviton announcements via these [What's New posts](https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&whats-new-content-all.q=Graviton&whats-new-content-all.q_operator=AND#What.27s_New_Feed).
 
