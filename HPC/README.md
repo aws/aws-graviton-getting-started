@@ -508,3 +508,4 @@ Sentieon              | DNAseq , TNseq, DNAscope | 202112.02 | [Release Notes](h
 Siemens               | StarCCM++     | 2023.2              | [Release Notes](https://blogs.sw.siemens.com/simcenter/simcenter-star-ccm-2302-released/#section_3)
 Université de Genève  | Palabos       | 2010                | [Lattice-Boltzmann Palabos (AWS)](https://aws.amazon.com/blogs/hpc/lattice-boltzmann-simulation-with-palabos-on-aws-using-graviton-based-amazon-ec2-hpc7g-instances/)
 Altair Engineering  | OpenRadioss       | 20231204                | [Presentations-Aachen270623 - OpenRadioss](https://www.openradioss.org/presentations-aachen270623/?wvideo=3ox1rtpco8), [Instructions](https://openradioss.atlassian.net/wiki/spaces/OPENRADIOSS/pages/47546369/HPC+Benchmark+Models)
+EDF Research And Development  | Code Saturne       | v7+                | [About Code Saturne ](https://www.code-saturne.org/cms/web/About-codesaturne)
