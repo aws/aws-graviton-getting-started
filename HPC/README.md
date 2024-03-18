@@ -21,6 +21,10 @@
       - [Build Gromacs 2022.4](#build-gromacs-20224)
       - [Run the benchmark](#run-the-benchmark)
       - [Sample output](#sample-output-1)
+    - [Code Saturne](#code-saturne)
+      - [Build Code Saturne 8.0.2](#build-code-saturne-802)
+      - [Run the benchmark](#run-bench_f128_02-benchmark)
+      - [Sample output](#code-saturne-benchmark-sample-output)
 - [Compile instructions on an Ec2](setup-an-ec2-hpc-instance.md#compile-instructions-on-an-ec2)
 - [MPI application profiling](#mpi-application-profiling)
     - [Tau Performance System](#tau-performance-system)
@@ -392,7 +396,7 @@ Finalising parallel run
 Gromacs is a widely used molecular dynamics software package. Gromacs is a computation heavy software, and can get better performance with the modern processors' SIMD (single instruction multiple data) capabilities. We recommend using Gromacs 2022.4 or later releases because they implement performance critical routines using the SVE instruction set found on Hpc7g/C7gn.
 
 #### Build Gromacs 2022.4 
-Ue [this script](scripts-gromacs/compile-gromacs-acfl.sh) with command `./scripts-gromacs/compile-gromacs-acfl.sh` to build Gromacs with ACfL
+Use [this script](scripts-gromacs/compile-gromacs-acfl.sh) with command `./scripts-gromacs/compile-gromacs-acfl.sh` to build Gromacs with ACfL
 ```
 # note: Gromacs supports 3 different programming interfaces for FFT:
 # "fftw3", "mkl" and "fftpack". The ArmPL FFT library has the same 
@@ -446,6 +450,79 @@ At the end of benchRIB output log, `/shared/data-gromacs/benchRIB/benchRIB.log`,
 Performance:        6.149        3.903
 Finished mdrun on rank 0 Fri May 12 22:18:17 2023
 ```
+
+### Code Saturne
+code_saturne is a general-purpose computational fluid dynamics free computer software package. Developed since 1997 at Électricité de France R&D, code_saturne is distributed under the GNU GPL licence.
+
+#### Build Code Saturne 8.0.2
+Use [this script](scripts-code_saturne/install-codesaturne-gcc-mpi4.sh) with command `./scrpits-code_saturne/install-codesaturne-gcc-mpi4.sh` to build Code Saturne with GCC. The configuration below uses BLAS library from ArmPL. The default multi-grid solver is cs_sles_solve_native. Users can change the solver and solver settings (n_max_iter_coarse_solver, min_g_cells) by updating ./src/user/cs_user_parameters.c.  [This user parameters file example](scripts-code_saturne/cs_user_parameters.c) shows a use case to use CS_SLES_P_SYM_GAUSS_SEIDEL solver for better solver performance.  
+```
+cd /shared/tools
+
+module use /shared/arm/modulefiles
+module load armpl
+export PATH=/shared/openmpi-4.1.6/bin:$PATH
+export LD_LIBRARY_PATH=/shared/openmpi-4.1.6/lib:$LD_LIBRARY_PATH
+export CC=mpicc
+export CXX=mpicxx
+export FC=mpif90
+export F77=mpif90
+export F90=mpif90
+
+if [ ! -d code_saturne-8.0.2 ]; then
+    wget https://www.code-saturne.org/releases/code_saturne-8.0.2.tar.gz
+    tar xf code_saturne-8.0.2.tar.gz
+fi
+cd code_saturne-8.0.2
+
+PREFIX=/shared/code_saturne_8.0-mpi4
+mkdir build-mpi4
+cd build-mpi4
+
+../configure CC=${CC} CXX=${CXX} FC=${FC} \
+    --with-blas=$ARMPL_LIBRARIES --prefix=$PREFIX \
+    --disable-gui --without-med \
+    --without-hdf5 --without-cgns \
+    --without-metis --disable-salome \
+    --without-salome --without-eos \
+    --disable-static --enable-long-gnum \
+    --enable-profile
+
+make -j
+make install
+```
+
+#### Run BENCH_F128_02 benchmark
+The code_saturne benchmark data can be generated using the following procedures.
+
+```
+mkdir -p /shared/data-codesaturne && cd /shared/data-codesaturne
+git clone https://github.com/code-saturne/saturne-open-cases.git
+
+cd /shared/data-codesaturne/saturne-open-cases/BUNDLE/BENCH_F128_PREPROCESS/DATA
+$PREFIX/bin/code_saturne run --initialize
+cd /shared/data-codesaturne/saturne-open-cases/BUNDLE/BENCH_F128_PREPROCESS/RESU/extrude_128
+./run_solver
+
+cd /shared/data-codesaturne/saturne-open-cases/BUNDLE/BENCH_F128_02/DATA
+$PREFIX/bin/code_saturne run --initialize
+```
+
+After that you can use [the following slurm batch script](scripts-code_saturne/submit-F128-2-hpc7g-gcc-mpi4.sh) with command `sbatch scripts-code_saturne/submit-F128-2-hpc7g-gcc-mpi4.sh` to run the benchmark.
+
+#### Code Saturne benchmark sample output
+At the end of the benchmark run, you will find `run_solver.log` and `performance.log` in the run directory. These logs contain the correctness and performance information of the run. You can find the Elapsed time for the job in `performance.log` and one of the sample can be found below.
+
+```
+Calculation time summary:
+
+  User CPU time:            294.198 s
+  System CPU time:           13.001 s
+  Total CPU time:         57958.255 s
+
+  Elapsed time:             318.384 s
+  CPU / elapsed time          0.965
+  ```
 
 ## MPI application profiling
 Ideally, as you add more resources, the runtime of HPC applications should reduce linearly. When scaling is sub-linear or worse, it is usually because of the non-optimal communication patterns. To debug these cases, open-source tools such as the [Tau Performance System](http://www.cs.uoregon.edu/research/tau/home.php), can generate profiling and tracing reports to help you locate the bottlenecks.
@@ -508,3 +585,7 @@ Sentieon              | DNAseq , TNseq, DNAscope | 202112.02 | [Release Notes](h
 Siemens               | StarCCM++     | 2023.2              | [Release Notes](https://blogs.sw.siemens.com/simcenter/simcenter-star-ccm-2302-released/#section_3)
 Université de Genève  | Palabos       | 2010                | [Lattice-Boltzmann Palabos (AWS)](https://aws.amazon.com/blogs/hpc/lattice-boltzmann-simulation-with-palabos-on-aws-using-graviton-based-amazon-ec2-hpc7g-instances/)
 Altair Engineering  | OpenRadioss       | 20231204                | [Presentations-Aachen270623 - OpenRadioss](https://www.openradioss.org/presentations-aachen270623/?wvideo=3ox1rtpco8), [Instructions](https://openradioss.atlassian.net/wiki/spaces/OPENRADIOSS/pages/47546369/HPC+Benchmark+Models)
+<<<<<<< HEAD
+Électricité de France   | Code Saturne       | 8.0.2                | https://www.code-saturne.org/cms/web/documentation/Tutorials
+=======
+>>>>>>> 66fea25cee86fa003ed613718c98c4791975abe4
