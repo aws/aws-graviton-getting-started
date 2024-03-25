@@ -18,6 +18,7 @@ Some techniques for writing optimized assembly:
 1. [Be aware of instruction level parallelism](#instruction-level-parallelism)
 1. [Split Data Dependency Chains](#split-data-dependency-chains)
 1. [Modulo Scheduling](#modulo-scheduling)
+1. [Test Everything](#test-everything)
 
 
 We will be adding more sections to this document soon, so check back!
@@ -532,3 +533,47 @@ both of these things, do we achieve this performance.
 
 I didn’t mention SVE gather load instructions on purpose. They would most
 definitely help here, and we will explore that in the future.
+
+# Test Everything
+
+Test everything and make no assumptions. When you are writing hand optimized
+assembly or intrinsics to achieve the best performance, speed can be impacted in
+surprising and unintuitive ways even for experienced assembly developers, so
+it’s important to create micro benchmarks for every function that you work on.
+It’s also important to consider how the function will be called. For example, a
+kernel in a video encoder for computing the sum-absolute-difference of two
+frames of video will be called repeatedly in a tight loop with similar or
+identical arguments which will give the branch predictor and instruction caches
+plenty of opportunity to train themselves to peak performance. Microbenchmarks
+to test these types of functions in loops with fixed arguments are very useful
+to measure performance. However, something like mempcy is called on irregular
+intervals possibly with different arguments for each call. Benchmarking a
+function like this in a tight loop may lead to misleading results since a tight
+loop will over-train the branch predictor leading the same path being taken each
+time, whereas in real workloads data dependent branches will incur a more
+significant penalty. To properly benchmark memcpy we would need to benchmark it
+with a distribution of length arguments similar to what you expect in a
+production workload, which will vary widely.
+
+There is no one-size-fits all approach for benchmarking, so as you design your
+test harness, consider how the function will be used and design accordingly. You
+may even want several types of microbenchmarks to evaluate changes to your
+function across different conditions. Most functions written in assembly should
+avoid the need for knowledge about an external structure so the author does not
+have to make assumptions about the layout of memory which could be changed by
+the compiler. This also makes it easier to extract these functions as small
+kernels for testing separately from a large application in a standalone test
+harness. A standalone test harness is very convenient, since it is likely to
+build much more quickly than a large application the assembly function is a part
+of, making iterative development quicker. In addition to testing a wide range of
+input conditions, which is the case for any function in any language, assembly
+functions should also be tested to ensure they do not violate the calling
+convention. For example, some registers should not be modified, or if they are,
+their contents should be spilled to the stack and reloaded before returning. For
+some functions, especially if the input affects locations of memory
+dereferencing, it is necessary to fuzz the function by generating random input
+arguments, or all permutations, if it is feasible.
+
+While testing is always important in software development, it is especially
+important for assembly programming. Choose a test method that works for your case
+and make thorough use of it.
