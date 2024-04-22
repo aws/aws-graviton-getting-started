@@ -27,7 +27,7 @@ logout
 Next, log back into the instance, and run:
 
 ```sh
-export LIBRDKAFKA_VERSION=2.0.2 # Or whichever version you need. We tested with 2.0.2.
+export LIBRDKAFKA_VERSION=2.3.0   #The minimum version required is 2.3.0
 git clone -b v${LIBRDKAFKA_VERSION} https://github.com/confluentinc/librdkafka 
 cd librdkafka/packaging/rpm
 MOCK_CONFIG=/etc/mock/amazonlinux-2-aarch64.cfg make
