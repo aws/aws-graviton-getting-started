@@ -62,7 +62,6 @@ allocating huge-pages.
 3. Disable Receive Packet Steering (RPS) to avoid contention and extra IPIs. 
     1.  `cat /sys/class/net/ethN/queues/rx-N/rps_cpus` and verify they are set to `0`. In general RPS is not needed on Graviton2. 
     2. You can try using RPS if your situation is unique.  Read the [documentation on RPS](https://www.kernel.org/doc/Documentation/networking/scaling.txt) to understand further how it might help. Also refer to [Optimizing network intensive workloads on Amazon EC2 A1 Instances](https://aws.amazon.com/blogs/compute/optimizing-network-intensive-workloads-on-amazon-ec2-a1-instances/) for concrete examples.
-4. Disable `tcp_autocorking` with `echo 0 > /proc/sys/net/ipv4/tcp_autocorking` and use `TCP_NODELAY` socket flag to avoid additional delays in the server's response that could impact latency.
 
 ## Metal instance IO optimizations
 
