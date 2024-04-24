@@ -197,13 +197,13 @@ if __name__ == "__main__":
     parser.add_argument("--no-root", action="store_true", help="Allow running without root privileges")
 
 
+    args = parser.parse_args()
+
     if not args.no_root:
         res = subprocess.run(["id", "-u"], check=True, stdout=subprocess.PIPE)
         if int(res.stdout) > 0:
             print("Must be run with root privileges (or with --no-root)")
             exit(1)
-
-    args = parser.parse_args()
 
     if args.custom_ctr:
         ctrs = args.custom_ctr.split("|")

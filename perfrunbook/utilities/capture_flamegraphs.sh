@@ -1,11 +1,12 @@
 #!/bin/bash
-
 set -e
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 let capture_freq=99
 reverse=
 
-# search replace filter that will combine thread names like 
+# search replace filter that will combine thread names like
 # GC-Thread-1 to GC-Thread- in perf-script sample header lines.
 sr_filter='s/^([a-zA-Z\-]+)[0-9]*-?([a-zA-z]*) (.*?)$/\1\2 \3/g'
 
@@ -18,12 +19,11 @@ help_msg() {
 process_perf_data () {
   perf inject -j -i perf.data -o perf.data.jit
   perf script -f -i perf.data.jit > script.out
-  
   if [[ ! -z "${sr_filter}" ]]; then
     perl -pi -e "${sr_filter}" script.out
   fi
-  ./FlameGraph/stackcollapse-perf.pl --kernel --jit script.out > folded.out
-  ./FlameGraph/flamegraph.pl ${reverse:+--reverse} --colors java folded.out > flamegraph_$1_$4_$3_$2.svg
+  "$script_dir/FlameGraph/stackcollapse-perf.pl" --kernel --jit script.out > folded.out
+  "$script_dir/FlameGraph/flamegraph.pl" ${reverse:+--reverse} --colors java folded.out > flamegraph_$1_$4_$3_$2.svg
   rm perf.data perf.data.jit script.out folded.out
 }
 
@@ -53,12 +53,6 @@ if [[ $? -ne 0 ]]; then
   help_msg
   exit 1
 fi
-
-date=$(date "+%Y-%m-%d_%H:%M:%S")
-# Get meta-data using IMDSv2
-token=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-instance_type=$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-type)
-instance_id=$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)
 
 POSITIONAL=()
 while [[ $# -gt 0 ]]
@@ -97,6 +91,16 @@ fi
 capture_time=300
 if [[ $# -gt 1 ]]; then
   capture_time=$2
+fi
+
+date=$(date "+%Y-%m-%d_%H:%M:%S")
+# Try to get meta-data using IMDSv2
+if token=$(curl --max-time 1 -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600") ; then
+  instance_type=$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-type)
+  instance_id=$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)
+else
+  instance_type="unknown"
+  instance_id="unknown"
 fi
 
 if [[ "$1" == "oncpu" ]]; then
