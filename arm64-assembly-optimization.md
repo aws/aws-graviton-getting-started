@@ -19,6 +19,7 @@ Some techniques for writing optimized assembly:
 1. [Split Data Dependency Chains](#split-data-dependency-chains)
 1. [Modulo Scheduling](#modulo-scheduling)
 1. [Test Everything](#test-everything)
+1. [Specialize functions for known input conditions](#specialize-functions-for-known-input-conditions)
 
 
 We will be adding more sections to this document soon, so check back!
@@ -577,3 +578,65 @@ arguments, or all permutations, if it is feasible.
 While testing is always important in software development, it is especially
 important for assembly programming. Choose a test method that works for your case
 and make thorough use of it.
+
+## Specialize functions for known input conditions
+
+Functions that are important enough to optimize with assembly often take very
+predictable or specific code paths that are the same every time they are called.
+For example, a hot function written in C may take an argument which specifies an
+array length which the C will use in a loop termination condition. The C may be
+written to accept any possible input for that length. However when we write the
+function in assembly, it can be advantageous to make assumptions about the
+arguments, such as “it will always be divisible by 2, 4, 8, or 16.” We can
+handle these cases by checking if any of these assumptions is true at the top of
+the function and then branch to a specialized portion of the function. Then the
+specialized assembly can omit more general code to handle any possible input and
+make use of loop unrolling or SIMD instructions which divide evenly into the
+array length.
+
+Another technique is to call hot functions through a function pointer. Before
+setting the function pointer, if the input arguments can be verified to always
+satisfy some conditions, like the length is divisible 16 and always non-zero, we
+can set the pointer to an assembly function which is optimized based on those
+assumptions. Authors of video codecs will be very familiar with this technique.
+In fact,
+[many](https://github.com/FFmpeg/FFmpeg/blob/master/libswscale/swscale.h)
+[encoders](https://bitbucket.org/multicoreware/x265_git/src/master/source/common/aarch64/asm-primitives.cpp)
+have a great deal of infrastructure just to dispatch work to specialized
+functions which match the input conditions.
+
+Here is an example:
+
+```
+int32_t sum_all(int8_t *values, int length)
+{
+   int32_t sum = 0;
+   for (int i = 0; i < length; i++)
+      sum += values[i];
+   return sum;
+}
+```
+
+If this is only ever called when length is divisible by 16 and non-zero, we can
+implement in assembly like this:
+
+```
+// x0 - int8_t *values
+// w1 - int length
+sum_all_x16_asm:
+    movi v2.4s, #0           // zero out v2 for use as an accumulator
+1:  ld1 {v0.16b}, [x0], #16  // load 16 bytes from values[i]
+    saddlp v1.8h, v0.16b     // pairwise-add-long (A, B, C, D, ...) => (A+B, C+D, ...)
+    sadalp v2.4s, v1.8h      // pairwise-add-accumulate-long (same, but add to v2)
+    subs w1, w1, #16         // check the loop counter
+    b.gt 1b                  // branch back if more iterations remain
+    addv s0, v2.4s           // add-across the accumulator
+    fmov w0, s0              // copy to general purpose register
+    ret
+```
+
+In this implementation, we can skip the initial check to see if length is zero
+and we can skip any checks for any unconsumed values if length was not divisible
+by 16. A more complex function may be able to be unrolled farther or make more
+assumptions about type conversions which are knowable based on the inputs, which
+can improve execution speed even more.
