@@ -165,6 +165,7 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
  * [Encored Technologies Successfully Built an HPC on AWS for Weather Research & Forecasting (WRF)](https://aws.amazon.com/solutions/case-studies/encored-technologies-case-study/)
  * [Instance sizes in the Amazon EC2 Hpc7 family – a different experience](https://aws.amazon.com/blogs/hpc/instance-sizes-in-the-amazon-ec2-hpc7-family-a-different-experience/)
  * [Checkpointing HPC applications using the Spot Instance two-minute notification from Amazon EC2](https://aws.amazon.com/blogs/hpc/checkpointing-hpc-applications-using-the-spot-instance-two-minute-notification-from-amazon-ec2/)
+ * [Best practices for running molecular dynamics simulations on AWS Graviton3E](https://aws.amazon.com/blogs/hpc/best-practices-for-running-molecular-dynamics-simulations-on-aws-graviton3e/)
 
 
 ## Machine Learning
