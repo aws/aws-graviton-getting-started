@@ -174,6 +174,7 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
  * [PyTorch blog: Optimized PyTorch 2.0 Inference with AWS Graviton processors](https://pytorch.org/blog/optimized-pytorch-w-graviton/)
  * [PyTorch Inference Performance Tuning on AWS Graviton Processors](https://pytorch.org/tutorials/recipes/inference_tuning_on_aws_graviton.html)
  * [Run machine learning inference workloads on AWS Graviton-based instances with Amazon SageMaker](https://aws.amazon.com/blogs/machine-learning/run-machine-learning-inference-workloads-on-aws-graviton-based-instances-with-amazon-sagemaker/)
+ * [Accelerate NLP inference with ONNX Runtime on AWS Graviton processors](https://aws.amazon.com/blogs/machine-learning/accelerate-nlp-inference-with-onnx-runtime-on-aws-graviton-processors/)
 
 ## Other
  * [Optimized Video Encoding with FFmpeg on AWS Graviton Processors](https://aws.amazon.com/blogs/opensource/optimized-video-encoding-with-ffmpeg-on-aws-graviton-processors/)
