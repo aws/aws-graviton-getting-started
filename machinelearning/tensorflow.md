@@ -18,7 +18,7 @@ As of June 2023, AWS Graviton DLCs are based on TensorFlow 2.12.0 (and TensorFlo
 # Login and pull the AWS DLC for tensorflow
 aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-west-2.amazonaws.com
 
-docker pull 763104351884.dkr.ecr.us-east-1.amazonaws.com/tensorflow-inference-graviton:2.12.1-cpu-py310-ubuntu20.04-ec2
+docker pull 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.12.1-cpu-py310-ubuntu20.04-ec2
 
 # Sample command to launch the tensorflow serving api with resnet50 model
 docker run -p 8501:8501 --name tfserving_resnet --mount type=bind,source=/tmp/resnet,target=/models/resnet -e MODEL_NAME=resnet -t 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.12.1-cpu-py310-ubuntu20.04-ec2
