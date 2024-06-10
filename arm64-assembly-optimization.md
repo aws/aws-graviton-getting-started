@@ -14,6 +14,11 @@ generated for the hot code. Profilers such as Linux perf allow the inspection of
 the assembly level code. During the review of the hot code, software developers
 can reference this guide to find better ways to optimize inner loops.
 
+To develop code for AWS Gravition, we always recommend developing and testing on
+Graviton itself to ensure that the optimizations you make are targeted toward
+Graviton. The microarchitecture of other Arm64 cores may be different in ways
+that lead to different optimizations.
+
 Some techniques for writing optimized assembly:
 1. [Be aware of instruction level parallelism](#instruction-level-parallelism)
 1. [Split Data Dependency Chains](#split-data-dependency-chains)
@@ -23,6 +28,35 @@ Some techniques for writing optimized assembly:
 
 
 We will be adding more sections to this document soon, so check back!
+
+### Other resources
+
+This guide aims only to provide tips on optimizing assembly or intrinsics code.
+There are other resources available on the web which can help you to learn
+concepts and others which you can refer to as references. Here is a list of
+helpful pages.
+
+* https://mariokartwii.com/armv8/ - a full book on how to get start writing
+  ARMv8 assembly
+* https://github.com/pkivolowitz/asm_book - another guide to get starting
+  writing assembly
+* https://github.com/slothy-optimizer/slothy  - a tool which can optimize
+  instruction scheduling, register allocation, and software pipeline of assembly
+  functions
+* https://developer.arm.com/architectures/instruction-sets/intrinsics - a
+  reference of intrinsics functions when you want to make direct use of SIMD
+  instructions from C/C++
+* https://dougallj.github.io/asil/index.html - a reference of SVE instructions
+  and their intrinsic function names by SVE version and extension feature
+  availability
+* https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst#the-base-procedure-call-standard -
+  a reference to the calling convention for aarch64, which is particularly
+  helpful to know when registers to avoid or to spill to the stack when they are
+  needed for use
+* https://developer.arm.com/documentation/ddi0602/2024-03 - the complete
+  reference for instructions in the Arm A-profile A64 ISA, which can be
+  downloaded as a PDF
+
 
 ## Instruction Level Parallelism
 When writing in C, or any higher level language, the programmer writes a sequence
