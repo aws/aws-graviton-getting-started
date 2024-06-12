@@ -173,8 +173,12 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
  * [Reduce Amazon SageMaker inference cost with AWS Graviton](https://aws.amazon.com/blogs/machine-learning/reduce-amazon-sagemaker-inference-cost-with-aws-graviton/)
  * [PyTorch blog: Optimized PyTorch 2.0 Inference with AWS Graviton processors](https://pytorch.org/blog/optimized-pytorch-w-graviton/)
  * [PyTorch Inference Performance Tuning on AWS Graviton Processors](https://pytorch.org/tutorials/recipes/inference_tuning_on_aws_graviton.html)
+ * [Sprinklr improves performance by 20% and reduces cost by 25% for machine learning inference on AWS Graviton3](https://aws.amazon.com/blogs/machine-learning/sprinklr-improves-performance-by-20-and-reduces-cost-by-25-for-machine-learning-inference-on-aws-graviton3/)
  * [Run machine learning inference workloads on AWS Graviton-based instances with Amazon SageMaker](https://aws.amazon.com/blogs/machine-learning/run-machine-learning-inference-workloads-on-aws-graviton-based-instances-with-amazon-sagemaker/)
- * [Accelerate NLP inference with ONNX Runtime on AWS Graviton processors](https://aws.amazon.com/blogs/machine-learning/accelerate-nlp-inference-with-onnx-runtime-on-aws-graviton-processors/)
+ * [Accelerate NLP inference with ONNX Runtime on AWS Graviton processors](https://aws.amazon.com/blogs/machine-learning/accelerate-nlp-inference-with-onnx-runtime-on-aws-graviton-processors)
+ * [Best-in-class LLM Performance on Arm Neoverse V1 based AWS Graviton3 CPUs](https://community.arm.com/arm-community-blogs/b/infrastructure-solutions-blog/posts/best-in-class-llm-performance-on-arm-neoverse-v1-based-aws-graviton3-servers)
+ * [Accelerating Popular Hugging Face Models using Arm Neoverse](https://community.arm.com/arm-community-blogs/b/infrastructure-solutions-blog/posts/accelerating-sentiment-analysis-on-arm-neoverse-cpus)
+ * [Run LLMs on CPU with Amazon SageMaker Real-time Inference](https://community.aws/content/2eazHYzSfcY9flCGKsuGjpwqq1B/run-llms-on-cpu-with-amazon-sagemaker-real-time-inference?lang=en)
 
 ## Other
  * [Optimized Video Encoding with FFmpeg on AWS Graviton Processors](https://aws.amazon.com/blogs/opensource/optimized-video-encoding-with-ffmpeg-on-aws-graviton-processors/)
