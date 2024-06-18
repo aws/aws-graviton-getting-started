@@ -34,6 +34,7 @@ This repository provides technical guidance for users and developers using [Amaz
 * [Additional resources](#additional-resources)
 * [How To Resources](howtoresources.md)
 * [Blog Posts](#blog-posts)
+* [Case Studies](#case-studies)
 
 # Transitioning to Graviton
 If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton based Amazon EC2 instances](transition-guide.md).
@@ -162,7 +163,6 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
  * [Application deep-dive into the AWS Graviton3E-based Amazon EC2 Hpc7g instance](https://aws.amazon.com/blogs/hpc/application-deep-dive-into-the-graviton3e-based-amazon-ec2-hpc7g-instance/)
  * [Rescale Automates the Deployment of Ansys LS-DYNA and Ansys Fluent Workloads on Amazon EC2 Hpc7g Instances](https://rescale.com/blog/rescale-automates-the-deployment-of-ansys-ls-dyna-and-ansys-fluent-workloads-on-amazon-ec2-hpc7g-instances/)
  * [Lattice Boltzmann simulation with Palabos on AWS using Graviton-based Amazon EC2 Hpc7g instances](https://aws.amazon.com/blogs/hpc/lattice-boltzmann-simulation-with-palabos-on-aws-using-graviton-based-amazon-ec2-hpc7g-instances/)
- * [Encored Technologies Successfully Built an HPC on AWS for Weather Research & Forecasting (WRF)](https://aws.amazon.com/solutions/case-studies/encored-technologies-case-study/)
  * [Instance sizes in the Amazon EC2 Hpc7 family – a different experience](https://aws.amazon.com/blogs/hpc/instance-sizes-in-the-amazon-ec2-hpc7-family-a-different-experience/)
  * [Checkpointing HPC applications using the Spot Instance two-minute notification from Amazon EC2](https://aws.amazon.com/blogs/hpc/checkpointing-hpc-applications-using-the-spot-instance-two-minute-notification-from-amazon-ec2/)
  * [Best practices for running molecular dynamics simulations on AWS Graviton3E](https://aws.amazon.com/blogs/hpc/best-practices-for-running-molecular-dynamics-simulations-on-aws-graviton3e/)
@@ -179,9 +179,19 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
  * [Best-in-class LLM Performance on Arm Neoverse V1 based AWS Graviton3 CPUs](https://community.arm.com/arm-community-blogs/b/infrastructure-solutions-blog/posts/best-in-class-llm-performance-on-arm-neoverse-v1-based-aws-graviton3-servers)
  * [Accelerating Popular Hugging Face Models using Arm Neoverse](https://community.arm.com/arm-community-blogs/b/infrastructure-solutions-blog/posts/accelerating-sentiment-analysis-on-arm-neoverse-cpus)
  * [Run LLMs on CPU with Amazon SageMaker Real-time Inference](https://community.aws/content/2eazHYzSfcY9flCGKsuGjpwqq1B/run-llms-on-cpu-with-amazon-sagemaker-real-time-inference?lang=en)
+ * [Accelerating large-scale neural network training on CPUs with ThirdAI and AWS Graviton](https://aws.amazon.com/blogs/machine-learning/accelerating-large-scale-neural-network-training-on-cpus-with-thirdai-and-aws-graviton/)
 
 ## Other
  * [Optimized Video Encoding with FFmpeg on AWS Graviton Processors](https://aws.amazon.com/blogs/opensource/optimized-video-encoding-with-ffmpeg-on-aws-graviton-processors/)
+
+# Case Studies
+
+## HPC
+ * [Encored Technologies Successfully Built an HPC on AWS for Weather Research & Forecasting (WRF)](https://aws.amazon.com/solutions/case-studies/encored-technologies-case-study/)
+ * [Arm Scales Performance for Chip Design Using Amazon FSx for NetApp ONTAP](https://aws.amazon.com/solutions/case-studies/arm-ltd-case-study/)
+
+## Other
+ * [Lower Latency and Costs Using AWS Graviton2–Based Instances with Sprinklr](https://aws.amazon.com/solutions/case-studies/sprinklr-case-study/)
 
 # Additional resources
 
