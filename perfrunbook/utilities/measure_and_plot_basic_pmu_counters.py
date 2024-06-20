@@ -14,20 +14,21 @@ import io
 np.seterr(divide='ignore')
 
 
-def perfstat(time, counter_numerator, counter_denominator, __unused__):
+def perfstat(time, period, cpus, counter_numerator, counter_denominator, __unused__):
     """
     Measure performance counters using perf-stat in a subprocess.  Return a CSV buffer of the values measured.
     """
     try:
-        res = subprocess.run(["lscpu", "-p=CPU"], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = io.StringIO(res.stdout.decode('utf-8'))
-        cpus = []
-        for line in output.readlines():
-            match = re.search(r'''^(\d+)$''', line)
-            if match is not None:
-                cpus.append(match.group(1))
+        if not cpus:
+            res = subprocess.run(["lscpu", "-p=CPU"], check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = io.StringIO(res.stdout.decode('utf-8'))
+            cpus = []
+            for line in output.readlines():
+                match = re.search(r'''^(\d+)$''', line)
+                if match is not None:
+                    cpus.append(match.group(1))
 
-        res = subprocess.run(["perf", "stat", f"-C{','.join(cpus)}", "-I1000", "-x|", "-a", "-e", f"{counter_numerator}", "-e", f"{counter_denominator}", "--", "sleep", f"{time}"],
+        res = subprocess.run(["perf", "stat", f"-C{','.join(cpus)}", f"-I{period}", "-x|", "-a", "-e", f"{counter_numerator}", "-e", f"{counter_denominator}", "--", "sleep", f"{time}"],
                              check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return io.StringIO(res.stdout.decode('utf-8'))
     except subprocess.CalledProcessError:
@@ -51,7 +52,7 @@ def plot_terminal(data, title, xtitle):
     plt.show()
 
 
-def plot_counter_stat(csv, stat_name, counter_numerator,
+def plot_counter_stat(csv, logfile, plot, stat_name, counter_numerator,
                       counter_denominator, scale):
     """
     Process the returned csv file into a time-series statistic to plot and
@@ -66,6 +67,8 @@ def plot_counter_stat(csv, stat_name, counter_numerator,
     df_processed = pd.DataFrame()
 
     df_processed[stat_name] = (df[df['event'] == counter_numerator]['count'].reset_index(drop=True)) / (df[df['event'] == counter_denominator]['count'].reset_index(drop=True)) * scale
+    df_processed[counter_numerator] = df[df['event'] == counter_numerator]['count'].reset_index(drop=True)
+    df_processed[counter_denominator] = df[df['event'] == counter_denominator]['count'].reset_index(drop=True)
     df_processed.dropna(inplace=True)
 
     # Calculate some meaningful aggregate stats for comparing time-series plots
@@ -75,12 +78,22 @@ def plot_counter_stat(csv, stat_name, counter_numerator,
     p99 = stats.scoreatpercentile(df_processed[stat_name], 99)
     xtitle = f"gmean:{geomean:>6.2f} p50:{p50:>6.2f} p90:{p90:>6.2f} p99:{p99:>6.2f}"
 
-    plot_terminal(df_processed, stat_name, xtitle)
+    if logfile:
+        df_processed.to_csv(logfile)
+    if plot:
+        plot_terminal(df_processed, stat_name, xtitle)
 
 
 def get_cpu_type():
-    GRAVITON_MAPPING = {"0xd0c": "Graviton2", "0xd40": "Graviton3"}
-    AMD_MAPPING = {"7R13": "Milan", "9R14": "Genoa"}
+    GRAVITON_MAPPING = {
+        "0xd0c": "Graviton2",
+        "0xd40": "Graviton3",
+        "0xd4f": "Graviton4"
+    }
+    AMD_MAPPING = {
+        "7R13": "Milan",
+        "9R14": "Genoa"
+    }
 
     with open("/proc/cpuinfo", "r") as f:
         for line in f.readlines():
@@ -170,6 +183,7 @@ GENOA_CTRS = {
 filter_proc = {
     "Graviton2": UNIVERSAL_GRAVITON_CTRS,
     "Graviton3": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON3_CTRS},
+    "Graviton4": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON3_CTRS},
     "Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8275CL CPU @ 3.00GHz": UNIVERSAL_INTEL_CTRS,
@@ -190,12 +204,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--stat", default="ipc", type=str, choices=stat_choices)
+    parser.add_argument("--period", default=1000, type=int)
+    parser.add_argument("--cpu-list", action="store", type=str)
+    parser.add_argument("--no-plot", action="store_true", help="Do not plot to terminal")
+    parser.add_argument("--log-file", help="Save counter data as CSV to specified file")
     parser.add_argument("--time", default=60, type=int, help="How long to measure for in seconds")
     parser.add_argument("--custom_ctr", type=str,
                         help="Specify a custom counter ratio and scaling factor as 'name|ctr1|ctr2|scale'"
                              ", calculated as ctr1/ctr2 * scale")
     parser.add_argument("--no-root", action="store_true", help="Allow running without root privileges")
-
 
     args = parser.parse_args()
 
@@ -214,5 +231,8 @@ if __name__ == "__main__":
         counter_info = filter_proc[processor_version][args.stat]
         stat_name = args.stat
 
-    csv = perfstat(args.time, *counter_info)
-    plot_counter_stat(csv, stat_name, *counter_info)
+    cpus = None
+    if args.cpu_list and args.cpu_list != "all":
+        cpus = args.cpu_list.split(",")
+    csv = perfstat(args.time, args.period, cpus, *counter_info)
+    plot_counter_stat(csv, args.log_file, (not args.no_plot), stat_name, *counter_info)
