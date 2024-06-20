@@ -12,16 +12,16 @@ There are multiple levels of software package abstractions available:
 
 **AWS Graviton TensorFlow DLC**
 
-As of June 2023, AWS Graviton DLCs are based on TensorFlow 2.12.0 (and TensorFlow Serving 2.12.1), but they also include additional optimizations from TensorFlow development branch. The DLCs improve the inference performance on Graviton up to 50% compared to the previous releases for ResNet-50 and Bert models and making Graviton3 the most cost effective compute optimized instance on AWS for these models.
+As of May 2024, AWS Graviton DLCs are based on TensorFlow 2.14.1. The DLCs enable the Graviton optimizations by default.
 
 ```
 # Login and pull the AWS DLC for tensorflow
 aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-west-2.amazonaws.com
 
-docker pull 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.12.1-cpu-py310-ubuntu20.04-ec2
+docker pull 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.14.1-cpu-py310-ubuntu20.04-ec2
 
 # Sample command to launch the tensorflow serving api with resnet50 model
-docker run -p 8501:8501 --name tfserving_resnet --mount type=bind,source=/tmp/resnet,target=/models/resnet -e MODEL_NAME=resnet -t 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.12.1-cpu-py310-ubuntu20.04-ec2
+docker run -p 8501:8501 --name tfserving_resnet --mount type=bind,source=/tmp/resnet,target=/models/resnet -e MODEL_NAME=resnet -t 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.14.1-cpu-py310-ubuntu20.04-ec2
 ```
 
 **Using Python wheel**
@@ -30,14 +30,9 @@ docker run -p 8501:8501 --name tfserving_resnet --mount type=bind,source=/tmp/re
 pip install tensorflow
 ```
 
-TensorFlow wheel supports the default eigen backend for Graviton CPUs, but typically onednn+acl provides better performance and this can be enabled by setting the below TF environment variable
-```
-export TF_ENABLE_ONEDNN_OPTS=1
-```
-
 **Using Docker hub container**
 
-As of June 2023, Docker hub images from armswdev are based on TensorFlow 2.12.0, but also include additional downstream optimizations and experimental features. These are avaiable for trying out the experimental downstream features and provide early feedback.
+As of May 2024, Docker hub images from armswdev are based on TensorFlow 2.15.1, but also include additional downstream optimizations and experimental features. These are avaiable for trying out the experimental downstream features and provide early feedback.
 
 ```
 # pull the tensorflow docker container with onednn-acl optimizations enabled
@@ -55,7 +50,7 @@ It is highly recommended to use the AMIs based on Linux Kernel 5.10 and beyond f
 
 AWS DLCs come with all the optimizations enabled, so, there are no additional runtime configurations required. Where as for the python wheels and the docker hub images, enable the below runtime configurations to achieve the best performance.
 ```
-# The default runtime backend for tensorflow is Eigen, but typically onednn+acl provides better performance and this can be enabled by setting the below TF environment variable
+# For TensorFlow versions older than 2.14.0, the default runtime backend is Eigen, but typically onednn+acl provides better performance. To enable the onednn+acl backend, set the following TF environment variable
 export TF_ENABLE_ONEDNN_OPTS=1
 
 # Graviton3(E) (e.g. c7g, c7gn, and hpc7g instances) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
@@ -92,7 +87,6 @@ optimized_graph_def = optimize_for_inference(graph_def, [item.split(':')[0] for 
                     [item.split(':')[0] for item in outputs], dtypes.float32.as_datatype_enum, False)
 g = tf.compat.v1.import_graph_def(optimized_graph_def, name='')
 ```
-Note: While the Grappler optimizer covers majority of the networks, there are few scenarios where either the Grappler optimizer can't optimize the generic graph or the runtime kernel launch overhead is simply not acceptable. XLA addresses these gaps by providing an alternative mode of running models: it compiles the TensorFlow graph into a sequence of computation kernels generated specifically for the given model. Please refer to the **Enable XLA optimizations** section below to achieve the best performance with the downstream XLA optimizations.
 
 # Evaluate performance with the standard MLPerf inference benchmarks
 
@@ -160,7 +154,7 @@ The below steps help debugging performance issues with any inference application
 export DNNL_VERBOSE=1
 export OMP_DISPLAY_ENV=VERBOSE
 ```
-If there are no OneDNN logs on the terminal, this could mean either the ops are executed with Eigen or XLA backend. To switch from Eigen to OneDNN+ACL backend, set 'TF_ENABLE_ONEDNN_OPTS=1' and rerun the model inference. For non-XLA compiled graphs, there should be a flow of DNN logs with details about the shapes, prop kinds and execution times. Inspect the logs to see if there are any ops and shapes not executed with the ACL gemm kernel, instead executed by cpp reference kernel. See below example dnnl logs to understand how the ACL gemm and reference cpp kernel execution traces look like.
+If there are no OneDNN logs on the terminal, this could mean the ops are executed with Eigen. To switch from Eigen to OneDNN+ACL backend, set 'TF_ENABLE_ONEDNN_OPTS=1' and rerun the model inference. There should be a flow of DNN logs with details about the shapes, prop kinds and execution times. Inspect the logs to see if there are any ops and shapes not executed with the ACL gemm kernel, instead executed by cpp reference kernel. See below example dnnl logs to understand how the ACL gemm and reference cpp kernel execution traces look like.
 ```
 # ACL gemm kernel
 dnnl_verbose,exec,cpu,convolution,gemm:acl,forward_training,src_f32::blocked:acdb:f0 wei_f32::blocked:acdb:f0 bia_f32::blocked:a:f0 dst_f32::blocked:acdb:f0,post_ops:'eltwise_relu;';,alg:convolution_direct,mb1_ic256oc64_ih56oh56kh1sh1dh0ph0_iw56ow56kw1sw1dw0pw0
@@ -215,35 +209,51 @@ OPENMP DISPLAY ENVIRONMENT END
 
 # Building TensorFlow from sources
 
-We recommend using the official distributions of TensorFlow for Graviton, but there are cases developers may want to compile TensorFlow from source. One such case would be to experiment with new features or develop custom features. This section outlines the recommended way to compile TensorFlow from source. Please note that "--config=mkl_aarch64" is the recommended bazel config for aarch64 builds.
+We recommend using the official distributions of TensorFlow for Graviton, but there are cases developers may want to compile TensorFlow from source. One such case would be to experiment with new features or develop custom features. This section outlines the recommended way to compile TensorFlow from source. Please note that "--config=mkl_aarch64_threadpool" is the recommended bazel config for aarch64 builds. The following instructions cover both gcc and clang builds.
+
+
+**Install the compiler tool chain**
+
+For Clang builds, install the llvm version recommended in the TensorFlow release. For example, llvm-17.0.2 is recommended for TF v2.16
 
 ```
-# This step is required if gcc-10 is not the default version on the OS distribution, e.g. Ubuntu 20.04
-# Install gcc-10 and g++-10 as it is required for Arm Compute Library build.
+wget https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.2/clang+llvm-17.0.2-aarch64-linux-gnu.tar.xz -O- | sudo tar xv -J --strip-component=1 -C /usr
+```
+
+For GCC builds, gcc10 or above version is required for building mkl_aarch64_threadpool configuration with Arm Compute Library. The following step is required if gcc-10+ is not the default version on the OS distribution, e.g. Ubuntu 20.04
+
+```
 sudo apt install -y gcc-10 g++-10
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 1
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 1
 
-# Install the required pip packages
+```
+
+**Install the required packages**
+```
 pip3 install numpy packaging
+sudo apt install patchelf
 
 # Install bazel for aarch64
-mkdir bazel
-cd bazel
-wget https://github.com/bazelbuild/bazel/releases/download/5.1.1/bazel-5.1.1-linux-arm64
-mv bazel-5.1.1-linux-arm64 bazel
-chmod a+x bazel
-export PATH=/home/ubuntu/bazel/:$PATH
+# Bazel version required depends on the TensorFlow version, please install the correct one
+# https://github.com/tensorflow/tensorflow/blob/master/.bazelversion captures the bazel version details
+# For example, tensorflow 2.16.1 build requires bazel 6.5.0
+BAZEL=6.5.0  # modify version as needed
+sudo wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL/bazel-$BAZEL-linux-arm64 -O /usr/local/bin/bazel
+sudo chmod +x /usr/local/bin/bazel
+```
 
+**Configure and build**
+
+```
 # Clone the tensorflow repository
 git clone https://github.com/tensorflow/tensorflow.git
 cd tensorflow
 # Optionally checkout the stable version if needed
-git checkout <latest stable version>
+TF_VERSION=v2.16.1 # modify version as needed
+git checkout $TF_VERSION
 
 # Set the build configuration
-export HOST_C_COMPILER=(which gcc)
-export HOST_CXX_COMPILER=(which g++)
 export PYTHON_BIN_PATH=(which python)
 export USE_DEFAULT_PYTHON_LIB_PATH=1
 export TF_ENABLE_XLA=1
@@ -265,21 +275,25 @@ export TF_NEED_OPENCL_SYCL=0
 export TF_NEED_COMPUTECPP=0
 export TF_NEED_KAFKA=0
 export TF_NEED_TENSORRT=0
+
+# Configure the build setup.
+# Leave the default option for everything except the compiler option. Enter "Y/n" depending on whether Clang or gcc build is required.
+# Do you want to use Clang to build TensorFlow? [Y/n]:
 ./configure
 
 # Issue bazel build command with 'mkl_aarch64' config to enable onednn+acl backend
-bazel build --verbose_failures -s --config=mkl_aarch64  //tensorflow/tools/pip_package:build_pip_package //tensorflow:libtensorflow_cc.so //tensorflow:install_headers
+bazel build --verbose_failures -s --config=mkl_aarch64_threadpool  //tensorflow/tools/pip_package:build_pip_package //tensorflow:libtensorflow_cc.so //tensorflow:install_headers
 
 # Create and install the wheel
-./bazel-bin/tensorflow/tools/pip_package/build_pip_package ./wheel-TF2.12.0-py3.8-aarch64
+./bazel-bin/tensorflow/tools/pip_package/build_pip_package ./wheel-$TF_VERSION-aarch64
 
-# The output wheel is generated in /home/ubuntu/tensorflow/wheel-TF2.12.0-py3.8-aarch64
-pip install <wheel-TF2.12.0-py3.8-aarch64/*.whl>
+# The output wheel is generated in /home/ubuntu/tensorflow/wheel-$TF_VERSION-aarch64
+pip install <wheel-$TF_VERSION-aarch64/*.whl>
 ```
 
-# Building TensorFlow Java from sources
+# Building TensorFlow Java binaries (JAR)
 
-This section outlines the recommended way to compile TensorFlow Java from source.
+This section outlines the recommended way to compile TensorFlow Java binaries. The build uses release python wheels for native libraries so, the tensorflow bazel build is not required for this step.
 
 Note: TensorFlow jar distribution for aarch64 linux platform is blocked on CI support for [tensorflow/java](https://github.com/tensorflow/java) repo.
 
@@ -288,83 +302,9 @@ sudo apt-get install pkg-config ccache clang ant python3-pip swig git file wget 
 
 sudo apt install maven default-jdk
 
-# Install bazel for aarch64
-# Bazel version required depends on the TensorFlow version, please install the correct one
-# https://github.com/tensorflow/tensorflow/blob/master/.bazelversion captures the bazel version details
-mkdir bazel
-cd bazel
-wget https://github.com/bazelbuild/bazel/releases/download/5.1.1/bazel-5.1.1-linux-arm64
-mv bazel-5.1.1-linux-arm64 bazel
-chmod a+x bazel
-export PATH=/home/ubuntu/bazel/:$PATH
-
-# Build and install javacpp-presets.
-# Clone the following forked repo to exclude the libraries that are not supported and not required
-git clone https://github.com/snadampal/javacpp-presets.git
-cd javacpp-presets
-git checkout tfjava_aarch64
-mvn install -Djavacpp.platform=linux-arm64 -Dmaven.javadoc.skip=true -X -T 16
-
 # Build and install tensorflow java bindings
 git clone https://github.com/tensorflow/java.git
 cd java
 mvn install -X -T 16
 
-# Workaround for the native library path: copy the jni library to system path and issue rebuild
-sudo cp ~/java/tensorflow-core/tensorflow-core-api/target/native/org/tensorflow/internal/c_api/linux-arm64/libjnitensorflow.so /usr/lib/aarch64-linux-gnu/jni
-mvn install -X -T 16
 ```
-
-# Enable XLA optimizations
-
-While the Grappler optimizer covers majority of the networks, there are few scenarios where either the Grappler optimizer can't optimize the generic graph or the runtime kernel launch overhead is simply not acceptable. XLA addresses these gaps by providing an alternative mode of running models: it compiles the TensorFlow graph into a sequence of computation kernels generated specifically for the given model.
-
-A simple way to start using XLA in TensorFlow models without any changes is to enable auto-clustering, which automatically finds clusters (connected subgraphs) within the TensorFlow functions which can be compiled and executed using XLA. Auto-clustering on CPU can be enabled by setting the TF_XLA_FLAGS environment variables as below:
-```python
-# Set the jit level for the current session via the config
-jit_level = tf_compat_v1.OptimizerOptions.ON_1
-config.graph_options.optimizer_options.global_jit_level = jit_level
-```
-```
-# Enable auto clustering for CPU backend
-export TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit"
-```
-
-**Troubleshooting xla performance issues**
-
-1. If XLA performance improvements are not as expected, the first step is to dump and inspect the XLA optimized graph and ensure there are not many op duplications resulted from the op fusion and other other optimization passes. XLA provides a detailed logging mechanism to dump the state at different checkpoints during the graph optimization passes. At high level, inspecting the graphs generated before and after the XLA pass is sufficient to understand whether XLA compilation is the correct optimization for the current graph. Please refer to the below instructions for enabling auto-clustering, along with .dot generation (using MLPerf Bert inference in SingleStream mode as the example here) and also commands to generate .svg version for easier visualization of the XLA generated graphs.
-```
-# To enable XLA auto clustering, and to generate .dot files
-XLA_FLAGS="--xla_dump_to=/tmp/generated  --xla_dump_hlo_as_dot" TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit" python run.py --backend=tf --scenario=SingleStream
-
-# To convert the .dot file into .svg
-sudo apt install graphviz
-dot -Tsvg <.dot file to be converted> >  <output .svg name>
-
-e.g.
-dot -Tsvg 1645569101166784.module_0000.cluster_51__XlaCompiledKernel_true__XlaHasReferenceVars_false__XlaNumConstantArgs_0__XlaNumResourceArgs_0_.80.before_optimizations.dot > module0_before_opts.svg
-
-dot -Tsvg 1645569101166784.module_0000.cluster_51__XlaCompiledKernel_true__XlaHasReferenceVars_false__XlaNumConstantArgs_0__XlaNumResourceArgs_0_.80.cpu_after_optimizations.dot > module0_after_opts.svg
-```
-
-2. Once the XLA graph looks as expected (without too many duplicated nodes), check how the ops are emitted. Currently XLA framework logging is under the same TF CPP logging, and level 1 is sufficient to get most of the info traces.
-```
-# Enable TF CPP framework logging
-export TF_CPP_MAX_VLOG_LEVEL=1
-```
-Then look for the emitter level traces to understand how each op for a given shape is lowered to LLVM IR. The below traces show whether the XLA ops are emitted to ACL or Eigen runtime.
-```
-# ACL runtime traces
-__xla_cpu_runtime_ACLBatchMatMulF32
-
-__xla_cpu_runtime_ACLConv2DF32
-
-# Eigen runtime traces
-__xla_cpu_runtime_EigenBatchMatMulF32
-
-__xla_cpu_runtime_EigenConv2DF32
-```
-If the shapes are not emitted by the ACL runtime, check the source build configuration to make sure 'mkl_aarch64' bazel config is enabled (which internally enables '--define=build_with_acl=true' bazel configuration). If the LLVM IR still doesn't emit the ACL runtime, please raise an ssue on [ACL github](https://github.com/ARM-software/ComputeLibrary) with the operator and shape details.
-
-3. The above triaging steps cover typical issues due to the missing compiler or runtime configurations. If you are stuck with any of these steps or if the performance is still not meeting the target, please raise an issue on [aws-graviton-getting-started](https://github.com/aws/aws-graviton-getting-started) github.
-
