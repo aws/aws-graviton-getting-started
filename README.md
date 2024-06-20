@@ -13,6 +13,7 @@ This repository provides technical guidance for users and developers using [Amaz
 	* [Go](golang.md)
 	* [Java](java.md)
 	* [.NET](dotnet.md)
+	* [Node.JS](nodejs.md)
 	* [PHP](php.md)
 	* [Python](python.md)
 	* [Rust](rust.md)
