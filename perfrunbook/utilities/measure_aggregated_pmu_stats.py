@@ -456,8 +456,15 @@ def build_groups(platforms):
 
 
 def get_cpu_type():
-    GRAVITON_MAPPING = {"0xd0c": "Graviton2", "0xd40": "Graviton3"}
-    AMD_MAPPING = {"7R13": "Milan", "9R14": "Genoa"}
+    GRAVITON_MAPPING = {
+        "0xd0c": "Graviton2",
+        "0xd40": "Graviton3",
+        "0xd4f": "Graviton4"
+    }
+    AMD_MAPPING = {
+        "7R13": "Milan",
+        "9R14": "Genoa"
+    }
 
     with open("/proc/cpuinfo", "r") as f:
         for line in f.readlines():
@@ -509,7 +516,6 @@ counter_mapping = {
         ArmCounterPKC("inst-scalar-fp-pkc", "VFP_SPEC", "event=0x75"),
 
     ],
-
     "Graviton3": [
         ArmCounterPKC("stall_backend_mem_pkc", "stall_backend_mem_cycles", "event=0x4005"),
         ArmCounterPKC("inst-sve-pkc", "SVE_INST_SPEC", "event=0x8006"),
@@ -677,6 +683,8 @@ def create_graviton_counter_mapping(cpu_type):
 filter_proc = {
     "Graviton2": create_graviton_counter_mapping("Graviton2"),
     "Graviton3": create_graviton_counter_mapping("Graviton3"),
+    # Neoverse-V2 cores have a superset of events that overlap with Gv3
+    "Graviton4": create_graviton_counter_mapping("Graviton3"),
     "Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz": [
         PlatformDetails(counter_mapping["Intel_SKX_CXL_ICX"], 4),
         PlatformDetails(counter_mapping["Intel_SKX_CXL"], 4)],
