@@ -10,6 +10,8 @@ performance benefit until they switched to Java 11.
 This page includes specific details about building and tuning Java application on Graviton.
 
 ### Java versions
+If you are still using JDK8, please stronly consider upgrading. There are significant performance improvements that you can benefit from, such as better JIT code generation, optimized GC at high thread counts, Arm-tuned Java monitors and locks, an improved SpinPause logic (with even more options in JDK17, like OnSpinWaitInstCount and OnSpinWaitInst), and using Arm intrinsics.
+
 JDK binaries for arm64 are available from a number of
 different sources.  [Amazon Corretto](https://aws.amazon.com/corretto/) is
 continuing to improve performance of Java workloads running on Graviton processors and
