@@ -5,6 +5,7 @@
 Amazon Linux 2023 | All versions | Yes | 4KB | [AMIs](amis_cf_sm.md) | Yes | Pointer Authentication enabled on Graviton3
 Amazon Linux 2 | 2.26-35 or later| Yes | 4KB | [AMIs](amis_cf_sm.md) | Yes | End of Life (EOL) scheduled 2025-06-30
 Ubuntu Pro | 22.04 LTS | Yes | 4KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/prodview-uy7jg4dds3qjw) | Yes | 
+Ubuntu | 24.04 LTS | Yes | 4KB | [noble](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 Ubuntu | 22.04 LTS | Yes | 4KB | [jammy](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 Ubuntu | 20.04 LTS | Yes | 4KB | [focal](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 Ubuntu | 18.04 LTS | Yes (*) | 4KB | [bionic](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | (*) needs `apt install libc6-lse`. Free support ended 2023/05/31.
@@ -20,13 +21,16 @@ Debian | 11 | Yes | 4KB | [Community](https://wiki.debian.org/Cloud/AmazonEC2Ima
 Debian | 10 | [Planned for Debian 11](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=956418) | 4KB | [Community](https://wiki.debian.org/Cloud/AmazonEC2Image/Buster) or [MarketPlace](https://aws.amazon.com/marketplace/pp/B085HGTX5J) | Yes, as of Debian 10.7 (2020-12-07) |
 FreeBSD | 12.1 or later | No | 4KB | [Community](https://www.freebsd.org/releases/12.1R/announce.html) or [MarketPlace](https://aws.amazon.com/marketplace/pp/B081NF7BY7) | No | Device hotplug and API shutdown don't work
 FreeBSD | 13.0 or later | Yes | 4KB | [Community](https://www.freebsd.org/releases/13.0R/announce.html) or [MarketPlace](https://aws.amazon.com/marketplace/pp/B09291VW11) | No | Device hotplug and API shutdown don't work
+FreeBSD | 14.1 or later | Yes | 4KB | [Community](https://www.freebsd.org/releases/14.1R/announce/) or [MarketPlace](https://aws.amazon.com/marketplace/pp/prodview-axdyrrhr6pboq) | Yes |
  Flatcar Linux | 3033.2.0 or later | Yes | 4KB | [AMIs](https://www.flatcar.org/docs/latest/installing/cloud/aws-ec2/) or [marketplace](https://aws.amazon.com/marketplace/pp/prodview-zmao5idgwafbi) | Yes | |
 Rocky Linux | 8.4 or later | Yes (*) | 64KB (*) | [ISOs](https://rockylinux.org/download) | | [Release Notes](https://docs.rockylinux.org/release_notes/8-changelog/)<br>(*) details to be confirmed once AMI's are available
 
 
-OS Name | Minimum recommended Linux kernel version for Graviton2
+OS Name | Minimum recommended Linux kernel version for Graviton
 ------ | ------
+Amazon Linux 2023 | All supported kernels
 Amazon Linux 2 | >= 4.14.273-207.502.amzn2, >= 5.4.186-102.354.amzn2, or >= 5.10.106-102.504.amzn2
+Ubuntu 24.04 | All supported kernels
 Ubuntu 22.04 | All supported kernels 
 Ubuntu 20.04 | >= 5.4.0-1047-aws, >= 5.8.0-1034-aws, >= 5.11.0-1009-aws
 Ubuntu 18.04 | >= 4.15.0-1101-aws, >= 5.4.0-1047-aws
