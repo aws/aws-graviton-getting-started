@@ -83,6 +83,7 @@ We have compiled a list of popular software within the container ecosystem that 
 | FireLens for Amazon ECS       | https://github.com/aws/aws-for-fluent-bit/issues/44                                                                | arm64 support as of v2.9.0                                                                              |  |
 | Flatcar Container Linux       | https://www.flatcar.org                                                                                            | arm64 support in Stable channel as of 3033.2.0                                                          |
 | Seqera Containers             | https://www.seqera.io/containers/                                                                                  |                                                                                                         |
+| Kublr                         | https://kublr.com                                                                                                  |                                                                                                         |
 
 **If your software isn't listed above, it doesn't mean it won't work!**
 
