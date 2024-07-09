@@ -4,10 +4,10 @@ Rust is supported on Linux/arm64 systems as a tier1 platform along side x86.
 
 ### Large-System Extensions (LSE)
 
-Starting from Graviton2 processor in C6g[d], C6gn, M6g[d], R6g[d], T4g, X2gd, I4g, Im4gn, Is4gen, 
-and G5g instances and all follow-on Graviton processors have support for the Armv8.2 instruction set.  Armv8.2 
-specification includes the large-system extensions (LSE) introduced in Armv8.1. LSE
-provides low-cost atomic operations:
+All available Graviton processors (excluding the first and not recommended Graviton1) 
+have support for the Armv8.2 instruction set.  Armv8.2 specification includes the 
+large-system extensions (LSE) introduced in Armv8.1. LSE provides low-cost atomic
+operations:
 
 LSE improves system throughput for CPU-to-CPU communication, locks, and mutexes.
 The improvement can be up to an order of magnitude when using LSE instead of
