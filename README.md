@@ -50,7 +50,7 @@ If you are new to Graviton and want to understand how to identify target workloa
 |Turbo supported	|No	|No	|No |
 |Software Optimization Guide (Instruction Throughput and Latency)|[SWOG](https://developer.arm.com/documentation/pjdoc466751330-9707/latest/)|[SWOG](https://developer.arm.com/documentation/pjdoc466751330-9685/latest/) |[SWOG](https://developer.arm.com/documentation/PJDOC-466751330-593177/latest/) |
 |Interconnect	|CMN-600	|CMN-650	|CMN-700 |
-|Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|ARMv8.5-a, Armv9.0-a |
+|Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|Armv9.0-a |
 |Additional  features	|fp16, rcpc, dotprod, crypto	|sve, rng, bf16, int8	|sve2, sve-int8, sve-bf16, sve-bitperm, sve-crypto |
 |Recommended `-mcpu` flag	([more information](c-c++.md#enabling-arm-architecture-specific-features))|`neoverse-n1` |`neoverse-512tvb` |`neoverse-512tvb` |
 |RNG Instructions	|No	|Yes	|Yes |
