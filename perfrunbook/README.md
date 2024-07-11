@@ -6,11 +6,11 @@ This document is a reference for software developers who want to benchmark, debu
 
 This document covers many topics including how to benchmark, how to debug performance and which optimization recommendations.  It is not meant to be read beginning-to-end. Instead view it as a collection of checklists and best known practices to apply when working with Graviton instances that go progressively deeper into analyzing the system.  Please see the FAQ below to direct you towards the most relevant set of checklists and tools depending on your specific situation.
 
-If after following these guides there is still an issue you cannot resolve with regards to performance on Graviton2, please do not hesitate to raise an issue on the [AWS-Graviton-Getting-Started](https://github.com/aws/aws-graviton-getting-started/issues) guide or contact us at [ec2-arm-dev-feedback@amazon.com](mailto:ec2-arm-dev-feedback@amazon.com).  If there is something missing in this guide, please raise an issue or better, post a pull-request.
+If after following these guides there is still an issue you cannot resolve with regards to performance on Graviton based instances, please do not hesitate to raise an issue on the [AWS-Graviton-Getting-Started](https://github.com/aws/aws-graviton-getting-started/issues) guide or contact us at [ec2-arm-dev-feedback@amazon.com](mailto:ec2-arm-dev-feedback@amazon.com).  If there is something missing in this guide, please raise an issue or better, post a pull-request.
 
 ## Pre-requisites
 
-To assist with some of the tasks listed in this runbook, we have created some helper-scripts for some of the tasks the checklists describe.  The helper-scripts assume the test instances are running an up-to-date AL2 or Ubuntu 20.04LTS distribution and the user can run the scripts using `sudo`. Follow the steps below to obtain and install the utilities on your test systems:
+To assist with some of the tasks listed in this runbook, we have created some helper-scripts for some of the tasks the checklists describe.  The helper-scripts assume the test instances are running an up-to-date AL2, AL2023 or Ubuntu 20.04LTS/22.04LTS distribution and the user can run the scripts using `sudo`. Follow the steps below to obtain and install the utilities on your test systems:
 
 ```bash
 # Clone the repository onto your systems-under-test and any load-generation instances
@@ -22,6 +22,11 @@ sudo ./install_perfrunbook_dependencies.sh
 
 # All scripts expect to run from the utilities directory
 ```
+
+## APerf for performance analysis
+
+There is also a new tool aimed at helping move workloads over to Graviton called [APerf](https://github.com/aws/aperf), it bundles many of the capabilities of the individual tools present in this
+runbook and provides a better presentation.  It is highly recommended to download this tool and use it to gather most of the same information in one test-run.
 
 ## Sections
 
@@ -48,7 +53,7 @@ sudo ./install_perfrunbook_dependencies.sh
 * **I benchmarked my service and performance on Graviton is slower compared to my current x86 based fleet, where do I start to root cause why?**
     Begin by verifying software dependencies and verifying the configuration of your Graviton and x86 testing environments to check that no major differences are present in the testing environment.  Performance differences may be due to differences in environment and not the due to the hardware.  Refer to the below chart for a step-by-step flow through this runbook to help root cause the performance regression:
     ![](./images/performance_debug_flowchart.png)
-* **What are the recommended optimizations to try with Graviton2?**
+* **What are the recommended optimizations to try with Graviton?**
     Refer to [Section 6](./optimization_recommendation.md) for our recommendations on how to make your application run faster on Graviton.
 * **I investigated every optimization in this guide and still cannot find the root-cause, what do I do next?**
     Please contact us at [ec2-arm-dev-feedback@amazon.com](mailto:ec2-arm-dev-feedback@amazon.com) or talk with your AWS account team representative to get additional help.

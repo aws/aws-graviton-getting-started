@@ -35,7 +35,7 @@ If you have more than one SUT, first verify there are no major differences in se
   %> uname -r
   4.14.219-161.340.amzn2.x86_64
     
-  # Example output on Graviton2 SUT
+  # Example output on Graviton SUT
   %> uname -r
   5.10.50-45.132.amzn2.aarch64
     
@@ -76,9 +76,9 @@ If you have more than one SUT, first verify there are no major differences in se
 
 ## Check for missing binary dependencies
 
-Libraries for Python or Java can link in binary shared objects to provide enhanced performance.  The absence of these shared object dependencies does not prevent the application from running on Graviton2, but the CPU will be forced to use a slow code-path instead of the optimized paths.  Use the checklist below to verify the same shared objects are available on all platforms.
+Libraries for Python or Java can link in binary shared objects to provide enhanced performance.  The absence of these shared object dependencies does not prevent the application from running on Graviton, but the CPU will be forced to use a slow code-path instead of the optimized paths.  Use the checklist below to verify the same shared objects are available on all platforms.
 
-1. JVM based languages — Check for the presence of binary shared objects in the installed JARs and compare between Graviton2 and x86.
+1. JVM based languages — Check for the presence of binary shared objects in the installed JARs and compare between Graviton and x86.
   ```bash
   %> cd ~/aws-getting-started-guide/perfrunbook/utilities
   %> sudo ./find_and_list_jar_with_so.sh
@@ -100,12 +100,12 @@ Libraries for Python or Java can link in binary shared objects to provide enhanc
   ./META-INF/native/linux64/libjansi.so
   ./META-INF/native/linux32/libjansi.so
   ``` 
-2. Python — Check for the presence of binary shared objects in your python version’s `site-packages` locations and compare between Graviton2 and x86: 
+2. Python — Check for the presence of binary shared objects in your python version’s `site-packages` locations and compare between Graviton and x86:
   ```bash
   %> cd ~/aws-getting-started-guide/perfrunbook/utilites
   %> sudo ./find_and_list_pylib_with_so.sh 3.7 # takes python version as arg
   # Example output ...
-  # ... Graviton2
+  # ... Graviton
   ./numpy/core/_multiarray_tests.cpython-37m-aarch64-linux-gnu.so
   ./numpy/core/_struct_ufunc_tests.cpython-37m-aarch64-linux-gnu.so
   ./numpy/core/_rational_tests.cpython-37m-aarch64-linux-gnu.so
@@ -130,14 +130,14 @@ Libraries for Python or Java can link in binary shared objects to provide enhanc
 
 ## Check native application build system and code
 
-For native compiled components of your application, proper compile flags are essential to make sure Graviton2’s hardware features are being fully taken advantage of.  Follow the below checklist:
+For native compiled components of your application, proper compile flags are essential to make sure Graviton’s hardware features are being fully taken advantage of.  Follow the below checklist:
 
 1. Verify equivalent code optimizations are being made for Graviton as well as x86.  For example with C/C++ code built with GCC, make sure if builds use `-O3` for x86, that Graviton builds also use that optimization and not some basic debug setting like just `-g`.
 2. Confirm when building for Graviton that **one of the following flags** are added to the compile line for GCC/LLVM12+ to ensure using Large System Extension instructions when able to speed up atomic operations.
-    1. Use `-moutline-atomics` for code that must run on Graviton1 and Graviton2
-    2. Use `-march=armv8.2a -mcpu=neoverse-n1` for code that will run on Graviton2 and other modern Arm platforms
+    1. Use `-moutline-atomics` for code that must run on all Graviton platforms
+    2. Use `-march=armv8.2a -mcpu=neoverse-n1` for code that will run on Graviton2 or later and other modern Arm platforms
 3. When building natively for Rust, ensure that `RUSTFLAGS` is set to **one of the following flags**
-    1. `export RUSTFLAGS="-Ctarget-features=+lse"` for code that will run on Graviton2 and earlier platforms that support LSE (Large System Extension) instructions.
+    1. `export RUSTFLAGS="-Ctarget-features=+lse"` for code that will run on all Graviton2 and other Arm platforms that support LSE (Large System Extension) instructions.
     2. `export RUSTFLAGS="-Ctarget-cpu=neoverse-n1"` for code that will only run on Graviton2 and later platforms.
 4. Check for the existence of assembly optimized on x86 with no optimization on Graviton.  For help with porting optimized assembly routines, see [Section 6](./optimization_recommendation.md).
   ```bash

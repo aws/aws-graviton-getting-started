@@ -2,8 +2,8 @@
 
 ### Enabling Arm Architecture Specific Features
 
-TLDR: To target all current generation Graviton instances (Graviton2 and
-Graviton3), use `-march=arm8.2-a`.
+TLDR: To target all current generation Graviton instances (Graviton2,
+Graviton3, and Graviton4), use `-march=arm8.2-a`.
 
 C and C++ code can be built for Graviton with a variety of flags, depending on
 the goal. If the goal is to get the best performance for a specific generation,
@@ -21,6 +21,7 @@ CPU          | Flag (performance)    | Flag (balanced)           | GCC version  
 -------------|-----------------------|---------------------------|------------------|---------------
 Graviton2    | `-mcpu=neoverse-n1` ¹ | `-march=armv8.2-a`        | GCC-9            | Clang/LLVM 10+
 Graviton3(E) | `-mcpu=neoverse-v1`   | `-mcpu=neoverse-512tvb` ² | GCC 11           | Clang/LLVM 14+
+Graviton4    | `-mcpu=neoverse-v2`   | `-mcpu=neoverse-512tvb` ² | GCC 13           | Clang/LLVM 16+
 
 ¹ Requires GCC-9 or later (or GCC-7 for Amazon Linux 2); otherwise we suggest
 using `-mcpu=cortex-a72`
@@ -48,7 +49,8 @@ Distribution    | GCC                  | Clang/LLVM
 ----------------|----------------------|-------------
 Amazon Linux 2023  | 11*               | 15*
 Amazon Linux 2  | 7*, 10               | 7, 11*
-Ubuntu 22.04    | 9, 10, 11*, 12         | 11, 12, 13, 14*
+Ubuntu 24.04    | 9, 10, 11, 12, 13*, 14 | 14, 15, 16, 17, 18*
+Ubuntu 22.04    | 9, 10, 11*, 12       | 11, 12, 13, 14*
 Ubuntu 20.04    | 7, 8, 9*, 10         | 6, 7, 8, 9, 10, 11, 12
 Ubuntu 18.04    | 4.8, 5, 6, 7*, 8     | 3.9, 4, 5, 6, 7, 8, 9, 10
 Debian10        | 7, 8*                | 6, 7, 8
@@ -58,7 +60,7 @@ SUSE Linux ES15 | 7*, 9, 10            | 7
 
 ### Large-System Extensions (LSE)
 
-The Graviton2 and Graviton3(E) processors have support for the Large-System Extensions (LSE)
+All Graviton processors after Graviton1 have support for the Large-System Extensions (LSE)
 which was first introduced in vArmv8.1. LSE provides low-cost atomic operations which can
 improve system throughput for CPU-to-CPU communication, locks, and mutexes.
 The improvement can be up to an order of magnitude when using LSE instead of
@@ -67,11 +69,12 @@ load/store exclusives.
 POSIX threads library needs LSE atomic instructions.  LSE is important for
 locking and thread synchronization routines.  The following systems distribute
 a libc compiled with LSE instructions:
-- Amazon Linux 2,
-- Amazon Linux 2022,
-- Ubuntu 18.04 (needs `apt install libc6-lse`),
-- Ubuntu 20.04,
-- Ubuntu 22.04.
+- Amazon Linux 2
+- Amazon Linux 2023
+- Ubuntu 18.04 (needs `apt install libc6-lse`)
+- Ubuntu 20.04
+- Ubuntu 22.04
+- Ubuntu 24.04
 
 The compiler needs to generate LSE instructions for applications that use atomic
 operations.  For example, the code of databases like PostgreSQL contain atomic
@@ -87,8 +90,8 @@ To check whether the application binary contains load and store exclusives:
 $ objdump -d app | grep -i 'ldxr\|ldaxr\|stxr\|stlxr' | wc -l
 ```
 
-GCC's `-moutline-atomics` flag produces a binary that runs on both Graviton and
-Graviton2.  Supporting both platforms with the same binary comes at a small
+GCC's `-moutline-atomics` flag produces a binary that runs on both Graviton1 and later
+Gravitons with LSE support.  Supporting both platforms with the same binary comes at a small
 extra cost: one load and one branch.  To check that an application
 has been compiled with `-moutline-atomics`, `nm` command line utility displays
 the name of functions and global variables in an application binary.  The boolean
@@ -152,16 +155,16 @@ if (feof(stdin)) {
 }
 ```
 
-### Using Graviton2 Arm instructions to speed-up Machine Learning
+### Using Arm instructions to speed-up Machine Learning
 
-Graviton2 processors been optimized for performance and power efficient machine learning by enabling [Arm dot-product instructions](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/exploring-the-arm-dot-product-instructions) commonly used for Machine Learning (quantized) inference workloads, and enabling [Half precision floating point - \_float16](https://developer.arm.com/documentation/100067/0612/Other-Compiler-specific-Features/Half-precision-floating-point-intrinsics) to double the number of operations per second, reducing the memory footprint compared to single precision floating point (\_float32), while still enjoying large dynamic range.
+Graviton2 and later processors been optimized for performance and power efficient machine learning by enabling [Arm dot-product instructions](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/exploring-the-arm-dot-product-instructions) commonly used for Machine Learning (quantized) inference workloads, and enabling [Half precision floating point - \_float16](https://developer.arm.com/documentation/100067/0612/Other-Compiler-specific-Features/Half-precision-floating-point-intrinsics) to double the number of operations per second, reducing the memory footprint compared to single precision floating point (\_float32), while still enjoying large dynamic range.
 
 ### Using SVE
 
 The scalable vector extensions (SVE) require both a new enough tool-chain to
 auto-vectorize to SVE (GCC 11+, LLVM 14+) and a 4.15+ kernel that supports SVE.
 One notable exception is that Amazon Linux 2 with a 4.14 kernel doesn't support SVE;
-please upgrade to a 5.4+ AL2 kernel.
+please upgrade to a 5.4+ AL2 kernel.  Graviton3 and Graviton4 support SVE, earlier Gravitons does not.
 
 ### Using Arm instructions to speed-up common code sequences
 The Arm instruction set includes instructions that can be used to speedup common

@@ -21,7 +21,7 @@ cargo build --release
 ```
 
 If you're running only on Graviton2 or newer hardware you can also enable other
-instructions by setting the cpu target as well:
+instructions by setting the cpu target such as the example below:
 
 ```
 export RUSTFLAGS="-Ctarget-cpu=neoverse-n1"
