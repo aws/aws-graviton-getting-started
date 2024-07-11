@@ -53,7 +53,7 @@ You may see a small single-digit percent increase in overhead with pseudo-NMI en
 
 ## Off-cpu profiling
 
-If Graviton2 is consuming less CPU-time than expected, it is useful to find call-stacks that are putting *threads* to sleep via the OS.  Lock contention, IO Bottlenecks, OS scheduler issues can all lead to cases where performance is lower, but the CPU is not being fully utilized.   The method to look for what might be causing more off-cpu time is the same as with looking for functions consuming more on-cpu time: generate a flamegraph and compare.  In this case, the differences are more subtle to look for as small differences can mean large swings in performance as more thread sleeps can induce milli-seconds of wasted execution time.  
+If Graviton is consuming less CPU-time than expected, it is useful to find call-stacks that are putting *threads* to sleep via the OS.  Lock contention, IO Bottlenecks, OS scheduler issues can all lead to cases where performance is lower, but the CPU is not being fully utilized.   The method to look for what might be causing more off-cpu time is the same as with looking for functions consuming more on-cpu time: generate a flamegraph and compare.  In this case, the differences are more subtle to look for as small differences can mean large swings in performance as more thread sleeps can induce milli-seconds of wasted execution time.
 
 1. Verify native (i.e. C/C++/Rust) code is built with `-fno-omit-frame-``pointer`
 2. Verify java code is started with `-XX:+PreserveFramePointer -agentpath:/path/to/libperf-jvmti.so`
@@ -109,4 +109,3 @@ In our `capture_flamegraphs.sh` helper script, we use `perf record` to gather tr
     1. Use `-e instructions` to generate a flame-graph of the functions that use the most instructions on average to identify a compiler or code optimization opportunity.
     2. Use `-e cache-misses` to generate a flame-graph of functions that miss the L1 cache the most to indicate if changing to a more efficient data-structure might be necessary.
     3. Use `-e branch-misses` to generate a flame-graph of functions that cause the CPU to mis-speculate.  This may identify regions with heavy use of conditionals, or conditionals that are data-dependent and may be a candidate for refactoring.
-

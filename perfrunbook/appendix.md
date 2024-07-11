@@ -4,13 +4,17 @@
 
 This Appendix contains additional information for engineers that want to go deeper on a particular topic, such as using different PMU counters to understand how the code is executing on the hardware, discussion on load generators, and additional tools to help with code observability.
 
-## Useful Graviton2 PMU Counters and ratios
+## Useful Graviton PMU Events and ratios
 
-The following list of counter ratios has been curated to list counters useful for performance debugging. The more extensive list of counters is contained in the following references:
+The following list of counter ratios has been curated to list events useful for performance debugging. The more extensive list of counters is contained in the following references:
 
 * [Arm ARM](https://developer.arm.com/documentation/102105/latest)
 * [Neoverse N1 TRM](https://developer.arm.com/documentation/100616/0400/debug-descriptions/performance-monitor-unit/pmu-events)
 * [Neoverse N1 PMU Guide](https://developer.arm.com/documentation/PJDOC-466751330-547673/r4p1?lang=en&rev=0)
+* [Neoverse V1 TRM](https://developer.arm.com/documentation/101427/latest/)
+* [Neoverse V1 PMU Guide](https://developer.arm.com/documentation/109708/latest/)
+* [Neoverse V2 TRM](https://developer.arm.com/documentation/102375/latest/)
+* [Neoverse V2 PMU Guide](https://developer.arm.com/documentation/109528/0100)
 
 |METRIC	|Counter #1	|Counter #2	|Formula	|Description	|
 |---	|---	|---	|---	|---	|
@@ -110,12 +114,13 @@ of such system level resources and if resources are used efficiently.
 CMN counters are only accessible on metal-type instances and certain OSes and kernels.
 
 
-|Distro      |Kernel   | Graviton2 (c6g) | Graviton3 (c7g) |
-|------------|---------|-----------------|-----------------|
-|Ubuntu-20.04| 5.15    |  yes            |    no           |
-|Ubuntu-20.04| >=5.19  |  yes            |    yes          |
-|Ubuntu-22.04| >=5.19  |  yes            |    yes          |
-|AL2023      | 6.1.2   |  yes            |    yes          |
+|Distro      |Kernel   | Graviton2 (6g)  | Graviton3 (7g)  | Graviton4 (8g) | 
+|------------|---------|-----------------|-----------------|----------------|
+|Ubuntu-20.04| 5.15    |  yes            |    no           | no             |
+|Ubuntu-20.04| >=5.19  |  yes            |    yes          | no             |
+|Ubuntu-22.04| >=5.19  |  yes            |    yes          | no             |
+|Ubuntu-24.04| >=6.8.0 |  yes            |    yes          | yes            |
+|AL2023      | 6.1.2   |  yes            |    yes          | no             |
 
 
 General procedure on Ubuntu
@@ -141,3 +146,4 @@ For further information about specific events and useful ratios, please refer to
 
 [ARM documentation for Graviton3's CMN-650](https://developer.arm.com/documentation/101481/0200/?lang=en)
 
+[ARM documentation for Graviton4's CMN-700](https://developer.arm.com/documentation/102308/latest/)

@@ -2,7 +2,7 @@
 
 [Graviton Performance Runbook toplevel](./README.md)
 
-When designing an experiment to benchmark Graviton2 against another instance type, it is key to remember the below 2 guiding principles:
+When designing an experiment to benchmark Graviton based instances against another instance type, it is key to remember the below 2 guiding principles:
 
 1. Always define a specific question to answer with your benchmark
 2. Control your variables and unknowns within the benchmark environment

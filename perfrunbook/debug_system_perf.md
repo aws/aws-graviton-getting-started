@@ -80,7 +80,7 @@ It is also advisable to check memory consumption using `sysstat -r ALL` or `htop
   %> cd ~/aws-gravition-getting-started/perfrunbook/utilities
   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat new-connections --time 60
   ```
-2. If seeing bursts, verify this is expected behavior for your load generator.  Bursts can cause performance degradation on Graviton2 if each new connection has to do an RSA signing operation for TLS connection establishment.
+2. If seeing bursts, verify this is expected behavior for your load generator.  Bursts can cause performance degradation for each new connection, especially if it has to do an RSA signing operation for TLS connection establishment.
 3. Check on SUT for hot connections (connections that are more heavily used than others) by running: `watch netstat -t`
 4. The example below shows the use of `netstat -t` to watch TCP connections with one being hot as indicated by its non-zero `Send-Q` value while all other connections have a value of 0. This can lead to one core being saturated by network processing on the SUT, bottlenecking the rest of the system.  
   ```bash
@@ -117,11 +117,10 @@ When running Java applications, monitor for differences in behavior using JFR (J
     3. The image below shows JMC’s GC pane, showing pause times, heap size and references remaining after each collection.
     ![](./images/jmc_example_image.png)
 4. The same information can be gathered by enabling GC logging and then processing the log output. Enter `-Xlog:gc*,gc+age=trace,gc+ref=debug,gc+ergo=trace` on the Java command line and re-start your application.
-5. If longer GC pauses are seen, this could be happening because objects are living longer on Graviton2 and the GC has to scan them.  To help debug this gather an off-cpu profile ([see Section 5.b](./debug_code_perf.md)) to look for threads that are sleeping more often and potentially causing heap objects to live longer.
+5. If longer GC pauses are seen, this could be happening because objects are living longer on Graviton and the GC has to scan them.  To help debug this gather an off-cpu profile ([see Section 5.b](./debug_code_perf.md)) to look for threads that are sleeping more often and potentially causing heap objects to live longer.
 6. Check for debug flags that are still enabled but should be disabled, such as: `-XX:-OmitStackTraceInFastThrow` which logs and generates stack traces for all exceptions, even if they are not fatal exceptions.
-7. Check there are no major differences in JVM ergonomics between Graviton2 and x86, run:
+7. Check there are no major differences in JVM ergonomics between Graviton and x86, run:
   ```bash
   %> java -XX:+PrintFlagsFinal -version
-  # Capture output from x86 and Graviton2 and then diff the files
+  # Capture output from x86 and Graviton and then diff the files
   ```
-

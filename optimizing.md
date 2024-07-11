@@ -8,7 +8,7 @@ it relies on undefined behavior in the language (e.g. assuming char is signed in
 or the behavior of signed integer overflow), contains memory management bugs that
 happen to be exposed by aggressive compiler optimizations, or incorrect ordering.
 Below are some techniques / tools we have used to find issues
-while migrating our internal services to newer compilers and Graviton2.
+while migrating our internal services to newer compilers and Graviton based instances.
 
 ### Using Sanitizers
 The compiler may generate code and layout data slightly differently on Graviton
@@ -29,7 +29,7 @@ information.
 Arm is weakly ordered, similar to POWER and other modern architectures. While
 x86 is a variant of total-store-ordering (TSO).
 Code that relies on TSO may lack barriers to properly order memory references.
-Armv8 based systems, including Graviton and Graviton2 are [weakly ordered
+Armv8 based systems, including all Gravitons are [weakly ordered
 multi-copy-atomic](https://www.cl.cam.ac.uk/~pes20/armv8-mca/armv8-mca-draft.pdf).
 
 While TSO allows reads to occur out-of-order with writes and a processor to
@@ -54,8 +54,8 @@ is corresponding Arm code there too. If not, that might be something to improve.
 We welcome suggestions by opening an issue in this repo.
 
 ### Lock/Synchronization intensive workload
-Graviton2 supports the Arm Large Scale Extensions (LSE). LSE based locking and synchronization
-is an order of magnitude faster for highly contended locks with high core counts (e.g. 64 with Graviton2).
+Graviton2 processors and later support the Arm Large Scale Extensions (LSE). LSE based locking and synchronization
+is an order of magnitude faster for highly contended locks with high core counts (e.g. up to 192 cores on Graviton4).
 For workloads that have highly contended locks, compiling with `-march=armv8.2-a` will enable LSE based atomics and can substantially increase performance. However, this will prevent the code
 from running on an Arm v8.0 system such as AWS Graviton-based EC2 A1 instances.
 With GCC 10 and newer an option `-moutline-atomics` will not inline atomics and
@@ -63,7 +63,7 @@ detect at run time the correct type of atomic to use. This is slightly worse
 performing than `-march=armv8.2-a` but does retain backwards compatibility.
 
 ### Network intensive workloads
-In some workloads, the packet processing capability of Graviton2 is both faster and
+In some workloads, the packet processing capability of Graviton is both faster and
 lower-latency than other platforms, which reduces the natural “coalescing”
 capability of Linux kernel and increases the interrupt rate.
 Depending on the workload it might make sense to enable adaptive RX interrupts
@@ -72,12 +72,29 @@ Depending on the workload it might make sense to enable adaptive RX interrupts
 ## Profiling the code
 If you aren't getting the performance you expect, one of the best ways to understand what is
 going on in the system is to compare profiles of execution and understand where the CPUs are
-spending time. This will frequently point to a hot function that could be optimized. A crutch
+spending time. This will frequently point to a hot function or sub-system that could be optimized. A crutch
 is comparing a profile between a system that is performing well and one that isn't to see the
 relative difference in execution time. Feel free to open an issue in this
 GitHub repo for advice or help.
 
-Install the Linux perf tool:
+Using [AWS APerf](https://github.com/aws/aperf) tool:
+```bash
+# Graviton
+wget -qO- https://github.com/aws/aperf/releases/download/v0.1.10-alpha/aperf-v0.1.10-alpha-aarch64.tar.gz | tar -xvz -C /target/directory
+
+# x86
+wget -qO- https://github.com/aws/aperf/releases/download/v0.1.10-alpha/aperf-v0.1.10-alpha-x86_64.tar.gz | tar -xvz -C /target/directory
+
+## Record a profile and generate a report
+cd /target/directory/
+./aperf record -r <RUN_NAME> -i <INTERVAL_NUMBER> -p <COLLECTION_PERIOD>
+./aperf report -r <COLLECTOR_DIRECTORY> -n <REPORT_NAME>
+
+## The resulting report can be viewed with a web-browser by opening the index.html file
+```
+
+
+Using the Linux perf tool:
 ```bash
 # Amazon Linux 2
 sudo yum install perf

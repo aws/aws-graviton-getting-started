@@ -108,7 +108,7 @@ One can collect hardware events/ counters for an application, on a specific CPU,
 More details on how to use Linux perf utility on AWS Graviton processors is available [here](https://github.com/aws/aws-graviton-getting-started/blob/main/optimizing.md#profiling-the-code).
 
 ## Summary: Utilities on AWS Graviton vs. Intel x86 architectures
-|Processor	|x86	|Graviton2,3	|
+|Processor	|x86	|Graviton2,3, and 4	|
 |---	|---	|---	|
 |CPU frequency listing	|*lscpu, /proc/cpuinfo, dmidecode*	|*dmidecode*	|
 |*turbostat* support	|Yes	|No	|
@@ -117,7 +117,7 @@ More details on how to use Linux perf utility on AWS Graviton processors is avai
 |*i7z* Works	|Yes	|No	|
 |*lmbench*	|Yes	|Yes	|
 |Intel *MLC*  |Yes    |No     |
-|Performance monitoring tools	|_[VTune Profiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html) and [PCM](https://github.com/opcm/pcm), [Linux perf](https://www.brendangregg.com/perf.html)_	|_[Linux perf](https://www.brendangregg.com/perf.html), [Arm Forge](https://developer.arm.com/Tools%20and%20Software/Arm%20Forge)_	|
+|Performance monitoring tools	|_[VTune Profiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html), [PCM](https://github.com/opcm/pcm), [Linux perf](https://www.brendangregg.com/perf.html), [APerf](https://github.com/aws/aperf)_	|_[Linux perf](https://www.brendangregg.com/perf.html), [Linaro Forge](https://www.linaroforge.com/), [Arm Streamline CLI Tools](https://developer.arm.com/Tools%20and%20Software/Streamline%20Performance%20Analyzer), [APerf](https://github.com/aws/aperf)_	|
 
 Utilities such as *lmbench* are available [here](http://lmbench.sourceforge.net/) and can be built for AWS Graviton processors to obtain latency and bandwidth stats.
 
@@ -125,4 +125,4 @@ Utilities such as *lmbench* are available [here](http://lmbench.sourceforge.net/
 
 **1.** The ARM Linux kernel community has decided not to put CPU frequency in _/proc/cpuinfo_ which can be read by tools such as _lscpu_ or directly.
 
-**2.** On AWS Graviton 2/3 processors, Turbo isn’t supported. So, utilities such as ‘turbostat’ aren’t supported/ relevant for Arm architecture (and not on AWS Graviton processor either). Also, tools such as *[i7z](https://code.google.com/archive/p/i7z/)* for discovering CPU frequency, turbo, sockets and other information are only supported on Intel architecture/ processors. Intel *MLC* is a memory latency checker utility that is only supported on Intel processors.
+**2.** On AWS Graviton processors, Turbo isn’t supported. So, utilities such as ‘turbostat’ aren’t supported/ relevant. Also, tools such as *[i7z](https://code.google.com/archive/p/i7z/)* for discovering CPU frequency, turbo, sockets and other information are only supported on Intel architecture/ processors. Intel *MLC* is a memory latency checker utility that is only supported on Intel processors.
