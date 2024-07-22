@@ -25,6 +25,7 @@ Some techniques for writing optimized assembly:
 1. [Modulo Scheduling](#modulo-scheduling)
 1. [Test Everything](#test-everything)
 1. [Specialize functions for known input conditions](#specialize-functions-for-known-input-conditions)
+1. [Use Efficient Instructions](#use-efficient-instructions)
 
 
 We will be adding more sections to this document soon, so check back!
@@ -674,3 +675,50 @@ and we can skip any checks for any unconsumed values if length was not divisible
 by 16. A more complex function may be able to be unrolled farther or make more
 assumptions about type conversions which are knowable based on the inputs, which
 can improve execution speed even more.
+
+## Use Efficient Instructions
+
+Make yourself aware of the various types of instructions available to use.
+Choosing the right instructions can make the difference between a 5 or 10
+instructions sequence or just one instruction that does exactly what you need.
+For example, saturating arithmetic instructions can replace a series of
+instructions with just one. A rounding-shift-right-narrow can compute an average
+of two integers with just two instructions instead of three with a truncating
+right shift and in fewer cycles than the very expensive divide instruction.
+
+One way this is especially true is the use of vector or instructions. We have
+already mentioned Neon instructions in this document, but to make it clearer,
+these instructions operation on multiple data lanes in parallel. They are also
+known as SIMD or Single Instruction Multiple Data instructions. The full details
+on how to use this type of programming is beyond the scope of this guide, but
+when it’s possible to process 16 bytes in parallel instead of just one at a
+time, the speed up can be significant.
+
+Another way to use efficient instructions is to consult the [software
+optimization guide](README.md#building-for-graviton2-graviton3-and-graviton3e).
+Many different combinations of instructions can accomplish the same result, and
+some are obviously better than others. Some instructions, like the
+absolute-difference-accumulate-long instructions (`SABAL` and `UABAL`) can only
+be executed on half of the vector pipelines in Neoverse V1, which slashes the
+overall throughput of a series of independent instructions to two per cycle.
+Using instead a series of absolute-difference instructions (`SABD` or `UABD`),
+which can execute on all four pipelines, can increase the parallelism.  If there
+are enough of these instructions, this is worth the trade off of requiring a
+separate step to add up the accumulating absolute difference. There are other
+instructions which this applies to, so consult the software optimization guide
+to see what the throughput and latency numbers are for the instructions you are
+using.
+
+Check to see what the compiler or several different compilers produce to see if
+it can’t teach any tricks. Sometimes just writing a short segment of code in C
+in Compiler Explorer and seeing what the latest versions of GCC and Clang
+produce with various levels of optimization can reveal tricks which you may not
+have thought of. This doesn’t always produce useful results, especially since
+writing in assembly suggests that the compiler’s output was not good enough, but
+it can be a good way to explore ideas for implementing short segments of code.
+
+Choosing the right instructions in an efficient way is something that takes
+practice and familiarity with the instructions available in the ISA. It takes
+time to get familiar with the broad array of options available to you as the
+programmer and as an experienced engineer, you can produce some impressive
+optimized code.
