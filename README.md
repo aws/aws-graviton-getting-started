@@ -25,6 +25,7 @@ This repository provides technical guidance for users and developers using [Amaz
 * [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
 * [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
 * [PyTorch](machinelearning/pytorch.md)
+* [llama.cpp](machinelearning/llama.cpp.md)
 * [R](R.md)
 * [TensorFlow](machinelearning/tensorflow.md)
 * [Spark on Graviton](DataAnalytics.md)
