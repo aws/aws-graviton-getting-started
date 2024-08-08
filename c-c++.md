@@ -3,7 +3,7 @@
 ### Enabling Arm Architecture Specific Features
 
 TLDR: To target all current generation Graviton instances (Graviton2,
-Graviton3, and Graviton4), use `-march=arm8.2-a`.
+Graviton3, and Graviton4), use `-march=armv8.2-a`.
 
 C and C++ code can be built for Graviton with a variety of flags, depending on
 the goal. If the goal is to get the best performance for a specific generation,
