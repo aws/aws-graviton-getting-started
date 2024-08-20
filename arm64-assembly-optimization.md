@@ -698,19 +698,112 @@ Another way to use efficient instructions is to consult the [software
 optimization guide](README.md#building-for-graviton2-graviton3-and-graviton3e).
 Many different combinations of instructions can accomplish the same result, and
 some are obviously better than others. Some instructions, like the
-absolute-difference-accumulate-long instructions (`SABAL` and `UABAL`) can only
+absolute-difference-accumulate-long instructions (`sabal` and `uabal`) can only
 be executed on half of the vector pipelines in Neoverse V1, which slashes the
 overall throughput of a series of independent instructions to two per cycle.
-Using instead a series of absolute-difference instructions (`SABD` or `UABD`),
-which can execute on all four pipelines, can increase the parallelism.  If there
+Using instead a series of absolute-difference instructions (`sabd` or `uabd`),
+which can execute on all four pipelines, can increase the parallelism. If there
 are enough of these instructions, this is worth the trade off of requiring a
 separate step to add up the accumulating absolute difference. There are other
 instructions which this applies to, so consult the software optimization guide
 to see what the throughput and latency numbers are for the instructions you are
 using.
 
+<details>
+<summary>
+Expand to see a code sample using the two different approaches for calculating
+sum-absolute-difference.
+</summary>
+The first function in this example uses `uabal` which is limited to half of the
+NEON execution units. The second uses more instructions to complete the final
+sum, but since the instructions can execute on all NEON execution units, it runs
+25% faster on Graviton3.
+
+This is a C implementation of the functions below for illustration.
+
+```
+int sum_absolute_difference_c(uint8_t *a, uint8_t *b, int h)
+{
+    int s = 0;
+    for (int i = 0; i < h*64; i++) {
+        s += abs(a[i] - b[i]);
+    }
+    return s;
+}
+```
+
+```
+.text
+.global sad_asm_01
+.global sad_asm_02
+
+sad_asm_01:
+    movi    v18.2d, #0                      // write zeros to the accumulation register
+1:
+    ld1     {v0.16b-v3.16b}, [x0], #64      // Load 64 bytes from uint8_t *a
+    ld1     {v4.16b-v7.16b}, [x1], #64      // Load 64 bytes from uint8_t *b
+    uabdl   v16.8h, v0.8b,  v4.8b           // sad long 0-7 (clears v16)
+    uabal2  v16.8h, v0.16b, v4.16b          // sad accumulate long 8-15
+    uabal   v16.8h, v1.8b,  v5.8b           // sad accumulate long 16-23
+    uabal2  v16.8h, v1.16b, v5.16b          // sad accumulate long 24-31
+    uabal   v16.8h, v2.8b,  v6.8b           // sad accumulate long 31-39
+    uabal2  v16.8h, v2.16b, v6.16b          // sad accumulate long 40-47
+    uabal   v16.8h, v3.8b,  v7.8b           // sad accumulate long 48-57
+    uabal2  v16.8h, v3.16b, v7.16b          // sad accumulate long 58-63
+    uadalp  v18.4s, v16.8h                  // add accumulate pairwise long into the 32 bit accumluator
+    subs    w2, w2, #1                      // decrement the loop counter
+    b.gt    1b                              // branch to the top of the loop
+
+    addv    s0, v18.4s                      // add across vector to add up the 32 bit values in the accumlutor (v18)
+    fmov    w0, s0                          // move vector register s0 to 32 bit GP register, w0 
+    ret
+
+
+
+sad_asm_02:
+    movi    v21.2d, #0                      // write zeros to the accumulation registers
+1:
+    ld1     {v0.16b-v3.16b}, [x0], #64      // Load 64 bytes from uint8_t *a
+    ld1     {v4.16b-v7.16b}, [x1], #64      // Load 64 bytes from uint8_t *b
+
+    uabd    v17.16b, v0.16b, v4.16b         // sad 0-15
+    uabd    v18.16b, v1.16b, v5.16b         // sad 16-31
+    uabd    v19.16b, v2.16b, v6.16b         // sad 32-47
+    uabd    v20.16b, v3.16b, v7.16b         // sad 48-63
+
+    uaddlp  v17.8h, v17.16b                 // add long pairwise each of the result registers from above
+    uaddlp  v18.8h, v18.16b                 // after these four instructions, we have converted 64 8-bit values to
+    uaddlp  v19.8h, v19.16b                 // 32 16-bit sums
+    uaddlp  v20.8h, v20.16b
+
+    addp    v17.8h, v17.8h, v18.8h          // add pairwise again converting 32 16-bit values to 16 16-bit values
+    addp    v18.8h, v19.8h, v20.8h          // second step to get to 16 values
+    addp    v17.8h, v17.8h, v18.8h          // add pairwise again, converting 16 16-bit values to 8 16-bit values
+    uaddlp  v17.4s, v17.8h                  // add pairwise long, converting 8 16-bit values to 4 32-bit values
+    add     v21.4s, v21.4s, v17.4s          // accumulate these 4 values into v21 for the next iteration
+
+    subs    w2, w2, #1                      // decrement the loop counter
+    b.gt    1b                              // branch to the top of the loop
+
+    addv    s0, v21.4s                      // add across vector to add up the 32 bit values in the accumluator (v21)
+    fmov    w0, s0                          // move vector register s0 to the 32 bit GP register, w0
+    ret
+```
+
+If the second approach is faster, why would we ever use `sabal` or `uabal`?
+There is a trade off, of course. As you can see in the example, it takes more
+instructions to avoid using `uabal` because you have to compute the accumulation
+another way. It works well in this example because we can parallelize the SAD
+computation across 64 bytes. If the amount of loop unrolling was more limited
+(maybe because a result from the previous iteration is needed in the next), we
+might not be able to parallelize enough SAD computations to keep 4 execution
+units full. In that case it would probably make sense to use `uabal` since we
+would already be unable to fill up the queues of 4 execution units.
+
+</details>
+
 Check to see what the compiler or several different compilers produce to see if
-it can’t teach any tricks. Sometimes just writing a short segment of code in C
+it can teach you any tricks. Sometimes just writing a short segment of code in C
 in Compiler Explorer and seeing what the latest versions of GCC and Clang
 produce with various levels of optimization can reveal tricks which you may not
 have thought of. This doesn’t always produce useful results, especially since
