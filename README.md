@@ -184,6 +184,8 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
  * [Accelerating Popular Hugging Face Models using Arm Neoverse](https://community.arm.com/arm-community-blogs/b/infrastructure-solutions-blog/posts/accelerating-sentiment-analysis-on-arm-neoverse-cpus)
  * [Run LLMs on CPU with Amazon SageMaker Real-time Inference](https://community.aws/content/2eazHYzSfcY9flCGKsuGjpwqq1B/run-llms-on-cpu-with-amazon-sagemaker-real-time-inference?lang=en)
  * [Accelerating large-scale neural network training on CPUs with ThirdAI and AWS Graviton](https://aws.amazon.com/blogs/machine-learning/accelerating-large-scale-neural-network-training-on-cpus-with-thirdai-and-aws-graviton/)
+ * [Enhancing LLM Serving with Torch Compiled RAG on AWS Graviton](https://github.com/pytorch/serve/tree/usecase/rag_based_llm/examples/usecases/RAG_based_LLM_serving#enhancing-llm-serving-with-torch-compiled-rag-on-aws-graviton)
+ * [Intro to Llama on Graviton](https://dev.to/aws-heroes/intro-to-llama-on-graviton-1dc)
 
 ## Other
  * [Optimized Video Encoding with FFmpeg on AWS Graviton Processors](https://aws.amazon.com/blogs/opensource/optimized-video-encoding-with-ffmpeg-on-aws-graviton-processors/)
@@ -193,6 +195,7 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
 ## HPC
  * [Encored Technologies Successfully Built an HPC on AWS for Weather Research & Forecasting (WRF)](https://aws.amazon.com/solutions/case-studies/encored-technologies-case-study/)
  * [Arm Scales Performance for Chip Design Using Amazon FSx for NetApp ONTAP](https://aws.amazon.com/solutions/case-studies/arm-ltd-case-study/)
+ * [The Institut Pasteur and AWS are analysing the world's DNA, using a public database](https://aws.amazon.com/solutions/case-studies/case-study-institut-pasteur/?nc1=h_ls)
 
 ## Other
  * [Lower Latency and Costs Using AWS Graviton2–Based Instances with Sprinklr](https://aws.amazon.com/solutions/case-studies/sprinklr-case-study/)
