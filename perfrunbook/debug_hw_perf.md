@@ -16,7 +16,24 @@ There are hundreds of events available to monitor in a server CPU today which is
 
 ## How to Collect PMU counters
 
-A limited subset of PMU events for the CPU are available on Graviton \*6g, \*7g sizes <16xl, we recommend using a 16xl for experiments needing PMU events to get access to all of them. On Graviton \*8g, sizes >24xl have access to all the CPU PMU events. On 5th and 6th generation x86 instances use a single socket instance is needed to have access to the CPU PMU events: >c5.9xl, >\*5.12xl, >\*6i.16xl, >c5a.12xl, and >\*6a.24xl.  On 7th generation x86 instances *7a and *7i, all sizes get access to a limited number of CPU PMU events, just like on Graviton instances, and full socket or larger instances (>\*7\*.24xl) get access to all PMU events.
+Not all instance sizes support PMU event collection.  Generally
+instance sizes which have an entire dedicated socket have full access
+to all PMU events, and smaller instance sizes of the newer generations
+have a reduced set of events suitable for most profiling needs.  For
+older generations smaller instance sizes may not support any PMU event
+collection.  The table below captures these details:
+
+|Instance Family |  Minimum Size for Full PMU Event Support | Basic Support at Smaller Sizes
+|------|------------|------|
+|*8g   | 24xlarge   | yes  |
+|*7a   | 24xlarge   | yes  |
+|*7g   | 16xlarge   | yes  |
+|*7i   | 24xlarge   | yes  |
+|*6a   | 24xlarge   | no   |
+|*6g   | 16xlarge   | yes  |
+|*6i   | 16xlarge   | no   |
+|*5   | c5.9xlarge, *5.12xlarge | no
+
 
 To measure the standard CPU PMU events, do the following:
 
