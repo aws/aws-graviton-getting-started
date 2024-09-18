@@ -9,6 +9,34 @@ performance benefit until they switched to Java 11.
 
 This page includes specific details about building and tuning Java application on Graviton.
 
+### Java Graviton Migration Checklist
+This checklist summarizes portions of the Java on Graviton section and can be helpful for getting started.  It is not a comprehensive summary, so we also recommend reading through all the content below.
+
+* Check AMI & Kernel Version support
+    * Pre-2020 Linux distributions are unlikely to contain the right optimizations
+    * Amazon Linux:  AL2023 is ideal.  AL2 is fine with a recent kernel (i.e. not 4.14).  AL2 is EOL in June 2025.
+    * Ubuntu:  Use at least Ubuntu 20.04.  More recent versions are even better.
+    * Red Hat Linux:  RHEL9 is ideal.  Use at least RHEL8.2 (be aware kernel uses unusual 64KB memory pages).
+    * For the full list, see [Operating Systems available for Graviton based instances](https://github.com/aws/aws-graviton-getting-started/blob/main/os.md)
+
+
+* Check JVM Version & Flavor
+    * Java:  The more recent the better. AWS recommends at least JDK11, but ideally JDK17 or newer.  JDK8 is the minimum version supporting Arm64 but likely won’t provide the best performance.
+    * [Amazon Corretto](https://aws.amazon.com/corretto) (Amazon’s distribution of OpenJDK):  Typically provides the best performance and is recommended for Graviton workloads.  Corretto 11 and above support LSE extensions, a set of atomic memory operations that improve performance for lock-contended workloads and reduce garbage collection time.  Some customers have seen even better performance on Corretto 17 and Corretto 21.
+* Check JARs and shared objects for architecture specific code (compiled other than Java byte code)
+    * See guidance for [manual scanning process](https://github.com/aws/aws-graviton-getting-started/blob/main/java.md#looking-for-x86-shared-objects-in-jars)
+    * [Porting Advisor for Graviton](https://github.com/aws/porting-advisor-for-graviton) can scan/flag them and is useful for [Maven](https://maven.apache.org/index.html)-based projects
+    * JNI extensions usually exist to implement performance critical functions in a language other than Java.  Without an Arm64 version the code may not work or can fall back on a slower pure Java implementation.  Check for Arm64 versions or later versions of the package to see if the JNI has been superseded by more performant native Java implementations.
+    * Follow [these instructions](https://github.com/aws/aws-graviton-getting-started/blob/main/java.md#building-multi-arch-jars) for building multi-arch JAR’s that support both x86 and Arm64/Graviton
+* Java Crypto operations:
+    * Review [Java JVM options](https://github.com/aws/aws-graviton-getting-started/blob/main/java.md#java-jvm-options) for Crypto optimizations and recommendations.
+    * AES/GCM benefits when using AES hardware instructions, which can improve performance by up to 5x for this algorithm.  Corretto & OpenJDK 18 support this by default and have been back-ported to Corretto & OpenJDK 11 and 17 which can be enabled using `XX:+UnlockDiagnosticVMOptions -XX:+UseAESCTRIntrinsics`
+    * [Amazon-corretto-crypto-provider](https://github.com/corretto/amazon-corretto-crypto-provider) is another option that offers optimizations for a large number of cryptographic operations
+* Application Testing & Performance Evaluation
+    * Be sure to run Graviton instances “hotter”: vCPUs are mapped to physical cores instead of Hyperthreads and performance often flatlines at a much higher CPU utilization than with x86 based instances.  Testing at low levels of load can lead to misleading results.  The most realistic test results are usually achieved when testing close to breaking latency.
+    * See the [Graviton Performance Runbook](https://github.com/aws/aws-graviton-getting-started/blob/main/perfrunbook/README.md) for more info
+    * [Aperf](https://github.com/aws/aperf) is a CLI tool for gathering & visualizing performance data that can be helpful.
+
 ### Java versions
 JDK binaries for arm64 are available from a number of
 different sources.  [Amazon Corretto](https://aws.amazon.com/corretto/) is
