@@ -213,7 +213,8 @@ On Ubuntu to enable SPE requires four extra steps
 # Install the arm_spe_pmu.ko module
 sudo apt install linux-modules-extra-$(uname -r)
 
-# Add kpti=off to the kernel boot command line
+# Add kpti=off to the kernel boot command line: GRUB_CMDLINE_LINUX in /etc/default/grub, to set it for all the installed kernels.
+# Note, the options passed to GRUB_CMDLINE_LINUX_DEFAULT will only propagate to the default kernel and not to all the installed kernels.
 # Reboot instance
 
 sudo modprobe arm_spe_pmu
@@ -229,6 +230,11 @@ Processing the data can be done with `perf report` to inspect hot functions and 
 the samples directly, you can use the [Arm SPE Parser](https://gitlab.arm.com/telemetry-solution/telemetry-solution/-/tree/spe-parser-prototype/tools/spe-parser).
 
 Be aware that SPE produces a large of volume of data (many GBs) if the sampling period is low and you collect the data over a long time.
+
+### Capturing cache coherence issues
+The `perf c2c` command can be used to analyze cache coherence issues and false sharing in multi-core systems. It needs SPE PMU available on Graviton metal instances.
+
+`perf c2c record ./application`
 
 ### Capturing Coherent Mesh Network (CMN) hardware events on Graviton metal instances
 
