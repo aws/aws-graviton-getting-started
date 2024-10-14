@@ -17,7 +17,7 @@ architecture and tuning and it's generally better to use that vs `-march` if
 you're building for a specific CPU.
 
 
-CPU          | Flag (performance)    | Flag (balanced)           | GCC version      | LLVM verison
+CPU          | Flag (performance)    | Flag (balanced)           | GCC version      | LLVM version
 -------------|-----------------------|---------------------------|------------------|---------------
 Graviton2    | `-mcpu=neoverse-n1` ¹ | `-march=armv8.2-a`        | GCC-9            | Clang/LLVM 10+
 Graviton3(E) | `-mcpu=neoverse-v1`   | `-mcpu=neoverse-512tvb` ² | GCC 11           | Clang/LLVM 14+
