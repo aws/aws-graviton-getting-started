@@ -8,7 +8,7 @@ If after checking the system behavior with the sysstat tools the behavior of you
 
 If you see that Graviton is consuming more CPU-time than expected, on-cpu profiling can help find what is taking more time.  On-cpu profiling statistically measures what code is consuming time on the CPU by periodically sampling stack traces on the SUT.  We provide a utility to collect CPU profiles and emit a flamegraph, which is a graphical representation to show the percentage of execution time consumed by a particular stack-trace.  The x-axis represents percentage of execution time, and the y-axis is stack depth. These are particularly useful for finding differences in function execution times between two platforms.  To collect flamegraphs of on-cpu profiling, do the following:
 
-1. Verify native code is built with `-g -fno-omit-frame-``pointer`
+1. Verify native code is built with `-g -fno-omit-frame-pointer`
 2. Verify java code is started with `-XX:+PreserveFramePointer -agentpath:/usr/lib64/libperf-jvmti.so`
 3. Verify NodeJS code is started with `--perf-basic-prof`
 4. Collect the Flamegraph
@@ -32,7 +32,7 @@ If you see that Graviton is consuming more CPU-time than expected, on-cpu profil
 1. Look for the most expensive functions and then compare with a flamegraph gathered from the x86 test system.
 2. If you find an expensive function that is not expensive on your x86 system, proceed to [Section 6](./optimization_recommendation.md) for Optimization recommendations.
 
-### On-cpu profiling using Psuedo Non-maskable-interrupts (NMI)
+### On-cpu profiling using Pseudo Non-maskable-interrupts (NMI)
 
 If your on-cpu profiling reveals the hot code is in the kernel, you may see issues with measuring code-paths that run in non-preemptible sections of Linux.  This usually manifests as small functions such as `arch_local_irq_restore` in the kernel showing high overhead.  Functions like this are un-masking interrupts, such as the interrupt `perf` uses to trigger taking a sample stack trace, and since the interrupt may have
 already been queued, `perf` will record IRQ unmasking functions as hot because that is when IRQs are re-enabled.  To collect profiles of kernel functions that are inside interrupt masked portions of code on Graviton you can enable `perf` to use a pseudo Non-maskable-interrupt to measure inside non-preemptible regions. To enable this, do the following:
@@ -55,7 +55,7 @@ You may see a small single-digit percent increase in overhead with pseudo-NMI en
 
 If Graviton is consuming less CPU-time than expected, it is useful to find call-stacks that are putting *threads* to sleep via the OS.  Lock contention, IO Bottlenecks, OS scheduler issues can all lead to cases where performance is lower, but the CPU is not being fully utilized.   The method to look for what might be causing more off-cpu time is the same as with looking for functions consuming more on-cpu time: generate a flamegraph and compare.  In this case, the differences are more subtle to look for as small differences can mean large swings in performance as more thread sleeps can induce milli-seconds of wasted execution time.
 
-1. Verify native (i.e. C/C++/Rust) code is built with `-fno-omit-frame-``pointer`
+1. Verify native (i.e. C/C++/Rust) code is built with `-fno-omit-frame-pointer`
 2. Verify java code is started with `-XX:+PreserveFramePointer -agentpath:/path/to/libperf-jvmti.so`
     1. The `libperf-jvmti.so` library is usually provided when `perf` is installed.  If it is not, see [how to build the jvmti from source](https://github.com/aws/aws-graviton-getting-started/blob/main/java.md#build-libperf-jvmtiso-on-amazon-linux-2) in our getting-started guide.
     2. Additional debugging information can be extracted by adding `-XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints` to the java command line.
