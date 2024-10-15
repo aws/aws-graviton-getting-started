@@ -135,7 +135,7 @@ For native compiled components of your application, proper compile flags are ess
 1. Verify equivalent code optimizations are being made for Graviton as well as x86.  For example with C/C++ code built with GCC, make sure if builds use `-O3` for x86, that Graviton builds also use that optimization and not some basic debug setting like just `-g`.
 2. Confirm when building for Graviton that **one of the following flags** are added to the compile line for GCC/LLVM12+ to ensure using Large System Extension instructions when able to speed up atomic operations.
     1. Use `-moutline-atomics` for code that must run on all Graviton platforms
-    2. Use `-march=armv8.2a -mcpu=neoverse-n1` for code that will run on Graviton2 or later and other modern Arm platforms
+    2. Use `-march=armv8.2-a -mcpu=neoverse-n1` for code that will run on Graviton2 or later and other modern Arm platforms
 3. When building natively for Rust, ensure that `RUSTFLAGS` is set to **one of the following flags**
     1. `export RUSTFLAGS="-Ctarget-features=+lse"` for code that will run on all Graviton2 and other Arm platforms that support LSE (Large System Extension) instructions.
     2. `export RUSTFLAGS="-Ctarget-cpu=neoverse-n1"` for code that will only run on Graviton2 and later platforms.
