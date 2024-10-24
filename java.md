@@ -178,11 +178,62 @@ to manage each platform specific Jar.  Release individual architecture specific 
 instance to download these released jars and package them into a combined Jar with a final `mvn release:perform`.
 An example of this methd can be found in the [Leveldbjni-native](https://github.com/fusesource/leveldbjni) `pom.xml` files. 
 
+### Remove Anti-patterns
+
+Anti-patterns can affect the performance on any instance family, but the level
+of impact can be different.  Below is a list of
+anti-patterns we have found to be particularly impactful on Graviton:
+
+1.  **Excessive exceptions**: Throwing exceptions and generating stack-traces
+has been observed to cost up to 2x more on Graviton platforms compared to x86.
+We recommend not to use Java exceptions as control flow, and to remove
+exceptions when they appear in the hot-code path. Identifying hot exceptions can
+be done using function profilers like [Aperf](https://github.com/aws/aperf), 
+[Async-profiler](https://github.com/async-profiler/async-profiler), or Linux `perf`.
+Overhead can be mitigated some by using the `-XX:+OmitStackTraceInFastThrow` JVM
+flag to allow the Java runtime to optimize the exception flow for some hot
+paths. The best solution is to avoid the exceptions as much as possible.
 
 ### Profiling Java applications
-For languages that rely on a JIT (such an Java), the symbol information that is
-captured is lacking, making it difficult to understand where runtime is being consumed.
-Similar to the code profiling example above, `libperf-jvmti.so` can be used to dump symbols for
+
+### APerf + Async-profiler
+
+To profile Java we recommend using [Aperf](https://github.com/aws/aperf) to gather profiles and view them
+via a static webpage.  On your test system, follow the below directions to profile your
+Java code using APerf:
+
+```bash
+# Get latest APerf release onto the machine you are profiling.  
+# As of Oct 28, 2024 the latest release is v0.13.0.
+wget https://github.com/aws/aperf/releases/download/v0.1.13-alpha/aperf-v0.1.13-alpha-aarch64.tar.gz
+tar -zxf aperf-v0.1.13-alpha-aarch64.tar.gz
+
+# Get the latest Async profiler
+wget https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-arm64.tar.gz
+tar -zxf async-profiler-3.0-linux-arm64.tar.gz
+cd async-profiler-3.0-linux-arm64
+sudo mkdir -p /opt/bin
+sudo mkdir -p /opt/lib
+sudo cp -a bin/* /opt/bin
+sudo cp -a lib/* /opt/lib
+
+export PATH=/opt/bin:$PATH
+export LD_LIBRARY_PATH=/opt/lib:$LD_LIBRARY_PATH
+sudo sysctl -w kernel.kptr_restrict=0
+sudo sysctl -w kernel.perf_event_paranoid=-1
+cd aperf-v0.1.13-alpha-aarch64
+
+# While the application is running
+./aperf record --profile --profile-java --period 300 -r java_record
+./aperf report -r java_record -n java_report
+
+# In java_report folder, open index.html in a browser to view report
+```
+
+### Linux `perf` and `libperf-jvmti.so`
+If prefering to use the standard Linux `perf` tool, we can capture information about symbols
+on Java JIT'ed code leveraging the `libperf-jvmti.so` agent. 
+Follow the below steps to use the `libperf-jvmti.so` to dump symbols for
 JITed code as the JVM runs.
 
 ```bash
