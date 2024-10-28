@@ -3,40 +3,28 @@
 This repository provides technical guidance for users and developers using [Amazon EC2 instances powered by AWS Graviton processors](https://aws.amazon.com/ec2/graviton/) (including the latest generation Graviton4 processors). While it calls out specific features of the Graviton processors themselves, this repository is also generally useful for anyone running code on Arm-based systems.
 
 # Contents
-* [Transitioning to Graviton](#transitioning-to-graviton)
-* [Building for Graviton](#building-for-graviton2-graviton3-and-graviton3e)
-* [Optimizing for Graviton](optimizing.md)
-* [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
-* [Recent software updates relevant to Graviton](#recent-software-updates-relevant-to-graviton)
-* Language-specific considerations
-	* [C/C++](c-c++.md)
-	* [Go](golang.md)
-	* [Java](java.md)
-	* [.NET](dotnet.md)
-	* [Node.JS](nodejs.md)
-	* [PHP](php.md)
-	* [Python](python.md)
-	* [Rust](rust.md)
-* [Containers on Graviton](containers.md)
-* [Headless website testing with Chrome and Puppeteer on Graviton](software/ChromeAndPuppeteer.md)
-* [Lambda on Graviton](#lambda-on-graviton)
-* [Operating Systems support](os.md)
-* [Third-party Software Vendors](isv.md)
-* [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
-* [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
-* [PyTorch](machinelearning/pytorch.md)
-* [llama.cpp](machinelearning/llama.cpp.md)
-* [R](R.md)
-* [TensorFlow](machinelearning/tensorflow.md)
-* [Spark on Graviton](DataAnalytics.md)
-* [Known issues and workarounds](#known-issues-and-workarounds)
-* [AWS Managed Services available on Graviton](managed_services.md)
-* [Graviton Performance Runbook](perfrunbook/README.md)
-* [Assembly Optimization Guide for Graviton Arm64 Processors](arm64-assembly-optimization.md)
-* [Additional resources](#additional-resources)
-* [How To Resources](howtoresources.md)
-* [Blog Posts](#blog-posts)
-* [Case Studies](#case-studies)
+- [AWS Graviton Technical Guide](#aws-graviton-technical-guide)
+- [Contents](#contents)
+- [Transitioning to Graviton](#transitioning-to-graviton)
+- [Building for Graviton](#building-for-graviton)
+- [Optimizing for Graviton](#optimizing-for-graviton)
+- [Recent software updates relevant to Graviton](#recent-software-updates-relevant-to-graviton)
+- [Containers on Graviton](#containers-on-graviton)
+- [Lambda on Graviton](#lambda-on-graviton)
+- [Operating Systems](#operating-systems)
+- [Known issues and workarounds](#known-issues-and-workarounds)
+	- [Postgres](#postgres)
+	- [Python installation on some Linux distros](#python-installation-on-some-linux-distros)
+	- [Bazel on Linux](#bazel-on-linux)
+	- [zlib on Linux](#zlib-on-linux)
+- [Blog Posts](#blog-posts)
+	- [HPC](#hpc)
+	- [Machine Learning](#machine-learning)
+	- [Other](#other)
+- [Case Studies](#case-studies)
+	- [HPC](#hpc-1)
+	- [Other](#other-1)
+- [Additional resources](#additional-resources)
 
 # Transitioning to Graviton
 If you are new to Graviton and want to understand how to identify target workloads, how to plan a transition project, how to test your workloads on AWS Graviton and finally how deploy in production, please read [the key considerations to take into account when transitioning workloads to AWS Graviton based Amazon EC2 instances](transition-guide.md).
@@ -80,7 +68,7 @@ packages that improve performance (if you know of others please let us know).
 Package | Version | Improvements
 --------|:-:|-------------
 bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases) | Pre-built bazel binary for Graviton/Arm64. [See below](#bazel-on-linux) for installation.
-Cassandra | 4.0+ | Supports running on Java/Corretto 11, improving overall performance
+Cassandra | 4.0+ | Supports running on Java/Corretto 11, improving overall performance. For better performance and scalability on Graviton, consider to use Cassandra 5 on Java/Corretto 17.
 FFmpeg  | 6.0+ | Improved performance of libswscale by 50% with better NEON vectorization which improves the performance and scalability of FFmpeg multi-threaded encoders. The changes are available in FFmpeg version 4.3, with further improvements to scaling and motion estimation available in 5.1. Additional improvements to both are available in 6. For encoding h.265, build with the master branch of x265 because the released version of 3.5 does not include important optimizations for Graviton. For more information about FFmpeg on Graviton, read the blog post on AWS Open Source Blog, [Optimized Video Encoding with FFmpeg on AWS Graviton Processors](https://aws.amazon.com/blogs/opensource/optimized-video-encoding-with-ffmpeg-on-aws-graviton-processors/).
 HAProxy  | 2.4+  | A [serious bug](https://github.com/haproxy/haproxy/issues/958) was fixed. Additionally, building with `CPU=armv81` improves HAProxy performance by 4x so please rebuild your code with this flag.
 MariaDB | 10.4.14+ | Default build now uses -moutline-atomics, general correctness bugs for Graviton fixed.
