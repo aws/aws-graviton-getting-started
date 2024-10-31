@@ -1,0 +1,62 @@
+Input spec                                                                                                                                                 
+--------------------------------                                                                                                                             
+-   wrf
+
+Concretized
+--------------------------------
+[+]  wrf@4.5.0%arm@23.10~adios2~chem~netcdf_classic+pnetcdf build_system=generic build_type='dm+sm' compile_type=em_real nesting=basic patches=29af725,68548f6,908c718,c522c47,e07c39c,e4971f6,e6f3db3,f3dd50d,f82a18c arch=linux-ubuntu20.04-neoverse_v1
+[e]      ^glibc@2.31%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^hdf5@1.14.3%arm@23.10~cxx+fortran+hl~ipo~java~map+mpi+shared~subfiling~szip~threadsafe+tools api=default build_system=cmake build_type=Release generator=make patches=82088c8 arch=linux-ubuntu20.04-neoverse_v1                                                                                              
+[+]          ^cmake@3.27.9%arm@23.10~doc+ncurses+ownlibs build_system=generic build_type=Release arch=linux-ubuntu20.04-neoverse_v1
+[+]              ^curl@8.7.1%arm@23.10~gssapi~ldap~libidn2~librtmp~libssh~libssh2+nghttp2 build_system=autotools libs=shared,static tls=openssl arch=linux-ubuntu20.04-neoverse_v1                                                                                                                                      
+[+]                  ^nghttp2@1.57.0%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1                                                    
+[+]          ^gmake@4.4.1%arm@23.10~guile build_system=generic arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^jasper@3.0.3%arm@23.10+jpeg~opengl+shared build_system=generic build_type=Release arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^libjpeg-turbo@3.0.0%arm@23.10~ipo~jpeg8~partial_decoder+pic build_system=cmake build_type=Release generator=make libs=shared,static arch=linux-ubuntu20.04-neoverse_v1                                                                                                                                    
+[+]              ^nasm@2.15.05%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^libpng@1.6.39%arm@23.10~ipo~pic build_system=cmake build_type=Release generator=make libs=shared,static arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^libtirpc@1.3.3%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^gnuconfig@2022-09-17%arm@23.10 build_system=generic arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^krb5@1.20.1%arm@23.10+shared build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]              ^bison@3.8.2%arm@23.10~color build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]              ^gettext@0.22.5%arm@23.10+bzip2+curses+git~libunistring+libxml2+pic+shared+tar+xz build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]                  ^libiconv@1.17%arm@23.10 build_system=autotools libs=shared,static arch=linux-ubuntu20.04-neoverse_v1
+[e]                  ^tar@1.30%arm@23.10 build_system=autotools zip=pigz arch=linux-ubuntu20.04-neoverse_v1
+[+]                  ^xz@5.4.6%arm@23.10~pic build_system=autotools libs=shared,static arch=linux-ubuntu20.04-neoverse_v1
+[e]              ^openssl@1.1.1f%arm@23.10~docs+shared build_system=generic certs=mozilla arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^libtool@2.4.7%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[e]          ^findutils@4.7.0%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^m4@1.4.19%arm@23.10+sigsegv build_system=autotools patches=9dc5fbd,bfdffa7 arch=linux-ubuntu20.04-neoverse_v1
+[e]          ^diffutils@3.7%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^libsigsegv@2.14%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^netcdf-c@4.9.2%arm@23.10+blosc~byterange~dap~fsync~hdf4~jna+mpi~nczarr_zip+optimize~parallel-netcdf+pic+shared+szip+zstd build_system=autotools patches=0161eb8 arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^bzip2@1.0.8%arm@23.10~debug~pic+shared build_system=generic arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^c-blosc@1.21.5%arm@23.10+avx2~ipo build_system=cmake build_type=Release generator=make arch=linux-ubuntu20.04-neoverse_v1
+[+]              ^lz4@1.9.4%arm@23.10+pic build_system=makefile libs=shared,static arch=linux-ubuntu20.04-neoverse_v1
+[+]              ^snappy@1.1.10%arm@23.10~ipo+pic+shared build_system=cmake build_type=Release generator=make arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^libaec@1.0.6%arm@23.10~ipo+shared build_system=cmake build_type=Release generator=make arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^zstd@1.5.6%arm@23.10~programs build_system=makefile libs=shared,static arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^netcdf-fortran@4.6.1%arm@23.10~doc+pic+shared build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^openmpi@5.0.3%arm@23.10~atomics~cuda~gpfs~internal-hwloc~internal-libevent~internal-pmix~java+legacylaunchers~lustre~memchecker~openshmem~orterunprefix+romio+rsh~static+vt+wrapper-rpath build_system=autotools fabrics=ofi romio-filesystem=none schedulers=slurm arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^autoconf@2.72%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^automake@1.16.5%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^hwloc@2.9.1%arm@23.10~cairo~cuda~gl~libudev+libxml2~netloc~nvml~oneapi-level-zero~opencl+pci~rocm build_system=autotools libs=shared,static arch=linux-ubuntu20.04-neoverse_v1
+[+]              ^libpciaccess@0.17%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]                  ^util-macros@1.19.3%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]              ^libxml2@2.10.3%arm@23.10+pic~python+shared build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^libevent@2.1.12%arm@23.10+openssl build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[e]          ^libfabric@1.21.0%arm@23.10~debug~kdreg~uring build_system=autotools fabrics=efa,shm,sockets,tcp,udp arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^numactl@2.0.14%arm@23.10 build_system=autotools patches=4e1d78c,62fc8a8,ff37630 arch=linux-ubuntu20.04-neoverse_v1
+[e]          ^openssh@8.2p1%arm@23.10+gssapi build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^pmix@5.0.1%arm@23.10~docs+pmi_backwards_compatibility~python~restful build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[e]          ^slurm@23.11.7%arm@23.10~cgroup~gtk~hdf5~hwloc~mariadb~nvml~pam+pmix+readline~restd~rsmi build_system=autotools sysconfdir=PREFIX/etc arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^parallel-netcdf@1.12.3%arm@23.10~burstbuffer+cxx+fortran+pic+shared build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^perl@5.38.0%arm@23.10+cpanm+opcode+open+shared+threads build_system=generic patches=714e4d1 arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^berkeley-db@18.1.40%arm@23.10+cxx~docs+stl build_system=autotools patches=26090f4,b231fcc arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^gdbm@1.23%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]              ^readline@8.2%arm@23.10 build_system=autotools patches=bbf97f1 arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^pkgconf@2.2.0%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^tcsh@6.24.00%arm@23.10 build_system=autotools patches=3a4e60f arch=linux-ubuntu20.04-neoverse_v1
+[+]          ^ncurses@6.5%arm@23.10~symlinks+termlib abi=none build_system=autotools patches=7a351bc arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^time@1.9%arm@23.10 build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
+[+]      ^zlib-ng@2.1.6%arm@23.10+compat+new_strategies+opt+pic+shared build_system=autotools arch=linux-ubuntu20.04-neoverse_v1
