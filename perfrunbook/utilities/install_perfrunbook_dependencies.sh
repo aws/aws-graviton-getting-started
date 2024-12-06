@@ -67,7 +67,7 @@ fi
 os_name=$(cat /etc/os-release | grep "PRETTY_NAME" | awk -F"=" '{print $2}' | tr -d '[="=]' | tr -d [:cntrl:])
 
 
-if [[ "$os_name" == "Amazon Linux 2023" ]]; then
+if [[ "$os_name" == "Amazon Linux 2023"* ]]; then
   install_al2023_dependencies
 elif [[ "$os_name" == "Amazon Linux 2" ]]; then
   install_al2_dependencies
