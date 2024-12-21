@@ -6,7 +6,7 @@ The main goal of [llama.cpp](https://github.com/ggerganov/llama.cpp) is to enabl
 
 # How to use llama.cpp on Graviton CPUs
 
-Building from sources is the recommended way to use llama.cpp on Graviton CPUs, and for other hardware platforms too. This section provides the instructions on how to build it from sources.
+Building from sources is the recommended way to use llama.cpp on Graviton CPUs, and for other hardware platforms too. This section provides the instructions on how to build llama.cpp from sources and how to install python bindings.
 
 **Prerequisites**
 
@@ -27,16 +27,27 @@ aws ec2 describe-images --owners amazon --filters "Name=architecture,Values=arm6
 git clone https://github.com/ggerganov/llama.cpp
 cd llama.cpp
 
-# build with make
-make
+# build with cmake
+mkdir build
+cd build
+cmake .. -DCMAKE_CXX_FLAGS="-mcpu=native" -DCMAKE_C_FLAGS="-mcpu=native"
+cmake --build . -v --config Release -j `nproc`
 
 ```
 
+**Install llama.cpp python bindings**
+
+```
+CMAKE_ARGS="-DCMAKE_CXX_FLAGS='-mcpu=native' -DCMAKE_C_FLAGS='-mcpu=native'" pip3 install --no-cache-dir llama-cpp-python
+
+```
+
+
 # Run LLM inference with llama.cpp
 
-llama.cpp provides a set of tools to (1) convert model binary file into GPT-Generated Unified Format (GGUF), (2) quantize single and half precision format models into one of the quantized formats, (3) rearrange model weights into blocked layout to leverage the hardware specific GEMM kernels and improve the performance, and (4) run LLM inference locally.
+llama.cpp provides a set of tools to (1) convert model binary file into GPT-Generated Unified Format (GGUF), (2) quantize single and half precision format models into one of the quantized formats, and (3) run LLM inference locally. For the steps on how to convert model binary into GGUF format and how to quantize them into low precision formats, please check [llama.cpp README](https://github.com/ggerganov/llama.cpp/blob/master/README.md).
 
-The following instructions use Meta Llama-3 8B parameter model from [Hugging Face](https://huggingface.co/models) models repository to demonstrate LLM inference performance on AWS Graviton based EC2 Instances. The model is already availble in quantized GGUF format. For the steps on how to convert model binary into GGUF format, please check [llama.cpp README](https://github.com/ggerganov/llama.cpp/blob/master/README.md). The model from the Hugging Face model repository can be run directly on Graviton based EC2 Instances. However, to be able to leverage the optimized GEMM kernels and improve the LLM inference performance by up to 2x, it is recommended to rearrange the model weights into blocked layout which is a one time model pre-processing step. This section shows you how to rearrange the model weights into blocked layout and run it efficiently on AWS Graviton3 and Graviton4 based Amazon EC2 Instances.
+The following instructions use Meta Llama-3 8B parameter model from [Hugging Face](https://huggingface.co/models) models repository to demonstrate LLM inference performance on AWS Graviton based EC2 Instances. The model is already availble in multiple quantized formats which can be directly run on AWS Graviton processors.
 
 
 ```
@@ -44,24 +55,44 @@ The following instructions use Meta Llama-3 8B parameter model from [Hugging Fac
 cd llama.cpp
 wget https://huggingface.co/SanctumAI/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/meta-llama-3-8b-instruct.Q4_0.gguf
 
-# Use 8x8 blocked layout for Graviton3 and 4x8 layout for Graviton4 Instances to match their SVE vector width,
-# i.e.,256bit wide on Graviton3 and 128bit wide on Graviton4.
+```
 
-# Run the following command on Graviton3 based Instances (using Q4_0_8_8)
-./llama-quantize --allow-requantize meta-llama-3-8b-instruct.Q4_0.gguf meta-llama-3-8b-instruct.Q4_0_8_8.gguf Q4_0_8_8
+**Using llama-cli**
 
-# Run the following command on Graviton4 based Instances (using Q4_0_4_8)
-./llama-quantize --allow-requantize meta-llama-3-8b-instruct.Q4_0.gguf meta-llama-3-8b-instruct.Q4_0_4_8.gguf Q4_0_4_8
-
-# Now, launch llama-cli with the above model and a sample input prompt. Use Q4_0_8_8 layout model if running on
-# Graviton3 or use the Q4_0_4_8 layout model if running on Graviton4 based EC2 Instances. The following command is using 64 threads.
+```
+# Now, launch llama-cli with the above model and a sample input prompt. The following command is using 64 threads.
 # Change -t argument for running inference with lower thread count. On completion, the script prints throughput and latency metics
 # for prompt encoding and response generation.
-./llama-cli -m meta-llama-3-8b-instruct.Q4_0_8_8.gguf -p "Building a visually appealing website can be done in ten simple steps:" -n 512 -t 64
-
+./build/bin/llama-cli -m meta-llama-3-8b-instruct.Q4_0.gguf -p "Building a visually appealing website can be done in ten simple steps:" -n 512 -t 64
 
 # Launch the model in conversation (chatbot) mode using this command
-./llama-cli -m meta-llama-3-8b-instruct.Q4_0_8_8.gguf -p "You are a helpful assistant" -cnv --color
+./build/bin/llama-cli -m meta-llama-3-8b-instruct.Q4_0.gguf -p "You are a helpful assistant" -cnv --color
+
+```
+
+**Using llama.cpp python binding**
+
+Note: Set the `n_threads` to number of vcpus explicitly while creating the Llama object. This is required to use all cores(vcpus) on Graviton instances. Without this set, the python bindings use half of the vcpus and the performance is not the best.
+
+```
+import json
+import argparse
+
+from llama_cpp import Llama
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-m", "--model", type=str, default="../models/7B/ggml-models.bin")
+args = parser.parse_args()
+
+# for example, for a .16xlarge instance, set n_threads=64
+llm = Llama(model_path=args.model,
+            n_threads=64)
+
+output = llm(
+"Question: How to build a visually appealing website in ten steps? Answer: ",
+max_tokens=512,
+echo=True,
+)
 
 ```
 
@@ -69,4 +100,6 @@ wget https://huggingface.co/SanctumAI/Meta-Llama-3-8B-Instruct-GGUF/resolve/main
 
 Please refer to
 1. [Best-in-class LLM performance on Arm Neoverse V1 based AWS Graviton3 CPUs](https://community.arm.com/arm-community-blogs/b/infrastructure-solutions-blog/posts/best-in-class-llm-performance) to know the LLM inference performance measured on AWS Graviton3 based EC2 Instances.
-2. [Run LLMs on CPU with Amazon SageMaker Real-time Inference](https://community.aws/content/2eazHYzSfcY9flCGKsuGjpwqq1B/run-llms-on-cpu-with-amazon-sagemaker-real-time-inference?lang=en) for running LLMs for real-time inference using AWS Graviton3 and Amazon SageMaker.
+2. [Running Llama 3 70B on the AWS Graviton4 CPU with Human Readable Performance](https://community.arm.com/arm-community-blogs/b/infrastructure-solutions-blog/posts/running-llama-3-70b-on-aws-graviton4) for LLM inference performance on AWS Graviton4 based EC2 Instances.
+3. [Intro to Llama on Graviton](https://dev.to/aws-heroes/intro-to-llama-on-graviton-1dc) for a step by step guide on how to deploy an LLM model on AWS Graviton-based EC2 Instances. Note: This guide refers to llama.cpp version from July 2024. If you are using the latest llama.cpp version, please replace the `Q4_0_4_8` and `Q4_0_8_8` with `Q4_0` format.
+4. [Run LLMs on CPU with Amazon SageMaker Real-time Inference](https://community.aws/content/2eazHYzSfcY9flCGKsuGjpwqq1B/run-llms-on-cpu-with-amazon-sagemaker-real-time-inference?lang=en) for running LLMs for real-time inference using AWS Graviton3 and Amazon SageMaker.
