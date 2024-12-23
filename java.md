@@ -38,6 +38,12 @@ This checklist summarizes portions of the Java on Graviton section and can be he
     * [Aperf](https://github.com/aws/aperf) is a CLI tool for gathering & visualizing performance data that can be helpful.
 
 ### Java versions
+If you are still using JDK8, please strongly consider upgrading. There are
+significant performance improvements that you can benefit from, such as better
+JIT code generation, optimized GC at high thread counts, Arm-tuned Java monitors
+and locks, an improved SpinPause logic (with even more options in JDK17, like
+OnSpinWaitInstCount and OnSpinWaitInst), and using Arm intrinsics.
+
 JDK binaries for arm64 are available from a number of
 different sources.  [Amazon Corretto](https://aws.amazon.com/corretto/) is
 continuing to improve performance of Java workloads running on Graviton processors and
