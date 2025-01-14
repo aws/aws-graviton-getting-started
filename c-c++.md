@@ -90,20 +90,6 @@ To check whether the application binary contains load and store exclusives:
 $ objdump -d app | grep -i 'ldxr\|ldaxr\|stxr\|stlxr' | wc -l
 ```
 
-GCC's `-moutline-atomics` flag produces a binary that runs on both Graviton1 and later
-Gravitons with LSE support.  Supporting both platforms with the same binary comes at a small
-extra cost: one load and one branch.  To check that an application
-has been compiled with `-moutline-atomics`, `nm` command line utility displays
-the name of functions and global variables in an application binary.  The boolean
-variable that GCC uses to check for LSE hardware capability is
-`__aarch64_have_lse_atomics` and it should appear in the list of symbols:
-```
-$ nm app | grep __aarch64_have_lse_atomics | wc -l
-# the output should be 1 if app has been compiled with -moutline-atomics
-```
-
-GCC 10.1+ enables `-moutline-atomics` by default as does the version of GCC 7 used by Amazon Linux 2.
-
 ### Porting codes with SSE/AVX intrinsics to NEON
 
 When programs contain code with x64 intrinsics, the following procedure can help
