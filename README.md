@@ -187,6 +187,7 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
  * [Enhancing LLM Serving with Torch Compiled RAG on AWS Graviton](https://github.com/pytorch/serve/tree/usecase/rag_based_llm/examples/usecases/RAG_based_LLM_serving#enhancing-llm-serving-with-torch-compiled-rag-on-aws-graviton)
  * [Intro to Llama on Graviton](https://dev.to/aws-heroes/intro-to-llama-on-graviton-1dc)
  * [Small Language Models (SLMs) inference with llama.cpp on Graviton4](https://community.aws/content/2pViH36qEfqDYwv0kEysJ0kqDp4/small-language-models-slms-inference-with-llama-cpp-on-graviton4)
+ * [Run DeepSeek R1 LLM Inference on AWS Graviton](machinelearning/llama.cpp.md/#run-deepseek-r1-llm-inference-on-aws-graviton)
 
 ## Other
  * [Optimized Video Encoding with FFmpeg on AWS Graviton Processors](https://aws.amazon.com/blogs/opensource/optimized-video-encoding-with-ffmpeg-on-aws-graviton-processors/)

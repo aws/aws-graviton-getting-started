@@ -96,6 +96,32 @@ echo=True,
 
 ```
 
+# Run DeepSeek R1 LLM Inference on AWS Graviton
+
+DeepSeek R1 is an open-source LLM for conversational AI, coding, and problem-solving tasks. The model can be readily deployed on AWS Graviton-based Amazon EC2 Instances for inference use cases. We recommend using [ollama](https://github.com/ollama/ollama) service for the inference deployment. Ollama service is built on top of [llama.cpp](https://github.com/ggerganov/llama.cpp) which is highly optimized to achieve the best performance on AWS Graviton processors. This section shows how to install ollama service and run DeepSeek R1 inference.
+
+```
+# Launch Graviton3 or Graviton4 based EC2 instance (for example, c7g, m7g, c8g or m8g instances)
+
+# Download and install the ollama service
+curl -fsSL https://ollama.com/install.sh | sh
+ollama --version
+systemctl is-active ollama.service
+
+# If the output is active, the service is running, and you can skip the next step. If it’s not, start it manually
+sudo systemctl start ollama.service
+
+# DeepSeek has released multiple versions of the R1 model, sizes from 1.5B parameters to 70B parameters.
+# ollama supports deepseek-r1:1.5b/7b/8b/14b/32b/70b models
+# Download and run the 8b model using the following command
+ollama run deepseek-r1:8b
+
+# To benchmark the prompt evaluation rate and response genetation rate, launch ollama with verbose option.
+# At the end of the inference, the script prints the token eval and the token generation rates
+ollama run deepseek-r1:8b "<prompt>" --verbose
+
+```
+
 # Additional Resources
 
 Please refer to
