@@ -6,7 +6,7 @@
 
 Version            | Linux Arm32   | Linux Arm64   | Notes
 ------------------|-----------|-----------|-------------
-.NET 9 | Yes | Yes | v9.0.0-preview.6 released July 9, 2024 with Arm64 Linux builds. Currently in preview with Standard Term Support. 
+.NET 9 | Yes | Yes | v9.0.0 released November 12, 2024 with Arm64 Linux builds. See also [Arm64 vectorization in .NET libraries](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-9/runtime#arm64-vectorization-in-net-libraries).
 .NET 8 | Yes | Yes | v8.0.0 released November 14, 2023 with Arm64 Linux builds. See also [Arm64 Performance Improvements in .NET 8](https://devblogs.microsoft.com/dotnet/this-arm64-performance-in-dotnet-8/). For details on .NET 8 and Graviton, check out this blog: [Powering .NET 8 with AWS Graviton3: Benchmarks](https://aws.amazon.com/blogs/dotnet/powering-net-8-with-aws-graviton3-benchmarks/)
 .NET 7 | Yes | Yes | v7.0.0 released November 8, 2022 with Arm64 Linux builds. For more details check out this video: [Boosting .NET application performance with Arm64 and AWS Graviton 3](https://www.youtube.com/watch?v=V4Lxs5TbaFk) Note that .NET 7 is [out of support](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core#lifecycle). 
 [.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Yes | Yes |  V6.0.0 released November 8, 2021 with Arm64 Linux builds. For more details check out this blog: [.NET 6 on AWS](https://aws.amazon.com/blogs/developer/net-6-on-aws/) and video: [AWS re:Invent 2021 - Accelerate .NET 6 performance with Arm64 on AWS Graviton2](https://www.youtube.com/watch?v=iMlyZI9NhFw)
