@@ -62,6 +62,7 @@ When debugging performance, start by measuring high level system behavior to pin
     0 ++-----------------------+------------------------+------------------------+------------------------+------------------------+-----------------------++
       0                        10                       20                       30                       40                       50                       60
                                                                              Time (s)
+  ```
 3. If CPU usage is higher or equal to the x86 system, proceed to profile for hot-functions in [Section 5.b](./debug_code_perf.md).
 4. If CPU usage is lower, proceed to [Section 5.b](./debug_code_perf.md) to profile which functions are putting threads to sleep and causing the CPU to go idle more than the x86 system.
 
