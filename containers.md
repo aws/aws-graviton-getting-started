@@ -113,7 +113,7 @@ If using the Kubernetes [Cluster Autoscaler](https://github.com/kubernetes/autos
 ---
 
 ### Further reading
-
+* [ECS blueprints on AWS Graviton](https://github.com/aws-ia/ecs-blueprints/blob/main/terraform/fargate-examples/graviton/README.md)
 * [Speed up Docker BuildX by building natively on EC2 Graviton](https://www.docker.com/blog/speed-up-building-with-docker-buildx-and-graviton2-ec2/)
 * [Building multi-arch docker images with buildx](https://tech.smartling.com/building-multi-architecture-docker-images-on-arm-64-c3e6f8d78e1c)
 * [Unifying Arm software development with Docker](https://community.arm.com/developer/tools-software/tools/b/tools-software-ides-blog/posts/unifying-arm-software-development-with-docker)
