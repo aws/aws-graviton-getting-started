@@ -73,7 +73,7 @@ Different architectures and systems have differing capabilities, which means som
 
 Furthermore, different generations of Graviton support different features, as noted in the table above. For example,
 Graviton3 supports SVE but Graviton2 does not. Graviton4 supports SVE2 and SVE. For some applications it may be
-adventageous to implement performance critical kernels to make use of the highest performing feature set available which
+advantageous to implement performance critical kernels to make use of the highest performing feature set available which
 may not be known until runtime. For this, the best practice is to consult HWCAPS. For details on how to do this, see
 [our guide on HWCAPS runtime feature detection](runtime-feature-detection.md).
 
