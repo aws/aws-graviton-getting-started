@@ -53,7 +53,7 @@ pip install -v -r requirements-cpu.txt --extra-index-url https://download.pytorc
 VLLM_TARGET_DEVICE=cpu python setup.py install
 ```
 
-**Run LLama Inference on AWS Graviton**
+**Run DeepSeek Inference on AWS Graviton**
 
 ```
 export VLLM_CPU_KVCACHE_SPACE=40
