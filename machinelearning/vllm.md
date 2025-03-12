@@ -13,7 +13,7 @@ There are no pre-built wheels or images for Graviton CPUs, so you must build vLL
 
 Graviton3(E) (e.g. *7g instances) and Graviton4 (e.g. *8g instances) CPUs support BFloat16 format and MMLA instructions for machine learning (ML) acceleration. These hardware features are enabled starting with Linux Kernel version 5.10. So, it is highly recommended to use the AMIs based on Linux Kernel 5.10 and beyond for the best LLM inference performance on Graviton Instances. Use the following queries to list the AMIs with the recommended Kernel versions. New Ubuntu 22.04, 24.04, and AL2023 AMIs all have kernels newer than 5.10.
 
-The following steps were tested on a Graviton3 R7g.2xlarge and Ubuntu 24.04.1
+The following steps were tested on a Graviton3 R7g.4xlarge and Ubuntu 24.04.1
 
 ```
 # For Kernel 5.10 based AMIs list
@@ -26,14 +26,12 @@ aws ec2 describe-images --owners amazon --filters "Name=architecture,Values=arm6
 **Install Compiler and Python packages**
 ```
 sudo apt-get update  -y
-sudo apt-get install -y gcc-12 g++-12 libnuma-dev python3-dev
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 10 --slave /usr/bin/g++ g++ /usr/bin/g++-12
+sudo apt-get install -y gcc-13 g++-13 libnuma-dev python3-dev python3-virtualenv
 ```
 
-**Create a new Python environment using uv, a very fast Python environment manager**
+**Create a new Python environment**
 ```
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv venv --python 3.12 --seed
+virtualenv venv
 source venv/bin/activate
 ```
 
@@ -48,7 +46,7 @@ cd vllm
 ```
 pip install --upgrade pip
 pip install "cmake>=3.26" wheel packaging ninja "setuptools-scm>=8" numpy
-pip install -v -r requirements-cpu.txt --extra-index-url https://download.pytorch.org/whl/cpu
+pip install -v -r requirements/cpu.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
 VLLM_TARGET_DEVICE=cpu python setup.py install
 ```
