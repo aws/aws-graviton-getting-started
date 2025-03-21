@@ -31,7 +31,7 @@ The following transition guide is organized into a logical sequence of steps as 
 
 
 1. [Optional] Start by watching [re:Invent 2024 - AWS Graviton: The best price performance for your AWS workloads](https://www.youtube.com/watch?v=W4dnUvJJ_Sg), [re:Invent 2024 - Dive deep into the AWS Nitro System](https://www.youtube.com/watch?v=YKZbNcOU77c) and [re:Invent 2021 - Deep dive into AWS Graviton3 and Amazon EC2 C7g instances](https://www.youtube.com/watch?v=WDKwwFQKfSI), which will give you an overview of the Graviton-based instances and some insights on how to run applications depending on their operating system, languages and runtimes.
-2. [Optional] Keep on learning by watching [re:Invent 2021 - The journey of silicon innovation at AWS]([https://www.youtube.com/watch?v=Yv3B_Zey83Y](https://www.youtube.com/watch?v=2DCAtpeBABY)to better understand Amazon long-term commitment to innovate with custom silicon.
+2. [Optional] Keep on learning by watching [AWS Summit SF 2022 - The journey of silicon innovation at AWS](https://www.youtube.com/watch?v=p62DLuSCNOw) to better understand Amazon long-term commitment to innovate with custom silicon.
 3. Get familiar with the rest of this [Getting started with AWS Graviton repository](README.md) which will act as a useful reference throughout your workload transition.
 
 
