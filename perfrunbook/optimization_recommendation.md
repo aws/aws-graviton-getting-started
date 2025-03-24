@@ -19,9 +19,9 @@ A TLB (translation lookaside buffer) is a cache that holds recent virtual addres
 1. Enable Transparent Huge Pages (THP)
      `echo always > /sys/kernel/mm/transparent_hugepage/enabled` -or- `echo madvise > /sys/kernel/mm/transparent_hugepage/enabled`
 2. On Linux kernels >=6.9 Transparent Huge Pages (THP) has been extended with [Folios](https://lwn.net/Articles/937239/) that create 16kB, and 64kB huge pages in addition to 2MB pages. This allows the Linux kernel to use huge pages in more places to increase performance by reducing TLB pressure.  All folio sizes can be set using `inherit` to use the setting of the top-level THP setting, or set independently to select the sizes to use.  Can also set each folio using `never`, `always` and `madvise`.
-   1. To use 16kB pages: `echo inherit > /sys/kernel/mm/transparent_hugepage/hugepages-16kB`
-   2. To use 64kB pages: `echo inherit > /sys/kernel/mm/transparent_hugepage/hugepages-64kB`
-   3. To use 2MB pages: `echo inherit > /sys/kernel/mm/transparent_hugepage/hugepages-2048kB`
+   1. To use 16kB pages: `echo inherit > /sys/kernel/mm/transparent_hugepage/hugepages-16kB/enabled`
+   2. To use 64kB pages: `echo inherit > /sys/kernel/mm/transparent_hugepage/hugepages-64kB/enabled`
+   3. To use 2MB pages: `echo inherit > /sys/kernel/mm/transparent_hugepage/hugepages-2048kB/enabled`
 3. If your application can use pinned hugepages because it uses mmap directly, try reserving huge pages directly via the OS.  This can be done by two methods.
     1. At runtime: `sysctl -w vm.nr_hugepages=X`
     2. At boot time by specifying on the kernel command line in `/etc/default/grub`: `hugepagesz=2M hugepages=512`
