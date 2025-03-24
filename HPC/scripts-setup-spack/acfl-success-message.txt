@@ -1,0 +1,21 @@
+==> Fetching https://mirror.spack.io/bootstrap/github-actions/v0.5/build_cache/linux-centos7-aarch64-gcc-10.2.1-clingo-bootstrap-spack-d63pp2l453bfygh6q7afwdj5mw7lhsns.spec.json
+==> Fetching https://mirror.spack.io/bootstrap/github-actions/v0.5/build_cache/linux-centos7-aarch64/gcc-10.2.1/clingo-bootstrap-spack/linux-centos7-aarch64-gcc-10.2.1-clingo-bootstrap-spack-d63pp2l453bfygh6q7afwdj5mw7lhsns.spack
+==> Installing "clingo-bootstrap@=spack%gcc@=10.2.1~docs+ipo+optimized+python+static_libstdcpp build_system=cmake build_type=Release generator=make patches=bebb819,ec99431 arch=linux-centos7-aarch64" from a buildcache
+[+] /usr (external glibc-2.31-6yya6cd5eav5gkbayotjix4ooxx3oo2c)
+==> Installing gcc-runtime-9.4.0-ilnehkuatqkgxyew2cazpncewjl6jpgp [2/3]
+==> No binary for gcc-runtime-9.4.0-ilnehkuatqkgxyew2cazpncewjl6jpgp found: installing from source
+==> No patches needed for gcc-runtime
+==> gcc-runtime: Executing phase: 'install'
+==> gcc-runtime: Successfully installed gcc-runtime-9.4.0-ilnehkuatqkgxyew2cazpncewjl6jpgp
+  Stage: 0.00s.  Install: 0.34s.  Post-install: 0.30s.  Total: 0.72s
+[+] /shared/spack/opt/spack/linux-ubuntu20.04-aarch64/gcc-9.4.0/gcc-runtime-9.4.0-ilnehkuatqkgxyew2cazpncewjl6jpgp
+==> Installing acfl-23.10-igywqof6vhkaoqpk2ku533loiy5h5cr5 [3/3]
+==> No binary for acfl-23.10-igywqof6vhkaoqpk2ku533loiy5h5cr5 found: installing from source
+==> Fetching https://developer.arm.com/-/media/Files/downloads/hpc/arm-compiler-for-linux/23-10/arm-compiler-for-linux_23.10_Ubuntu-20.04_aarch64.tar
+==> No patches needed for acfl
+==> acfl: Executing phase: 'install'                                                                                                                        ==> acfl: Successfully installed acfl-23.10-igywqof6vhkaoqpk2ku533loiy5h5cr5                                                                                  Stage: 2m 9.74s.  Install: 3m 45.58s.  Post-install: 1m 27.77s.  Total: 7m 23.22s
+[+] /shared/spack/opt/spack/linux-ubuntu20.04-aarch64/gcc-9.4.0/acfl-23.10-igywqof6vhkaoqpk2ku533loiy5h5cr5
+==> Added 1 new compiler to /shared/spack/etc/spack/compilers.yaml
+    arm@23.10
+==> Compilers are defined in the following files:
+    /shared/spack/etc/spack/compilers.yaml
