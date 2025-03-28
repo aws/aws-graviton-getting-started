@@ -18,14 +18,12 @@ There's a good article about it on the AWS Compute blog: [Query for the latest A
 |Amazon Linux 2023|`/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64`|
 |Amazon Linux 2023 minimal|`/aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-default-arm64`|
 |Amazon Linux 2|`/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2`|
-|Debian 11|`/aws/service/debian/release/11/latest/arm64`|
-|Debian 12|`/aws/service/debian/release/12/latest/arm64`|
-|Ubuntu 23.04|`/aws/service/canonical/ubuntu/server/23.04/stable/current/arm64/hvm/ebs-gp2/ami-id`|
+|Ubuntu 24.04|`/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id`|
 |Ubuntu 22.04|`/aws/service/canonical/ubuntu/server/22.04/stable/current/arm64/hvm/ebs-gp2/ami-id`|
-|Ubuntu 21.04|`/aws/service/canonical/ubuntu/server/21.04/stable/current/arm64/hvm/ebs-gp2/ami-id`|
 |Ubuntu 20.04|`/aws/service/canonical/ubuntu/server/20.04/stable/current/arm64/hvm/ebs-gp2/ami-id`|
-|Ubuntu 18.04|`/aws/service/canonical/ubuntu/server/18.04/stable/current/arm64/hvm/ebs-gp2/ami-id`|
-|SLES 15 SP4|`/aws/service/suse/sles/15-sp4/arm64/latest`|
+|Debian 12|`/aws/service/debian/release/12/latest/arm64`|
+|Debian 11|`/aws/service/debian/release/11/latest/arm64`|
+|SLES 15 SP6|`/aws/service/suse/sles/15-sp6/arm64/latest`|
 
 Here is an example to get the AMI ID of the latest **Amazon Linux 2023** version in the us-east-1 region:
 
@@ -55,7 +53,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref LatestAmiId
-      InstanceType: c6g.medium
+      InstanceType: c7g.medium
 ```
 
 
@@ -72,5 +70,5 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref LatestAmiId
-      InstanceType: c6g.medium
+      InstanceType: c7g.medium
 ```
