@@ -59,6 +59,27 @@ install_ubuntu2004_dependencies () {
   echo "------ DONE ------"
 }
 
+install_ubuntu2404_dependencies () {
+  echo "------ INSTALLING UTILITIES ------"
+  apt-get update
+  apt-get install -y -q vim unzip git lsb-release grub2-common net-tools
+  ln -s /usr/sbin/grub-mkconfig /usr/sbin/grub2-mkconfig
+
+  echo "------ INSTALLING HIGH LEVEL PERFORMANCE TOOLS ------"
+  apt-get install -y -q sysstat htop hwloc tcpdump dstat
+
+  echo "------ INSTALLING LOW LEVEL PERFORAMANCE TOOLS ------"
+  apt-get install -y -q linux-tools-$(uname -r) linux-headers-$(uname -r) linux-modules-extra-$(uname -r) bpfcc-tools
+
+  echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
+  apt-get install -y -q python3-dev python3-pip pipx
+  pipx install pandas numpy scipy matplotlib sh seaborn plotext --include-deps
+  pipx ensurepath
+  git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
+
+  echo "------ DONE ------"
+}
+
 if [[ $(id -u) -ne 0 ]]; then
   echo "Must run with sudo privileges"
   exit 1
@@ -75,6 +96,8 @@ elif [[ "$os_name" =~ "Ubuntu 20.04" ]]; then
   install_ubuntu2004_dependencies
 elif [[ "$os_name" =~ "Ubuntu 22.04" ]]; then
   install_ubuntu2004_dependencies
+elif [[ "$os_name" =~ "Ubuntu 24.04" ]]; then
+  install_ubuntu2404_dependencies
 else
   echo "$os_name not supported"
   exit 1
