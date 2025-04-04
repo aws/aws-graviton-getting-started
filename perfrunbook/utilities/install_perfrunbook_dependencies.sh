@@ -132,23 +132,32 @@ fi
 os_name=$(cat /etc/os-release | grep "PRETTY_NAME" | awk -F"=" '{print $2}' | tr -d '[="=]' | tr -d [:cntrl:])
 
 
-if [[ "$os_name" == "Amazon Linux 2023"* ]]; then
-  install_al2023_dependencies
-elif [[ "$os_name" == "Amazon Linux 2" ]]; then
-  install_al2_dependencies
-elif [[ "$os_name" =~ "Ubuntu 20.04" ]]; then
-  install_ubuntu2004_dependencies
-elif [[ "$os_name" =~ "Ubuntu 22.04" ]]; then
-  install_ubuntu2004_dependencies
-elif [[ "$os_name" =~ "Ubuntu 24.04" ]]; then
-  install_ubuntu2404_dependencies
-elif [[ "$os_name" == "Red Hat Enterprise Linux 9.5 (Plow)" ]]; then
-  install_rhel_9_5_dependencies
-elif [[ "$os_name" == "SUSE Linux Enterprise Server 15 SP6" ]]; then
-  install_sles_15_sp6_dependencies
-else
-  echo "$os_name not supported"
-  exit 1
-fi
+case "$os_name" in
+  "Amazon Linux 2023"*)
+    install_al2023_dependencies
+    ;;
+  "Amazon Linux 2")
+    install_al2_dependencies
+    ;;
+  "Ubuntu 20.04"*)
+    install_ubuntu2004_dependencies
+    ;;
+  "Ubuntu 22.04"*)
+    install_ubuntu2004_dependencies
+    ;;
+  "Ubuntu 24.04"*)
+    install_ubuntu2404_dependencies
+    ;;
+  "Red Hat Enterprise Linux 9.5 (Plow)")
+    install_rhel_9_5_dependencies
+    ;;
+  "SUSE Linux Enterprise Server 15 SP6")
+    install_sles_15_sp6_dependencies
+    ;;
+  *)
+    echo "$os_name not supported"
+    exit 1
+    ;;
+esac
 
 echo "DEPENDENCIES SUCCESSFULLY INSTALLED! -- RUN UTILITIES FROM THIS DIRECTORY"
