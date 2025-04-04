@@ -80,6 +80,26 @@ install_ubuntu2404_dependencies () {
   echo "------ DONE ------"
 }
 
+install_rhel_9_5_dependencies () {
+  echo "------ INSTALLING UTILITIES ------"
+  dnf install -y -q vim unzip git perl-open.noarch
+
+  echo "------ INSTALLING HIGH LEVEL PERFORMANCE TOOLS ------"
+  dnf install -y -q sysstat htop hwloc tcpdump
+
+  echo "------ INSTALLING LOW LEVEL PERFORAMANCE TOOLS ------"
+  dnf install -y -q perf kernel-devel-$(uname -r) bcc
+
+  echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
+  dnf install -y -q python3 python3-pip
+  python3 -m pip install --upgrade pip
+  python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
+  git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
+
+  echo "------ DONE ------"
+}
+
+
 if [[ $(id -u) -ne 0 ]]; then
   echo "Must run with sudo privileges"
   exit 1
@@ -98,6 +118,8 @@ elif [[ "$os_name" =~ "Ubuntu 22.04" ]]; then
   install_ubuntu2004_dependencies
 elif [[ "$os_name" =~ "Ubuntu 24.04" ]]; then
   install_ubuntu2404_dependencies
+elif [[ "$os_name" == "Red Hat Enterprise Linux 9.5 (Plow)" ]]; then
+  install_rhel_9_5_dependencies  
 else
   echo "$os_name not supported"
   exit 1
