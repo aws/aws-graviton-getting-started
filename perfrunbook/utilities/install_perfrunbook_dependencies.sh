@@ -99,6 +99,30 @@ install_rhel_9_5_dependencies () {
   echo "------ DONE ------"
 }
 
+install_sles_15_sp6_dependencies() {
+    echo "------ INSTALLING UTILITIES ------"
+    zypper --quiet --non-interactive install vim unzip git
+
+    echo "------ INSTALLING HIGH LEVEL PERFORMANCE TOOLS ------"
+    zypper --quiet --non-interactive install sysstat htop hwloc tcpdump
+
+    echo "------ INSTALLING LOW LEVEL PERFORMANCE TOOLS ------"
+    # Install perf and related tools
+    zypper --quiet --non-interactive install perf
+    zypper --quiet --non-interactive install kernel-default-devel
+    zypper --quiet --non-interactive install bcc-tools
+
+    echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
+    # Install Python and pip
+    zypper --quiet --non-interactive install python3 python3-pip
+    python3 -m pip install --upgrade pip
+    python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
+
+    # Get FlameGraph tools
+    git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
+
+    echo "------ DONE ------"
+}
 
 if [[ $(id -u) -ne 0 ]]; then
   echo "Must run with sudo privileges"
@@ -119,7 +143,9 @@ elif [[ "$os_name" =~ "Ubuntu 22.04" ]]; then
 elif [[ "$os_name" =~ "Ubuntu 24.04" ]]; then
   install_ubuntu2404_dependencies
 elif [[ "$os_name" == "Red Hat Enterprise Linux 9.5 (Plow)" ]]; then
-  install_rhel_9_5_dependencies  
+  install_rhel_9_5_dependencies
+elif [[ "$os_name" == "SUSE Linux Enterprise Server 15 SP6" ]]; then
+  install_sles_15_sp6_dependencies
 else
   echo "$os_name not supported"
   exit 1
