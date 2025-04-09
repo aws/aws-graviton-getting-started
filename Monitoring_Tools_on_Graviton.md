@@ -34,6 +34,20 @@ The *dmidecode* utility is a tool for listing details of the system's hardware c
 |Current Speed| 2600 MHz|
 |...|...|
 
+#### AWS API to get CPU frequency information
+The AWS EC2 API also allows to query an instance type processor maximum frequency.
+
+Below is an example using the AWS CLI to query the processor frequency of a Graviton3-based c7g.4xlarge:
+```
+$ aws ec2 describe-instance-types --instance-types c7g.4xlarge --query "InstanceTypes[].{InstanceType:InstanceType,SustainedClockSpeedInGhz:ProcessorInfo.SustainedClockSpeedInGhz}" --output json
+[
+    {
+        "InstanceType": "c7g.4xlarge",
+        "SustainedClockSpeedInGhz": 2.6
+    }
+]
+```
+
 #### *hwloc* and *lstopo* utilities
 Shown below is sample output for these utilities on a c6g.2xlarge instance.
 
