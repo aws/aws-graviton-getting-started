@@ -200,6 +200,7 @@ Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
 ## Other
  * [Optimized Video Encoding with FFmpeg on AWS Graviton Processors](https://aws.amazon.com/blogs/opensource/optimized-video-encoding-with-ffmpeg-on-aws-graviton-processors/)
  * [Video Encoding on Graviton in 2025](https://aws.amazon.com/blogs/opensource/video-encoding-on-graviton-in-2025/)
+ * [Using Amazon APerf to go from 50% below to 36% above performance target](https://aws.amazon.com/blogs/compute/using-amazon-aperf-to-go-from-50-below-to-36-above-performance-target/)
 
 # Case Studies
 
