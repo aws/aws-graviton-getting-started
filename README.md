@@ -157,7 +157,7 @@ make install
 ```
 Make sure to have the full path to your lib at $HOME/lib in /etc/ld.so.conf and run ldconfig.
 
-For users of OpenJDK, which is dynamically linked to the system zlib, you can set LD_LIBRARY_PATH to point to the directory where your newly built version of zlib-cloudflare is located or load that library with LD_PRELOAD.
+For JDKs that dynamically link to the system zlib, you can set LD_LIBRARY_PATH to point to the directory where your newly built version of zlib-cloudflare is located or load that library with LD_PRELOAD.
 
 You can check the libz that JDK is dynamically linked against with:
 ```
@@ -165,7 +165,8 @@ $ ldd /Java/jdk-11.0.8/lib/libzip.so | grep libz
 libz.so.1 => /lib/x86_64-linux-gnu/libz.so.1 (0x00007ffff7783000)
 ```
 
-Currently, users of Amazon Corretto cannot link against zlib-cloudflare.
+NOTE: Linux versions of OpenJDK and Amazon Corretto 17+ dynamically link to zlib. Earlier versions of Corretto bundled zlib directly and this behavior can vary by JDK vendor and platform.
+
 
 # Blog Posts
 
