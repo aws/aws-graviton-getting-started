@@ -64,7 +64,8 @@ If you are new to Graviton and want to understand how to identify target workloa
 |L1 cache (per core)	|64kB inst / 64kB data	|64kB inst / 64kB data	|64kB inst / 64kB data |
 |L2 cache (per core)	|1MB	|1MB	|2MB |
 |LLC (shared)	|32MB	|32MB	|36MB |
-|DRAM	|8x DDR4	|8x DDR5	|12x DDR5 |
+|Memory (NUMA) nodes | 1 | 1 | 1  (2 for 48xlarge)
+|DRAM	|8x DDR4	|8x DDR5	|12x DDR5 (24x for 48xlarge) |
 |DDR Encryption	|yes	|yes	|yes |
 
 # Optimizing for Graviton
