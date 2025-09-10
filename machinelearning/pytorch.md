@@ -9,7 +9,9 @@ There are multiple levels of software package abstractions available: AWS DLC (D
 
 **AWS Graviton PyTorch DLC**
 
-4Q'23 AWS Graviton DLCs are based on PyTorch 2.1. These DLCs continue to deliver the best performance on Graviton for bert and roberta sentiment analysis and fill mask models, making Graviton3 the most cost effective CPU platform on the AWS cloud for these models.
+AWS [Deep Learning Containers](https://github.com/aws/deep-learning-containers) are pre-built Docker images that make it easier to run popular deep learning frameworks and tools on AWS. Pytorch 2.6.0 is the latest version that DLCs cater to. The list of available images is in [available_images.md](https://github.com/aws/deep-learning-containers/blob/master/available_images.md) 
+
+These DLCs continue to deliver the best performance on Graviton for Bert and RoBerta sentiment analysis and fill-mask models, making Graviton the most cost-effective CPU platform on the AWS cloud for these models.
 
 ```
 sudo apt-get update
@@ -21,7 +23,7 @@ aws ecr get-login-password --region us-east-1 \
   --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
 
 # Pull the AWS DLC for pytorch
-docker pull 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference-graviton:2.1.0-cpu-py310-ubuntu20.04-ec2
+docker pull 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference-arm64:2.6.0-cpu-py312-ubuntu22.04-ec2
 ```
 
 **Using Python wheels**
@@ -70,7 +72,7 @@ docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/pytorch-arm-neoverse:r23.1
 
 AWS DLCs come with all the optimizations enabled, so, there are no additional runtime configurations required. Where as for the python wheels and the docker hub images, enable the below runtime configurations to achieve the best performance.
 ```
-# Graviton3(E) (e.g. c7g, c7gn and Hpc7g instances) supports BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
+# Graviton3(E) (e.g. c7g, c7gn and Hpc7g instances) and later generations support BF16 format for ML acceleration. This can be enabled in oneDNN by setting the below environment variable
 grep -q bf16 /proc/cpuinfo && export DNNL_DEFAULT_FPMATH_MODE=BF16
 
 # Enable primitive caching to avoid the redundant primitive allocation
@@ -89,6 +91,21 @@ num_processes=<number of processes>
 export OMP_NUM_THREADS=$((1 > ($num_vcpus/$num_processes) ? 1 : ($num_vcpus/$num_processes)))
 export OMP_PROC_BIND=false
 export OMP_PLACES=cores
+```
+
+We also recommend using `torch.compile()` when possible, as this has been shown to accelerate inference by up to 2x as described in our blog: [Accelerated PyTorch inference with torch.compile on AWS Graviton processors](https://aws.amazon.com/blogs/machine-learning/accelerated-pytorch-inference-with-torch-compile-on-aws-graviton-processors/). 
+
+While running inference using Convolutional Neural Networks (CNNs), we recommend converting the model to the channels-last format for optimal performance.
+```
+import torch
+import torchvision.models as models
+
+model = models.mobilenet_v2(pretrained=True).eval()
+model = model.to(memory_format=torch.channels_last)
+
+sample_input = torch.randn(1, 3, 224, 224)
+with torch.inference_mode():
+    outputs = model(sample_input)
 ```
 
 # Evaluate performance with PyTorch benchmark
