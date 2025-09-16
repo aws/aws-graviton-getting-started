@@ -47,7 +47,7 @@ When adopting Graviton, it is recommended to use recent software versions as muc
 
 Python 2.7 is EOL since January the 1st 2020, it is definitely recommended to upgrade to a Python 3.x version before moving to Graviton.
 
-Python 3.7 will reach [EOL in July, 2023](https://devguide.python.org/versions/), so when starting to port an application to Graviton, it is recommended to target at least Python 3.8.
+Python 3.9 will reach [EOL in October, 2025](https://devguide.python.org/versions/), so when starting to port an application to Graviton, it is recommended to target at least Python 3.10.
 
 ### 1.3 Python on AL2 and RHEL 8
 
