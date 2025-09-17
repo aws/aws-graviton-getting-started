@@ -4,14 +4,23 @@ If you are just getting started with AWS Graviton-based instances, or even if yo
 
 ### Recent Events
 
+#### [AWS re:Invent 2024](https://reinvent.awsevents.com/)
+  * [DEV302: AWS re:Invent 2024 - Optimizing performance and cost with AWS Graviton](https://www.youtube.com/watch?v=vSdScyCFsFI)
+  * [CMP320: AWS re:Invent 2024 - AWS Graviton: The best price performance for your AWS workloads](https://www.youtube.com/watch?v=W4dnUvJJ_Sg)
+  * [CMP323: AWS re:Invent 2024 - Optimize your AI/ML workloads with Amazon EC2 Graviton](https://www.youtube.com/watch?v=QIAaMlW1fVo)
+  * [PRO303: AWS re:Invent 2024 - Scaling to new heights: Coinbase migrates to Amazon EKS and scales 10x](https://www.youtube.com/watch?v=ghGR14k-co0)
+  * [AWS re:Invent 2024 - CEO Keynote with Matt Garman](https://youtu.be/LY7m5LQliAo?si=I5zvhjVu55LHlAmn&t=980)
+
 #### [AWS re:Invent 2023](https://reinvent.awsevents.com/)
   * [CMP404: Migrating to AWS Graviton with AWS container services](https://www.youtube.com/watch?v=9JZVomrx6uQ)
   * [CMP315: Migrating critical business applications to AWS Graviton with ease](https://www.youtube.com/watch?v=9W0j__k5afg)
   * [CMP334: The best price performance for your AWS workloads (Graviton4 deep dive)](https://www.youtube.com/watch?v=T_hMIjKtSr4)
-  
+
 ### Development Tools
 
 * Performance Analysis - [APerf](https://github.com/aws/aperf)
+* [Transforming Java applications with Amazon Q Developer](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/transform-java.html)
+* [Transforming .NET applications with Amazon Q Developer](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/transform-dotnet-IDE.html)
 * Source Code Analysis - [Porting Advisor for Graviton](https://github.com/aws/porting-advisor-for-graviton)
 
 ### Building / Running applications on AWS Graviton
@@ -53,11 +62,6 @@ If you are just getting started with AWS Graviton-based instances, or even if yo
 * Blog - [Reduce Amazon SageMaker inference cost with AWS Graviton](https://aws.amazon.com/blogs/machine-learning/reduce-amazon-sagemaker-inference-cost-with-aws-graviton/)
 * Tech Talk - [Deep Dive: PyTorch 2.0 on AWS Graviton](https://www.youtube.com/watch?v=c1Rl-vCmnT0)
 * Blog - [Implementing a Full ML Lifecycle with Anaconda Distribution on AWS Graviton](https://www.anaconda.com/blog/implementing-a-full-ml-lifecycle-with-anaconda-distribution-on-aws-graviton)
-
-### Porting Advisor for AWS Graviton
-
-* Twitch - [Porting Advisor for Graviton](https://www.twitch.tv/videos/1822190104)
-* Blog -  [Using Porting Advisor for Graviton](https://aws.amazon.com/blogs/compute/using-porting-advisor-for-graviton/)
 
 ### Databases
 
