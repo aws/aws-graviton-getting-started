@@ -56,7 +56,7 @@ Before starting the transition, you will need to inventory your current software
   * [PHP](php.md)
   * [Python](python.md)
   * [R](R.md)
-  * [Rust](rust.md)  
+  * [Rust](rust.md)
 
 As a rule the more current your software environment the more likely you will obtain the full performance entitlement from Graviton.
 
