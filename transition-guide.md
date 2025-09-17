@@ -44,7 +44,9 @@ Before starting the transition, you will need to inventory your current software
 * All the libraries, frameworks and runtimes used by the application.
 * Tools used to build, deploy and test your application (e.g. compilers, test suites, CI/CD pipelines, provisioning tools and scripts). Note there are language specific sections in the getting started guide with useful pointers to getting the best performance from Graviton processors.
 * Tools and/or agents used to deploy and manage the application in production (e.g. monitoring tools or security agents)
-* The [Porting Advisor for Graviton](https://github.com/aws/porting-advisor-for-graviton) is an open-source command line tool that analyzes source code and generates a report highlighting missing and outdated libraries and code constructs that may require modification along with recommendations for alternatives. It accelerates your transition to AWS Graviton-based instances by reducing the iterative process of identifying and resolving source code and library dependencies
+* [Amazon Transform](https://aws.amazon.com/q/developer/transform/) helps quickly and easily migrate software environments that provide a path to Graviton adoption - for example:
+  * [Transforming Java applications with Amazon Q Developer](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/transform-java.html)
+  * [Transforming .NET applications with Amazon Q Developer](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/transform-dotnet-IDE.html)
 * This guide contains language specifics sections where you'll find additional per-language guidance:
   * [C/C++](c-c++.md)
   * [Go](golang.md)
