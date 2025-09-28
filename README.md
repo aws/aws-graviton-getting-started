@@ -43,30 +43,30 @@ If you are new to Graviton and want to understand how to identify target workloa
 
 # Building for Graviton
 
-|Processor	|Graviton2	|Graviton3(E)	| Graviton4 |
-|---	|---	|---	|--- |
-|Instances	|[M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6g/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6g/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6g/), [T4g](https://aws.amazon.com/ec2/instance-types/t4g), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [I4g/Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/)	|[C7g/C7gd/C7gn](https://aws.amazon.com/ec2/instance-types/c7g/), [M7g/M7gd](https://aws.amazon.com/ec2/instance-types/m7g/), [R7g/R7gd](https://aws.amazon.com/ec2/instance-types/r7g/), and [Hpc7g](https://aws.amazon.com/ec2/instance-types/hpc7g/)	|[C8g](https://aws.amazon.com/ec2/instance-types/c8g/), [M8g](https://aws.amazon.com/ec2/instance-types/m8g/), [R8g](https://aws.amazon.com/ec2/instance-types/r8g/), [X8g](https://aws.amazon.com/ec2/instance-types/x8g/), and [I8g](https://aws.amazon.com/ec2/instance-types/i8g/) |
-|Core	|[Neoverse-N1](https://developer.arm.com/documentation/100616/0301)	|[Neoverse-V1](https://developer.arm.com/documentation/101427/latest/)	|[Neoverse-V2](https://developer.arm.com/documentation/102375/latest) |
-|Frequency	|2500MHz	|2600MHz	|2800MHz (2700MHz for 48xlarge) |
-|Turbo supported	|No	|No	|No |
-|Software Optimization Guide (Instruction Throughput and Latency)|[SWOG](https://developer.arm.com/documentation/pjdoc466751330-9707/latest/)|[SWOG](https://developer.arm.com/documentation/pjdoc466751330-9685/latest/) |[SWOG](https://developer.arm.com/documentation/PJDOC-466751330-593177/latest/) |
-|Interconnect	|CMN-600	|CMN-650	|CMN-700 |
-|Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|Armv9.0-a |
-|[32bit Backward Compatibility](https://developer.arm.com/documentation/ka006014/latest/) |Userspace only |Userspace only |No support |
-|Additional  features	|fp16, rcpc, dotprod, crypto	|sve, rng, bf16, int8	|sve2, sve-int8, sve-bf16, sve-bitperm, sve-crypto |
-|Recommended `-mcpu` flag	([more information](c-c++.md#enabling-arm-architecture-specific-features))|`neoverse-n1` |`neoverse-512tvb` |`neoverse-512tvb` |
-|RNG Instructions	|No	|Yes	|Yes |
-|SIMD instructions	|2x Neon 128bit vectors	|4x Neon 128bit vectors / 2x SVE 256bit	|4x Neon/SVE 128bit vectors |
-|LSE (atomic mem operations)	|yes	|yes	|yes |
-|Pointer Authentication	|no	|yes	|yes |
-|Branch Target Identification |no |no |yes |
-|Cores	|64	|64	|96 per socket (192 for 2-socket 48xlarge) |
-|L1 cache (per core)	|64kB inst / 64kB data	|64kB inst / 64kB data	|64kB inst / 64kB data |
-|L2 cache (per core)	|1MB	|1MB	|2MB |
-|LLC (shared)	|32MB	|32MB	|36MB |
-|Memory (NUMA) nodes | 1 | 1 | 1  (2 for 48xlarge)
-|DRAM	|8x DDR4	|8x DDR5	|12x DDR5 (24x for 48xlarge) |
-|DDR Encryption	|yes	|yes	|yes |
+Processor|Graviton2	|Graviton3(E)	| Graviton4 |
+---|---|---|---|
+Instances	|[M6g/M6gd](https://aws.amazon.com/ec2/instance-types/m6g/), [C6g/C6gd/C6gn](https://aws.amazon.com/ec2/instance-types/c6g/), [R6g/R6gd](https://aws.amazon.com/ec2/instance-types/r6g/), [T4g](https://aws.amazon.com/ec2/instance-types/t4g), [X2gd](https://aws.amazon.com/ec2/instance-types/x2/), [G5g](https://aws.amazon.com/ec2/instance-types/g5g/), and [I4g/Im4gn/Is4gen](https://aws.amazon.com/ec2/instance-types/i4g/)	|[C7g/C7gd/C7gn](https://aws.amazon.com/ec2/instance-types/c7g/), [M7g/M7gd](https://aws.amazon.com/ec2/instance-types/m7g/), [R7g/R7gd](https://aws.amazon.com/ec2/instance-types/r7g/), and [Hpc7g](https://aws.amazon.com/ec2/instance-types/hpc7g/)	|[C8g](https://aws.amazon.com/ec2/instance-types/c8g/), [M8g](https://aws.amazon.com/ec2/instance-types/m8g/), [R8g](https://aws.amazon.com/ec2/instance-types/r8g/), [X8g](https://aws.amazon.com/ec2/instance-types/x8g/), and [I8g](https://aws.amazon.com/ec2/instance-types/i8g/) |
+Core	|[Neoverse-N1](https://developer.arm.com/documentation/100616/0301)	|[Neoverse-V1](https://developer.arm.com/documentation/101427/latest/)	|[Neoverse-V2](https://developer.arm.com/documentation/102375/latest) |
+Frequency	|2500MHz	|2600MHz	|2800MHz (2700MHz for 48xlarge) |
+Turbo supported	|No	|No	|No |
+Software Optimization Guide (Instruction Throughput and Latency)|[SWOG](https://developer.arm.com/documentation/pjdoc466751330-9707/latest/)|[SWOG](https://developer.arm.com/documentation/pjdoc466751330-9685/latest/) |[SWOG](https://developer.arm.com/documentation/PJDOC-466751330-593177/latest/) |
+Interconnect	|CMN-600	|CMN-650	|CMN-700 |
+Architecture revision	|ARMv8.2-a	|ARMv8.4-a	|Armv9.0-a |
+[32bit Backward Compatibility](https://developer.arm.com/documentation/ka006014/latest/) |Userspace only |Userspace only |No support |
+Additional  features	|fp16, rcpc, dotprod, crypto	|sve, rng, bf16, int8	|sve2, sve-int8, sve-bf16, sve-bitperm, sve-crypto |
+Recommended `-mcpu` flag	([more information](c-c++.md#enabling-arm-architecture-specific-features))|`neoverse-n1` |`neoverse-512tvb` |`neoverse-512tvb` |
+RNG Instructions	|No	|Yes	|Yes |
+SIMD instructions	|2x Neon 128bit vectors	|4x Neon 128bit vectors / 2x SVE 256bit	|4x Neon/SVE 128bit vectors |
+LSE (atomic mem operations)	|yes	|yes	|yes |
+Pointer Authentication	|no	|yes	|yes |
+Branch Target Identification |no |no |yes |
+Cores	|64	|64	|96 per socket (192 for 2-socket 48xlarge) |
+L1 cache (per core)	|64kB inst / 64kB data	|64kB inst / 64kB data	|64kB inst / 64kB data |
+L2 cache (per core)	|1MB	|1MB	|2MB |
+LLC (shared)	|32MB	|32MB	|36MB |
+Memory (NUMA) nodes | 1 | 1 | 1  (2 for 48xlarge)
+DRAM	|8x DDR4	|8x DDR5	|12x DDR5 (24x for 48xlarge) |
+DDR Encryption	|yes	|yes	|yes |
 
 # Optimizing for Graviton
 Please refer to [optimizing](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/README.md).
