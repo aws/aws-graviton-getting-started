@@ -3,6 +3,7 @@
 
 import argparse
 import copy
+import glob
 import json
 import math
 import os
@@ -51,10 +52,12 @@ class SignalWatcher:
 
 #Counter = namedtuple("Counter", "ctr1 ctr2")
 class PMUEventCounter:
-    def __init__(self, name, program_str, per_cpu=True):
+    def __init__(self, name, program_str, per_cpu=True, agg_func=None):
         self.name = name
         self.program_str = program_str
         self.per_cpu = per_cpu
+        self.pmu = None
+        self.agg_func = agg_func or "sum"
 
     def __eq__(self, other):
         return self.name == other.get_canonical_name()
@@ -65,15 +68,64 @@ class PMUEventCounter:
     def get_canonical_name(self):
         return self.name
 
-    def get_event_to_program(self):
+    def set_pmu(self, pmu):
+        self.pmu = self.pmu or pmu
+
+    def get_event_to_program(self, group):
         """
         Returns an event to program, which may be different than the
         canonical name.  This is useful for naming
         """
-        return self.program_str
+        return f"{self.pmu}/{self.program_str},name={group}-{self.get_canonical_name()}/"
 
     def is_per_cpu(self):
         return self.per_cpu
+
+
+class PMUCompositeEventCounter(PMUEventCounter):
+    def get_event_to_program(self, group):
+        """
+        Specific to some events like Gv4 mesh events where we need to measure multiple
+        events for perf to multiplex on our behalf and then combine later.
+        """
+        program_strings = []
+        for events in self.program_str:
+            ps = f"{self.pmu}/{events},name={group}-{self.get_canonical_name()}/"
+            program_strings.append(ps)
+
+        return f"{','.join(program_strings)}"
+    
+
+class ArmCMN700EventCounter(PMUEventCounter):
+    """
+    This counter sets up an event or pair of events to monitor
+    on a CMN700 mesh that may support multi-socket.
+    """
+
+    pmus = []
+
+    @staticmethod
+    def detect_pmus():
+        paths = glob.glob("/sys/devices/arm_cmn_*")
+        return [os.path.basename(path) for path in paths]
+
+    def __init__(self, name, program_str, per_cpu=False, agg_func=None):
+        super().__init__(name, program_str, per_cpu, agg_func)
+
+        if not ArmCMN700EventCounter.pmus:
+            ArmCMN700EventCounter.pmus = ArmCMN700EventCounter.detect_pmus()
+
+    def get_event_to_program(self, group):
+        """
+        This is specific to the CMN700 on Grv4
+        """
+
+        program_strings = []
+        for pmu in ArmCMN700EventCounter.pmus:
+            ps = f"{pmu}/{self.program_str},name={group}-{self.get_canonical_name()}/"
+            program_strings.append(ps)
+
+        return f"{','.join(program_strings)}"
 
 
 class CounterConfig:
@@ -89,11 +141,14 @@ class CounterConfig:
             self.numerator = numerator
         else:
             raise TypeError("Unknown type passed in for numerator")
+        self.numerator.set_pmu(pmu)
 
         if isinstance(denominator, str):
             self.denominator = PMUEventCounter(denominator, denominator)
         elif isinstance(numerator, PMUEventCounter):
             self.denominator = denominator
+        if self.denominator is not None:
+            self.denominator.set_pmu(pmu)
 
         self.scale = scale
 
@@ -123,6 +178,28 @@ class CounterConfig:
         Returns series of the counter ratios from the individual counter measurements for
         plotting or statistical manipulation
         """
+        # Group the same counters together that may form a composite event, or come from different PMUs, and aggregate their counts
+        dfs = []
+        dfn = (
+            df[df["counter"] == self.numerator.get_canonical_name()][["count", "event", "group", "counter"]]
+            .reset_index()
+            .groupby(by=["normalized_time", "CPU", "event", "group", "counter"], as_index=False)
+            .aggregate(self.numerator.agg_func)
+            .set_index(["normalized_time", "CPU"])
+        )
+        dfs.append(dfn)
+        if self.denominator:
+            dfd = (
+                df[df["counter"] == self.denominator.get_canonical_name()][["count", "event", "group", "counter"]]
+                .reset_index()
+                .groupby(by=["normalized_time", "CPU", "event", "group", "counter"], as_index=False)
+                .aggregate(self.denominator.agg_func)
+                .set_index(["normalized_time", "CPU"])
+            )
+            dfs.append(dfd)
+        df = pd.concat(dfs, sort=False).sort_index()
+
+
         if self.numerator and not self.denominator:
             return (df[df["counter"] == self.numerator.get_canonical_name()]["count"].reset_index(drop=True)) * self.scale
 
@@ -160,7 +237,6 @@ class ArmCounterPKC(ArmCounterConfig):
         super().__init__(name, PMUEventCounter(event_name, event),
                          PMUEventCounter("cycles", "event=0x11"), scale*1000)
 
-
 class ArmCounterPKI(ArmCounterConfig):
     def __init__(self, name, event_name, event, scale=1):
         super().__init__(name, PMUEventCounter(event_name, event),
@@ -170,11 +246,13 @@ class ArmCMNCounterConfig(CounterConfig):
     def __init__(self, name, counter1, counter2, scale):
         super().__init__("arm_cmn_0", name, counter1, counter2, scale)
 
+class ArmCMN700CounterConfig(CounterConfig):
+    def __init__(self, name, counter1, counter2, scale):
+        super().__init__("arm_cmn_*", name, counter1, counter2, scale)
 
 class x86CounterConfig(CounterConfig):
     def __init__(self, name, counter1, counter2, scale):
         super().__init__("cpu", name, counter1, counter2, scale)
-
 
 class x86CounterPKI(x86CounterConfig):
     def __init__(self, name, event_name, event, scale=1):
@@ -185,7 +263,6 @@ class IntelCounterPKC(x86CounterConfig):
     def __init__(self, name, event_name, event, scale=1):
         super().__init__(name, PMUEventCounter(event_name, event),
                          PMUEventCounter("cycles", "event=0x3c,umask=0x0"), scale*1000)
-
 
 class AMDCounterPKC(x86CounterConfig):
     def __init__(self, name, event_name, event):
@@ -226,13 +303,13 @@ def perfstat(counter_groups, timeout=None, cpus=None):
                     group = f"group{i}"
                     # Forms the perf counter format with a unique group and hash to form the name
                     #XXX: For arm_cmn, getting a None type for a counter to program, so that's odd....
-                    counters = [f"{pmu}/{ctr.get_event_to_program()},name={group}-{ctr.get_canonical_name()}/" for ctr in ctrset]
+                    counters = [ctr.get_event_to_program(group)for ctr in ctrset]
                     # Collect everything un-aggregated.  So we can see lightly loaded CPUs
 
                     perf_cmd = [
                         "perf",
                         "stat",
-                        f"-I{SAMPLE_INTERVAL * 1000}",
+                        f"-I{2 * SAMPLE_INTERVAL * 1000}",
                         "-A",
                         "-x|",
                         "-a",
@@ -459,11 +536,13 @@ def get_cpu_type():
     GRAVITON_MAPPING = {
         "0xd0c": "Graviton2",
         "0xd40": "Graviton3",
-        "0xd4f": "Graviton4"
+        "0xd4f": "Graviton4",
+        "0xd84": "Graviton5"
     }
     AMD_MAPPING = {
         "7R13": "Milan",
-        "9R14": "Genoa"
+        "9R14": "Genoa",
+        "9R45": "Turin"
     }
 
     with open("/proc/cpuinfo", "r") as f:
@@ -493,19 +572,28 @@ class PlatformDetails:
         return self.counter_list
 
 
+def _agg_gv5_l3_misses(x):
+    x = x.to_list()
+    sz = len(x)
+    if sz < 3:
+        return float("nan")
+    l3_demand_miss, l3_demand_access, l2_refill = x
+    return (l3_demand_miss / l3_demand_access) * l2_refill
+
+
 counter_mapping = {
     "Graviton": [
-        ArmCounterConfig("ipc",
-                         PMUEventCounter("instructions", "event=0x8"), 
-                         PMUEventCounter("cycles", "event=0x11"),
-                         1),
+        ArmCounterConfig(
+            "ipc",
+            PMUEventCounter("instructions", "event=0x8"), 
+            PMUEventCounter("cycles", "event=0x11"),
+            1),
         ArmCounterPKI("branch-mpki", "branch_miss_predicts", "event=0x10"),
         ArmCounterPKI("code_sparsity", "code_sparsity", "event=0x11c"),
         ArmCounterPKI("data-l1-mpki", "data_l1_refills", "event=0x3"),
         ArmCounterPKI("inst-l1-mpki", "inst_l1_refills", "event=0x1"),
         ArmCounterPKI("l2-ifetch-mpki", "l2_refills_ifetch", "event=0x108"),
         ArmCounterPKI("l2-mpki", "l2_refills", "event=0x17"),
-        ArmCounterPKI("l3-mpki", "llc_cache_miss_rd", "event=0x37"),
         ArmCounterPKC("stall_frontend_pkc", "stall_frontend_cycles", "event=0x23"),
         ArmCounterPKC("stall_backend_pkc", "stall_backend_cycles", "event=0x24"),
         ArmCounterPKI("inst-tlb-mpki", "inst_tlb_refill", "event=0x2"),
@@ -516,7 +604,11 @@ counter_mapping = {
         ArmCounterPKC("inst-scalar-fp-pkc", "VFP_SPEC", "event=0x75"),
 
     ],
+    "Graviton2": [
+        ArmCounterPKI("l3-mpki", "llc_cache_miss_rd", "event=0x37"),
+    ],
     "Graviton3": [
+        ArmCounterPKI("l3-mpki", "llc_cache_miss_rd", "event=0x37"),
         ArmCounterPKC("stall_backend_mem_pkc", "stall_backend_mem_cycles", "event=0x4005"),
         ArmCounterPKC("inst-sve-pkc", "SVE_INST_SPEC", "event=0x8006"),
         ArmCounterPKC("inst-sve-empty-pkc", "SVE_PRED_EMPTY_SPEC", "event=0x8075"),
@@ -528,7 +620,34 @@ counter_mapping = {
         # FP FIXED OPS: number of NEON and Scalar ops, counting NEON vector width (128-bit)
         ArmCounterPKC("flop-nonsve-pkc", "FP_FIXED_OPS_SPEC", "event=0x80C1"),
     ],
+    "Graviton4": [
+        ArmCounterPKI("l3-mpki", "llc_cache_miss_rd", "event=0x37"),
+        ArmCounterPKC("stall_backend_mem_pkc", "stall_backend_mem_cycles", "event=0x4005"),
+        ArmCounterPKC("inst-sve-pkc", "SVE_INST_SPEC", "event=0x8006"),
+        ArmCounterPKC("inst-sve-empty-pkc", "SVE_PRED_EMPTY_SPEC", "event=0x8075"),
+        ArmCounterPKC("inst-sve-full-pkc", "SVE_PRED_FULL_SPEC", "event=0x8076"),
+        ArmCounterPKC("inst-sve-partial-pkc", "SVE_PRED_PARTIAL_SPEC", "event=0x8077"),
+        # SCALE OPS: number of SVE ops, counting size of vector
+        # See The A-profile achitecture reference manual (DDI 0487J.a) in Sec D12.11.1 tells us these are in ALU operations per 128-bits,
+        ArmCounterPKC("flop-sve-pkc", "FP_SCALE_OPS_SPEC", "event=0x80C0", scale=256/128),
+        # FP FIXED OPS: number of NEON and Scalar ops, counting NEON vector width (128-bit)
+        ArmCounterPKC("flop-nonsve-pkc", "FP_FIXED_OPS_SPEC", "event=0x80C1"),
+    ],
+    "Graviton5": [
+        ArmCounterConfig(
+            "l3-mpki", 
+            PMUCompositeEventCounter(
+                "llc_cache_miss_rd", 
+                ["event=0x37", "event=0x36", "event=0x17"],
+                per_cpu=True,
+                agg_func=_agg_gv5_l3_misses
+            ),
+            PMUEventCounter("instructions", "event=0x8"),
+            1000,
+        ),
+    ],
     "CMN": [
+        # DDR-BW-MBps over-counts when close to saturation, need to remove the retry percentage from the BW reading. 
         ArmCMNCounterConfig("DDR-BW-MBps", PMUEventCounter("hnf_mc_reqs", "type=0x5,eventid=0xd", per_cpu=False), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
         ArmCMNCounterConfig("DDR-retry-rate", PMUEventCounter("hnf_mc_retries", "type=0x5,eventid=0xc", per_cpu=False), PMUEventCounter("hnf_mc_reqs", "type=0x5,eventid=0xd", per_cpu=False), 100),
         ArmCMNCounterConfig("LLC-miss-rate", PMUEventCounter("hnf_cache_miss", "type=0x5,eventid=0x1", per_cpu=False), PMUEventCounter("hnf_slc_sf_cache_access", "type=0x5,eventid=0x2", per_cpu=False), 100),
@@ -547,6 +666,22 @@ counter_mapping = {
         ArmCMNCounterConfig("DVM-PICI-BW-Ops/s", PMUEventCounter("dn_pici_dvmops", "type=0x1,eventid=0x3", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
         ArmCMNCounterConfig("DVM-VICI-BW-Ops/s", PMUEventCounter("dn_vici_dvmops", "type=0x1,eventid=0x4", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
         ArmCMNCounterConfig("DVMSync-BW-Ops/s", PMUEventCounter("dn_dvmsyncops", "type=0x1,eventid=0x5", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+    ],
+    "CMN700": [
+        # DDR-BW-MBps on Gv4 in its current form over-counts when at saturation and if using 48xl with cross-socket communication.  Need to remove retry fraction and Remote BW reading.
+        ArmCMN700CounterConfig("DDR-BW-MBps", ArmCMN700EventCounter("hnf_mc_reqs", "type=0x200,eventid=0xd", per_cpu=False), None, (64.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
+        ArmCMN700CounterConfig("Remote-DDR-BW-MBps", ArmCMN700EventCounter("hnf_mc_remote_reqs", "type=0x103,eventid=0x56", per_cpu=False), None, (32.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
+        ArmCMN700CounterConfig("DDR-retry-rate", ArmCMN700EventCounter("hnf_mc_retries", "type=0x200,eventid=0xc", per_cpu=False), ArmCMN700EventCounter("hnf_mc_reqs", "type=0x200,eventid=0xd", per_cpu=False), 100),
+        ArmCMN700CounterConfig("LLC-miss-rate", ArmCMN700EventCounter("hnf_cache_miss", "type=0x200,eventid=0x1", per_cpu=False), ArmCMN700EventCounter("hnf_slc_sf_cache_access", "type=0x200,eventid=0x2", per_cpu=False), 100),
+        ArmCMN700CounterConfig("SF-back-inval-pka", ArmCMN700EventCounter("hnf_snf_eviction", "type=0x200,eventid=0x7", per_cpu=False), ArmCMN700EventCounter("hnf_slc_sf_cache_access", "type=0x200,eventid=0x2", per_cpu=False), 1000),
+        ArmCMN700CounterConfig("SF-snoops-pka", ArmCMN700EventCounter("hnf_sf_snps", "type=0x200,eventid=0x18", per_cpu=False), ArmCMN700EventCounter("hnf_slc_sf_cache_access", "type=0x200,eventid=0x2", per_cpu=False), 1000),
+        ArmCMN700CounterConfig("PCIe-Read-MBps", ArmCMN700EventCounter("rni_rx_flits", "type=0xa,eventid=0x4", per_cpu=False), None, (32.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
+        ArmCMN700CounterConfig("PCIe-Write-MBps", ArmCMN700EventCounter("rni_tx_flits", "type=0xa,eventid=0x5", per_cpu=False), None, (32.0 / 1024.0 / 1024.0 / SAMPLE_INTERVAL)),
+        ArmCMN700CounterConfig("DVM-TLBI-BW-Ops/s", ArmCMN700EventCounter("dn_dvmops", "type=0x1,eventid=0x1", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMN700CounterConfig("DVM-BPI-BW-Ops/s", ArmCMN700EventCounter("dn_bpi_dvmops", "type=0x1,eventid=0x2", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMN700CounterConfig("DVM-PICI-BW-Ops/s", ArmCMN700EventCounter("dn_pici_dvmops", "type=0x1,eventid=0x3", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMN700CounterConfig("DVM-VICI-BW-Ops/s", ArmCMN700EventCounter("dn_vici_dvmops", "type=0x1,eventid=0x4", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
+        ArmCMN700CounterConfig("DVMSync-BW-Ops/s", ArmCMN700EventCounter("dn_dvmsyncops", "type=0x1,eventid=0x5", per_cpu=False), None, (1.0 / SAMPLE_INTERVAL)),
     ],
     "Intel_SKX_CXL_ICX": [
         x86CounterConfig("ipc", PMUEventCounter("insts", "event=0xc0,umask=0x0"), PMUEventCounter("cycles", "event=0x3c,umask=0x0"), 1),
@@ -663,7 +798,9 @@ def create_graviton_counter_mapping(cpu_type):
 
     mesh_mapping = {
         "Graviton2": "CMN600",
-        "Graviton3": "CMN650"
+        "Graviton3": "CMN650",
+        "Graviton4": "CMN700",
+        "Graviton5": "CMN650"
     }
 
     pmu_groups = []
@@ -672,7 +809,8 @@ def create_graviton_counter_mapping(cpu_type):
         if cpu_type in counter_mapping:
             pmu_groups.append(PlatformDetails(counter_mapping[cpu_type], 6))
     if have_cmn:
-        pmu_groups.append(PlatformDetails(counter_mapping["CMN"], 2))
+        if cpu_type != "Graviton4":
+            pmu_groups.append(PlatformDetails(counter_mapping["CMN"], 2))
         if cpu_type in mesh_mapping:
             pmu_groups.append(PlatformDetails(counter_mapping[mesh_mapping[cpu_type]], 2))
 
@@ -684,7 +822,8 @@ filter_proc = {
     "Graviton2": create_graviton_counter_mapping("Graviton2"),
     "Graviton3": create_graviton_counter_mapping("Graviton3"),
     # Neoverse-V2 cores have a superset of events that overlap with Gv3
-    "Graviton4": create_graviton_counter_mapping("Graviton3"),
+    "Graviton4": create_graviton_counter_mapping("Graviton4"),
+    "Graviton5": create_graviton_counter_mapping("Graviton5"),
     "Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz": [
         PlatformDetails(counter_mapping["Intel_SKX_CXL_ICX"], 4),
         PlatformDetails(counter_mapping["Intel_SKX_CXL"], 4)],
@@ -703,12 +842,18 @@ filter_proc = {
     "Intel(R) Xeon(R) Platinum 8488C": [
         PlatformDetails(counter_mapping["Intel_SKX_CXL_ICX"], 6),
         PlatformDetails(counter_mapping["Intel_SPR"], 6)],
+    "Intel(R) Xeon(R) 6975P-C": [
+        PlatformDetails(counter_mapping["Intel_SKX_CXL_ICX"], 6),
+        PlatformDetails(counter_mapping["Intel_SPR"], 6)],
     "Milan": [
         PlatformDetails(counter_mapping["Milan_Genoa"], 6),
         PlatformDetails(counter_mapping["Milan"], 6)],
     "Genoa": [
         PlatformDetails(counter_mapping["Milan_Genoa"], 5),
         PlatformDetails(counter_mapping["Genoa"], 5)],
+    "Turin": [
+        PlatformDetails(counter_mapping["Milan_Genoa"], 5),
+        PlatformDetails(counter_mapping["Genoa"], 5)], 
 }
 
 if __name__ == "__main__":
