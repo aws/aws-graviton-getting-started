@@ -25,6 +25,9 @@ collection.  The table below captures these details:
 
 |Instance Family |  Minimum Size for Full PMU Event Support | Basic Support at Smaller Sizes
 |------|------------|------|
+|*9g   | 48xlarge   | yes  |
+|*8a   | 24xlarge   | yes  |
+|*8i   | 48xlarge   | yes  |
 |*8g   | 24xlarge   | yes  |
 |*7a   | 24xlarge   | yes  |
 |*7g   | 16xlarge   | yes  |

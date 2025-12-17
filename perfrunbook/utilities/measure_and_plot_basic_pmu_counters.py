@@ -14,7 +14,7 @@ import io
 np.seterr(divide='ignore')
 
 
-def perfstat(time, period, cpus, counter_numerator, counter_denominator, __unused__):
+def perfstat(time, period, cpus, counter_numerator, counter_denominator, scale="unused", agg_func="unused"):
     """
     Measure performance counters using perf-stat in a subprocess.  Return a CSV buffer of the values measured.
     """
@@ -28,6 +28,7 @@ def perfstat(time, period, cpus, counter_numerator, counter_denominator, __unuse
                 if match is not None:
                     cpus.append(match.group(1))
 
+        # print(" ".join(["perf", "stat", f"-C{','.join(cpus)}", f"-I{period}", "-x|", "-a", "-e", f"{counter_numerator}", "-e", f"{counter_denominator}", "--", "sleep", f"{time}"]))
         res = subprocess.run(["perf", "stat", f"-C{','.join(cpus)}", f"-I{period}", "-x|", "-a", "-e", f"{counter_numerator}", "-e", f"{counter_denominator}", "--", "sleep", f"{time}"],
                              check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return io.StringIO(res.stdout.decode('utf-8'))
@@ -53,7 +54,7 @@ def plot_terminal(data, title, xtitle):
 
 
 def plot_counter_stat(csv, logfile, plot, stat_name, counter_numerator,
-                      counter_denominator, scale):
+                      counter_denominator, scale, numerator_agg_func="sum"):
     """
     Process the returned csv file into a time-series statistic to plot and
     also calculate some useful aggregate stats.
@@ -66,8 +67,18 @@ def plot_counter_stat(csv, logfile, plot, stat_name, counter_numerator,
                             'frac': np.float64, 'rsrvd3': str, 'rsrvd4': str})
     df_processed = pd.DataFrame()
 
-    df_processed[stat_name] = (df[df['event'] == counter_numerator]['count'].reset_index(drop=True)) / (df[df['event'] == counter_denominator]['count'].reset_index(drop=True)) * scale
-    df_processed[counter_numerator] = df[df['event'] == counter_numerator]['count'].reset_index(drop=True)
+    # We allow composite numerators, so we need to filter just the numerator events and then aggregate them.
+    # The aggregation might be a custom aggregation or simply a sum to compose a stat out of multiple pieces.
+    # We only allow perf events to be specified as pmu/event=val/ format.
+    numerators = re.split(r"(?<=/),", counter_numerator)
+    df_processed_numerator = (df[df['event'].isin(numerators)][['count', 'time']]
+                              .reset_index()
+                              .groupby(by=["time"], as_index=False)
+                              .aggregate(numerator_agg_func)
+                              .set_index(["time"]))
+    
+    df_processed[stat_name] = (df_processed_numerator['count'].reset_index(drop=True)) / (df[df['event'] == counter_denominator]['count'].reset_index(drop=True)) * scale
+    df_processed[counter_numerator] = df_processed_numerator['count'].reset_index(drop=True)
     df_processed[counter_denominator] = df[df['event'] == counter_denominator]['count'].reset_index(drop=True)
     df_processed.dropna(inplace=True)
 
@@ -88,11 +99,13 @@ def get_cpu_type():
     GRAVITON_MAPPING = {
         "0xd0c": "Graviton2",
         "0xd40": "Graviton3",
-        "0xd4f": "Graviton4"
+        "0xd4f": "Graviton4",
+        "0xd84": "Graviton5"
     }
     AMD_MAPPING = {
         "7R13": "Milan",
-        "9R14": "Genoa"
+        "9R14": "Genoa",
+        "9R45": "Turin"
     }
 
     with open("/proc/cpuinfo", "r") as f:
@@ -110,13 +123,20 @@ def get_cpu_type():
                 return GRAVITON_MAPPING[cpu]
 
 
+def _agg_gv5_l3_misses(x):
+    x = x.to_list()
+    sz = len(x)
+    if sz < 3:
+        return float("nan")
+    l3_demand_miss, l3_demand_access, l2_refill = x
+    return (l3_demand_miss / l3_demand_access) * l2_refill
+
 UNIVERSAL_GRAVITON_CTRS = {
     "ipc": ["armv8_pmuv3_0/event=0x8/", "armv8_pmuv3_0/event=0x11/", 1],
     "branch-mpki": ["armv8_pmuv3_0/event=0x10/", "armv8_pmuv3_0/event=0x8/", 1000],
     "data-l1-mpki": ["armv8_pmuv3_0/event=0x3/", "armv8_pmuv3_0/event=0x8/", 1000],
     "inst-l1-mpki": ["armv8_pmuv3_0/event=0x1/", "armv8_pmuv3_0/event=0x8/", 1000],
     "l2-mpki": ["armv8_pmuv3_0/event=0x17/", "armv8_pmuv3_0/event=0x8/", 1000],
-    "l3-mpki": ["armv8_pmuv3_0/event=0x37/", "armv8_pmuv3_0/event=0x8/", 1000],
     "stall_frontend_pkc": ["armv8_pmuv3_0/event=0x23/", "armv8_pmuv3_0/event=0x11/", 1000],
     "stall_backend_pkc": ["armv8_pmuv3_0/event=0x24/", "armv8_pmuv3_0/event=0x11/", 1000],
     "inst-tlb-mpki": ["armv8_pmuv3_0/event=0x2/", "armv8_pmuv3_0/event=0x8/", 1000],
@@ -125,8 +145,19 @@ UNIVERSAL_GRAVITON_CTRS = {
     "data-tlb-tw-pki": ["armv8_pmuv3_0/event=0x34/", "armv8_pmuv3_0/event=0x8/", 1000],
     "code-sparsity": ["armv8_pmuv3_0/event=0x11c/", "armv8_pmuv3_0/event=0x8/", 1000],
 }
+GRAVITON2_3_4_CTRS = {
+    "l3-mpki": ["armv8_pmuv3_0/event=0x37/", "armv8_pmuv3_0/event=0x8/", 1000]
+}
 GRAVITON3_CTRS = {
     "stall_backend_mem_pkc": ["armv8_pmuv3_0/event=0x4005/", "armv8_pmuv3_0/event=0x11/", 1000],
+    "l2-ifetch-mpki": ["armv8_pmuv3_0/event=0x108/", "armv8_pmuv3_0/event=0x8/", 1000], 
+}
+GRAVITON5_CTRS = {
+    # The definition of events r37 and r36 changed on Graviton5 to be only demand accesses and
+    # whereas on all previous Graviton's they included hardware prefetch. To estimate L3 MPKI that 
+    # includes prefetches on Graviton5 we get the L3 miss-rate for demand access and multiply by
+    # L2 refills.
+    "l3-mpki": ["armv8_pmuv3_0/event=0x37/,armv8_pmuv3_0/event=0x36/,armv8_pmuv3_0/event=0x17/", "armv8_pmuv3_0/event=0x8/", 1000, _agg_gv5_l3_misses]
 }
 UNIVERSAL_INTEL_CTRS = {
     "ipc": ["cpu/event=0xc0,umask=0x0/", "cpu/event=0x3c,umask=0x0/", 1],
@@ -181,17 +212,21 @@ GENOA_CTRS = {
 }
 
 filter_proc = {
-    "Graviton2": UNIVERSAL_GRAVITON_CTRS,
-    "Graviton3": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON3_CTRS},
-    "Graviton4": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON3_CTRS},
+    "Graviton2": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON2_3_4_CTRS},
+    "Graviton3": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON2_3_4_CTRS, **GRAVITON3_CTRS},
+    "Graviton4": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON2_3_4_CTRS, **GRAVITON3_CTRS},
+    "Graviton5": {**UNIVERSAL_GRAVITON_CTRS, **GRAVITON3_CTRS, **GRAVITON5_CTRS},
+    "Intel(R) Xeon(R) Platinum 8388M CPU @ 2.40GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8275CL CPU @ 3.00GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz": UNIVERSAL_INTEL_CTRS,
     "Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz": {**UNIVERSAL_INTEL_CTRS, **ICX_CTRS},
     "Intel(R) Xeon(R) Platinum 8488C": {**UNIVERSAL_INTEL_CTRS, **SPR_CTRS},
+    "Intel(R) Xeon(R) 6975P-C": {**UNIVERSAL_INTEL_CTRS, **SPR_CTRS},
     "Milan": {**UNIVERSAL_AMD_CTRS, **MILAN_CTRS},
     "Genoa": {**UNIVERSAL_AMD_CTRS, **GENOA_CTRS},
+    "Turin": {**UNIVERSAL_AMD_CTRS, **GENOA_CTRS},
 }
 
 if __name__ == "__main__":
