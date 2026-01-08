@@ -12,25 +12,29 @@ If you see that Graviton is consuming more CPU-time than expected, on-cpu profil
 2. Verify java code is started with `-XX:+PreserveFramePointer -agentpath:/usr/lib64/libperf-jvmti.so`
 3. Verify NodeJS code is started with `--perf-basic-prof`
 4. Collect the Flamegraph
-  ```bash
-  # In terminal one on SUT/load-gen
-  %> <start load generator or benchmark>
+   ```bash
+   # In terminal one on SUT/load-gen
+   %> <start load generator or benchmark>
     
-  # In terminal two on SUT
-  cd ~/aws-graviton-getting-started/perfrunbook/utilities
-  sudo ./capture_flamegraphs.sh oncpu 300
+   # In terminal two on SUT
+   cd ~/aws-graviton-getting-started/perfrunbook/utilities
+   sudo ./capture_flamegraphs.sh oncpu 300
     
-  # You will see a file saved in the following format:
-  # flamegraph_oncpu_<instance id>_<instance type>_<date>.svg
+   # You will see a file saved in the following format:
+   # flamegraph_oncpu_<instance id>_<instance type>_<date>.svg
     
-  # In terminal three on your local machine
-  %> scp "<username>@<instance-ip>:~/flamegraph_oncpu_*.svg" .
-  %> open /path/to/flamegraph_oncpu_*.svg
-  ```
+   # In terminal three on your local machine
+   %> scp "<username>@<instance-ip>:~/flamegraph_oncpu_*.svg" .
+   %> open /path/to/flamegraph_oncpu_*.svg
+   ```
+   You can also perform on-cpu profiling through [APerf](https://github.com/aws/aperf). Set `/proc/sys/kernel/kptr_restrict` to 0 (or run `sudo sysctl -w kernel.kptr_restrict=0`) for kernel address visibility, and use the `--profile` option during `aperf record`. In the report, check the Flamegraphs page for the flamegraph both in default and reverse order:
+   ![flamegraph](images/aperf-examples/flamegraph_page.png)
+   Also check the Top Functions page for the text representation of the call stacks and their CPU utilization:
+   ![top functions](images/aperf-examples/top_functions_page.png)
 5. Example on-cpu flamegraph:
    ![](images/oncpu_example_flamgraph.png)
-1. Look for the most expensive functions and then compare with a flamegraph gathered from the x86 test system.
-2. If you find an expensive function that is not expensive on your x86 system, proceed to [Section 6](./optimization_recommendation.md) for Optimization recommendations.
+6. Look for the most expensive functions and then compare with a flamegraph gathered from the x86 test system.
+7. If you find an expensive function that is not expensive on your x86 system, proceed to [Section 6](./optimization_recommendation.md) for Optimization recommendations.
 
 ### On-cpu profiling using Pseudo Non-maskable-interrupts (NMI)
 

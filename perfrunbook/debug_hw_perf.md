@@ -54,7 +54,11 @@ To measure the standard CPU PMU events, do the following:
   # Cut down vCPUs needed on Graviton
   %> sudo ./configure_vcpus.sh <# vcpus> cores
   ```
-3. Measure individual hardware events or useful ratios (i.e. instruction commit event count over cycle tick counts to get instruction throughput per cycle) with our helper script. It will plot a time-series curve of the event count's behavior over time and provide geomean and percentile statistics.
+3. If you have installed [APerf](https://github.com/aws/aperf), set `/proc/sys/kernel/perf_event_paranoid` to -1 (or run `sudo sysctl -w kernel.perf_event_paranoid=-1`), and by default `aperf record` collects all PMU events mentioned in this guide (if they are supported by the instance type). In the APerf report, check all PMU metrics in the PMU Events page:
+   ![pmu events](images/aperf-examples/pmu_events_page.png)
+   
+    Follow the next two steps to collect PMU events if you don't use [APerf](https://github.com/aws/aperf).
+4. Measure individual hardware events or useful ratios (i.e. instruction commit event count over cycle tick counts to get instruction throughput per cycle) with our helper script. It will plot a time-series curve of the event count's behavior over time and provide geomean and percentile statistics.
   ```bash
   # In terminal 1
   %> <start load generator or benchmark>
@@ -102,7 +106,7 @@ To measure the standard CPU PMU events, do the following:
        0                        10                       20                       30                      40                       50                       60
                                                            gmean:   1.50 p50:   1.50 p90:   1.50 p99:   1.61
   ```
-1. You can also measure all relevant ratios at once using our aggregate PMU measuring script if you do not need a time-series view.  It prints out a table of measured PMU ratios at the end and supports the same events.
+5. You can also measure all relevant ratios at once using our aggregate PMU measuring script if you do not need a time-series view.  It prints out a table of measured PMU ratios at the end and supports the same events.
   ```bash
   # In terminal 1
   %> <start load generator or benchmark>
