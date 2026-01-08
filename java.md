@@ -198,8 +198,7 @@ paths. The best solution is to avoid the exceptions as much as possible.
 
 ### APerf + Async-profiler
 
-To profile Java we recommend using [Aperf](https://github.com/aws/aperf) to gather profiles and view them
-via a static webpage.  On your test system, follow the below directions to profile your
+To profile Java we recommend using [APerf](https://github.com/aws/aperf) and its `--profile-java` option. On your test system, follow the below directions to profile your
 Java code using APerf:
 
 ```bash
@@ -229,6 +228,10 @@ cd aperf-v0.1.13-alpha-aarch64
 
 # In java_report folder, open index.html in a browser to view report
 ```
+
+You can then find heatmaps for CPU, memory, and wall clock profiling in the report's Java Profiling Heatmaps page:
+
+![java profile heatmap](perfrunbook/images/aperf-examples/java_profile_heatmap.png)
 
 ### Linux `perf` and `libperf-jvmti.so`
 If prefering to use the standard Linux `perf` tool, we can capture information about symbols

@@ -74,6 +74,10 @@ If you have more than one SUT, first verify there are no major differences in se
 7.  Check the instance types used and verify IO devices are setup equivalently between the SUTs. I.e. m5d\.metal and m6gd\.metal have different disk configurations that may lead to differing performance measurements if your service is sensitive to disk performance. 
 8. We recommend using instances set to [**dedicated tenancy**](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/dedicated-instance.html) first to establish a baseline for performance variance for your test application.  Knowing this baseline will help interpret results when testing on instances that are set to **default** tenancy.
 
+If you have an [APerf](https://github.com/aws/aperf) report, you can check the SUT's info in the home page:
+
+![system info](images/aperf-examples/system_info.png)
+
 ## Check for missing binary dependencies
 
 Libraries for Python or Java can link in binary shared objects to provide enhanced performance.  The absence of these shared object dependencies does not prevent the application from running on Graviton, but the CPU will be forced to use a slow code-path instead of the optimized paths.  Use the checklist below to verify the same shared objects are available on all platforms.

@@ -23,10 +23,9 @@ sudo ./install_perfrunbook_dependencies.sh
 # All scripts expect to run from the utilities directory
 ```
 
-## APerf for performance analysis
+## Install APerf
 
-There is also a new tool aimed at helping move workloads over to Graviton called [APerf](https://github.com/aws/aperf), it bundles many of the capabilities of the individual tools present in this
-runbook and provides a better presentation.  It is highly recommended to download this tool and use it to gather most of the same information in one test-run.
+We maintain a performance profiling and debugging tool called [APerf](https://github.com/aws/aperf). It collects a wide range of performance-related data and generates a report. The report contains all metrics mentioned in the performance runbook, and it automatically runs analysis on the data to look for potential performance issues. We highly recommend to use [APerf](https://github.com/aws/aperf) to assist with performance debugging. You can either download the [latest binary](https://github.com/aws/aperf/releases) or build from [source](https://github.com/aws/aperf).
 
 ## Sections
 

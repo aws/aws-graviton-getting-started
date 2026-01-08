@@ -66,9 +66,17 @@ When debugging performance, start by measuring high level system behavior to pin
 3. If CPU usage is higher or equal to the x86 system, proceed to profile for hot-functions in [Section 5.b](./debug_code_perf.md).
 4. If CPU usage is lower, proceed to [Section 5.b](./debug_code_perf.md) to profile which functions are putting threads to sleep and causing the CPU to go idle more than the x86 system.
 
+If you have an [APerf](https://github.com/aws/aperf) report, all metrics mentioned above can be viewed in the CPU Utilization page:
+
+![CPU graphs](images/aperf-examples/cpu_util_page.png)
+
 ## Check system memory usage
 
 It is also advisable to check memory consumption using `sysstat -r ALL` or `htop`.  Verify the system is not under memory pressure during testing. 
+
+If you have an [APerf](https://github.com/aws/aperf) report, check the Memory Usage page:
+
+![meminfo graphs](images/aperf-examples/meminfo_page.png)
 
 ## Check network usage
 
@@ -100,6 +108,10 @@ It is also advisable to check memory consumption using `sysstat -r ALL` or `htop
 7. [Metrics in cloudwatch](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html): `bw_in_allowance_exceeded`, `bw_out_allowance_exceeded`, `conntrack_allowance_exceeded`, `linklocal_allowance_exceeded`, `pps_allowance_exceeded` for your instances can be inspected to see if networking throttles are being hit.  If they are, your network is the botteneck and should be increased.
 8. If hitting ENA throttles, provision a larger instance to get more bandwidth if possible.  IO bottlenecks tend to mask any CPU performance gains.
 
+If you have an [APerf](https://github.com/aws/aperf) report, you can find more network-related metrics in the Network Stat page:
+
+![netstat graphs](images/aperf-examples/netstat_page.png)
+
 ## Check Runtime behavior
 
 Checking how your chosen runtime is behaving should be done before moving on to more in depth studies. Basic runtime tunables such as Garbage Collection need to be checked to ensure there is no unexpected behavior. We describe how to perform such standard checks for the Java runtime in the following.  Below we describe how to perform some standard checks for the Java runtime.  We are not able to provide recommended tools or methodologies for checking high level behavior of other popular runtimes such as Python or NodeJS at the moment.
@@ -114,7 +126,7 @@ When running Java applications, monitor for differences in behavior using JFR (J
     3. Open up the JFR file with Mission Control
 2. Check for Garbage Collection (GC) behavior
     1. Longer collectionpauses, 
-    2. Check if more objects/references are are live between collections compared to x86.
+    2. Check if more objects/references are live between collections compared to x86.
     3. The image below shows JMC’s GC pane, showing pause times, heap size and references remaining after each collection.
     ![](./images/jmc_example_image.png)
 4. The same information can be gathered by enabling GC logging and then processing the log output. Enter `-Xlog:gc*,gc+age=trace,gc+ref=debug,gc+ergo=trace` on the Java command line and re-start your application.
