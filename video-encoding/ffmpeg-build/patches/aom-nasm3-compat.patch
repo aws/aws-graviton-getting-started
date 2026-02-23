@@ -1,0 +1,11 @@
+--- a/build/cmake/aom_optimization.cmake
++++ b/build/cmake/aom_optimization.cmake
+@@ -212,7 +212,7 @@ macro(add_nasm_library)
+     # nasm 2.14+ uses -O2 by default, but the help still shows -Ox is the
+     # default. Check to see if -O2 is supported, and if so, use it.
+     unset(NASM_OFLAG)
+-    execute_process(COMMAND ${CMAKE_ASM_NASM_COMPILER} -hf
++    execute_process(COMMAND ${CMAKE_ASM_NASM_COMPILER} -h
+                     OUTPUT_VARIABLE nasm_helptext)
+ 
+     if("${nasm_helptext}" MATCHES "-O2")

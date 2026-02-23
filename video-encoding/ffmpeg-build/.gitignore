@@ -1,0 +1,9 @@
+sources/
+output/
+__pycache__/
+*.pyc
+ffmpeg_build_config.json
+test_matrix_*.log
+build_*.log
+test_logs/
+Dockerfile.test
