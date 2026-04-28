@@ -199,7 +199,7 @@ The SPE PMU on Graviton enables cores to precisely trace events for individual i
 linux `perf` tool.  It samples instructions from the executed instruction stream at random.  It is particularly useful for finding information
 about particular loads that are always long latency, false sharing of atomic variables, or branches that are often mis-predicted and causing slow-downs.
 Because SPE is precise, this information can be attributed back to individual code lines that need to be optimized.
-SPE is enabled Graviton 2 and 3 metal instances.  The below table shows for which Linux distributions and kernel versions SPE is known to be
+SPE is enabled Graviton 2,3, and 4 metal instances.  The below table shows for which Linux distributions and kernel versions SPE is known to be
 enabled.
 
 | Distro       | Kernel  |
