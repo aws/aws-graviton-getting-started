@@ -52,6 +52,7 @@
 
 # Deep dive
 
+* [Linux Kernel](linux_kernel.md)
 * [Runtime feature detection](runtime-feature-detection.md)
 * [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
 * [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
