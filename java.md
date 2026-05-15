@@ -14,7 +14,7 @@ This checklist summarizes portions of the Java on Graviton section and can be he
 
 * Check AMI & Kernel Version support
     * Pre-2020 Linux distributions are unlikely to contain the right optimizations.
-    * Amazon Linux:  AL2023 is ideal.  AL2 is fine with a recent kernel (i.e. not 4.14).  AL2 is EOL in June 2025.
+    * Amazon Linux:  AL2023 is ideal.  AL2 is fine with a recent kernel (i.e. not 4.14).  AL2 is EOL on 2026-06-30.
     * Ubuntu:  Use at least Ubuntu 20.04.  More recent versions are even better.
     * Red Hat Linux:  RHEL9 is ideal.  Use at least RHEL8.2 (be aware kernel uses unusual 64KB memory pages).
     * For the full list, see [Operating Systems available for Graviton based instances](https://github.com/aws/aws-graviton-getting-started/blob/main/os.md).
@@ -202,15 +202,13 @@ To profile Java we recommend using [APerf](https://github.com/aws/aperf) and its
 Java code using APerf:
 
 ```bash
-# Get latest APerf release onto the machine you are profiling.  
-# As of Oct 28, 2024 the latest release is v0.13.0.
-wget https://github.com/aws/aperf/releases/download/v0.1.13-alpha/aperf-v0.1.13-alpha-aarch64.tar.gz
-tar -zxf aperf-v0.1.13-alpha-aarch64.tar.gz
+# Download and extract latest APerf release (auto-detects architecture)
+arch=$(uname -m); curl -sL $(curl -s https://api.github.com/repos/aws/aperf/releases/latest | grep "browser_download_url.*$arch.*\.tar\.gz" | cut -d'"' -f4) | tar -xz
 
 # Get the latest Async profiler
-wget https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-arm64.tar.gz
-tar -zxf async-profiler-3.0-linux-arm64.tar.gz
-cd async-profiler-3.0-linux-arm64
+wget https://github.com/async-profiler/async-profiler/releases/download/v4.4/async-profiler-4.4-linux-arm64.tar.gz
+tar -zxf async-profiler-4.4-linux-arm64.tar.gz
+cd async-profiler-4.4-linux-arm64
 sudo mkdir -p /opt/bin
 sudo mkdir -p /opt/lib
 sudo cp -a bin/* /opt/bin
@@ -220,7 +218,7 @@ export PATH=/opt/bin:$PATH
 export LD_LIBRARY_PATH=/opt/lib:$LD_LIBRARY_PATH
 sudo sysctl -w kernel.kptr_restrict=0
 sudo sysctl -w kernel.perf_event_paranoid=-1
-cd aperf-v0.1.13-alpha-aarch64
+cd ../aperf-*-$arch
 
 # While the application is running
 ./aperf record --profile --profile-java --period 300 -r java_record
