@@ -68,16 +68,3 @@ allocating huge-pages.
 3. Disable Receive Packet Steering (RPS) to avoid contention and extra IPIs. 
     1.  `cat /sys/class/net/ethN/queues/rx-N/rps_cpus` and verify they are set to `0`. In general RPS is not needed on Graviton2 and newer.
     2. You can try using RPS if your situation is unique.  Read the [documentation on RPS](https://www.kernel.org/doc/Documentation/networking/scaling.txt) to understand further how it might help. Also refer to [Optimizing network intensive workloads on Amazon EC2 A1 Instances](https://aws.amazon.com/blogs/compute/optimizing-network-intensive-workloads-on-amazon-ec2-a1-instances/) for concrete examples.
-
-## Metal instance IO optimizations
-
-1. If on Graviton2 and newer metal instances, try disabling the System MMU (Memory Management Unit) to speed up IO handling:
-  ```bash
-  %> cd ~/aws-gravition-getting-started/perfrunbook/utilities
-  # Configure the SMMU to be off on metal, which is the default on x86.
-  # Leave the SMMU on if you require the additional security protections it offers.
-  # Virtualized instances do not expose an SMMU to instances.
-  %> sudo ./configure_graviton_metal_iommu.sh off
-  %> sudo shutdown now -r
-  ```
-
