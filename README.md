@@ -20,6 +20,7 @@ This repository provides technical guidance for users and developers using [Amaz
 * [Containers on Graviton](containers.md)
 * [Headless website testing with Chrome and Puppeteer on Graviton](software/ChromeAndPuppeteer.md)
 * [Lambda on Graviton](#lambda-on-graviton)
+* [Linux Kernel](linux_kernel.md)
 * [Operating Systems support](os.md)
 * [Third-party Software Vendors](isv.md)
 * [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
