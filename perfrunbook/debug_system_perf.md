@@ -105,7 +105,7 @@ If you have an [APerf](https://github.com/aws/aperf) report, check the Memory Us
   ```
 5. Go back and verify the load generator is providing the expected traffic.
 6. Check `sar -n DEV 1` to see throughput and packets per second, and overall packet rate the system is getting per device. Check and verify you are not hitting ENA throttles. 
-7. [Metrics in cloudwatch](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html): `bw_in_allowance_exceeded`, `bw_out_allowance_exceeded`, `conntrack_allowance_exceeded`, `linklocal_allowance_exceeded`, `pps_allowance_exceeded` for your instances can be inspected to see if networking throttles are being hit.  If they are, your network is the botteneck and should be increased.
+7. [Metrics in cloudwatch](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html): `bw_in_allowance_exceeded`, `bw_out_allowance_exceeded`, `conntrack_allowance_exceeded`, `linklocal_allowance_exceeded`, `pps_allowance_exceeded` for your instances can be inspected to see if networking throttles are being hit.  If they are, your network is the bottleneck and should be increased.
 8. If hitting ENA throttles, provision a larger instance to get more bandwidth if possible.  IO bottlenecks tend to mask any CPU performance gains.
 
 If you have an [APerf](https://github.com/aws/aperf) report, you can find more network-related metrics in the Network Stat page:
@@ -125,7 +125,7 @@ When running Java applications, monitor for differences in behavior using JFR (J
     2. Download the resulting JFR file to local machine
     3. Open up the JFR file with Mission Control
 2. Check for Garbage Collection (GC) behavior
-    1. Longer collectionpauses, 
+    1. Longer collection pauses, 
     2. Check if more objects/references are live between collections compared to x86.
     3. The image below shows JMC’s GC pane, showing pause times, heap size and references remaining after each collection.
     ![](./images/jmc_example_image.png)

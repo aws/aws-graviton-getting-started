@@ -108,7 +108,7 @@ Example eBPF programs can be found: https://github.com/iovisor/bcc.
 
 ### Capturing Coherent Mesh Network hardware event counters
 
-The CMN PMU counts events such as requests to DRAM (memory bandwidth), virtual memory manangement events,
+The CMN PMU counts events such as requests to DRAM (memory bandwidth), virtual memory management events,
 I/O bus requests and coherence snoop events. These metrics can be used to assess an application's utilization
 of such system level resources and if resources are used efficiently.
 CMN counters are only accessible on metal-type instances and certain OSes and kernels.

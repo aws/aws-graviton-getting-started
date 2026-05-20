@@ -177,7 +177,7 @@ Vectorization is accomplished either by SVE or NEON instructions.  SVE vectoriza
 
 For SVE instructions there are metrics which describe how many SVE instructions had empty, full and partially-filled SVE predicates: `inst-sve-empty-pkc`, `inst-sve-partial-pkc`, and `inst-sve-full-pkc`.  These metrics apply to all SVE instructions (loads, stores, integer, and floating-point operations).  The `pkc` term indicates the counters are in units of "per kilo cycle".
 
-A single SVE instruction can execute multiple (vectorized) floating point operations in the ALU.  These are counted individually by `flop-sve-pkc`.  For example: a single SVE `FMUL` instruction on 32-bit floats on Graviton 3's 256-bit vector will increment the `flop-sve-pkc` counter by eight because the operation is executed on the eight 32-bit floats that fit in the 256-bit vector.  Some instructions, such as `FMA` and (Fused Multiply Add) excute two floating point operations per item in the vector and increment the counter accordingly.  The `flop-sve-pkc` counter is incremented assuming a full SVE predicate.
+A single SVE instruction can execute multiple (vectorized) floating point operations in the ALU.  These are counted individually by `flop-sve-pkc`.  For example: a single SVE `FMUL` instruction on 32-bit floats on Graviton 3's 256-bit vector will increment the `flop-sve-pkc` counter by eight because the operation is executed on the eight 32-bit floats that fit in the 256-bit vector.  Some instructions, such as `FMA` (Fused Multiply Add), execute two floating point operations per item in the vector and increment the counter accordingly.  The `flop-sve-pkc` counter is incremented assuming a full SVE predicate.
 
 Floating point operations for NEON and scalar instructions are counted together in the `flop-nonsve-pkc` counter.  For a single NEON `FMUL` instruction on 32-bit floats, the `inst-neon-pkc` counter will increment by one, and the `flop-nonsve-pkc` counter will increment by four (the number of 32-bit floats in a 128-bit NEON register).  For a single scalar `FMUL` instruction, the `flop-nonsve-pkc` counter will increment by one.  Some instructions (e.g., Fused Multiply Add) will increment the value by two.
 
@@ -185,7 +185,7 @@ The total number of floating-point instructions retired every 1000 cycles is `in
 
 A footnote to readers of the ARM architecture PMU event description: SVE floating point operations are reported by hardware in units of "floating point operations per 128-bits of vector size", however the aggregation script we provide has already accounted for the Graviton 3 vector width before reporting.
 
-## Additonal PMUs and PMU events
+## Additional PMUs and PMU events
 
 On metal instances, all available hardware PMUs and their events are exposed to instances and can be accessed so long as driver support by the OS in use is available.  
 These extra PMUs help with diagnosing specific use cases, but are generally less applicable than the more widely used CPU PMU.
@@ -199,7 +199,7 @@ The SPE PMU on Graviton enables cores to precisely trace events for individual i
 linux `perf` tool.  It samples instructions from the executed instruction stream at random.  It is particularly useful for finding information
 about particular loads that are always long latency, false sharing of atomic variables, or branches that are often mis-predicted and causing slow-downs.
 Because SPE is precise, this information can be attributed back to individual code lines that need to be optimized.
-SPE is enabled Graviton 2,3, and 4 metal instances.  The below table shows for which Linux distributions and kernel versions SPE is known to be
+SPE is enabled on Graviton 2, 3, and 4 metal instances.  The below table shows for which Linux distributions and kernel versions SPE is known to be
 enabled.
 
 | Distro       | Kernel  |

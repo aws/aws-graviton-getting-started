@@ -60,7 +60,7 @@ The load generator setup is important to understand and verify: it generates the
    %> <start test>
         
    # On load-generator
-   # Grab tcpdump from network device that will recieve traffic, likely 
+   # Grab tcpdump from network device that will receive traffic, likely 
    # eth0, but check your configuration.
    %> tcpdump -i eth<N> -s 128 -w dump.pcap
    %> <stop tcpdump using Ctrl-C>
