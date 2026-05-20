@@ -37,13 +37,12 @@ The load generator setup is important to understand and verify: it generates the
    # port exhaustion is happening and can lead to decrease in driven load.  Use the below tips to
    # fix the issue.
    
-   # Increase ephemeral port range on load generator/SUT
-   %> sudo sysctl -w net.ipv4.ip_local_port_range 1024 65535
-   # If you application uses IPv6
-   %> sudo sysctl -w net.ipv6.ip_local_port_range 1024 65535
+   # Widen the ephemeral port range (applies to both IPv4 and IPv6)
+   %> sudo sysctl -w net.ipv4.ip_local_port_range="1024 65535"
    
-   # Allow kernel to re-use connections in load generator/SUT
-   %> sysctl -w net.ipv4.tcp_tw_reuse=1
+   # Reuse TIME_WAIT sockets for outgoing connections (relies on TCP
+   # timestamps; avoid behind SNAT/MASQUERADE where timestamps are rewritten).
+   %> sudo sysctl -w net.ipv4.tcp_tw_reuse=1
    ```
 8. Check connection rates on SUT.  Do you see constant rate of new connections or bursty behavior? Does it match the expectations for the workload? 
    ```bash
