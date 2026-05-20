@@ -12,7 +12,7 @@ When debugging performance, start by measuring high level system behavior to pin
   %> <start load generator or benchmark>
     
   # Terminal two
-  %> cd ~/aws-gravition-getting-started/perfrunbook/utilities
+  %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat cpu-iowait --time 60
   ```
 2. Check the `cpu-user` and `cpu-kernel` time at your chosen load point. Check to see if Graviton2 has higher or lower cpu time  than the x86 comparison system-under-test.  
@@ -21,7 +21,7 @@ When debugging performance, start by measuring high level system behavior to pin
   %> <start load generator or benchmark>
     
   # Terminal two
-  %> cd ~/aws-gravition-getting-started/perfrunbook/utilities
+  %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat cpu-user --time 60
   # To get kernel time, do cpu-kernel
     
@@ -86,7 +86,7 @@ If you have an [APerf](https://github.com/aws/aperf) report, check the Memory Us
   %> <start test>
     
   # On SUT
-  %> cd ~/aws-gravition-getting-started/perfrunbook/utilities
+  %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat new-connections --time 60
   ```
 2. If seeing bursts, verify this is expected behavior for your load generator.  Bursts can cause performance degradation for each new connection, especially if it has to do an RSA signing operation for TLS connection establishment.
