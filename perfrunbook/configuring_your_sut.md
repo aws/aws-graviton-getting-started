@@ -31,22 +31,21 @@ If you have more than one SUT, first verify there are no major differences in se
   ```
 3. Check all instances are running the same major and minor kernel versions.  It is recommended to upgrade to the newest kernel available to bring in the latest security and bug fixes.
   ```bash
-  # Example output on x86 SUT
+  # Example output on Graviton SUT (Amazon Linux 2023)
   %> uname -r
-  4.14.219-161.340.amzn2.x86_64
+  6.1.84-99.169.amzn2023.aarch64
     
-  # Example output on Graviton SUT
+  # Example output on x86 SUT (Amazon Linux 2023)
   %> uname -r
-  5.10.50-45.132.amzn2.aarch64
+  6.1.84-99.169.amzn2023.x86_64
     
-  # To upgrade on AL2 for example to Linux 5.10:
-  %> sudo amazon-linux-extras enable kernel-5.10
-  %> sudo yum install kernel
+  # Update on Amazon Linux 2023 to the latest kernel:
+  %> sudo dnf update kernel
     
-  # To update on Ubuntu
-  %> sudo apt-cache search "linux-image"
-  # Find the newest kernel available
-  %> sudo apt-get install linux-image-<version>-generic
+  # Update on Ubuntu (HWE kernel is recommended for latest hardware support
+  # including SPE on Graviton metal instances)
+  %> sudo apt-get install linux-generic-hwe-22.04   # Ubuntu 22.04
+  %> sudo apt-get install linux-generic-hwe-24.04   # Ubuntu 24.04
     
   # Restart your instance
   %> sudo reboot now

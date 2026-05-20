@@ -10,14 +10,14 @@ If after following these guides there is still an issue you cannot resolve with 
 
 ## Pre-requisites
 
-To assist with some of the tasks listed in this runbook, we have created some helper-scripts for some of the tasks the checklists describe.  The helper-scripts assume the test instances are running an up-to-date AL2, AL2023 or Ubuntu 20.04LTS/22.04LTS distribution and the user can run the scripts using `sudo`. Follow the steps below to obtain and install the utilities on your test systems:
+To assist with some of the tasks listed in this runbook, we have created some helper-scripts for some of the tasks the checklists describe.  The helper-scripts assume the test instances are running an up-to-date Amazon Linux 2023, Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, RHEL 9.5, or SLES 15 SP6 distribution and the user can run the scripts using `sudo`.  Amazon Linux 2 and Ubuntu 20.04 are still recognized by `install_perfrunbook_dependencies.sh` for backward compatibility, but both are past their standard end-of-support and are not recommended for new performance work.  Follow the steps below to obtain and install the utilities on your test systems:
 
 ```bash
 # Clone the repository onto your systems-under-test and any load-generation instances
 git clone https://github.com/aws/aws-graviton-getting-started.git
 cd aws-graviton-getting-started/perfrunbook/utilities
 
-# On AL2 or Ubuntu distribution
+# On AL2023, Ubuntu, RHEL or SLES
 sudo ./install_perfrunbook_dependencies.sh
 
 # All scripts expect to run from the utilities directory
