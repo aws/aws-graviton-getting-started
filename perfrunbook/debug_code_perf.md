@@ -74,10 +74,10 @@ If Graviton is consuming less CPU-time than expected, it is useful to find call-
   sudo ./capture_flamegraphs.sh offcpu 300
     
   # You will see a file saved in the following format:
-  # flamegraph_oncpu_<instance id>_<instance type>_<date>.svg
+  # flamegraph_offcpu_<instance id>_<instance type>_<date>.svg
     
   # In terminal three on your local machine
-  %> scp "<username>@<instance-ip>:~/flamegraph_oncpu_*.svg" .
+  %> scp "<username>@<instance-ip>:~/flamegraph_offcpu_*.svg" .
   %> open /path/to/flamegraph_offcpu.svg
   ```
 5. Inspect the flamegraphs for which code paths cause extra sleeps compared to x86:
@@ -96,12 +96,12 @@ In our `capture_flamegraphs.sh` helper script, we use `perf record` to gather tr
   %> <start test>
     
   # x86 SUT
-  perf record -a -g -k 1 -F99 -e cpu-clock:pppH -- sleep
+  perf record -a -g -k 1 -F99 -e cpu-clock:pppH -- sleep <duration_sec>
   perf script -f -i perf.data > x86_script.out
   ./FlameGraph/stackcollapse-perf.pl --kernel --jit x86_script.out > x86_folded.out
     
   # Graviton SUT
-  perf record -a -g -k 1 -F99 -e cpu-clock:pppH -- sleep
+  perf record -a -g -k 1 -F99 -e cpu-clock:pppH -- sleep <duration_sec>
   perf script -f -i perf.data > grv_script.out
   ./FlameGraph/stackcollapse-perf.pl --kernel --jit grv_script.out > grv_folded.out
   # Copy x86_folded.out to Graviton SUT
