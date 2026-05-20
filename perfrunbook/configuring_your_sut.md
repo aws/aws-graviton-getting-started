@@ -84,7 +84,7 @@ Libraries for Python or Java can link in binary shared objects to provide enhanc
 
 1. JVM based languages — Check for the presence of binary shared objects in the installed JARs and compare between Graviton and x86.
   ```bash
-  %> cd ~/aws-getting-started-guide/perfrunbook/utilities
+  %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
   %> sudo ./find_and_list_jar_with_so.sh
   # Example output ...
   # jars may place the shared object in different folders for the arch support
@@ -106,25 +106,25 @@ Libraries for Python or Java can link in binary shared objects to provide enhanc
   ``` 
 2. Python — Check for the presence of binary shared objects in your python version’s `site-packages` locations and compare between Graviton and x86:
   ```bash
-  %> cd ~/aws-getting-started-guide/perfrunbook/utilites
-  %> sudo ./find_and_list_pylib_with_so.sh 3.7 # takes python version as arg
+  %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
+  %> sudo ./find_and_list_pylib_with_so.sh 3.11 # takes python version as arg
   # Example output ...
   # ... Graviton
-  ./numpy/core/_multiarray_tests.cpython-37m-aarch64-linux-gnu.so
-  ./numpy/core/_struct_ufunc_tests.cpython-37m-aarch64-linux-gnu.so
-  ./numpy/core/_rational_tests.cpython-37m-aarch64-linux-gnu.so
-  ./numpy/core/_simd.cpython-37m-aarch64-linux-gnu.so
-  ./numpy/core/_multiarray_umath.cpython-37m-aarch64-linux-gnu.so
-  ./numpy/core/_umath_tests.cpython-37m-aarch64-linux-gnu.so
-  ./numpy/core/_operand_flag_tests.cpython-37m-aarch64-linux-gnu.so
+  ./numpy/core/_multiarray_tests.cpython-311-aarch64-linux-gnu.so
+  ./numpy/core/_struct_ufunc_tests.cpython-311-aarch64-linux-gnu.so
+  ./numpy/core/_rational_tests.cpython-311-aarch64-linux-gnu.so
+  ./numpy/core/_simd.cpython-311-aarch64-linux-gnu.so
+  ./numpy/core/_multiarray_umath.cpython-311-aarch64-linux-gnu.so
+  ./numpy/core/_umath_tests.cpython-311-aarch64-linux-gnu.so
+  ./numpy/core/_operand_flag_tests.cpython-311-aarch64-linux-gnu.so
   # ... x86
-  ./numpy/core/_operand_flag_tests.cpython-37m-x86_64-linux-gnu.so
-  ./numpy/core/_simd.cpython-37m-x86_64-linux-gnu.so
-  ./numpy/core/_rational_tests.cpython-37m-x86_64-linux-gnu.so
-  ./numpy/core/_umath_tests.cpython-37m-x86_64-linux-gnu.so
-  ./numpy/core/_multiarray_tests.cpython-37m-x86_64-linux-gnu.so
-  ./numpy/core/_multiarray_umath.cpython-37m-x86_64-linux-gnu.so
-  ./numpy/core/_struct_ufunc_tests.cpython-37m-x86_64-linux-gnu.so
+  ./numpy/core/_operand_flag_tests.cpython-311-x86_64-linux-gnu.so
+  ./numpy/core/_simd.cpython-311-x86_64-linux-gnu.so
+  ./numpy/core/_rational_tests.cpython-311-x86_64-linux-gnu.so
+  ./numpy/core/_umath_tests.cpython-311-x86_64-linux-gnu.so
+  ./numpy/core/_multiarray_tests.cpython-311-x86_64-linux-gnu.so
+  ./numpy/core/_multiarray_umath.cpython-311-x86_64-linux-gnu.so
+  ./numpy/core/_struct_ufunc_tests.cpython-311-x86_64-linux-gnu.so
   ```  
 3. If you find any missing libraries, check for newer versions at:
     1. [https://mvnrepository.com](https://mvnrepository.com/)
