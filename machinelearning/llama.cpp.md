@@ -47,7 +47,7 @@ CMAKE_ARGS="-DCMAKE_CXX_FLAGS='-mcpu=native' -DCMAKE_C_FLAGS='-mcpu=native'" pip
 
 llama.cpp provides a set of tools to (1) convert model binary file into GPT-Generated Unified Format (GGUF), (2) quantize single and half precision format models into one of the quantized formats, and (3) run LLM inference locally. For the steps on how to convert model binary into GGUF format and how to quantize them into low precision formats, please check [llama.cpp README](https://github.com/ggerganov/llama.cpp/blob/master/README.md).
 
-The following instructions use Meta Llama-3 8B parameter model from [Hugging Face](https://huggingface.co/models) models repository to demonstrate LLM inference performance on AWS Graviton based EC2 Instances. The model is already availble in multiple quantized formats which can be directly run on AWS Graviton processors.
+The following instructions use Meta Llama-3 8B parameter model from [Hugging Face](https://huggingface.co/models) models repository to demonstrate LLM inference performance on AWS Graviton based EC2 Instances. The model is already available in multiple quantized formats which can be directly run on AWS Graviton processors.
 
 
 ```
