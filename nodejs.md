@@ -32,10 +32,16 @@ EC2 instance types; it is not unique to Graviton.
 
 ## Applications Using Many and Complex Regular Expressions
 
-A shortcoming in the just in time compiler in V8 for aarch64 creates a long link
-chain of veeneers when evaluating complex regular expressions. A new version of
-V8 addresses this, but it has not yet been merged into NodeJS main. If your
-application relies heavily on regular expression performance AND you find that
-the performance is lower on Graviton, try adding `--regexp-interpret-all` to
-the node arguments to force V8 to interpret rather than compile regular
-expressions.
+Older versions of V8 (prior to V8 9.4, which first shipped with Node.js
+[v16.11.0](https://nodejs.org/en/blog/release/v16.11.0) in October 2021) had
+a shortcoming in the JIT compiler for aarch64 that created long veneer chains
+when evaluating complex regular expressions. Veneering was further optimized
+for long link chains in V8 12.5 (April 2024, see [V8 commit
+07ee5d4](https://github.com/v8/v8/commit/07ee5d44bfe7cc46d4e632616e7cc2d5c8c84c51)
+and [Chromium bug 40261789](https://issues.chromium.org/issues/40261789)).
+This has been fixed in all currently supported Node.js versions (18+). If
+you are running an unsupported older version and find that regexp performance
+is lower on Graviton, add `--regexp-interpret-all` to the node arguments as
+a workaround, but note this flag carries a significant performance penalty
+(up to 10x slower on some patterns) so upgrading to a supported Node.js LTS
+release is strongly preferred.
