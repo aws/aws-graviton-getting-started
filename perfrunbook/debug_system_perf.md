@@ -121,7 +121,7 @@ Checking how your chosen runtime is behaving should be done before moving on to 
 When running Java applications, monitor for differences in behavior using JFR (Java Flight Recorder) to record JVM behavior and view with JMC (Java Mission Control). These can expose different execution behaviors as reasons for performance differences.
 
 1. Enable a JFR recording for your application by adding `-XX:+FlightRecorder -XX:StartFlightRecording=delay=<X>s,duration=<X>s,name=<name>,filename=path/to/recording.jfr` to the JVM command line.
-    1. Get [Java Mission Control](https://www.oracle.com/java/technologies/javase/products-jmc8-downloads.html)
+    1. Get [JDK Mission Control](https://www.oracle.com/java/technologies/jdk-mission-control.html)
     2. Download the resulting JFR file to local machine
     3. Open up the JFR file with Mission Control
 2. Check for Garbage Collection (GC) behavior
