@@ -47,7 +47,7 @@ already been queued, `perf` will record IRQ unmasking functions as hot because t
   ```bash
   # In terminal on SUT
   cd ~/aws-graviton-getting-started/perfrunbook/utilities
-  # Use a custome event from the PMU such as r11 (cycles) or r8 (instructions)
+  # Use a custom event from the PMU such as r11 (cycles) or r8 (instructions)
   sudo ./capture_flamegraphs.sh r11 300
   ```
 4. Double check you are using a PMU hardware-event, if you do not see a change in your profiles. Events that do not come from the cpu PMU, such as `cpu-clock`, can not utilize the pseudo-NMI feature on Graviton.
