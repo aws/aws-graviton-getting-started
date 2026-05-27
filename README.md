@@ -87,6 +87,16 @@ made on a daily basis. As a general rule later versions of compilers, language r
 should be used whenever possible. The table below includes known recent changes to popular
 packages that improve performance (if you know of others please let us know).
 
+Note: most rows below show the earliest version that introduced the
+referenced Graviton/Arm64 improvement. A few rows (currently .NET and
+PHP) instead show the **lowest version still under upstream support**,
+because the original Graviton-improvement floor is now end-of-life and
+recommending it as a target for new deployments would be misleading.
+The accompanying language-specific guide (e.g. [dotnet.md](dotnet.md),
+[php.md](php.md)) has the full version history. In all cases later
+versions generally include additional optimizations and bug fixes and
+should be preferred for new deployments.
+
 Package | Version | Improvements
 --------|:-:|-------------
 bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases) | Pre-built bazel binary for Graviton/Arm64. [See below](#bazel-on-linux) for installation.
@@ -97,7 +107,7 @@ MariaDB | 10.4.14+ | Default build now uses -moutline-atomics, general correctne
 mongodb | 4.2.15+ / 4.4.7+ / 5.0.0+ | Improved performance on graviton, especially for internal JS engine. LSE support added in [SERVER-56347](https://jira.mongodb.org/browse/SERVER-56347).
 MySQL   | 8.0.23+ | Improved spinlock behavior, compiled with -moutline-atomics if compiler supports it.
 PostgreSQL | 15+ | General scalability improvements plus additional [improvements to spin-locks specifically for Arm64](https://commitfest.postgresql.org/37/3527/)
-.NET | [5+](https://dotnet.microsoft.com/download/dotnet/5.0) | [.NET 5 significantly improved performance for ARM64](https://devblogs.microsoft.com/dotnet/Arm64-performance-in-net-5/). Here's an associated [AWS Blog](https://aws.amazon.com/blogs/compute/powering-net-5-with-aws-graviton2-benchmark-results/) with some performance results. 
+.NET | [8+](https://dotnet.microsoft.com/download/dotnet/8.0) | .NET has continued to deliver large Arm64 performance gains since [.NET 5](https://devblogs.microsoft.com/dotnet/Arm64-performance-in-net-5/); see [Arm64 performance improvements in .NET 8](https://devblogs.microsoft.com/dotnet/this-arm64-performance-in-dotnet-8/) and [Arm64 vectorization in .NET 9](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-9/runtime#arm64-vectorization-in-net-libraries). .NET 8 (LTS) is the recommended minimum and [.NET 10 (LTS)](https://dotnet.microsoft.com/download/dotnet/10.0) is the current LTS preferred for new projects; .NET 5/6/7 are out of support. See also [Powering .NET 8 with AWS Graviton3: Benchmarks](https://aws.amazon.com/blogs/dotnet/powering-net-8-with-aws-graviton3-benchmarks/) and the [.NET on Graviton guide](dotnet.md).
 OpenH264 | [2.1.1+](https://github.com/cisco/openh264/releases/tag/v2.1.1) | Pre-built Cisco OpenH264 binary for Graviton/Arm64. 
 PCRE2   | 10.34+  | Added NEON vectorization to PCRE's JIT to match first and pairs of characters. This may improve performance of matching by up to 8x. This fixed version of the library now is shipping with Ubuntu 20.04 and PHP 8.
 PHP     | 8.2+    | Currently supported PHP versions perform well on Graviton. PHP 7.4 included initial performance improvements but is EOL.
