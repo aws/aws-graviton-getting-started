@@ -629,7 +629,7 @@ counter_mapping = {
         ArmCounterPKC("inst-sve-partial-pkc", "SVE_PRED_PARTIAL_SPEC", "event=0x8077"),
         # SCALE OPS: number of SVE ops, counting size of vector
         # See The A-profile achitecture reference manual (DDI 0487J.a) in Sec D12.11.1 tells us these are in ALU operations per 128-bits,
-        ArmCounterPKC("flop-sve-pkc", "FP_SCALE_OPS_SPEC", "event=0x80C0", scale=256/128),
+        ArmCounterPKC("flop-sve-pkc", "FP_SCALE_OPS_SPEC", "event=0x80C0", scale=128/128),
         # FP FIXED OPS: number of NEON and Scalar ops, counting NEON vector width (128-bit)
         ArmCounterPKC("flop-nonsve-pkc", "FP_FIXED_OPS_SPEC", "event=0x80C1"),
     ],
