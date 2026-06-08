@@ -4,8 +4,11 @@ PHP is a general-purpose scripting language geared towards web development.
 PHP scripts are executed by an interpreter implemented as a plug-in module
 in web servers, a separate daemon (php-fpm) or a CGI executable (php-cgi).
 
-PHP 7.4 and later are tested to perform well on Graviton. It works out of
-the box on Ubuntu 22.04 and AL2023, but requires extra steps on AL2.
+PHP 8.2 and later are tested to perform well on Graviton. It works out of
+the box on Ubuntu 22.04 and AL2023, but requires extra steps on Amazon
+Linux 2 to enable the OPcache JIT (see [OPcache on Amazon Linux 2 (AL2)](#opcache-on-amazon-linux-2-al2)
+below). PHP 7.4 also works but reached EOL in November 2022 and should
+be upgraded.
 
 ### OPcache on Amazon Linux 2 (AL2)
 

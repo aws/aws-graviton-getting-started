@@ -59,7 +59,7 @@ cd aws-graviton-getting-started/aws-lambda/GravitonLambdaNumber
 ```
 ### Migrating a Lambda function from x86 to arm64
 This demo shows how to migrate an existing Lambda function from x86 to arm64 using an x86 based workstation.
-The Node.js function code in [`/src/app.js`](/src/app.js) uses the [axios](https://www.npmjs.com/package/axios) client to connect to a third part service, [http://numbersapi.com/](http://numbersapi.com/), to find interesting facts about numbers. As the axios library is not a binary file, it can seamlessly work on Graviton2 without compilation.
+The Node.js function code in [`/src/app.js`](GravitonLambdaNumber/src/app.js) uses the [axios](https://www.npmjs.com/package/axios) client to connect to a third part service, [http://numbersapi.com/](http://numbersapi.com/), to find interesting facts about numbers. As the axios library is not a binary file, it can seamlessly work on Graviton2 without compilation.
 
 The existing application consists of an API endpoint which invokes the Lambda function, retrieves the number fact, and returns the response.
 
@@ -67,7 +67,7 @@ Build the existing x86 function version using AWS SAM.
 ```
 sam build
 ```
-![sam build](/aws-lambda/img/sambuild.png)
+![sam build](img/sambuild.png)
 
 Deploy the function to your AWS account:
 ```
@@ -75,11 +75,11 @@ sam deploy --stack-name GravitonLambdaNumber -g
 ```
 Accept the initial defaults, and ensure you enter Y for `LambdaNumberFunction may not have authorization defined, Is this okay? [y/N]: y`
 
-![sam deploy -g](/aws-lambda/img/samdeploy-g.png)
+![sam deploy -g](img/samdeploy-g.png)
 
 AWS SAM deploys the infrastructure and outputs an APIBasePath
 
-![ApiBasePath](/aws-lambda/img/ApiBasePath.png)
+![ApiBasePath](img/ApiBasePath.png)
 
 Use `curl` and make a POST request to the APIBasePath URL with a number as a date.
 ```
@@ -87,7 +87,7 @@ curl -X POST https://6ioqy4z9ee.execute-api.us-east-1.amazonaws.com -H 'Content-
 ```
 The Lambda function should respond with the `x64` processor architecture and a fact about the date.
 
-![curl x86](/aws-lambda/img/curlx86.png)
+![curl x86](img/curlx86.png)
 
 Amend the processor architecture within the AWS SAM [template.yml](./GravitonLambdaNumber/template.yml) file.
 replace 
@@ -112,7 +112,7 @@ curl -X POST https://6ioqy4z9ee.execute-api.us-east-1.amazonaws.com -H 'Content-
 ```
 The Lambda function should respond with the `arm64` processor architecture and a fact about the date.
 
-![curl arm64](/aws-lambda/img/curlarm64.png)
+![curl arm64](img/curlarm64.png)
 
 The function has seamlessly migrated from x86 to arm64.
 
@@ -125,7 +125,7 @@ Specify `--use-container` to use the build container.
 ```
 sam build --use-container
 ```
-![sam build --use-container](/aws-lambda/img/sambuildcontainer.png)
+![sam build --use-container](img/sambuildcontainer.png)
 
 ### Local testing
 You can test the arm64 function locally using either AWS SAM or Docker natively.
@@ -134,7 +134,7 @@ When using AWS SAM, you can use [`sam local invoke`]([template.yml](https://docs
 ```
 sam local invoke LambdaNumberFunction -e ./test/event.json
 ```
-![sam local invoke](/aws-lambda/img/samlocalinvoke.png)
+![sam local invoke](img/samlocalinvoke.png)
 
 ### Building arm64 Lambda functions as container images
 You can build arm64 functions as container images. You  can use [AWS SAM natively](https://aws.amazon.com/blogs/compute/using-container-image-support-for-aws-lambda-with-aws-sam/) to build container images.
@@ -151,26 +151,26 @@ Build the container image.
 ```
 docker build -t dockernumber-arm ./src 
 ```
-![docker build](/aws-lambda/img/dockerbuild.png)
+![docker build](img/dockerbuild.png)
 
 Inspect the container image to confirm the `Architecture`.
 ```
 docker inspect dockernumber-arm | grep Architecture 
 ```
-![docker inspect](/aws-lambda/img/dockerinspect.png)
+![docker inspect](img/dockerinspect.png)
 
 You can locally test the function using `docker run`
 In another terminal window run the Lambda function docker container image.
 ```
 docker run -p 9000:8080 dockernumber-arm:latest
 ```
-![docker run](/aws-lambda/img/dockerrun.png)
+![docker run](img/dockerrun.png)
 
 Use `curl` to invoke the Lambda function using the local docker endpoint, passing in a sample `event.json`.
 ```
 curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d @./test/event.json
 ```
-![docker run response](/aws-lambda/img/dockerrunresponse.png)
+![docker run response](img/dockerrunresponse.png)
 
 You can view the local logs in the `docker run` terminal window.
 
@@ -186,7 +186,7 @@ docker tag dockernumber-arm:latest 123456789012.dkr.ecr.us-east-1.amazonaws.com/
 docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/dockernumber-arm:latest
 ```
 You can then create a Lambda function from the container image using the AWS Management Console, AWS CLI, or other tools.
-![Create function from image](/aws-lambda/img/createfunctionfromimage.png)
+![Create function from image](img/createfunctionfromimage.png)
 
 ## Comparing x86 and arm64 performance and cost.
 You can use the [AWS Lambda Power Tuning](https://github.com/alexcasalboni/aws-lambda-power-tuning) open-source project to suggest a configuration to minimize costs and maximize performance. The tool allows you to compare two results on the same chart and incorporate arm64-based pricing. This is useful to compare two versions of the same function, one using x86 and the other arm64.
@@ -204,7 +204,7 @@ sam build --use-container
 sam deploy --stack-name PythonPrime -g
 ```
 Note the Output values of the two Lambda functions:
-![Prime Functions](/aws-lambda/img/primefunctions.png)
+![Prime Functions](img/primefunctions.png)
 
 ### Deploy the AWS Lambda Power Tuning State Machine
 Navigate to [https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:451282441545:applications~aws-lambda-power-tuning](https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:451282441545:applications~aws-lambda-power-tuning) and choose **Deploy**.
@@ -239,7 +239,7 @@ The following is an example input.
 ```
 Select *Open in a new browser tab* and choose **Start execution**.
 The Lambda Power Tuning state machine runs for each configured memory value.
-![PowerTuningStateMachine](/aws-lambda/img/powertuningstatemachine.png)
+![PowerTuningStateMachine](img/powertuningstatemachine.png)
 
 Once complete, the *Execution event history* final step, *ExecutionSucceeded* contains a visualization URL. 
 ```
@@ -261,7 +261,7 @@ Once complete, the *Execution event history* final step, *ExecutionSucceeded* co
 ```
 Browse to the lambda-power-tuning URL to view the average *Invocation time (ms)* and *Invocation Cost (USD)* for each memory value for the x86 function.
 
-![PowerTuning x86 results](/aws-lambda/img/powertuningx86results.png)
+![PowerTuning x86 results](img/powertuningx86results.png)
 
 Navigate back to the Step Functions console and run another state machine, specifying the ARN of the arm64 Lambda function from the AWS SAM Outputs.
 Once complete, copy the visualization URL from the *Execution event history* final step, *ExecutionSucceeded*. 
@@ -271,11 +271,11 @@ Enter **x86** as name for function 1
 Enter **arm64** as the name for function 2
 Paste in the URL from the arm64 function and choose **Compare**.
 
-![PowerTuning Compare](/aws-lambda/img/powertuningcompare.png)
+![PowerTuning Compare](img/powertuningcompare.png)
 
 View the comparison between the *x86* and the *arm64* function.
 
-![PowerTuning Comparison](/aws-lambda/img/powertuningcomparison.png)
+![PowerTuning Comparison](img/powertuningcomparison.png)
 
 At 2048 MB, the arm64 function is 29% faster and 43% cheaper than the identical Lambda function running on x86!
 Power Tuning gives you a data driven approach to select the optimal memory configuration for your Lambda functions. This allows you to also compare x86 and arm64 and may allow you to reduce the memory configuration of your arm64 Lambda functions, further reducing costs.

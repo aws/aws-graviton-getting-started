@@ -8,7 +8,7 @@ Ubuntu Pro | 22.04 LTS | Yes | 4KB | [MarketPlace](https://aws.amazon.com/market
 Ubuntu | 24.04 LTS | Yes | 4KB | [noble](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 Ubuntu | 22.04 LTS | Yes | 4KB | [jammy](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 Ubuntu | 20.04 LTS | Yes | 4KB | [focal](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
-Ubuntu | 18.04 LTS | Yes (*) | 4KB | [bionic](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | (*) needs `apt install libc6-lse`. Free support ended 2023/05/31.
+~~Ubuntu~~ | ~~18.04 LTS~~ | ~~Yes (*)~~ | ~~4KB~~ | ~~[bionic](https://cloud-images.ubuntu.com/locator/ec2/)~~ | ~~Yes~~ | (*) needs `apt install libc6-lse`. Standard support ended 2023/05/31; ESM only.
 SuSE | 15 SP2 or later| Planned | 4KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07SPTXBDX) | Yes | 
 Redhat Enterprise Linux | 8.2 or later | Yes | 64KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07T2NH46P) | Yes | 
 ~~Redhat Enterprise Linux~~ | ~~7.x~~ | ~~No~~ | ~~64KB~~ | ~~[MarketPlace](https://aws.amazon.com/marketplace/pp/B07KTFV2S8)~~ | | Supported on A1 instances but not on Graviton2 and later based ones

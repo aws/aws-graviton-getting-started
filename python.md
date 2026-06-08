@@ -230,22 +230,16 @@ To enable parallelism with BLIS, one needs to both configure with
 `--enable-threading=openmp` and set the environment variable `BLIS_NUM_THREADS`
 to the number of threads to use, the default is to use a single thread.
 
-### 2.7 Graviton support in Conda / Anaconda
-Anaconda is a distribution of the Python and R programming languages for scientific computing, that aims to simplify package management and deployment.
+### 2.7 Graviton support in Conda / Miniforge
+Conda is a popular package and environment manager for the Python and R programming languages, widely used in scientific computing. Several distributions ship the `conda` tool. We recommend [Miniforge](https://github.com/conda-forge/miniforge) — a minimal `conda` installer that defaults to the community-maintained, BSD-licensed [conda-forge](https://conda-forge.org/) channel, which is free for commercial use. Miniforge avoids the Terms of Service prompt that Anaconda's `main` and `r` channels now require for non-interactive use, which is convenient for unattended provisioning on Graviton instances.
 
-Anaconda has announced [support for AWS Graviton on May 14, 2021](https://www.anaconda.com/blog/anaconda-aws-graviton2).
+Here is an example on how to use it to install [numpy](https://numpy.org/) and [pandas](https://pandas.pydata.org/) on aarch64.
 
-Instructions to install the full Anaconda package installer can be found at https://docs.anaconda.com/anaconda/install/graviton2/ .
-
-Anaconda also offers a lightweight version called [Miniconda](https://docs.conda.io/en/latest/miniconda.html) which is a small, bootstrap version of Anaconda that includes only conda, Python, the packages they depend on, and a small number of other useful packages, including pip, zlib and a few others.
-
-Here is an example on how to use it to install [numpy](https://numpy.org/) and [pandas](https://pandas.pydata.org/) for Python 3.9.
-
-The first step is to install conda:
+The first step is to install conda via Miniforge:
 ```
-$ wget https://repo.anaconda.com/miniconda/Miniconda3-py39_4.10.3-Linux-aarch64.sh
-$ chmod a+x Miniconda3-py39_4.10.3-Linux-aarch64.sh
-$ ./Miniconda3-py39_4.10.3-Linux-aarch64.sh
+$ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh
+$ chmod a+x Miniforge3-Linux-aarch64.sh
+$ ./Miniforge3-Linux-aarch64.sh
 ```
 
 Once installed, you can either use the `conda` command directly to install packages, or write an environment definition file and create the corresponding environment.
