@@ -30,12 +30,13 @@ Rocky Linux | 8.4 or later | Yes (*) | 64KB (*) | [ISOs](https://rockylinux.org/
 OS Name | Minimum recommended Linux kernel version for Graviton
 ------ | ------
 Amazon Linux 2023 | All supported kernels
-Amazon Linux 2 | >= 4.14.273-207.502.amzn2, >= 5.4.186-102.354.amzn2, or >= 5.10.106-102.504.amzn2
+Amazon Linux 2\* | >= 5.10.106-102.504.amzn2
 Ubuntu 24.04 | All supported kernels
 Ubuntu 22.04 | All supported kernels 
-Ubuntu 20.04 | >= 5.4.0-1047-aws, >= 5.8.0-1034-aws, >= 5.11.0-1009-aws
-Ubuntu 18.04 | >= 4.15.0-1101-aws, >= 5.4.0-1047-aws
+Ubuntu 20.04 | >= 5.15.0-1009-aws
 Redhat Entreprise Linux 8 | >= 4.18.0-305.10
+
+\* Graviton5 does not support Amazon Linux 2 kernel 4.14.x
 
 # Operating systems which do not support Graviton based instances
 
