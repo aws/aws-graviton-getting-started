@@ -23,19 +23,19 @@ have a reduced set of events suitable for most profiling needs.  For
 older generations smaller instance sizes may not support any PMU event
 collection.  The table below captures these details:
 
-|Instance Family |  Minimum Size for Full PMU Event Support | Basic Support at Smaller Sizes
+|Instance Family |  Sizes with Full PMU Event Support | Basic Support at Smaller Sizes
 |------|------------|------|
-|*9g   | 48xlarge   | yes  |
-|*8a   | 24xlarge   | yes  |
+|*9g   | 12xlarge, 24xlarge, 48xlarge   | yes  |
+|*8a   | 24xlarge, 48xlarge   | yes  |
 |*8i   | 48xlarge   | yes  |
-|*8g   | 24xlarge   | yes  |
-|*7a   | 24xlarge   | yes  |
+|*8g   | 24xlarge, 48xlarge   | yes  |
+|*7a   | 24xlarge, 48xlarge   | yes  |
 |*7g   | 16xlarge   | yes  |
-|*7i   | 24xlarge   | yes  |
-|*6a   | 24xlarge   | no   |
+|*7i   | 24xlarge, 48xlarge   | yes  |
+|*6a   | 24xlarge, 48xlarge   | no   |
 |*6g   | 16xlarge   | yes  |
-|*6i   | 16xlarge   | no   |
-|*5   | c5.9xlarge, *5.12xlarge | no
+|*6i   | 16xlarge, 32xlarge   | no   |
+|*5    | c5.9xlarge, *5.12xlarge | no
 
 
 To measure the standard CPU PMU events, do the following:
@@ -199,7 +199,7 @@ The SPE PMU on Graviton enables cores to precisely trace events for individual i
 linux `perf` tool.  It samples instructions from the executed instruction stream at random.  It is particularly useful for finding information
 about particular loads that are always long latency, false sharing of atomic variables, or branches that are often mis-predicted and causing slow-downs.
 Because SPE is precise, this information can be attributed back to individual code lines that need to be optimized.
-SPE is enabled on Graviton 2, 3, and 4 metal instances.  The below table shows for which Linux distributions and kernel versions SPE is known to be
+SPE is enabled on Graviton 2, 3, 4, and 5 metal instances.  The below table shows for which Linux distributions and kernel versions SPE is known to be
 enabled.
 
 | Distro       | Kernel  |
@@ -208,11 +208,16 @@ enabled.
 | AL2023       | >=6.1.2 |
 | Ubuntu 20.04 | >=5.15  |
 | Ubuntu 22.04 | >=6.2   |
+| Ubuntu 24.04 | >=6.17.0|
+| Ubuntu 26.04 | >=7.0.0 |
 
 On Amazon Linux 2 and 2023, the SPE PMU is available by default on Graviton metal instances, you can check for its existence by verifying:
 ```
 # Returns the directory exists
 ls /sys/devices/arm_spe_0
+
+# or check perf list for arm_spe_0// event with
+sudo perf list
 ```
 
 On Ubuntu to enable SPE requires four extra steps
@@ -220,7 +225,7 @@ On Ubuntu to enable SPE requires four extra steps
 # Install the arm_spe_pmu.ko module
 sudo apt install linux-modules-extra-$(uname -r)
 
-# Add kpti=off to the kernel boot command line: GRUB_CMDLINE_LINUX in /etc/default/grub, to set it for all the installed kernels.
+# Add kpti=off to the kernel boot command line for Graviton2: GRUB_CMDLINE_LINUX in /etc/default/grub, to set it for all the installed kernels.
 # Note, the options passed to GRUB_CMDLINE_LINUX_DEFAULT will only propagate to the default kernel and not to all the installed kernels.
 # Reboot instance
 
@@ -228,6 +233,9 @@ sudo modprobe arm_spe_pmu
 
 # Verify exists
 ls /sys/devices/arm_spe_0
+
+# or check perf list for arm_spe_0// event with
+sudo perf list
 ```
 
 SPE can be used via Linux `perf`. An example that samples every 1000'th branch on core 0 system wide is shown below:
@@ -251,14 +259,17 @@ These metrics can be used to assess an application's utilization of such system 
 CMN counters are only accessible on Graviton metal-type instances and certain OSes and kernels.
 
 
-|Distro      |Kernel   | Graviton2 (c6g) | Graviton3 (c7g) |
-|------------|---------|-----------------|-----------------|
-|Ubuntu-20.04| 5.15    |  yes            |    no           |
-|Ubuntu-20.04| >=5.19  |  yes            |    yes          |
-|Ubuntu-22.04| 5.15    |  no             |    no           |
-|Ubuntu-22.04| >=5.19  |  yes            |    yes          |
-|AL2         | 5.10    |  no             |    no           |
-|AL2023      | 6.1.2   |  yes            |    yes          |
+|Distro      |Kernel   | Graviton2 (c6g) | Graviton3 (c7g) |  Graviton4 (c8g) | Graviton5 (m9g) |
+|------------|---------|-----------------|-----------------|------------------|-----------------|
+|Ubuntu-20.04| 5.15    | yes             | no              | no               | no              |
+|Ubuntu-20.04| >=5.19  | yes             | yes             | no               | no              |
+|Ubuntu-22.04| >=6.8.0  | yes            | yes             | yes              | no              |
+|Ubuntu-24.04| >=6.17.0 | yes            | yes             | yes              | no              |
+|Ubuntu-26.04| >=7.0.0 | yes             | yes             | yes              | no              |
+|AL2         | 5.10    | no              | no              | no               | no              |
+|AL2023      | 6.1.x   | yes             | yes             | no               | no              |
+|AL2023      | 6.12.x  | yes             | yes             | yes              | no              |
+|AL2023      | 6.18.x  | yes             | yes             | yes              | no              |
 
 
 General procedure on Ubuntu
