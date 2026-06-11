@@ -15,6 +15,8 @@ The following list of counter ratios has been curated to list events useful for 
 * [Neoverse V1 PMU Guide](https://developer.arm.com/documentation/109708/latest/)
 * [Neoverse V2 TRM](https://developer.arm.com/documentation/102375/latest/)
 * [Neoverse V2 PMU Guide](https://developer.arm.com/documentation/109528/0100)
+* [Neoverse V3 TRM](https://developer.arm.com/documentation/107734/latest/)
+* [Neoverse V3 PMU Guide](https://developer.arm.com/documentation/110079/latest/)
 
 |METRIC	|Counter #1	|Counter #2	|Formula	|Description	|
 |---	|---	|---	|---	|---	|

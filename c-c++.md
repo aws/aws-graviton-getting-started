@@ -3,7 +3,7 @@
 ### Enabling Arm Architecture Specific Features
 
 TLDR: To target all current generation Graviton instances (Graviton2,
-Graviton3, and Graviton4), use `-march=armv8.2-a`.
+Graviton3, Graviton4, and Graviton5), use `-march=armv8.2-a`.
 
 C and C++ code can be built for Graviton with a variety of flags, depending on
 the goal. If the goal is to get the best performance for a specific generation,
@@ -21,14 +21,17 @@ CPU          | Flag (performance)    | Flag (balanced)           | GCC version  
 -------------|-----------------------|---------------------------|------------------|---------------
 Graviton2    | `-mcpu=neoverse-n1` ¹ | `-march=armv8.2-a`        | GCC-9            | Clang/LLVM 10+
 Graviton3(E) | `-mcpu=neoverse-v1`   | `-mcpu=neoverse-512tvb` ² | GCC 11           | Clang/LLVM 14+
-Graviton4    | `-mcpu=neoverse-v2`   | `-mcpu=neoverse-512tvb` ² | GCC 13           | Clang/LLVM 16+
-Graviton5    | `-mcpu=neoverse-v3`.  | `-mcpu=neoverse-512tvb` ² | GCC 14           | Clang/LLVM 19+
+Graviton4    | `-mcpu=neoverse-v2`   | `-mcpu=neoverse-512tvb` ² | GCC 13 ³         | Clang/LLVM 16+
+Graviton5    | `-mcpu=neoverse-v3`   | `-mcpu=neoverse-512tvb` ² | GCC 15 ³         | Clang/LLVM 19+
 
 ¹ Requires GCC-9 or later (or GCC-7 for Amazon Linux 2); otherwise we suggest
 using `-mcpu=cortex-a72`
 
 ² If your compiler doesn't support `neoverse-512tvb`, please use the Graviton2
 tuning.
+
+³ `-mcpu=neoverse-v2` and `-mcpu=neoverse-v3` have been back-ported into the
+GCC-11 distributed with Amazon Linux 2023.
 
 For some applications, it may be necessary to support a broad range of Arm64
 targets while still making use of more advanced features such as LSE (Large
@@ -48,7 +51,7 @@ Starred version marks the default system compiler.
 
 Distribution    | GCC                  | Clang/LLVM
 ----------------|----------------------|-------------
-Amazon Linux 2023  | 11*               | 15*
+Amazon Linux 2023  | 11*, 14           | 15*, 18
 Amazon Linux 2  | 7*, 10               | 7, 11*
 Ubuntu 24.04    | 9, 10, 11, 12, 13*, 14 | 14, 15, 16, 17, 18*
 Ubuntu 22.04    | 9, 10, 11*, 12       | 11, 12, 13, 14*

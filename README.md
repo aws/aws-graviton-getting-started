@@ -76,7 +76,7 @@ Please refer to [optimizing](optimizing.md) for general debugging and profiling 
 Different architectures and systems have differing capabilities, which means some tools you might be familiar with on one architecture don't have equivalent on AWS Graviton. Documented [Monitoring Tools](Monitoring_Tools_on_Graviton.md) with some of these utilities.
 
 Furthermore, different generations of Graviton support different features, as noted in the table above. For example,
-Graviton3 supports SVE but Graviton2 does not. Graviton4 supports SVE2 and SVE. For some applications it may be
+Graviton3 supports SVE but Graviton2 does not. Graviton4 and Graviton5 support SVE2 and SVE. For some applications it may be
 advantageous to implement performance critical kernels to make use of the highest performing feature set available which
 may not be known until runtime. For this, the best practice is to consult HWCAPS. For details on how to do this, see
 [our guide on HWCAPS runtime feature detection](runtime-feature-detection.md).
