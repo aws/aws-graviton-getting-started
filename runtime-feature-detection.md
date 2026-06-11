@@ -139,7 +139,7 @@ features can be found by searching in the PDF for `FEAT_` + the symbol which fol
 | HWCAP_USCAT        |           |           | *         | *         | *         |
 | HWCAP_ILRCPC       |           |           | *         | *         | *         |
 | HWCAP_FLAGM        |           |           | *         | *         | *         |
-| HWCAP_SSBS         |           | *         | *         | *         |          |
+| HWCAP_SSBS         |           | *         | *         | *         |           |
 | HWCAP_SB           |           |           |           | *         | *         |
 | HWCAP_PACA         |           |           | *         | *         | *         |
 | HWCAP_PACG         |           |           | *         | *         | *         |

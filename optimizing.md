@@ -55,7 +55,7 @@ We welcome suggestions by opening an issue in this repo.
 
 ### Lock/Synchronization intensive workload
 Graviton2 processors and later support the Arm Large Scale Extensions (LSE). LSE based locking and synchronization
-is an order of magnitude faster for highly contended locks with high core counts (e.g. up to 192 cores on Graviton4).
+is an order of magnitude faster for highly contended locks with high core counts (e.g. up to 192 cores on Graviton4 and Graviton5).
 For workloads that have highly contended locks, compiling with `-march=armv8.2-a` will enable LSE based atomics and can substantially increase performance. However, this will prevent the code
 from running on an Arm v8.0 system such as AWS Graviton-based EC2 A1 instances.
 With GCC 10 and newer an option `-moutline-atomics` will not inline atomics and

@@ -37,7 +37,7 @@ void test() {
     int have_sve = !!(getauxval(AT_HWCAP2) & HWCAP2_SVE2);
     uint64_t sum = 0;
     if (have_sve) {
-        sum = sum_all_sve(&values[0], sizeof_array(values));
+        sum = sum_all_sve2(&values[0], sizeof_array(values));
     } else {
         sum = sum_all(&values[0], sizeof_array(values));
     }
