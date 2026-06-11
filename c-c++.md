@@ -22,6 +22,7 @@ CPU          | Flag (performance)    | Flag (balanced)           | GCC version  
 Graviton2    | `-mcpu=neoverse-n1` ¹ | `-march=armv8.2-a`        | GCC-9            | Clang/LLVM 10+
 Graviton3(E) | `-mcpu=neoverse-v1`   | `-mcpu=neoverse-512tvb` ² | GCC 11           | Clang/LLVM 14+
 Graviton4    | `-mcpu=neoverse-v2`   | `-mcpu=neoverse-512tvb` ² | GCC 13           | Clang/LLVM 16+
+Graviton5    | `-mcpu=neoverse-v3`.  | `-mcpu=neoverse-512tvb` ² | GCC 14           | Clang/LLVM 19+
 
 ¹ Requires GCC-9 or later (or GCC-7 for Amazon Linux 2); otherwise we suggest
 using `-mcpu=cortex-a72`
@@ -150,7 +151,7 @@ Graviton2 and later processors been optimized for performance and power efficien
 The scalable vector extensions (SVE) require both a new enough tool-chain to
 auto-vectorize to SVE (GCC 11+, LLVM 14+) and a 4.15+ kernel that supports SVE.
 One notable exception is that Amazon Linux 2 with a 4.14 kernel doesn't support SVE;
-please upgrade to a 5.4+ AL2 kernel.  Graviton3 and Graviton4 support SVE, earlier Gravitons does not.
+please upgrade to a 5.4+ AL2 kernel.  Graviton3, Graviton4, and Graviton5 support SVE, earlier Gravitons do not.
 
 ### Using Arm instructions to speed-up common code sequences
 The Arm instruction set includes instructions that can be used to speedup common

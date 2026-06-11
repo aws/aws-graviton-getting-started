@@ -114,14 +114,16 @@ of such system level resources and if resources are used efficiently.
 CMN counters are only accessible on metal-type instances and certain OSes and kernels.
 
 
-|Distro      |Kernel   | Graviton2 (6g)  | Graviton3 (7g)  | Graviton4 (8g) | 
-|------------|---------|-----------------|-----------------|----------------|
-|Ubuntu-20.04| 5.15    |  yes            |    no           | no             |
-|Ubuntu-20.04| >=5.19  |  yes            |    yes          | no             |
-|Ubuntu-22.04| >=5.19  |  yes            |    yes          | no             |
-|Ubuntu-24.04| >=6.8.0 |  yes            |    yes          | yes            |
-|AL2023      | 6.1.2   |  yes            |    yes          | no             |
+|Distro      |Kernel   | Graviton2 (6g)  | Graviton3 (7g)  | Graviton4 (8g) | Graviton5 (9g)*|
+|------------|---------|-----------------|-----------------|----------------|----------------|
+|Ubuntu-20.04| 5.15    |  yes            |    no           | no             | no             |
+|Ubuntu-20.04| >=5.19  |  yes            |    yes          | no             | no             |
+|Ubuntu-22.04| >=5.19  |  yes            |    yes          | no             | no             |
+|Ubuntu-24.04| >=6.8.0 |  yes            |    yes          | yes            | no             |
+|Ubuntu-26.04| >=7.0.0 |  yes            |    yes          | yes            | no             |
+|AL2023      | 6.1.2   |  yes            |    yes          | no             | no             |
 
+\* Support is being actively [developed upstream](https://lkml.iu.edu/2606.0/06615.html)
 
 General procedure on Ubuntu
 ```
@@ -147,3 +149,5 @@ For further information about specific events and useful ratios, please refer to
 [ARM documentation for Graviton3's CMN-650](https://developer.arm.com/documentation/101481/0200/?lang=en)
 
 [ARM documentation for Graviton4's CMN-700](https://developer.arm.com/documentation/102308/latest/)
+
+[ARM documentation for Graviton5's CMN-S3](https://developer.arm.com/documentation/107858/latest/)

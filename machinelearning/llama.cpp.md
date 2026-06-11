@@ -10,7 +10,7 @@ Building from sources is the recommended way to use llama.cpp on Graviton CPUs, 
 
 **Prerequisites**
 
-Graviton3(E) (e.g. c7g/m7g/r7g, c7gn and Hpc7g Instances) and Graviton4 (e.g. r8g Instances) CPUs support BFloat16 format and MMLA instructions for machine learning (ML) acceleration. These hardware features are enabled starting with Linux Kernel version 5.10. So, it is highly recommended to use the AMIs based on Linux Kernel 5.10 and beyond for the best LLM inference performance on Graviton Instances. Use the following queries to list the AMIs with the recommended Kernel versions.
+Graviton3(E) (e.g. c7g/m7g/r7g, c7gn and Hpc7g Instances), Graviton4 (e.g. r8g Instances), and Graviton5 (e.g. m9g instances) CPUs support BFloat16 format and MMLA instructions for machine learning (ML) acceleration. These hardware features are enabled starting with Linux Kernel version 5.10. So, it is highly recommended to use the AMIs based on Linux Kernel 5.10 and beyond for the best LLM inference performance on Graviton Instances. Use the following queries to list the AMIs with the recommended Kernel versions.
 
 ```
 # For Kernel 5.10 based AMIs list

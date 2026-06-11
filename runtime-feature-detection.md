@@ -1,7 +1,7 @@
 # Runtime Feature Detection on Graviton
 
 Different generations of Graviton support different features. For example, Graviton3 supports SVE but Graviton2 does
-not. Graviton4 supports SVE2 and SVE. For some applications it may be advantageous to implement performance critical
+not. Graviton4, and Graviton5 support both SVE2 and SVE. For some applications it may be advantageous to implement performance critical
 kernels to make use of the highest performing feature set available which may not be known until runtime. For this, the
 best practice is to consult HWCAPS. This guide covers the procedure for feature detection on Linux.
 
@@ -17,7 +17,7 @@ are defined in `asm/hwcap.h`. Below is a [sample C program](sample-code/hwcaps-t
 runtime system is detected to support it. This program can be compiled on any generation of Graviton and then executed
 on any generation of Graviton and select the correct function at runtime. Indeed, when testing the code for this
 article, the author compiled the program on Ubuntu 24.04 with GCC 13.3 on Graviton1 and then subsequently tested on all
-generations, including Graviton4, which supports SVE2.
+generations.
 
 ```c
 #include <stdio.h>
@@ -109,88 +109,88 @@ consult the [Arm Architectural Reference Manual](https://developer.arm.com/docum
 features can be found by searching in the PDF for `FEAT_` + the symbol which follows `HWCAP_` in the table below.
 
 
-| CAP                | Graviton1 | Graviton2 | Graviton3 | Graviton4 | 
-|--------------------|-----------|-----------|-----------|-----------| 
-| HWCAP_FP           | *         | *         | *         | *         | 
-| HWCAP_ASIMD        | *         | *         | *         | *         | 
-| HWCAP_EVTSTRM      | *         | *         | *         | *         | 
-| HWCAP_AES          | *         | *         | *         | *         | 
-| HWCAP_PMULL        | *         | *         | *         | *         | 
-| HWCAP_SHA1         | *         | *         | *         | *         | 
-| HWCAP_SHA2         | *         | *         | *         | *         | 
-| HWCAP_CRC32        | *         | *         | *         | *         | 
-| HWCAP_ATOMICS      |           | *         | *         | *         | 
-| HWCAP_FPHP         |           | *         | *         | *         | 
-| HWCAP_ASIMDHP      |           | *         | *         | *         | 
-| HWCAP_CPUID        | *         | *         | *         | *         | 
-| HWCAP_ASIMDRDM     |           | *         | *         | *         | 
-| HWCAP_JSCVT        |           |           | *         | *         | 
-| HWCAP_FCMA         |           |           | *         | *         | 
-| HWCAP_LRCPC        |           | *         | *         | *         | 
-| HWCAP_DCPOP        |           | *         | *         | *         | 
-| HWCAP_SHA3         |           |           | *         | *         | 
-| HWCAP_SM3          |           |           | *         |           | 
-| HWCAP_SM4          |           |           | *         |           | 
-| HWCAP_ASIMDDP      |           | *         | *         | *         | 
-| HWCAP_SHA512       |           |           | *         | *         | 
-| HWCAP_SVE          |           |           | *         | *         | 
-| HWCAP_ASIMDFHM     |           |           | *         | *         | 
-| HWCAP_DIT          |           |           | *         | *         | 
-| HWCAP_USCAT        |           |           | *         | *         | 
-| HWCAP_ILRCPC       |           |           | *         | *         | 
-| HWCAP_FLAGM        |           |           | *         | *         | 
-| HWCAP_SSBS         |           | *         | *         | *         | 
-| HWCAP_SB           |           |           |           | *         | 
-| HWCAP_PACA         |           |           | *         | *         | 
-| HWCAP_PACG         |           |           | *         | *         | 
-| HWCAP2_DCPODP      |           |           | *         | *         | 
-| HWCAP2_SVE2        |           |           |           | *         | 
-| HWCAP2_SVEAES      |           |           |           | *         | 
-| HWCAP2_SVEPMULL    |           |           |           | *         | 
-| HWCAP2_SVEBITPERM  |           |           |           | *         | 
-| HWCAP2_SVESHA3     |           |           |           | *         | 
-| HWCAP2_SVESM4      |           |           |           |           | 
-| HWCAP2_FLAGM2      |           |           |           | *         | 
-| HWCAP2_FRINT       |           |           |           | *         | 
-| HWCAP2_SVEI8MM     |           |           | *         | *         | 
-| HWCAP2_SVEF32MM    |           |           |           |           | 
-| HWCAP2_SVEF64MM    |           |           |           |           | 
-| HWCAP2_SVEBF16     |           |           | *         | *         | 
-| HWCAP2_I8MM        |           |           | *         | *         | 
-| HWCAP2_BF16        |           |           | *         | *         | 
-| HWCAP2_DGH         |           |           | *         | *         | 
-| HWCAP2_RNG         |           |           | *         | *         | 
-| HWCAP2_BTI         |           |           |           | *         | 
-| HWCAP2_MTE         |           |           |           |           | 
-| HWCAP2_ECV         |           |           |           |           | 
-| HWCAP2_AFP         |           |           |           |           | 
-| HWCAP2_RPRES       |           |           |           |           | 
-| HWCAP2_MTE3        |           |           |           |           | 
-| HWCAP2_SME         |           |           |           |           | 
-| HWCAP2_SME_I16I64  |           |           |           |           | 
-| HWCAP2_SME_F64F64  |           |           |           |           | 
-| HWCAP2_SME_I8I32   |           |           |           |           | 
-| HWCAP2_SME_F16F32  |           |           |           |           | 
-| HWCAP2_SME_B16F32  |           |           |           |           | 
-| HWCAP2_SME_F32F32  |           |           |           |           | 
-| HWCAP2_SME_FA64    |           |           |           |           | 
-| HWCAP2_WFXT        |           |           |           |           | 
-| HWCAP2_EBF16       |           |           |           |           | 
-| HWCAP2_SVE_EBF16   |           |           |           |           | 
-| HWCAP2_CSSC        |           |           |           |           | 
-| HWCAP2_RPRFM       |           |           |           |           | 
-| HWCAP2_SVE2P1      |           |           |           |           | 
-| HWCAP2_SME2        |           |           |           |           | 
-| HWCAP2_SME2P1      |           |           |           |           | 
-| HWCAP2_SME_I16I32  |           |           |           |           | 
-| HWCAP2_SME_BI32I32 |           |           |           |           | 
-| HWCAP2_SME_B16B16  |           |           |           |           | 
-| HWCAP2_SME_F16F16  |           |           |           |           | 
-| HWCAP2_MOPS        |           |           |           |           | 
-| HWCAP2_HBC         |           |           |           |           | 
-| HWCAP2_SVE_B16B16  |           |           |           |           | 
-| HWCAP2_LRCPC3      |           |           |           |           | 
-| HWCAP2_LSE128      |           |           |           |           | 
+| CAP                | Graviton1 | Graviton2 | Graviton3 | Graviton4 | Graviton5 |
+|--------------------|-----------|-----------|-----------|-----------|-----------|
+| HWCAP_FP           | *         | *         | *         | *         | *         |
+| HWCAP_ASIMD        | *         | *         | *         | *         | *         |
+| HWCAP_EVTSTRM      | *         | *         | *         | *         | *         |
+| HWCAP_AES          | *         | *         | *         | *         | *         |
+| HWCAP_PMULL        | *         | *         | *         | *         | *         |
+| HWCAP_SHA1         | *         | *         | *         | *         | *         |
+| HWCAP_SHA2         | *         | *         | *         | *         | *         |
+| HWCAP_CRC32        | *         | *         | *         | *         | *         |
+| HWCAP_ATOMICS      |           | *         | *         | *         | *         |
+| HWCAP_FPHP         |           | *         | *         | *         | *         |
+| HWCAP_ASIMDHP      |           | *         | *         | *         | *         |
+| HWCAP_CPUID        | *         | *         | *         | *         | *         |
+| HWCAP_ASIMDRDM     |           | *         | *         | *         | *         |
+| HWCAP_JSCVT        |           |           | *         | *         | *         |
+| HWCAP_FCMA         |           |           | *         | *         | *         |
+| HWCAP_LRCPC        |           | *         | *         | *         | *         |
+| HWCAP_DCPOP        |           | *         | *         | *         | *         |
+| HWCAP_SHA3         |           |           | *         | *         | *         |
+| HWCAP_SM3          |           |           | *         |           |           |
+| HWCAP_SM4          |           |           | *         |           |           |
+| HWCAP_ASIMDDP      |           | *         | *         | *         | *         |
+| HWCAP_SHA512       |           |           | *         | *         | *         |
+| HWCAP_SVE          |           |           | *         | *         | *         |
+| HWCAP_ASIMDFHM     |           |           | *         | *         | *         |
+| HWCAP_DIT          |           |           | *         | *         | *         |
+| HWCAP_USCAT        |           |           | *         | *         | *         |
+| HWCAP_ILRCPC       |           |           | *         | *         | *         |
+| HWCAP_FLAGM        |           |           | *         | *         | *         |
+| HWCAP_SSBS         |           | *         | *         | *         |          |
+| HWCAP_SB           |           |           |           | *         | *         |
+| HWCAP_PACA         |           |           | *         | *         | *         |
+| HWCAP_PACG         |           |           | *         | *         | *         |
+| HWCAP2_DCPODP      |           |           | *         | *         | *         |
+| HWCAP2_SVE2        |           |           |           | *         | *         |
+| HWCAP2_SVEAES      |           |           |           | *         | *         |
+| HWCAP2_SVEPMULL    |           |           |           | *         | *         |
+| HWCAP2_SVEBITPERM  |           |           |           | *         | *         |
+| HWCAP2_SVESHA3     |           |           |           | *         | *         |
+| HWCAP2_SVESM4      |           |           |           |           |           |
+| HWCAP2_FLAGM2      |           |           |           | *         | *         |
+| HWCAP2_FRINT       |           |           |           | *         | *         |
+| HWCAP2_SVEI8MM     |           |           | *         | *         | *         |
+| HWCAP2_SVEF32MM    |           |           |           |           |           |
+| HWCAP2_SVEF64MM    |           |           |           |           |           |
+| HWCAP2_SVEBF16     |           |           | *         | *         | *         |
+| HWCAP2_I8MM        |           |           | *         | *         | *         |
+| HWCAP2_BF16        |           |           | *         | *         | *         |
+| HWCAP2_DGH         |           |           | *         | *         | *         |
+| HWCAP2_RNG         |           |           | *         | *         | *         |
+| HWCAP2_BTI         |           |           |           | *         | *         |
+| HWCAP2_MTE         |           |           |           |           |           |
+| HWCAP2_ECV         |           |           |           |           | *         |
+| HWCAP2_AFP         |           |           |           |           | *         |
+| HWCAP2_RPRES       |           |           |           |           |           |
+| HWCAP2_MTE3        |           |           |           |           |           |
+| HWCAP2_SME         |           |           |           |           |           |
+| HWCAP2_SME_I16I64  |           |           |           |           |           |
+| HWCAP2_SME_F64F64  |           |           |           |           |           |
+| HWCAP2_SME_I8I32   |           |           |           |           |           |
+| HWCAP2_SME_F16F32  |           |           |           |           |           |
+| HWCAP2_SME_B16F32  |           |           |           |           |           |
+| HWCAP2_SME_F32F32  |           |           |           |           |           |
+| HWCAP2_SME_FA64    |           |           |           |           |           |
+| HWCAP2_WFXT        |           |           |           |           | *         |
+| HWCAP2_EBF16       |           |           |           |           |           |
+| HWCAP2_SVE_EBF16   |           |           |           |           |           |
+| HWCAP2_CSSC        |           |           |           |           |           |
+| HWCAP2_RPRFM       |           |           |           |           |           |
+| HWCAP2_SVE2P1      |           |           |           |           |           |
+| HWCAP2_SME2        |           |           |           |           |           |
+| HWCAP2_SME2P1      |           |           |           |           |           |
+| HWCAP2_SME_I16I32  |           |           |           |           |           |
+| HWCAP2_SME_BI32I32 |           |           |           |           |           |
+| HWCAP2_SME_B16B16  |           |           |           |           |           |
+| HWCAP2_SME_F16F16  |           |           |           |           |           |
+| HWCAP2_MOPS        |           |           |           |           |           |
+| HWCAP2_HBC         |           |           |           |           |           |
+| HWCAP2_SVE_B16B16  |           |           |           |           |           |
+| HWCAP2_LRCPC3      |           |           |           |           |           |
+| HWCAP2_LSE128      |           |           |           |           |           |
 
 ## See Also
 - https://www.kernel.org/doc/html/v5.4/arm64/elf_hwcaps.html
