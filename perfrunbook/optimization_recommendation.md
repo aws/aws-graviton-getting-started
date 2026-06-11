@@ -41,6 +41,7 @@ allocating huge-pages.
     2. [Graviton2 core software optimization guide](https://developer.arm.com/documentation/pjdoc466751330-9707/2-0)
     3. [Graviton3 core software optimization guide](https://developer.arm.com/documentation/110659)
     4. [Graviton4 core software optimization guide](https://developer.arm.com/documentation/PJDOC-466751330-593177/latest/)
+    5. [Graviton5 core software optimization guide](https://developer.arm.com/documentation/110079/latest)
 
 ## Optimizing synchronization heavy optimizations
 

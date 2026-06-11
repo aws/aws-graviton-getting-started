@@ -1,6 +1,6 @@
 # AWS Graviton Technical Guide
 
-This repository provides technical guidance for users and developers using [Amazon EC2 instances powered by AWS Graviton processors](https://aws.amazon.com/ec2/graviton/) (including the latest generation Graviton4 processors). While it calls out specific features of the Graviton processors themselves, this repository is also generally useful for anyone running code on Arm-based systems.
+This repository provides technical guidance for users and developers using [Amazon EC2 instances powered by AWS Graviton processors](https://aws.amazon.com/ec2/graviton/) (including the latest generation Graviton5 processors). While it calls out specific features of the Graviton processors themselves, this repository is also generally useful for anyone running code on Arm-based systems.
 
 # Contents
 * [Transitioning to Graviton](#transitioning-to-graviton)
