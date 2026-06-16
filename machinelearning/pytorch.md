@@ -51,22 +51,11 @@ curl -O https://publish.djl.ai/djl-serving/djl-serving_0.25.0-1_all.deb
 sudo dpkg -i djl-serving_0.25.0-1_all.deb
 ```
 
-**Using Docker hub container**
-
-4Q'23 Docker hub images from armswdev are based on PyTorch 2.0.0, but also include additional downstream optimizations and experimental features. These are avaiable for trying out the experimental downstream features and provide early feedback.
-
-```
-# Pull pytorch docker container with onednn-acl optimizations enabled
-docker pull armswdev/pytorch-arm-neoverse:r23.10-torch-2.0.0-onednn-acl
-
-# Launch the docker image
-docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/pytorch-arm-neoverse:r23.10-torch-2.0.0-onednn-acl
-```
 
 # Prerequisites
 
 1. It is highly recommended to use the AMIs based on Linux Kernel 5.10 and beyond for the best PyTorch inference performance on Graviton3 instances
-2. Python 3.8 is the minimum supported python version starting PyTorch 2.0.0. For more details, please refer to PyTorch 2.0 [release note](https://github.com/pytorch/pytorch/releases/tag/v2.0.0)
+2. Python 3.10 is the minimum supported python version starting PyTorch 2.12.0. For more details, please refer to PyTorch 2.12 [release note](https://github.com/pytorch/pytorch/releases/tag/v2.12.0)
 
 # Runtime configurations for optimal performance
 
@@ -236,7 +225,7 @@ sudo apt install -y scons cmake
 cd $HOME
 git clone https://github.com/ARM-software/ComputeLibrary.git
 cd ComputeLibrary
-git checkout v23.05.1
+git checkout v52.6.0
 scons Werror=1 -j8 debug=0 neon=1 opencl=0 os=linux openmp=1 cppthreads=0 arch=armv8a multi_isa=1 build=native
 
 # Build PyTorch from the tip of the tree
