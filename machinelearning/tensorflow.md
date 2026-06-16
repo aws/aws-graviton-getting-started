@@ -12,16 +12,13 @@ There are multiple levels of software package abstractions available:
 
 **AWS Graviton TensorFlow DLC**
 
-As of May 2024, AWS Graviton DLCs are based on TensorFlow 2.14.1. The DLCs enable the Graviton optimizations by default.
+As of June 2026, AWS Graviton DLCs are based on TensorFlow 2.19. The DLCs enable the Graviton optimizations by default.
 
 ```
 # Login and pull the AWS DLC for tensorflow
 aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-west-2.amazonaws.com
 
-docker pull 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.14.1-cpu-py310-ubuntu20.04-ec2
-
-# Sample command to launch the tensorflow serving api with resnet50 model
-docker run -p 8501:8501 --name tfserving_resnet --mount type=bind,source=/tmp/resnet,target=/models/resnet -e MODEL_NAME=resnet -t 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-graviton:2.14.1-cpu-py310-ubuntu20.04-ec2
+docker pull 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-inference-arm64:2.19.0-cpu-py312-ubuntu22.04-sagemaker
 ```
 
 **Using Python wheel**
@@ -30,17 +27,6 @@ docker run -p 8501:8501 --name tfserving_resnet --mount type=bind,source=/tmp/re
 pip install tensorflow
 ```
 
-**Using Docker hub container**
-
-As of May 2024, Docker hub images from armswdev are based on TensorFlow 2.15.1, but also include additional downstream optimizations and experimental features. These are avaiable for trying out the experimental downstream features and provide early feedback.
-
-```
-# pull the tensorflow docker container with onednn-acl optimizations enabled
-docker pull armswdev/tensorflow-arm-neoverse
-
-# launch the docker image
-docker run -it --rm -v /home/ubuntu/:/hostfs armswdev/tensorflow-arm-neoverse
-```
 
 # Prerequisites
 
@@ -48,7 +34,7 @@ It is highly recommended to use the AMIs based on Linux Kernel 5.10 and beyond f
 
 # Runtime configurations for optimal performance
 
-AWS DLCs come with all the optimizations enabled, so, there are no additional runtime configurations required. Where as for the python wheels and the docker hub images, enable the below runtime configurations to achieve the best performance.
+AWS DLCs are built with all the optimizations enabled, so, there are no additional runtime configurations required. For the python wheels, enable the below runtime configurations to achieve the best performance.
 ```
 # For TensorFlow versions older than 2.14.0, the default runtime backend is Eigen, but typically onednn+acl provides better performance. To enable the onednn+acl backend, set the following TF environment variable
 export TF_ENABLE_ONEDNN_OPTS=1
