@@ -115,7 +115,7 @@ pip     | 19.3+   | Enable installation of python wheel binaries on Graviton
 PyTorch | 2.0+    | Optimize Inference latency and throughput on Graviton. [AWS DLCs and python wheels are available](machinelearning/pytorch.md).
 ruby    | 3.0+ | Enable arm64 optimizations that improve performance by as much as 40%. These changes have also been back-ported to the Ruby shipping with AmazonLinux2, Fedora, and Ubuntu 20.04.
 Spark | 3.0+ | Supports running on Java/Corretto 11, improving overall performance.
-zlib    | 1.2.8+  | For the best performance on Graviton please use [zlib-cloudflare](https://github.com/cloudflare/zlib).
+zlib    | zlib-ng 2.3.3+  | The original [zlib](https://github.com/madler/zlib) shipped by most distributions has no Arm optimizations. For the best performance on Graviton, use [zlib-ng](https://github.com/zlib-ng/zlib-ng) 2.3.3 or later, which now outperforms our previous recommendation of [zlib-cloudflare](https://github.com/cloudflare/zlib).
 
 # Containers on Graviton
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
@@ -160,17 +160,18 @@ bazel
 Bazelisk itself should not require further updates, as its only purpose is to keep Bazel updated.
 
 ## zlib on Linux
-Linux distributions, in general, use the original zlib without any optimizations. zlib-cloudflare has been updated to provide better and faster compression on Arm and x86. To use zlib-cloudflare:
+Linux distributions generally ship the original [zlib](https://github.com/madler/zlib) without any Arm optimizations. [zlib-ng](https://github.com/zlib-ng/zlib-ng) is an actively maintained fork that delivers significantly faster compression and decompression on both Arm and x86, and as of 2.3.3 outperforms the older [zlib-cloudflare](https://github.com/cloudflare/zlib) fork on Graviton. To build and install zlib-ng with a zlib-compatible API:
 ```
-git clone https://github.com/cloudflare/zlib.git
-cd zlib
-./configure --prefix=$HOME
+git clone https://github.com/zlib-ng/zlib-ng.git
+cd zlib-ng
+git checkout 2.3.3
+./configure --prefix=$HOME --zlib-compat
 make
 make install
 ```
 Make sure to have the full path to your lib at $HOME/lib in /etc/ld.so.conf and run ldconfig.
 
-For JDKs that dynamically link to the system zlib, you can set LD_LIBRARY_PATH to point to the directory where your newly built version of zlib-cloudflare is located or load that library with LD_PRELOAD.
+For JDKs that dynamically link to the system zlib, you can set LD_LIBRARY_PATH to point to the directory where your newly built version of zlib-ng is located or load that library with LD_PRELOAD.
 
 You can check the libz that JDK is dynamically linked against with:
 ```
@@ -178,7 +179,7 @@ $ ldd /Java/jdk-11.0.8/lib/libzip.so | grep libz
 libz.so.1 => /lib/x86_64-linux-gnu/libz.so.1 (0x00007ffff7783000)
 ```
 
-NOTE: Linux versions of OpenJDK and Amazon Corretto 17+ dynamically link to zlib. Earlier versions of Corretto bundled zlib directly and this behavior can vary by JDK vendor and platform.
+NOTE: Linux versions of OpenJDK and current Amazon Corretto releases (Corretto 11 since 11.0.20, Corretto 17 since 17.0.8, and Corretto 21+) dynamically link to zlib. Older Corretto builds bundled zlib statically, and this behavior can still vary by JDK vendor and platform.
 
 
 # Blog Posts
