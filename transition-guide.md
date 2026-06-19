@@ -50,6 +50,7 @@ Before starting the transition, you will need to inventory your current software
 * This guide contains language specifics sections where you'll find additional per-language guidance:
   * [C/C++](c-c++.md)
   * [Go](golang.md)
+  * [Groovy](groovy.md)
   * [Java](java.md)
   * [Node.js](nodejs.md)
   * [.NET](dotnet.md)
