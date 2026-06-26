@@ -5,6 +5,7 @@
 * [Optimizing for Graviton](optimizing.md)
     * [C/C++](c-c++.md)
     * [Go](golang.md)
+    * [Groovy](groovy.md)
     * [Java](java.md)
     * [JAR files](CommonNativeJarsTable.md)
     * [.NET](dotnet.md)

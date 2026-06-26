@@ -11,6 +11,7 @@ This repository provides technical guidance for users and developers using [Amaz
 * Language-specific considerations
 	* [C/C++](c-c++.md)
 	* [Go](golang.md)
+	* [Groovy](groovy.md)
 	* [Java](java.md)
 	* [.NET](dotnet.md)
 	* [Node.JS](nodejs.md)
