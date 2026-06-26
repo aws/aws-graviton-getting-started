@@ -1,14 +1,22 @@
 # Groovy on Graviton: tuning tips
 
+## TL;DR
+
+If a Groovy app shows a per-thread regression on Graviton vs equivalent x86 instances, it is most often paying for Groovy's dynamic dispatch on every hot call. Capture an on-CPU flame graph with `async-profiler`. If frames like `MetaClassImpl.invokeMethod`, `CachedMethod.invoke`, `java.lang.reflect.Method.invoke`, or (on Groovy 4+) `Invokers$Holder.linkToCallSite` and `LambdaForm$MH.*` dominate your hot path, annotate the relevant classes with `@CompileStatic`, give parameters concrete types, and replace closure-based iteration (`findAll`, `any`, `each`) with `for` loops in those classes. This typically recovers a large fraction of the gap and, for dispatch-bound workloads, can match or exceed the original x86 baseline.
+
 ## Background
 
-Groovy applications running on AWS Graviton (M6g, M7g, C7g, M8g, etc) sometimes show worse per-thread CPU performance than the equivalent x86 instance, even with the same JVM and the same application. In most cases this is not a Groovy-specific bug - it's the cost of dynamic method dispatch performance differences on aarch64 than on x86_64.
+Groovy applications running on AWS Graviton (M6g, M7g, C7g, M8g, etc) sometimes show worse per-thread CPU performance than the equivalent x86 instance, even with the same JVM and the same application. In most cases this is not a Groovy-specific bug. It's the cost of Groovy's dynamic method dispatch behaving differently on aarch64 than on x86_64.
+
+Groovy resolves most method calls through its **meta-object protocol (MOP)**: the runtime layer that looks up methods, properties, and operators by name on a per-call basis instead of binding them at compile time. Every untyped (`def`) parameter, untyped closure, dynamic property access, and non-`@CompileStatic` class goes through the MOP.
+
+`@CompileStatic` is a Groovy compiler annotation (in `groovy.transform`) that opts a method or class out of the MOP entirely. With it, the compiler resolves method and property calls at compile time, emits direct JVM bytecode (`invokevirtual`, `invokestatic`, `invokeinterface`) to your real targets, and rejects code it cannot resolve statically. The result is bytecode equivalent to what you'd get from Java, with no runtime dispatch overhead.
 
 This guide explains what to look for in a profile, why it happens, and the highest-leverage source-level change you can make.
 
 ## Why dynamic dispatch costs more on aarch64
 
-A dynamic Groovy method call (the default for any `def`-typed parameter, untyped closure, metaobject-protocol-driven property access, or non-`@CompileStatic` class) goes through a chain that looks roughly like:
+A dynamic Groovy method call (the default for any `def`-typed parameter, untyped closure, MOP-driven property access, or non-`@CompileStatic` class) goes through a chain that looks roughly like:
 
 ```
 your call → CallSite → MetaClassImpl.invokeMethod →
@@ -39,9 +47,17 @@ Open the HTML and search for these frames. If their combined inclusive time is m
 | `org.codehaus.groovy.runtime.metaclass.ClosureMetaClass.invokeMethod` | closure call through the MOP |
 | `org.codehaus.groovy.reflection.CachedMethod.invoke` | reflective call from MOP into your method |
 | `java.lang.reflect.Method.invoke` (with Groovy frames as parents) | reflective dispatch, expensive everywhere, more so on aarch64 |
-| `java.lang.invoke.Invokers$Holder.linkToCallSite` | MethodHandle call-site resolution |
 | `org.codehaus.groovy.runtime.callsite.CallSiteArray.defaultCall` | first-call slow path; high % means many cold call sites |
 | `org.codehaus.groovy.runtime.GStringImpl.<init>` / `.toString` | `"foo ${bar}"` interpolation, small but adds up |
+
+On Groovy 3.0+ with `invokedynamic` enabled (the default on Groovy 4+), the MOP still drives dispatch but it is reached through the JVM's `invokedynamic` machinery. You'll see additional frames riding alongside the ones above:
+
+| Frame | What it indicates |
+|---|---|
+| `java.lang.invoke.Invokers$Holder.linkToCallSite` | `invokedynamic` call-site resolution |
+| `java.lang.invoke.LambdaForm$MH.*` (`guard`, `invoke`, `guardWithCatch`, etc.) | MethodHandle / LambdaForm trampolines used by `invokedynamic` |
+| `java.lang.invoke.DelegatingMethodHandle$Holder.delegate` | MethodHandle delegation chain |
+| `org.codehaus.groovy.vmplugin.v8.IndyInterface.*` (`bootstrap`, `selectMethod`) | Groovy's `invokedynamic` bootstrap into the MOP |
 
 You may also see `org.codehaus.groovy.runtime.ConvertedClosure.invokeCustom` if a `Closure` is being adapted to a SAM type via reflection (e.g., a Groovy closure passed to a Java API that takes a `Predicate` or `Function`). Plain `findAll {...}` / `any {...}` calls into `DefaultGroovyMethods` do not produce this frame, so its absence in your profile doesn't mean the MOP isn't busy.
 
@@ -86,17 +102,17 @@ class CouponEligibility {
 }
 ```
 
-Under load with ~100 active coupons and ~200 carts/sec, a profile shows the following inclusive-time percentages (a frame's percentage is the share of samples whose stack contains it, so MOP frames stack up near 100% because almost every sample passes through them):
+Under load (Groovy 4.0.24), a profile shows roughly the following inclusive-time pattern (a frame's percentage is the share of samples whose stack contains it, so MOP frames stack up near 100% because almost every sample passes through them; on Groovy 4 you'll also see `linkToCallSite` and `LambdaForm$MH.*` frames at similar percentages, omitted here for readability):
 
 ```
 % (inclusive)
-99%  com.example.coupons.CouponEligibility.eligibleCoupons
-99%  org.codehaus.groovy.runtime.DefaultGroovyMethods.findAll
-99%  groovy.lang.MetaClassImpl.invokeMethod
-95%  org.codehaus.groovy.runtime.metaclass.ClosureMetaClass.invokeMethod
-89%  org.codehaus.groovy.reflection.CachedMethod.invoke
-89%  java.lang.reflect.Method.invoke
-62%  com.example.coupons.CouponEligibility.applies
+~99%  com.example.coupons.CouponEligibility.eligibleCoupons
+~99%  org.codehaus.groovy.runtime.DefaultGroovyMethods.findAll
+~99%  groovy.lang.MetaClassImpl.invokeMethod
+~95%  org.codehaus.groovy.runtime.metaclass.ClosureMetaClass.invokeMethod
+~90%  org.codehaus.groovy.reflection.CachedMethod.invoke
+~90%  java.lang.reflect.Method.invoke
+~60%  com.example.coupons.CouponEligibility.applies
 ```
 
 Almost nothing is in your code. The work is dispatch.
@@ -154,14 +170,14 @@ The post-change profile typically looks like:
 
 ```
 % (inclusive)
-97%  com.example.coupons.CouponEligibility.eligibleCoupons
-66%  com.example.coupons.CouponEligibility.applies
-58%  java.util.HashSet.contains
-10%  java.util.ArrayList.add
- -   groovy.lang.MetaClassImpl.invokeMethod   (gone)
- -   org.codehaus.groovy.runtime.metaclass.ClosureMetaClass.invokeMethod   (gone)
- -   org.codehaus.groovy.reflection.CachedMethod.invoke   (gone)
- -   java.lang.reflect.Method.invoke   (gone, except in unrelated code)
+~97%  com.example.coupons.CouponEligibility.eligibleCoupons
+~65%  com.example.coupons.CouponEligibility.applies
+~60%  java.util.HashSet.contains
+~10%  java.util.ArrayList.add
+  -   groovy.lang.MetaClassImpl.invokeMethod   (gone)
+  -   org.codehaus.groovy.runtime.metaclass.ClosureMetaClass.invokeMethod   (gone)
+  -   org.codehaus.groovy.reflection.CachedMethod.invoke   (gone)
+  -   java.lang.reflect.Method.invoke   (gone, except in unrelated code)
 ```
 
 The work is now in your code and not in the dispatch layers. 
