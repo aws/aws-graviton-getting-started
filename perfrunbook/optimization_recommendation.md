@@ -52,7 +52,7 @@ allocating huge-pages.
 ## Network heavy workload optimizations
 
 1. Check ENA device tunings with `ethtool -c ethN` where `N` is the device number and check `Adaptive RX` setting. By default on instances without extra ENI’s this will be `eth0`.
-    1. Set to `ethtool -C ethN adpative-rx off` for a latency sensitive workload
+    1. Set to `ethtool -C ethN adaptive-rx off` for a latency sensitive workload
     2. ENA tunings via `ethtool` can be made permanent by editing `/etc/sysconfig/network-scripts/ifcfg-ethN` files.
 2. Disable `irqbalance` from dynamically moving IRQ processing between vCPUs and set dedicated cores to process each IRQ.  Example script below:
   ```bash
