@@ -37,4 +37,4 @@ cp $grub_loc ${grub_loc}.bak
 config_mem $1
 update_grub
 
-echo "To make changes take effect run: %> sudo shutdown now -r"
+echo "To make changes take effect run: %> sudo shutdown -r now"
