@@ -295,3 +295,5 @@ Further information about capturing fabric events is available here:
 
 [ARM documentation for Graviton3's CMN-650](https://developer.arm.com/documentation/101481/0200/?lang=en)
 
+[ARM documentation for Graviton4's CMN-700](https://developer.arm.com/documentation/102308/latest/?lang=en)
+
