@@ -96,11 +96,11 @@ If you find a specific function that is mis-behaving, either putting the CPU to 
 1. Install the BCC tools
   ```bash
   # AL2 
-  %> sudo `amazon-linux-extras enable BCC
+  %> sudo amazon-linux-extras enable BCC
   %> sudo yum install bcc
     
   # Ubuntu
-  %> sudo apt-get install linux-headers-$(uname -r) bpfcc-tools`
+  %> sudo apt-get install linux-headers-$(uname -r) bpfcc-tools
   ```
 2. Write an eBPF program in C that can be embedded in a python file
 3. Run the eBPF program using the python to interface via the BCC tools and collect the statistics
