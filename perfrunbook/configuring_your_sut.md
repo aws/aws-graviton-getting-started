@@ -140,7 +140,7 @@ For native compiled components of your application, proper compile flags are ess
     1. Use `-moutline-atomics` for code that must run on all Graviton platforms
     2. Use `-march=armv8.2-a -mcpu=neoverse-n1` for code that will run on Graviton2 or later and other modern Arm platforms
 3. When building natively for Rust, ensure that `RUSTFLAGS` is set to **one of the following flags**
-    1. `export RUSTFLAGS="-Ctarget-features=+lse"` for code that will run on all Graviton2 and other Arm platforms that support LSE (Large System Extension) instructions.
+    1. `export RUSTFLAGS="-Ctarget-feature=+lse"` for code that will run on all Graviton2 and other Arm platforms that support LSE (Large System Extension) instructions.
     2. `export RUSTFLAGS="-Ctarget-cpu=neoverse-n1"` for code that will only run on Graviton2 and later platforms.
 4. Check for the existence of assembly optimized on x86 with no optimization on Graviton.  For help with porting optimized assembly routines, see [Section 6](./optimization_recommendation.md).
   ```bash
