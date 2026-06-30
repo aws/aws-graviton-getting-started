@@ -51,7 +51,7 @@ The load generator setup is important to understand and verify: it generates the
    
    # Terminal on SUT
    %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
-   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat new-connections --time 60
+   %> ./measure_and_plot_basic_sysstat_stats.py --stat new-connections --time 60
    ```
 9. If higher than expected connections/s are being observed, the cause of these new connections can be determined by looking at a packet trace and determining which end is initiating and closing the connections. 
    ```bash
@@ -74,8 +74,8 @@ The load generator setup is important to understand and verify: it generates the
     
    # Terminal #2 on load generator
    %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
-   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat tcp-out-segments --time 60
-   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat tcp-in-segments --time 60
+   %> ./measure_and_plot_basic_sysstat_stats.py --stat tcp-out-segments --time 60
+   %> ./measure_and_plot_basic_sysstat_stats.py --stat tcp-in-segments --time 60
    ```
    Or, if you have an [APerf](https://github.com/aws/aperf) report, check the `IpExt:InOctets` and `IpExt:OutOctets` metrics in Network stats:
    ![Aperf report](images/aperf-examples/netstat_in_out_traffics.png)
