@@ -98,6 +98,9 @@ If you find a specific function that is mis-behaving, either putting the CPU to 
   # AL2 
   %> sudo amazon-linux-extras enable BCC
   %> sudo yum install bcc
+
+  # AL2023
+  %> sudo dnf install bcc
     
   # Ubuntu
   %> sudo apt-get install linux-headers-$(uname -r) bpfcc-tools
