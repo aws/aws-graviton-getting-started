@@ -53,7 +53,7 @@ allocating huge-pages.
 
 1. Check ENA device tunings with `ethtool -c ethN` where `N` is the device number and check `Adaptive RX` setting. By default on instances without extra ENI’s this will be `eth0`.
     1. Set to `ethtool -C ethN adaptive-rx off` for a latency sensitive workload
-    2. ENA tunings via `ethtool` can be made permanent by editing `/etc/sysconfig/network-scripts/ifcfg-ethN` files.
+    2. ENA `ethtool` tunings can be made persistent across reboots; the legacy `/etc/sysconfig/network-scripts/ifcfg-ethN` files no longer apply on Amazon Linux 2023, RHEL 9, or Ubuntu. Amazon Linux 2023 and Ubuntu use `systemd-networkd`: place a custom `.link` file in `/etc/systemd/network/` and set the equivalent options in its `[Link]` section (e.g. `UseAdaptiveRxCoalesce=false`). On RHEL 9 (NetworkManager), use `nmcli connection modify <conn> ethtool.<property> <value>` (e.g. `ethtool.coalesce-adaptive-rx 0`).
 2. Disable `irqbalance` from dynamically moving IRQ processing between vCPUs and set dedicated cores to process each IRQ.  Example script below:
   ```bash
   # Assign eth0 ENA interrupts to the first N-1 cores
