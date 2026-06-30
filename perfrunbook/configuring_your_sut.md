@@ -14,6 +14,10 @@ If you have more than one SUT, first verify there are no major differences in se
   %> sudo cat /etc/system-release
   Amazon Linux release 2 (Karoo)
     
+  ## Amazon Linux 2023
+  %> cat /etc/system-release
+  Amazon Linux release 2023.12.20260629 (Amazon Linux)
+    
   ## Ubuntu
   %> sudo lsb_release -a
   Distributor ID: Ubuntu
@@ -25,6 +29,9 @@ If you have more than one SUT, first verify there are no major differences in se
   ```bash
   ## AL2
   %> sudo yum update
+    
+  ## Amazon Linux 2023
+  %> sudo dnf update
     
   ## Ubuntu
   %> sudo apt-get upgrade
