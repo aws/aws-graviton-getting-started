@@ -148,7 +148,7 @@ case "$os_name" in
   "Ubuntu 24.04"*)
     install_ubuntu2404_dependencies
     ;;
-  "Red Hat Enterprise Linux 9.5 (Plow)")
+  "Red Hat Enterprise Linux 9"*)
     install_rhel_9_5_dependencies
     ;;
   "SUSE Linux Enterprise Server 15 SP6")
