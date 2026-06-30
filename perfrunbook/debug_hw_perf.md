@@ -173,7 +173,7 @@ Backend stalls are caused when the CPU is unable to make forward progress execut
 
 ### Drill down Vectorization
 
-Vectorization is accomplished either by SVE or NEON instructions.  SVE vectorization will use 256-bit vectors on Graviton 3 processors, but the scalable nature of SVE makes both the code and binary vector-length agnostic.  NEON vectorization is always a 128-bit vector size, and does not have the predicate feature of SVE.
+Vectorization is accomplished either by SVE or NEON instructions.  SVE vectorization will use 256-bit vectors on Graviton3 (Neoverse V1) processors and 128-bit vectors on Graviton4 (Neoverse V2, SVE2), but the scalable nature of SVE makes both the code and binary vector-length agnostic.  NEON vectorization is always a 128-bit vector size, and does not have the predicate feature of SVE.
 
 For SVE instructions there are metrics which describe how many SVE instructions had empty, full and partially-filled SVE predicates: `inst-sve-empty-pkc`, `inst-sve-partial-pkc`, and `inst-sve-full-pkc`.  These metrics apply to all SVE instructions (loads, stores, integer, and floating-point operations).  The `pkc` term indicates the counters are in units of "per kilo cycle".
 
