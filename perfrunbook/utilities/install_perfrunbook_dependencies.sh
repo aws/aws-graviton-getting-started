@@ -72,9 +72,8 @@ install_ubuntu2404_dependencies () {
   apt-get install -y -q linux-tools-$(uname -r) linux-headers-$(uname -r) linux-modules-extra-$(uname -r) bpfcc-tools
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
-  apt-get install -y -q python3-dev python3-pip pipx
-  pipx install pandas numpy scipy matplotlib sh seaborn plotext --include-deps
-  pipx ensurepath
+  apt-get install -y -q python3-dev python3-pip
+  python3 -m pip install --break-system-packages pandas numpy scipy matplotlib sh seaborn plotext
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
