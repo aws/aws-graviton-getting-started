@@ -15,7 +15,7 @@ When debugging performance, start by measuring high level system behavior to pin
   %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
   %> python3 ./measure_and_plot_basic_sysstat_stats.py --stat cpu-iowait --time 60
   ```
-2. Check the `cpu-user` and `cpu-kernel` time at your chosen load point. Check to see if Graviton2 has higher or lower cpu time  than the x86 comparison system-under-test.  
+2. Check the `cpu-user` and `cpu-kernel` time at your chosen load point. Check to see if Graviton has higher or lower cpu time  than the x86 comparison system-under-test.  
   ```bash
   # Terminal one
   %> <start load generator or benchmark>
