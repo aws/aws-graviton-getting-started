@@ -66,7 +66,7 @@ To measure the standard CPU PMU events, do the following:
   # In terminal 2
   %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
   # AMD (5a, 6a and 7a) instances not supported currently.
-  %> sudo python3 ./measure_and_plot_basic_pmu_counters.py --stat ipc
+  %> sudo ./measure_and_plot_basic_pmu_counters.py --stat ipc
     
   # Example Output
   1.6 ++-----------------------+------------------------+------------------------+-----------------------+------------------------+-----------------------++
@@ -114,7 +114,7 @@ To measure the standard CPU PMU events, do the following:
   # In terminal 2
   %> cd ~/aws-graviton-getting-started/perfrunbook/utilities
   # AMD (5a, 6a, and 7a) instances not supported currently.
-  %> sudo python3 ./measure_aggregated_pmu_stats.py --timeout 300
+  %> sudo ./measure_aggregated_pmu_stats.py --timeout 300
 |Ratio               |   geomean|       p10|       p50|       p90|       p95|       p99|     p99.9|      p100|
 |ipc                 |      1.81|      1.72|      1.81|      1.90|      1.93|      1.95|      1.95|      1.95|
 |branch-mpki         |      0.01|      0.01|      0.01|      0.01|      0.01|      0.02|      0.02|      0.02|

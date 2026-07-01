@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# The analysis utilities import their Python dependencies as libraries and are
+# shebang'd against this interpreter. We install those dependencies into a
+# dedicated virtual environment rather than the system interpreter: newer
+# distributions mark the system Python as externally-managed (PEP 668), and a
+# venv keeps the dependencies self-contained on every distribution.
+PERFRUNBOOK_VENV="/opt/perfrunbook-venv"
+
+install_python_dependencies () {
+  python3 -m venv "${PERFRUNBOOK_VENV}"
+  "${PERFRUNBOOK_VENV}/bin/pip" install --upgrade pip
+  "${PERFRUNBOOK_VENV}/bin/pip" install pandas numpy scipy matplotlib sh seaborn plotext
+}
+
 install_al2023_dependencies () {
   echo "------ INSTALLING UTILITIES ------"
   dnf install -y -q vim unzip git
@@ -12,8 +25,7 @@ install_al2023_dependencies () {
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
   dnf install -y -q python3 python3-pip
-  python3 -m pip install --upgrade pip
-  python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
+  install_python_dependencies
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
@@ -31,8 +43,7 @@ install_al2_dependencies () {
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
   yum install -y -q python3 python3-pip
-  python3 -m pip install --upgrade pip
-  python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
+  install_python_dependencies
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
@@ -51,9 +62,8 @@ install_ubuntu2004_dependencies () {
   apt-get install -y -q linux-tools-$(uname -r) linux-headers-$(uname -r) linux-modules-extra-$(uname -r) bpfcc-tools
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
-  apt-get install -y -q python3-dev python3-pip
-  python3 -m pip install --upgrade pip
-  python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
+  apt-get install -y -q python3-dev python3-pip python3-venv
+  install_python_dependencies
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
@@ -72,9 +82,8 @@ install_ubuntu2404_dependencies () {
   apt-get install -y -q linux-tools-$(uname -r) linux-headers-$(uname -r) linux-modules-extra-$(uname -r) bpfcc-tools
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
-  apt-get install -y -q python3-dev python3-pip pipx
-  pipx install pandas numpy scipy matplotlib sh seaborn plotext --include-deps
-  pipx ensurepath
+  apt-get install -y -q python3-dev python3-pip python3-venv
+  install_python_dependencies
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
@@ -92,8 +101,7 @@ install_rhel_9_5_dependencies () {
 
   echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
   dnf install -y -q python3 python3-pip
-  python3 -m pip install --upgrade pip
-  python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
+  install_python_dependencies
   git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
 
   echo "------ DONE ------"
@@ -115,8 +123,7 @@ install_sles_15_sp6_dependencies() {
     echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
     # Install Python and pip
     zypper --quiet --non-interactive install python3 python3-pip
-    python3 -m pip install --upgrade pip
-    python3 -m pip install pandas numpy scipy matplotlib sh seaborn plotext
+    install_python_dependencies
 
     # Get FlameGraph tools
     git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
