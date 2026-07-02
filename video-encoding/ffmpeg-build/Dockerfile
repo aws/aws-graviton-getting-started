@@ -39,6 +39,7 @@ RUN HIGH_BIT_DEPTH=1 PREFIX=/usr/local scripts/build-x265.sh
 
 # == aom ==
 FROM base AS aom
+COPY patches /build/patches
 COPY sources/aom sources/aom
 RUN PREFIX=/usr/local scripts/build-aom.sh
 
