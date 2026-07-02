@@ -28,6 +28,7 @@ function amazon_linux_2023_dependencies() {
         make \
         numactl-devel \
         ninja-build \
+        patch \
         pkgconfig \
         python3-pip \
         nasm \
@@ -113,6 +114,7 @@ function ubuntu_dependencies() {
         libfreetype6-dev \
         libtool \
         ninja-build \
+        patch \
         pkg-config \
         texinfo \
         wget \

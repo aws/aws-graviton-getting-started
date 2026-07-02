@@ -1,11 +1,23 @@
 --- a/build/cmake/aom_optimization.cmake
 +++ b/build/cmake/aom_optimization.cmake
-@@ -212,7 +212,7 @@ macro(add_nasm_library)
-     # nasm 2.14+ uses -O2 by default, but the help still shows -Ox is the
-     # default. Check to see if -O2 is supported, and if so, use it.
-     unset(NASM_OFLAG)
--    execute_process(COMMAND ${CMAKE_ASM_NASM_COMPILER} -hf
-+    execute_process(COMMAND ${CMAKE_ASM_NASM_COMPILER} -h
-                     OUTPUT_VARIABLE nasm_helptext)
+@@ -212,10 +212,19 @@
+ # Currently checks only for presence of required object formats and support for
+ # the -Ox argument (multipass optimization).
+ function(test_nasm)
++  # nasm 3.x split its help output: the object formats (elf64, macho32, ...)
++  # are listed by `-hf`, while the optimization flags moved to the base `-h`
++  # output. The `-Ox` flag still exists in 3.x but its help text now reads
++  # "select optimization" rather than the bare "-Ox" token that aom's original
++  # regex matched. Capture both `-hf` and `-h` and match either pattern so the
++  # checks below work with nasm 2.x and 3.x.
+   execute_process(COMMAND ${CMAKE_ASM_NASM_COMPILER} -hf
+                   OUTPUT_VARIABLE nasm_helptext)
++  execute_process(COMMAND ${CMAKE_ASM_NASM_COMPILER} -h
++                  OUTPUT_VARIABLE nasm_opt_helptext)
++  string(APPEND nasm_helptext "${nasm_opt_helptext}")
  
-     if("${nasm_helptext}" MATCHES "-O2")
+-  if(NOT "${nasm_helptext}" MATCHES "-Ox")
++  if(NOT "${nasm_helptext}" MATCHES "-Ox|select optimization")
+     message(
+       FATAL_ERROR "Unsupported nasm: multipass optimization not supported.")
+   endif()
