@@ -12,7 +12,7 @@ This tool makes it easy to build optimized, up-to-date FFmpeg packages with a si
 
 - Single-file Python script for building FFmpeg with common codecs
 - Produces native packages (RPM for Amazon Linux, DEB for Ubuntu)
-- Optimized for Graviton2/3/4 and x86_64 (AVX2/AVX512)
+- Optimized for Graviton2/3/4/5 and x86_64 (AVX2/AVX512)
 - Includes x264, x265 (8-bit + 10-bit), AOM, SVT-AV1, and Opus
 - Docker-based builds for reproducibility
 - Test mode to verify packages work correctly
@@ -89,10 +89,12 @@ The config file (`ffmpeg_build_config.json`) supports:
 ### Options
 
 - `target_distro`: al2023, ubuntu-jammy, ubuntu-noble, ubuntu-resolute
-- `target_platform`: graviton2, graviton3, graviton4, avx2, avx512
+- `target_platform`: graviton2, graviton3, graviton4, graviton5, avx2, avx512
 - `compiler`: gcc, clang, gcc-latest, clang-latest, or specific versions (see below)
 - `build_type`: "release" (latest tags) or "tip" (main branches)
 - `commit_overrides`: Pin specific projects to exact commits/tags
+
+**Graviton5 compiler requirements:** Full Graviton5 optimization (`-march=armv9.2-a`, `-mtune=neoverse-v3`) requires GCC ≥ 15 or Clang ≥ 19. The build will succeed on older compilers by automatically falling back to Graviton4-equivalent flags (`-march=armv9-a`, `-mtune=neoverse-v2`) with a warning. For best performance on Graviton5 instances, use `clang-latest` on AL2023, Ubuntu Noble, or Ubuntu Resolute (which provide Clang 19+).
 
 Available compilers by distro:
 - AL2023: gcc (11), gcc11, gcc14, clang (15), clang15, clang18, clang19
