@@ -26,16 +26,20 @@ This repository provides technical guidance for users and developers using [Amaz
 * [Third-party Software Vendors](isv.md)
 * [Finding and managing AMIs for Graviton, with AWS SystemManager or CloudFormation](amis_cf_sm.md)
 * [DPDK, SPDK, and other datapath software](dpdk_spdk.md)
-* [PyTorch](machinelearning/pytorch.md)
-* [llama.cpp](machinelearning/llama.cpp.md)
+* Machine Learning
+	* [PyTorch](machinelearning/pytorch.md)
+	* [llama.cpp](machinelearning/llama.cpp.md)
+	* [TensorFlow](machinelearning/tensorflow.md)
+	* [vLLM](machinelearning/vllm.md)
+	* [ONNX](machinelearning/onnx.md)
 * [R](R.md)
-* [TensorFlow](machinelearning/tensorflow.md)
 * [Spark on Graviton](DataAnalytics.md)
+* [HPC (High Performance Computing)](HPC/)
 * [Known issues and workarounds](#known-issues-and-workarounds)
 * [AWS Managed Services available on Graviton](managed_services.md)
-* [Graviton Performance Runbook](perfrunbook/README.md)
+* [Graviton Performance Runbook](perfrunbook/)
 * [Assembly Optimization Guide for Graviton Arm64 Processors](arm64-assembly-optimization.md)
-* [Tools and Agent Skills](tools/README.md)
+* [Tools and Agent Skills](tools/)
 * [Additional resources](#additional-resources)
 * [How To Resources](howtoresources.md)
 * [Blog Posts](#blog-posts)
@@ -72,7 +76,7 @@ DRAM	|8x DDR4	|8x DDR5	|12x DDR5 (24x for 48xlarge) | 12x DDR5 |
 DDR Encryption	|yes	|yes	|yes |yes |
 
 # Optimizing for Graviton
-Please refer to [optimizing](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/README.md).
+Please refer to [optimizing](optimizing.md) for general debugging and profiling information.  For detailed checklists on optimizing and debugging performance on Graviton, see our [performance runbook](perfrunbook/).
 
 Different architectures and systems have differing capabilities, which means some tools you might be familiar with on one architecture don't have equivalent on AWS Graviton. Documented [Monitoring Tools](Monitoring_Tools_on_Graviton.md) with some of these utilities.
 
@@ -102,7 +106,7 @@ Package | Version | Improvements
 --------|:-:|-------------
 bazel	| [3.4.1+](https://github.com/bazelbuild/bazel/releases) | Pre-built bazel binary for Graviton/Arm64. [See below](#bazel-on-linux) for installation.
 Cassandra | 4.0+ | Supports running on Java/Corretto 11, improving overall performance
-FFmpeg  | 6.0+ | Improvements to scaling and improvements for codec libraries including `libaom`, `libx265`. We recommend [building FFmpeg from source](video-encoding/ffmpeg-build/README.md) with latest codec releases. For more information about FFmpeg on Graviton, read the blog post on AWS Open Source Blog, [Video Encoding on Graviton in 2025](https://aws.amazon.com/blogs/opensource/video-encoding-on-graviton-in-2025/).
+FFmpeg  | 6.0+ | Improvements to scaling and improvements for codec libraries including `libaom`, `libx265`. We recommend [building FFmpeg from source](video-encoding/ffmpeg-build/) with latest codec releases. For more information about FFmpeg on Graviton, read the blog post on AWS Open Source Blog, [Video Encoding on Graviton in 2025](https://aws.amazon.com/blogs/opensource/video-encoding-on-graviton-in-2025/).
 HAProxy  | 2.4+  | A [serious bug](https://github.com/haproxy/haproxy/issues/958) was fixed. Additionally, building with `CPU=armv81` improves HAProxy performance by 4x so please rebuild your code with this flag.
 MariaDB | 10.4.14+ | Default build now uses -moutline-atomics, general correctness bugs for Graviton fixed.
 mongodb | 4.2.15+ / 4.4.7+ / 5.0.0+ | Improved performance on graviton, especially for internal JS engine. LSE support added in [SERVER-56347](https://jira.mongodb.org/browse/SERVER-56347).
@@ -122,10 +126,10 @@ zlib    | zlib-ng 2.3.3+  | The original [zlib](https://github.com/madler/zlib) 
 You can run Docker, Kubernetes, Amazon ECS, and Amazon EKS on Graviton. Amazon ECR supports multi-arch containers.
 Please refer to [containers](containers.md) for information about running container-based workloads on Graviton.
 
-# [Lambda on Graviton](aws-lambda/README.md)
+# [Lambda on Graviton](aws-lambda/)
 [AWS Lambda](https://aws.amazon.com/lambda/) now allows you to configure new and existing functions to run on Arm-based AWS Graviton2 processors in addition to x86-based functions. Using this processor architecture option allows you to get up to 34% better price performance. Duration charges are 20 percent lower than the current pricing for x86 with [millisecond granularity](https://aws.amazon.com/blogs/aws/new-for-aws-lambda-1ms-billing-granularity-adds-cost-savings/). This also applies to duration charges when using [Provisioned Concurrency](https://aws.amazon.com/blogs/aws/new-provisioned-concurrency-for-lambda-functions/). Compute [Savings Plans](https://aws.amazon.com/blogs/aws/savings-plan-update-save-up-to-17-on-your-lambda-workloads/) supports Lambda functions powered by Graviton2. For more details on Lambda's arm64 architecture support, see [Lambda instruction set architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html).
 
-The [Lambda](aws-lambda/README.md) page highlights some of the migration considerations and also provides some simple to deploy demos you can use to explore how to build and migrate to Lambda functions using Arm/Graviton2.
+The [Lambda](aws-lambda/) page highlights some of the migration considerations and also provides some simple to deploy demos you can use to explore how to build and migrate to Lambda functions using Arm/Graviton2.
 
 # Operating Systems
 
@@ -230,12 +234,12 @@ NOTE: Linux versions of OpenJDK and current Amazon Corretto releases (Corretto 1
 
 # Tools and Agent Skills
 
-[Agent Skills](tools/skills/README.md) are portable instruction packages that AI coding assistants can follow to perform Graviton migrations. They work across 20+ platforms including Claude Code, Kiro, Cursor, Codex, Windsurf, Gemini CLI, and GitHub Copilot.
+[Agent Skills](tools/skills/) are portable instruction packages that AI coding assistants can follow to perform Graviton migrations. They work across 20+ platforms including Claude Code, Kiro, Cursor, Codex, Windsurf, Gemini CLI, and GitHub Copilot.
 
 Available skills:
  * [Java x86-to-Graviton migration](tools/skills/languages/java-x86-to-graviton/) - dependency audit, native library validation, JVM optimization, ARM64 build validation
 
-See [tools/skills/README.md](tools/skills/README.md) for installation instructions and the full catalogue.
+See [tools/skills/](tools/skills/) for installation instructions and the full catalogue.
 
 # Additional resources
 

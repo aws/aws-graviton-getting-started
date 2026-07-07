@@ -1,6 +1,6 @@
 # Quick introduction to benchmarking
 
-[Graviton Performance Runbook toplevel](./README.md)
+[Graviton Performance Runbook toplevel](./)
 
 When designing an experiment to benchmark Graviton based instances against another instance type, it is key to remember the below 2 guiding principles:
 

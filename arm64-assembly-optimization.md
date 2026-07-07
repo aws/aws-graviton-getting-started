@@ -127,7 +127,7 @@ When writing assembly for arm64 or any platform, be aware that the CPU has more
 than one pipeline of different types. The types and quantities are outlined in
 the Software Optimization Guide, often abbreviated as SWOG. The guide
 for each Graviton processor is linked from the [main page of this
-technical guide](README.md). Using this knowledge, the programmer can arrange instructions of
+technical guide](./). Using this knowledge, the programmer can arrange instructions of
 different types next to each other to take advantage of instruction level
 parallelism, ILP. For example, interleaving load instructions with vector or
 floating point instructions can keep both pipelines busy.
@@ -695,7 +695,7 @@ when it’s possible to process 16 bytes in parallel instead of just one at a
 time, the speed up can be significant.
 
 Another way to use efficient instructions is to consult the [software
-optimization guide](README.md#building-for-graviton2-graviton3-and-graviton3e).
+optimization guide](./#building-for-graviton2-graviton3-and-graviton3e).
 Many different combinations of instructions can accomplish the same result, and
 some are obviously better than others. Some instructions, like the
 absolute-difference-accumulate-long instructions (`sabal` and `uabal`) can only

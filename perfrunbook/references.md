@@ -1,6 +1,6 @@
 # References
 
-[Graviton Performance Runbook toplevel](./README.md)
+[Graviton Performance Runbook toplevel](./)
 
 Experimental design:
 

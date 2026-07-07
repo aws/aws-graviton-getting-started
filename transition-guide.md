@@ -47,7 +47,7 @@ The following transition guide is organized into a logical sequence of steps as 
 
 1. [Optional] Start by watching [re:Invent 2024 - AWS Graviton: The best price performance for your AWS workloads](https://www.youtube.com/watch?v=W4dnUvJJ_Sg), [re:Invent 2024 - Dive deep into the AWS Nitro System](https://www.youtube.com/watch?v=YKZbNcOU77c) and [re:Invent 2021 - Deep dive into AWS Graviton3 and Amazon EC2 C7g instances](https://www.youtube.com/watch?v=WDKwwFQKfSI), which will give you an overview of the Graviton-based instances and some insights on how to run applications depending on their operating system, languages and runtimes.
 2. [Optional] Keep on learning by watching [AWS Summit SF 2022 - The journey of silicon innovation at AWS](https://www.youtube.com/watch?v=p62DLuSCNOw) to better understand Amazon long-term commitment to innovate with custom silicon.
-3. Get familiar with the rest of this [Getting started with AWS Graviton repository](README.md) which will act as a useful reference throughout your workload transition.
+3. Get familiar with the rest of this [Getting started with AWS Graviton repository](./) which will act as a useful reference throughout your workload transition.
 
 
 **Step 2 -  Explore your workload, and inventory your current software stack**
@@ -97,7 +97,7 @@ To transition and test your application, you will need a suitable Graviton envir
 
 Note: If you are not building your application or component parts of your overall application stack you may skip this step.
 
-For applications built using interpreted or JIT’d languages, including Java, PHP or Node.js, they should run as-is or with only minor modifications. The repository contains language specific sections with recommendations, for example [Java](java.md), [Python](python.md), [C/C++](c-c++.md), [Golang](golang.md), [PHP](php.md), [R](r.md), [Node.js](nodejs.md), [Rust](rust.md) or [.Net](dotnet.md). Note: if there is no language specific section, it is because there is no specific guidance beyond using a suitably current version of the language as documented [here](README.md#recent-software-updates-relevant-to-graviton). .NET-core is a great way to benefit from Graviton-based instances, this [blog post](https://aws.amazon.com/blogs/dotnet/powering-net-8-with-aws-graviton3-benchmarks/) covers .NET 8 performance.
+For applications built using interpreted or JIT’d languages, including Java, PHP or Node.js, they should run as-is or with only minor modifications. The repository contains language specific sections with recommendations, for example [Java](java.md), [Python](python.md), [C/C++](c-c++.md), [Golang](golang.md), [PHP](php.md), [R](r.md), [Node.js](nodejs.md), [Rust](rust.md) or [.Net](dotnet.md). Note: if there is no language specific section, it is because there is no specific guidance beyond using a suitably current version of the language as documented [here](./#recent-software-updates-relevant-to-graviton). .NET-core is a great way to benefit from Graviton-based instances, this [blog post](https://aws.amazon.com/blogs/dotnet/powering-net-8-with-aws-graviton3-benchmarks/) covers .NET 8 performance.
 
 Applications using compiled languages including C, C++ or Go, need to be compiled for the Arm64 architecture. Most modern builds (e.g. using Make) will just work when run natively on Graviton-based instances, however, you’ll find language specific compiler recommendations in this repository: [C/C++](c-c++.md), [Go](golang.md), and [Rust](rust.md).
 
@@ -121,7 +121,7 @@ One of the major differences between AWS Graviton instances and other Amazon EC2
 
 During the transition to Graviton, if you are using Amazon EC2 Auto Scaling, you may be able to increase the threshold values for the CloudWatch alarms that invoke the scaling process. This may reduce the number of EC2 instances now needed to serve a given level of demand.
 
-Important: This repository has sections dedicated to [Optimization](optimizing.md) and a [Performance Runbook](perfrunbook/README.md) for you to follow during this stage.
+Important: This repository has sections dedicated to [Optimization](optimizing.md) and a [Performance Runbook](perfrunbook/) for you to follow during this stage.
 
 If after reading the documentation in this repository and following the recommendations you do not observe expected performance then please reach out to your AWS account team, or send email to [ec2-arm-dev-feedback@amazon.com](mailto:ec2-arm-dev-feedback@amazon.com) with details so we can assist you with your performance observations.
 

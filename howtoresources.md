@@ -22,7 +22,7 @@ If you are just getting started with AWS Graviton-based instances, or even if yo
 * [Transforming Java applications with Amazon Q Developer](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/transform-java.html)
 * [Transforming .NET applications with Amazon Q Developer](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/transform-dotnet-IDE.html)
 * Source Code Analysis - [Porting Advisor for Graviton](https://github.com/aws/porting-advisor-for-graviton)
-* AI-Assisted Migration - [Graviton Agent Skills](tools/skills/README.md)
+* AI-Assisted Migration - [Graviton Agent Skills](tools/skills/)
 
 ### Building / Running applications on AWS Graviton
 

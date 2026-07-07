@@ -28,12 +28,12 @@ Then ask your AI assistant:
 
 | File | Purpose |
 |------|---------|
-| [SKILL.md](SKILL.md) | Main entry point — scope, workflow, exit criteria |
-| [phases/phase1-static-analysis.md](phases/phase1-static-analysis.md) | Dependency audit, native library scanning, code analysis |
-| [phases/phase2-resolution.md](phases/phase2-resolution.md) | ARM64-blocking fixes, JVM flags, Dockerfile updates |
-| [phases/phase3-validation.md](phases/phase3-validation.md) | ARM64 build, test, startup validation |
-| [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) | Scope guardrails and decision tree |
-| [document_references/documentation-standards.md](document_references/documentation-standards.md) | Output file format and naming conventions |
+| [SKILL.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/SKILL.md) | Main entry point — scope, workflow, exit criteria |
+| [phases/phase1-static-analysis.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/phases/phase1-static-analysis.md) | Dependency audit, native library scanning, code analysis |
+| [phases/phase2-resolution.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/phases/phase2-resolution.md) | ARM64-blocking fixes, JVM flags, Dockerfile updates |
+| [phases/phase3-validation.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/phases/phase3-validation.md) | ARM64 build, test, startup validation |
+| [document_references/agent-scope-boundaries.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/document_references/agent-scope-boundaries.md) | Scope guardrails and decision tree |
+| [document_references/documentation-standards.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/document_references/documentation-standards.md) | Output file format and naming conventions |
 
 ## Output
 

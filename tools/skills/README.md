@@ -158,4 +158,4 @@ See the [skill template](_templates/SKILL.template.md) for the boilerplate struc
 4. Add a `README.md` with a human-readable overview
 5. Keep the main entry point under 500 lines — split detailed instructions into `phases/`, `references/`, or `scripts/` subdirectories
 
-Fill in language-specific details based on the existing [Graviton documentation](../../README.md) for each language.
+Fill in language-specific details based on the existing [Graviton documentation](../../) for each language.

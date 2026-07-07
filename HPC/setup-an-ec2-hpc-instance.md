@@ -38,7 +38,7 @@ Currently Loaded Modulefiles:
  1) binutils/12.2.0   2) acfl/23.04.1   3) armpl/23.04.1
 ```
 
-After that, you need to install EFA driver which is not installed on an EC2 instance by default and [Open MPI](README.md#open-mpi).
+After that, you need to install EFA driver which is not installed on an EC2 instance by default and [Open MPI](./#open-mpi).
 ```
 # install EFA, Open MPI under /shared
 cd /shared/tools

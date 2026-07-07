@@ -34,7 +34,7 @@ This checklist summarizes portions of the Java on Graviton section and can be he
     * [Amazon-corretto-crypto-provider](https://github.com/corretto/amazon-corretto-crypto-provider) is another option that offers optimizations for a large number of cryptographic operations.
 * Application Testing & Performance Evaluation
     * Be sure to run Graviton instances “hotter”: vCPUs are mapped to physical cores instead of Hyperthreads and performance often flatlines at a much higher CPU utilization than with x86 based instances.  Testing at low levels of load can lead to misleading results.  The most realistic test results are usually achieved when testing close to breaking latency.
-    * See the [Graviton Performance Runbook](https://github.com/aws/aws-graviton-getting-started/blob/main/perfrunbook/README.md) for more info.
+    * See the [Graviton Performance Runbook](perfrunbook/) for more info.
     * [Aperf](https://github.com/aws/aperf) is a CLI tool for gathering & visualizing performance data that can be helpful.
 
 ### Java versions
@@ -285,4 +285,4 @@ $ make
 
 ### Agent Skills for Java Migration
 
-To automate the x86-to-Graviton migration process using an AI coding assistant (Claude Code, Kiro, Cursor, Codex, Windsurf, and others), use the [Java x86-to-Graviton Agent Skill](tools/skills/languages/java-x86-to-graviton/). It walks an agent through dependency auditing, native library validation, JVM flag configuration, and ARM64 build validation. See [tools/skills/README.md](tools/skills/README.md) for installation instructions.
+To automate the x86-to-Graviton migration process using an AI coding assistant (Claude Code, Kiro, Cursor, Codex, Windsurf, and others), use the [Java x86-to-Graviton Agent Skill](tools/skills/languages/java-x86-to-graviton/). It walks an agent through dependency auditing, native library validation, JVM flag configuration, and ARM64 build validation. See [tools/skills/](tools/skills/) for installation instructions.

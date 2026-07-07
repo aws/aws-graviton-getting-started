@@ -1,6 +1,6 @@
 # Tools
 
-Developer tooling that complements the existing [Graviton optimization guides](../README.md).
+Developer tooling that complements the existing [Graviton optimization guides](../).
 
 ## Contents
 
@@ -8,4 +8,4 @@ Developer tooling that complements the existing [Graviton optimization guides](.
 
 Portable instruction packages (SKILL.md format) for AI coding assistants. These skills encode Graviton migration expertise into a format that works across 20+ platforms including Claude Code, Kiro, Cursor, Codex, Windsurf, Gemini CLI, GitHub Copilot, and more.
 
-See [tools/skills/README.md](skills/README.md) for the full catalogue and usage instructions.
+See [tools/skills/](skills/) for the full catalogue and usage instructions.

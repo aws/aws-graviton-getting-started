@@ -64,7 +64,7 @@
 
 * [Overview](tools/README.md)
 * [Agent Skills](tools/skills/README.md)
-    * [Java x86-to-Graviton Migration](tools/skills/languages/java-x86-to-graviton/SKILL.md)
+    * [Java x86-to-Graviton Migration](tools/skills/languages/java-x86-to-graviton/README.md)
 
 -----------
 

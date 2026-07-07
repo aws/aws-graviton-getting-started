@@ -1,5 +1,7 @@
 # Monitoring tools for AWS Graviton
-Listed below are some monitoring and profiling tools supported on AWS Gravtion. Also listed are some differences when compared to the tools available on x86 processor architectures.
+We recommend using [APerf](https://github.com/aws/aperf) for all performance monitoring, debugging, and profiling tasks. It runs on Graviton, Intel, and AMD platforms. It collects a large variety of performance-related system metrics and profiles, performs analysis, and visualizes them in HTML-based reports.
+
+Other monitoring and profiling tools supported on AWS Gravtion are listed below, as well as differences when compared to the tools available on x86 platforms.
 
 Some of the most commonly used tools such as _top, htop, iostat, lstopo, hwloc, dmidecode, lmbench, Linux perf_ are supported on AWS Graviton processors. There are some tools such as Intel MLC, Intel VTune Profiler, PCM that are supported only on Intel processors and some tools such as _turbostat_ supported on x86 processors.
 

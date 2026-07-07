@@ -1,6 +1,6 @@
 # Optimizing performance
 
-[Graviton Performance Runbook toplevel](./README.md)
+[Graviton Performance Runbook toplevel](./)
 
 This section describes multiple different optimization suggestions to try on Graviton based instances to attain higher performance for your service.  Each sub-section defines some optimization recommendations that can help improve performance if you see a particular signature after measuring the performance using the previous checklists.
 
