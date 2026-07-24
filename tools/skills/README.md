@@ -49,6 +49,7 @@ https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/langu
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   cd /tmp/graviton-skill && \
   git sparse-checkout set tools/skills/languages/java-x86-to-graviton && \
+  mkdir -p ~/.claude/skills && \
   cp -r tools/skills/languages/java-x86-to-graviton ~/.claude/skills/ && \
   cd - && rm -rf /tmp/graviton-skill
 ```
