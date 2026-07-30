@@ -221,6 +221,51 @@ Resolution: dependencyManagement override or exclusion+re-add
 
 > ⚠️ **Verify the JAR, never the version number.** Do not infer "old version → missing ARM64 binary." Confirm by inspecting the *resolved* artifact: `unzip -l <jar> | grep -i aarch64`, then `file` the extracted `.so` to confirm `ARM aarch64`. Counter-examples that look old but are already fine on Graviton: **JNA 5.6.0** ships `linux-aarch64/libjnidispatch.so` (COMPATIBLE — 5.8.0 only adds macOS/Windows ARM), and **snappy-java ≥ 1.1.4** ships `Linux/aarch64/libsnappyjava.so`. Only versions whose JAR genuinely lacks the `linux/aarch64` binary are MUST UPGRADE.
 
+### Build-Tool Artifacts with OS/Arch Classifiers
+
+Some build-time tools download a **platform-specific executable** that never appears in `dependency:tree` (it is resolved by a plugin, not as a normal dependency), so the steps above miss it entirely. The classic case: `protoc` pulled by `protobuf-maven-plugin`/`os-maven-plugin` via a classifier like `exe:${os.detected.classifier}`. If the pinned version has no `linux-aarch_64` classifier published, the build fails on Graviton with "Could not resolve artifact ...:exe:linux-aarch_64" — but only at build time.
+
+Grep the build files for plugins/extensions that carry an OS/arch classifier and check the pinned versions:
+
+```bash
+grep -nE 'os-maven-plugin|protobuf-maven-plugin|os\.detected\.classifier|protocArtifact|:exe:|javacpp|jni' \
+  pom.xml build.gradle build.gradle.kts 2>/dev/null || true
+```
+
+For each hit, verify on Maven Central that the *pinned* version actually publishes the classifier it will be asked for, before declaring it compatible. There is no local artifact to inspect here — the plugin resolves it at build time, so it is absent from both `dependency:tree` and the §1.2.1 content scan. Query the repository directly:
+
+```bash
+# Usage: central_has_classifier <group> <artifact> <version> <classifier>
+# e.g.   central_has_classifier com.google.protobuf protoc 3.11.0 linux-aarch_64
+central_has_classifier() {
+  listing=$(curl -sS --max-time 20 \
+    "https://repo1.maven.org/maven2/$(echo "$1" | tr '.' '/')/$2/$3/" 2>/dev/null)
+  # Distinguish "query failed" from "classifier absent" — an empty listing is NOT evidence.
+  if ! printf '%s' "$listing" | grep -q "$2-$3"; then
+    echo "UNKNOWN — could not list $1:$2:$3 on Maven Central (network/proxy?). Do NOT record a verdict."
+    return 2
+  fi
+  if printf '%s' "$listing" | grep -qE "href=\"$2-$3-$4\.(exe|jar|so|zip)\""; then
+    echo "PRESENT — $1:$2:$3 publishes $4"
+  else
+    echo "ABSENT — $1:$2:$3 does NOT publish $4"
+  fi
+}
+```
+
+Match the classifier to the *target*, not the dev laptop: **Graviton is Linux, so `linux-aarch_64` is the classifier that decides the migration verdict.** `osx-aarch_64` matters only for local Apple-Silicon builds and is never a Graviton blocker.
+
+Verified floors for `com.google.protobuf:protoc` (checked against repo1.maven.org):
+
+| Classifier | First version publishing it | Applies to |
+|---|---|---|
+| `linux-aarch_64` | **3.5.0** | Graviton — this is the blocking floor |
+| `osx-aarch_64` | **3.17.3** | Local Apple-Silicon builds only, non-blocking |
+
+So **protoc ≥ 3.5.0 is already fine on Graviton**; 3.5.0 through 3.16.x all ship `linux-aarch_64`. Only 3.4.0 and earlier are genuinely x86-only (3.3.0 publishes just `linux/osx/windows-x86_32|x86_64`) → MUST UPGRADE, and per the minimality rule the target is **3.5.0**, not the latest. Do not treat "< 3.17" as the Linux floor — that is the macOS floor and using it forces ~12 needless minor-version bumps.
+
+Also check **os-maven-plugin**: older releases mis-detect aarch64 → confirm it emits `linux-aarch_64` for `os.detected.classifier`. Bumping `protoc` via a shared `${protobuf.version}` property may also move `protobuf-java` — document that as a consequence of the required fix, not independent modernization.
+
 ## 1.4 Architecture-Specific Code Detection
 
 > **Output: `graviton-validation/04-code-scan-findings.md`**

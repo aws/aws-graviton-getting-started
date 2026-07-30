@@ -4,7 +4,7 @@
 
 * "POWER.md": "Main entry point (Kiro format). Same content as SKILL.md with Kiro-specific frontmatter (displayName, keywords, author)."
 
-* "phases/phase1-static-analysis.md": "Detailed steps for Phase 1: project structure analysis, native library validation (bundled and runtime-extracted .so files), tiered FAIL/WARN/PASS policy, dependency ARM64 compatibility analysis including transitive dependencies, architecture-specific code detection, and Java version check."
+* "phases/phase1-static-analysis.md": "Detailed steps for Phase 1: project structure analysis, native library validation (bundled and runtime-extracted .so files), tiered FAIL/WARN/PASS policy, dependency ARM64 compatibility analysis including transitive dependencies, Maven Central classifier verification for plugin-resolved build-tool artifacts (the central_has_classifier helper, plus verified protoc floors), architecture-specific code detection, and Java version check."
 
 * "phases/phase2-resolution.md": "Detailed steps for Phase 2: native library resolution (cross-compilation or fallback), dependency updates for MUST UPGRADE items only (Maven dependencyManagement and Gradle resolutionStrategy patterns for transitive deps), architecture detection code updates, Dockerfile platform annotations, and version-gated Graviton JVM flag configuration."
 

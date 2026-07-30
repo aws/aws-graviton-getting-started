@@ -58,7 +58,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 ### 2. Build Tool Artifacts
 - ✅ Protoc compiler missing ARM64 executables
 - ✅ Build plugins missing ARM64 classifiers
-- ✅ Example: protoc 3.3.0 → 3.21.0 (no osx-aarch_64 artifact)
+- ✅ Example: protoc 3.3.0 → 3.5.0 (3.3.0 publishes no `linux-aarch_64` exe; 3.5.0 is the lowest that does)
 
 ### 3. Architecture Detection
 - ✅ Code checking for "amd64" without "aarch64" handling
@@ -177,7 +177,7 @@ These are **almost always** ARM64-compatible without updates:
 
 | Dependency | Old → New | ARM64 Issue | Evidence |
 |------------|-----------|-------------|----------|
-| protoc | 3.3.0 → 3.21.0 | Missing linux-aarch_64 and osx-aarch_64 artifacts | `mvn` build log shows "Could not find artifact ...:exe:linux-aarch_64" |
+| protoc | 3.3.0 → 3.5.0 | 3.3.0 publishes no `linux-aarch_64` exe (x86 only) | `mvn` build log shows "Could not find artifact ...:exe:linux-aarch_64"; Central listing for 3.5.0 shows `protoc-3.5.0-linux-aarch_64.exe` |
 | snappy-java | 1.1.1.7 → 1.1.4 | 1.1.1.7 JAR has no `Linux/aarch64/libsnappyjava.so` | `unzip -l snappy-java-1.1.1.7.jar \| grep aarch64` returns nothing |
 ```
 
@@ -208,16 +208,26 @@ These are **almost always** ARM64-compatible without updates:
 **Correct Analysis:**
 > "JUnit 3.8.1: Pure Java library, no native dependencies, builds and runs successfully on ARM64. Status: COMPATIBLE. No update required for ARM64 compatibility. Note for user: Consider upgrading to JUnit 4/5 as part of separate modernization effort."
 
-### Case Study: Protoc 3.3.0
+### Case Study: Protoc 3.3.0 (right verdict, wrong target version)
 
-**Analysis (CORRECT):**
+**Analysis (PARTLY WRONG):**
 > "Protoc 3.3.0 lacks osx-aarch_64 and linux-aarch_64 artifacts in Maven Central. Build will fail on ARM64 with 'Could not resolve artifact' error. MUST UPGRADE to 3.21.0+ which includes ARM64 executables."
 
-**Why This Was Correct:**
-- Specific ARM64 artifact missing
-- Build WILL fail on ARM64
-- Evidence-based reasoning
-- Clear minimum version requirement
+**What Was Right:**
+- 3.3.0 genuinely publishes only x86 executables (`linux/osx/windows-x86_32|x86_64`) — no ARM64 at all
+- The build WILL fail on Graviton with "Could not resolve artifact ...:exe:linux-aarch_64"
+- Verdict MUST UPGRADE is correct, and the reasoning cites a specific missing artifact
+
+**What Was Wrong — the target version:**
+- `linux-aarch_64` first appears in **protoc 3.5.0**, not 3.17 or 3.21. Every release from 3.5.0 through 3.16.x already ships it.
+- Recommending 3.21.0+ violates the minimality rule (*prefer the lowest version that includes the ARM64 binary*) and drags ~18 minor versions of unrelated change into an ARM64 migration.
+- Worse, `protoc` is usually pinned via a shared `${protobuf.version}` property, so an oversized bump also moves `protobuf-java` — a runtime library — turning a compatibility fix into unrequested modernization.
+- Citing `osx-aarch_64` alongside `linux-aarch_64` conflates the **macOS** floor (`osx-aarch_64` lands in 3.17.3) with the Linux one, which is what inflates the recommended version. Graviton is Linux: `linux-aarch_64` alone decides the verdict.
+
+**Correct Analysis:**
+> "Protoc 3.3.0 publishes no ARM64 executable (`linux-aarch_64` absent; only x86_32/x86_64 for linux/osx/windows). Build fails on Graviton with 'Could not resolve artifact ...:exe:linux-aarch_64'. Status: MUST UPGRADE. Minimum ARM64 version: **3.5.0** — the lowest release publishing `linux-aarch_64`. Note: if this bump moves a shared `${protobuf.version}`, document the resulting `protobuf-java` change as a consequence of the required fix."
+
+**The transferable lesson:** an artifact-based verdict can still carry a wrong *minimum version*. Establish the floor by finding the lowest release that publishes the needed classifier — see the `central_has_classifier` helper in phase1-static-analysis.md §1.3 — rather than reaching for a recent version that obviously has it.
 
 ### Case Study: JNA 5.6.0 (verify the JAR, not the version)
 
