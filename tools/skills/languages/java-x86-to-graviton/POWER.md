@@ -10,6 +10,8 @@ author: "AWS"
 
 Validate a Java application's readiness to run on AWS Graviton instances. This transformation identifies architecture-specific incompatibilities, validates native library ARM64 support, updates only ARM64-blocking dependencies, and tests on ARM64.
 
+[summaries.md](summaries.md) indexes every file in this skill and when to read it — consult it for the full file map, or if you entered mid-skill without reading this file top to bottom.
+
 ## Scope Guardrails
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
