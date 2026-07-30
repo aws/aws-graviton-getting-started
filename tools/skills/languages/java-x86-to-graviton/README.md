@@ -25,6 +25,22 @@ Then ask your AI assistant:
 
 > Run the java-x86-to-graviton skill on this project
 
+## Customizing for your environment (optional)
+
+By default the skill uses neutral, vendor-agnostic defaults. To orient it around your
+team's toolchain — a specific JDK distribution to build/validate with, the Maven Wrapper,
+an internal image registry, your cluster's ARM64 node labels — copy the template to a
+`skill-config.md` at your project root and fill in what applies:
+
+```bash
+cp .skills/java-x86-to-graviton/document_references/skill-config.template.md \
+   skill-config.md
+```
+
+The config lives in *your* repo (not the skill folder), so skill updates never overwrite
+it. It steers **how** the transformation runs but never widens its scope — see
+[document_references/skill-configuration.md](document_references/skill-configuration.md).
+
 ## Skill Files
 
 | File | Purpose |
@@ -35,6 +51,8 @@ Then ask your AI assistant:
 | [phases/phase3-validation.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/phases/phase3-validation.md) | ARM64 build, test, startup validation |
 | [document_references/agent-scope-boundaries.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/document_references/agent-scope-boundaries.md) | Scope guardrails and decision tree |
 | [document_references/documentation-standards.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/document_references/documentation-standards.md) | Output file format and naming conventions |
+| [document_references/skill-configuration.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/document_references/skill-configuration.md) | Optional skill-configuration schema and precedence rules |
+| [document_references/skill-config.template.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/java-x86-to-graviton/document_references/skill-config.template.md) | Copyable template for the optional skill configuration |
 
 ## Output
 

@@ -51,7 +51,9 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 ### 1. Native Library Issues
 - ✅ Dependencies with x86-only `.so`/`.dll`/`.dylib` files
 - ✅ Missing ARM64 native library artifacts
-- ✅ Example: JNA 5.6.0 → 5.8.0 (lacks ARM64 .so files)
+- ✅ Example: snappy-java 1.1.1.7 → 1.1.4 (1.1.1.7 ships no `Linux/aarch64/libsnappyjava.so`; 1.1.4+ does)
+
+> ⚠️ **Verify the JAR, never the version number.** Whether a version has an ARM64 binary is a fact about the artifact's contents, not something you can infer from how old the version is. Many libraries added Linux aarch64 support years ago (e.g. JNA has shipped `linux-aarch64/libjnidispatch.so` since 5.5.0; snappy-java since 1.1.4). Before writing MUST UPGRADE, confirm the *resolved* JAR actually lacks the aarch64 binary: `unzip -l <artifact>.jar | grep -i aarch64` and `file` the extracted `.so`. A version being "old" is never sufficient evidence.
 
 ### 2. Build Tool Artifacts
 - ✅ Protoc compiler missing ARM64 executables
@@ -175,8 +177,8 @@ These are **almost always** ARM64-compatible without updates:
 
 | Dependency | Old → New | ARM64 Issue | Evidence |
 |------------|-----------|-------------|----------|
-| protoc | 3.3.0 → 3.21.0 | Missing linux-aarch_64 and osx-aarch_64 artifacts | Build log shows "Could not find artifact" |
-| JNA | 5.6.0 → 5.8.0 | Missing ARM64 .so files | Runtime UnsatisfiedLinkError on ARM64 |
+| protoc | 3.3.0 → 3.21.0 | Missing linux-aarch_64 and osx-aarch_64 artifacts | `mvn` build log shows "Could not find artifact ...:exe:linux-aarch_64" |
+| snappy-java | 1.1.1.7 → 1.1.4 | 1.1.1.7 JAR has no `Linux/aarch64/libsnappyjava.so` | `unzip -l snappy-java-1.1.1.7.jar \| grep aarch64` returns nothing |
 ```
 
 ### For Updates NOT Made:
@@ -216,6 +218,22 @@ These are **almost always** ARM64-compatible without updates:
 - Build WILL fail on ARM64
 - Evidence-based reasoning
 - Clear minimum version requirement
+
+### Case Study: JNA 5.6.0 (verify the JAR, not the version)
+
+**Initial Analysis (WRONG):**
+> "JNA 5.6.0 is old and JNA has native code — mark as MUST UPGRADE to a newer version for ARM64."
+
+**Why This Was Wrong:**
+- `jna-5.6.0.jar` already bundles `com/sun/jna/linux-aarch64/libjnidispatch.so` (a real ARM aarch64 ELF binary — JNA has shipped it since 5.5.0).
+- It loads and runs on Graviton (Linux ARM64) with no change.
+- Newer JNA (5.8.0+) only *adds* `darwin-aarch64` (Apple-Silicon local dev) and `win32-aarch64` (Windows ARM) — neither relevant to Graviton.
+- "Old + has native code" is not evidence of a missing Graviton binary.
+
+**Correct Analysis:**
+> "JNA 5.6.0: JAR contains `linux-aarch64/libjnidispatch.so` (verified via `unzip -l` + `file`). Loads on Graviton unmodified. Status: COMPATIBLE. No update required for ARM64. (If the local BUILD host is an Apple-Silicon Mac, 5.6.0 also lacks `darwin-aarch64` — but that affects local dev only, not the Graviton target.)"
+
+**Lesson:** Always inspect the resolved JAR for the `linux/aarch64` binary before deciding. A version number cannot tell you whether the Graviton binary is present.
 
 ## 🎯 Success Criteria
 

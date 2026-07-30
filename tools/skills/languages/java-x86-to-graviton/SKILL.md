@@ -18,6 +18,10 @@ Validate a Java application's readiness to run on AWS Graviton instances. This t
 
 **Out of scope:** Java version changes, JDK distribution changes, general dependency modernization, security updates, code refactoring, .gitignore/.dockerignore changes.
 
+## Skill Configuration (Optional)
+
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (build/validation JDK, build command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope — `agent-scope-boundaries.md` still binds, and the application's shipped JDK distribution stays unchanged (a configured JDK preference selects only the build/validation environment per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md). Record any applied overrides in `01-project-assessment.md`.
+
 ## Entry Criteria
 
 1. Java application currently running on x86 architecture
@@ -142,7 +146,7 @@ ARM64 failures are blocking. Do not skip tests; the failing build is the final b
 
 - Performance benchmarking and load testing
 - Integration testing with external services
-- CI/CD pipeline configuration for ARM64 builds
+- CI/CD pipeline configuration for ARM64 builds (if `skill-config.md` defines `ci.system`, phrase this recommendation in that system's vocabulary; the skill makes no CI changes itself)
 
 ## Notes
 

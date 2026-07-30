@@ -6,6 +6,8 @@ Build and test on ARM64 architecture. Supported platforms: Linux, macOS, WSL.
 
 Before skipping build validation, check for local container runtimes. Apple Silicon Macs run ARM64 containers natively via Docker or Finch, making full ARM64 validation possible without a remote Graviton instance.
 
+> **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below — but only after verifying it is installed; if the pinned runtime is not present, fall back to the auto-detection cascade. If `container.runtime` is absent, auto-detect as below. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+
 ```bash
 # Detect available container runtimes
 CONTAINER_CMD=""
@@ -48,8 +50,8 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands (e.g.
 
 Build-time tools (annotation processors, compiler plugins) may not support the latest Java compiler versions. Runtime compatibility != compile-time tooling compatibility.
 
-**Common annotation processor sensitivities:**
-- **Lombok:** < 1.18.36 fails with Java 25
+**Common annotation processor sensitivities** (upper bound — the processor breaks on JDKs *newer* than this):
+- **Lombok:** 1.18.20 needs build JDK ≤ **17** (fails on 21 *and* 25 with `NoSuchFieldError JCTree$JCImport.qualid`); ≥ 1.18.30 handles 21; < 1.18.36 fails on Java 25
 - **MapStruct:** < 1.5.0 may fail with Java 17+
 - **Dagger:** < 2.40 may fail with Java 16+
 
@@ -59,30 +61,35 @@ Build-time tools (annotation processors, compiler plugins) may not support the l
 3. Apply session-scoped Java alignment below
 4. Document the processor and version requiring alignment
 
+**Choosing the build JDK — do NOT just pick the top of the "21 > 17 > 11" preference.** That preference is only a tiebreaker among JDKs the processor *supports*. Pick the **lowest installed LTS that is ≥ the project's declared target AND supported by the failing processor**; if the build still fails on it, **descend to the next lower LTS** and retry. Example: an app targeting Java 17 with Lombok 1.18.20 must build on JDK **17** — JDK 21 also fails, so blindly preferring 21 does not resolve it. This is a *build/validation* JDK choice only; the app's shipped Java version is unchanged (§1.5).
+
 ### Detect Project Target Version
 
+Use POSIX-portable extraction (`sed -nE` / `grep -oE`) — `grep -oP` (PCRE lookbehind) is GNU-only and silently returns empty on stock macOS/BSD, which this skill supports.
+
 ```bash
-# Maven
-PROJECT_TARGET=$(grep -oP '(?<=<release>)[0-9]+' pom.xml 2>/dev/null || \
-                 grep -oP '(?<=<target>)[0-9]+' pom.xml 2>/dev/null || \
-                 grep -oP '(?<=<java.version>)[0-9]+' pom.xml 2>/dev/null)
+# Maven — covers <maven.compiler.release/target/source>, <release>, <target>, <source>, <java.version>.
+# The `${v#1.}` step maps legacy "1.8"/"1.5" to "8"/"5".
+PROJECT_TARGET=$(sed -nE 's/.*<(maven\.compiler\.release|release|maven\.compiler\.target|target|maven\.compiler\.source|source|java\.version)>([0-9.]+)<.*/\2/p' pom.xml 2>/dev/null | head -1)
+PROJECT_TARGET=${PROJECT_TARGET#1.}
+# Most robust when the project builds: mvn help:evaluate -Dexpression=maven.compiler.release -q -DforceStdout
 
 # Gradle (Groovy)
 if [ -z "$PROJECT_TARGET" ]; then
-  PROJECT_TARGET=$(grep -oP 'sourceCompatibility\s*[=:]\s*['\''"]?\K[0-9]+' build.gradle 2>/dev/null || \
-                   grep -oP 'JavaVersion\.VERSION_\K[0-9]+' build.gradle 2>/dev/null || \
-                   grep -oP 'jvmToolchain\s*\(\s*\K[0-9]+' build.gradle 2>/dev/null)
+  PROJECT_TARGET=$(grep -oE '(sourceCompatibility|targetCompatibility)[[:space:]]*[=:][[:space:]]*['\''"]?(1\.)?[0-9]+' build.gradle 2>/dev/null | grep -oE '[0-9]+$' | head -1)
+  [ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(grep -oE 'JavaVersion\.VERSION_(1_)?[0-9]+' build.gradle 2>/dev/null | grep -oE '[0-9]+$' | head -1)
+  [ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(grep -oE 'jvmToolchain\([[:space:]]*[0-9]+' build.gradle 2>/dev/null | grep -oE '[0-9]+' | head -1)
 fi
 
 # Gradle (Kotlin DSL)
 if [ -z "$PROJECT_TARGET" ]; then
-  PROJECT_TARGET=$(grep -oP 'jvmToolchain\(\K[0-9]+' build.gradle.kts 2>/dev/null || \
-                   grep -oP 'languageVersion\.set\(JavaLanguageVersion\.of\(\K[0-9]+' build.gradle.kts 2>/dev/null)
+  PROJECT_TARGET=$(grep -oE 'jvmToolchain\([0-9]+' build.gradle.kts 2>/dev/null | grep -oE '[0-9]+' | head -1)
+  [ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(grep -oE 'JavaLanguageVersion\.of\([0-9]+' build.gradle.kts 2>/dev/null | grep -oE '[0-9]+' | head -1)
 fi
 
 # gradle.properties fallback
 if [ -z "$PROJECT_TARGET" ]; then
-  PROJECT_TARGET=$(grep -oP 'javaVersion\s*=\s*\K[0-9]+' gradle.properties 2>/dev/null)
+  PROJECT_TARGET=$(grep -oE 'javaVersion[[:space:]]*=[[:space:]]*[0-9]+' gradle.properties 2>/dev/null | grep -oE '[0-9]+$' | head -1)
 fi
 
 echo "Project targets Java: $PROJECT_TARGET"
@@ -96,7 +103,8 @@ If runtime significantly exceeds target (e.g., Java 25 with Java 17 target), use
 # macOS
 (
   export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-  java -version
+  export PATH="$JAVA_HOME/bin:$PATH"   # required: without this, `java`/`javac` still resolve to the shell-default JDK
+  java -version                         # now reflects the switched JDK, not the default
   ${BUILD_CMD} clean install
 )
 
@@ -126,7 +134,9 @@ JAVA_HOME=/path/to/java-21 ${BUILD_CMD} clean install
 
 **Version preference:** Java 21 > 17 > 11. After transformation, user's `java -version` must match pre-transformation.
 
-**If no compatible version found:** Document requirement, provide install commands, do NOT install automatically:
+> **Skill config:** If `skill-config.md` defines `jdk.preferred_distribution` / `jdk.discovery_glob` / `jdk.version_select`, use them to locate the build/validation JDK instead of the defaults below. This selects only the JDK used to build and validate — the application's shipped distribution is unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+
+**If no compatible version found:** Document requirement, provide install commands, do NOT install automatically. Use `jdk.install_hint` from `skill-config.md` if defined; otherwise the defaults below:
 ```bash
 # Amazon Corretto
 # macOS: brew install --cask corretto@21
@@ -139,6 +149,8 @@ JAVA_HOME=/path/to/java-21 ${BUILD_CMD} clean install
 > **Output: `graviton-validation/06-build-test-results.md`** (Build Attempts, Test Failure Classification)
 
 ### Build Strategy
+
+> **Skill config:** Substitute `build.maven_invocation` / `build.gradle_invocation` from `skill-config.md` for the `mvn` / `./gradlew` commands below if defined (e.g. `./mvnw`), falling back to the bare command if the specified wrapper is not present. Also applies to the `${BUILD_CMD}` used in §3.0 and the test commands in §3.2. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
 1. **First attempt** - full build with tests:
    - Gradle: `./gradlew clean build`
@@ -189,12 +201,24 @@ java -XshowSettings:properties -version | grep os.arch  # Must show aarch64
 
 > **Output: update `graviton-validation/06-build-test-results.md`**
 
-**Containerized:**
+**Containerized:** the shippable runtime image (§2.4) is **JRE-only** — it contains `app.jar` but no `mvn`/`gradlew`, no sources, and no `pom.xml`/`build.gradle`. Running `--entrypoint mvn app:arm64 test` against it fails with `exec: "mvn": executable file not found` / `no POM in this directory`. Run the ARM64 test suite one of two ways instead:
+
 ```bash
-$CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint ./gradlew app:arm64 test
-# or
-$CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint mvn app:arm64 test
+# Option A — build the multi-stage builder target for linux/arm64 and let its RUN step run tests
+# (add `RUN mvn test` / `RUN ./gradlew test` to the builder stage, or a test-only stage pinned
+# to --platform=$TARGETPLATFORM so tests execute on aarch64, not the build host's arch).
+$CONTAINER_CMD build --platform linux/arm64 --target builder -t app:builder-arm64 .
+
+# Option B — run tests in a build-tool container on linux/arm64 with the source mounted
+# (use the SAME distribution/version as the project's base image tag):
+$CONTAINER_CMD run --rm --platform linux/arm64 -v "$PWD":/app -w /app \
+  --entrypoint mvn maven:3.9-eclipse-temurin-17 clean test
+# or Gradle:
+$CONTAINER_CMD run --rm --platform linux/arm64 -v "$PWD":/app -w /app \
+  --entrypoint ./gradlew gradle:8-jdk17 test
 ```
+
+> Note (finch/lima on macOS): `-v` bind mounts only work for host paths shared into the VM (`$HOME`, `/private`, `/Volumes`). A project under `/tmp` resolves to the VM's own tmpfs → empty `/app`; use `/private/tmp` or a path under `$HOME`, or `$CONTAINER_CMD build` (which streams the context) instead.
 
 **Host-based:**
 ```bash
@@ -216,6 +240,8 @@ Verify:
 1. Application starts without errors
 2. JVM flags accepted without errors
 3. No immediate runtime crashes
+
+> **macOS-host false FAIL.** When running host-based startup/tests on an Apple-Silicon Mac (`os.name=Mac, os.arch=aarch64`), a runtime-extracting native lib may load its `Linux/aarch64` binary fine on Graviton yet throw on macOS because the resolved JAR has no *Mac*/aarch64 binary (e.g. snappy-java added `Mac/aarch64` only in 1.1.8.4; the minimal Graviton floor 1.1.4 has `Linux/aarch64` but not Mac). A native-load failure on the macOS host is a **host-dev artifact, not a Graviton verdict** when the JAR contains a verified `Linux/aarch64` binary (per §1.2.1) — confirm on a `linux/arm64` container, which is authoritative, rather than marking the migration FAILED. Same principle as the JNA darwin-aarch64 case in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md).
 
 Recommend to user for independent testing: performance benchmarking, load testing, resource utilization measurement.
 
