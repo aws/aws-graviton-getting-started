@@ -68,9 +68,16 @@ Build-time tools (annotation processors, compiler plugins) may not support the l
 Use POSIX-portable extraction (`sed -nE` / `grep -oE`) — `grep -oP` (PCRE lookbehind) is GNU-only and silently returns empty on stock macOS/BSD, which this skill supports.
 
 ```bash
-# Maven — covers <maven.compiler.release/target/source>, <release>, <target>, <source>, <java.version>.
+# Maven — query each tag group in PRIORITY order with short-circuit fallback:
+# release (authoritative) > target/source > java.version. Do NOT collapse these into one
+# combined alternation + `head -1` — that returns whichever tag appears FIRST physically in
+# the file (commonly <properties><java.version> before the <build> plugin block), silently
+# selecting the wrong build JDK (e.g. 21 when a compiler-plugin <release>17 is authoritative).
 # The `${v#1.}` step maps legacy "1.8"/"1.5" to "8"/"5".
-PROJECT_TARGET=$(sed -nE 's/.*<(maven\.compiler\.release|release|maven\.compiler\.target|target|maven\.compiler\.source|source|java\.version)>([0-9.]+)<.*/\2/p' pom.xml 2>/dev/null | head -1)
+mvn_tag() { sed -nE "s/.*<($1)>([0-9.]+)<.*/\2/p" pom.xml 2>/dev/null | head -1; }
+PROJECT_TARGET=$(mvn_tag 'maven\.compiler\.release|release')
+[ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(mvn_tag 'maven\.compiler\.target|target|maven\.compiler\.source|source')
+[ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(mvn_tag 'java\.version')
 PROJECT_TARGET=${PROJECT_TARGET#1.}
 # Most robust when the project builds: mvn help:evaluate -Dexpression=maven.compiler.release -q -DforceStdout
 
@@ -241,7 +248,7 @@ Verify:
 2. JVM flags accepted without errors
 3. No immediate runtime crashes
 
-> **macOS-host false FAIL.** When running host-based startup/tests on an Apple-Silicon Mac (`os.name=Mac, os.arch=aarch64`), a runtime-extracting native lib may load its `Linux/aarch64` binary fine on Graviton yet throw on macOS because the resolved JAR has no *Mac*/aarch64 binary (e.g. snappy-java added `Mac/aarch64` only in 1.1.8.4; the minimal Graviton floor 1.1.4 has `Linux/aarch64` but not Mac). A native-load failure on the macOS host is a **host-dev artifact, not a Graviton verdict** when the JAR contains a verified `Linux/aarch64` binary (per §1.2.1) — confirm on a `linux/arm64` container, which is authoritative, rather than marking the migration FAILED. Same principle as the JNA darwin-aarch64 case in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md).
+> **macOS-host false FAIL.** When running host-based startup/tests on an Apple-Silicon Mac (`os.name=Mac, os.arch=aarch64`), a runtime-extracting native lib may load its `Linux/aarch64` binary fine on Graviton yet throw on macOS because the resolved JAR has no *Mac*/aarch64 binary (e.g. snappy-java added `Mac/aarch64/libsnappyjava.dylib` only in 1.1.8.2; the minimal Graviton floor 1.1.2.2 has `Linux/aarch64` but not Mac). A native-load failure on the macOS host is a **host-dev artifact, not a Graviton verdict** when the JAR contains a verified `Linux/aarch64` binary (per §1.2.1) — confirm on a `linux/arm64` container, which is authoritative, rather than marking the migration FAILED. Same principle as the JNA darwin-aarch64 case in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md).
 
 Recommend to user for independent testing: performance benchmarking, load testing, resource utilization measurement.
 

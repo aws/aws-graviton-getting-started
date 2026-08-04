@@ -51,9 +51,11 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 ### 1. Native Library Issues
 - ✅ Dependencies with x86-only `.so`/`.dll`/`.dylib` files
 - ✅ Missing ARM64 native library artifacts
-- ✅ Example: snappy-java 1.1.1.7 → 1.1.4 (1.1.1.7 ships no `Linux/aarch64/libsnappyjava.so`; 1.1.4+ does)
+- ✅ Example: snappy-java 1.1.1.7 → 1.1.2.2 (1.1.1.7 ships no `Linux/aarch64/libsnappyjava.so`; 1.1.2.2 is the lowest that does)
 
-> ⚠️ **Verify the JAR, never the version number.** Whether a version has an ARM64 binary is a fact about the artifact's contents, not something you can infer from how old the version is. Many libraries added Linux aarch64 support years ago (e.g. JNA has shipped `linux-aarch64/libjnidispatch.so` since 5.5.0; snappy-java since 1.1.4). Before writing MUST UPGRADE, confirm the *resolved* JAR actually lacks the aarch64 binary: `unzip -l <artifact>.jar | grep -i aarch64` and `file` the extracted `.so`. A version being "old" is never sufficient evidence.
+> ⚠️ **Verify the JAR, never the version number.** Whether a version has an ARM64 binary is a fact about the artifact's contents, not something you can infer from how old the version is. Many libraries added Linux aarch64 support years earlier than people assume — JNA has shipped `linux-aarch64/libjnidispatch.so` since 5.5.0, and snappy-java's `Linux/aarch64/libsnappyjava.so` first appears in **1.1.2.2** (2016-03-29), roughly fifteen releases before the 1.1.4 that is commonly cited. The boundary is exact and narrow: 1.1.2.1 has no aarch64 binary and throws `[FAILED_TO_LOAD_NATIVE_LIBRARY]` on Graviton; 1.1.2.2 loads and round-trips. Before writing MUST UPGRADE, confirm the *resolved* JAR actually lacks the aarch64 binary: `unzip -l <artifact>.jar | grep -i aarch64` and `file` the extracted `.so`. A version being "old" is never sufficient evidence.
+>
+> **When checking a floor, make a missing artifact fail loudly.** `curl` without `--fail` writes the 404 HTML body to the output path, producing a small file that is not a valid archive — and `unzip -l ... | grep aarch64` on it returns empty, which is indistinguishable from a real "no aarch64 binary" result. That is a false MUST UPGRADE. Use `curl -sSL --fail` and check the exit status, or verify the archive first with `unzip -t`, before reading any grep result as evidence. Confirm a version exists at all in `maven-metadata.xml` rather than assuming a gap in a version sequence was published (e.g. snappy-java has `1.1.3-M1`/`1.1.3-M2` milestones but **no released `1.1.3`**).
 
 ### 2. Build Tool Artifacts
 - ✅ Protoc compiler missing ARM64 executables
@@ -178,7 +180,7 @@ These are **almost always** ARM64-compatible without updates:
 | Dependency | Old → New | ARM64 Issue | Evidence |
 |------------|-----------|-------------|----------|
 | protoc | 3.3.0 → 3.5.0 | 3.3.0 publishes no `linux-aarch_64` exe (x86 only) | `mvn` build log shows "Could not find artifact ...:exe:linux-aarch_64"; Central listing for 3.5.0 shows `protoc-3.5.0-linux-aarch_64.exe` |
-| snappy-java | 1.1.1.7 → 1.1.4 | 1.1.1.7 JAR has no `Linux/aarch64/libsnappyjava.so` | `unzip -l snappy-java-1.1.1.7.jar \| grep aarch64` returns nothing |
+| snappy-java | 1.1.1.7 → 1.1.2.2 | 1.1.1.7 JAR has no `Linux/aarch64/libsnappyjava.so` | `unzip -l snappy-java-1.1.1.7.jar \| grep aarch64` returns nothing |
 ```
 
 ### For Updates NOT Made:

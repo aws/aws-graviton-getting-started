@@ -53,7 +53,7 @@ Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was conf
 <dependency>
     <groupId>org.xerial.snappy</groupId>
     <artifactId>snappy-java</artifactId>
-    <version>1.1.4</version> <!-- a version verified to ship Linux/aarch64/libsnappyjava.so (confirm the chosen version's JAR) -->
+    <version>1.1.2.2</version> <!-- a version verified to ship Linux/aarch64/libsnappyjava.so (confirm the chosen version's JAR) -->
 </dependency>
 ```
 
@@ -65,7 +65,7 @@ Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was conf
         <dependency>
             <groupId>org.xerial.snappy</groupId>
             <artifactId>snappy-java</artifactId>
-            <version>1.1.4</version>
+            <version>1.1.2.2</version>
         </dependency>
     </dependencies>
 </dependencyManagement>
@@ -85,7 +85,7 @@ Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was conf
 <dependency>
     <groupId>org.xerial.snappy</groupId>
     <artifactId>snappy-java</artifactId>
-    <version>1.1.4</version>
+    <version>1.1.2.2</version>
 </dependency>
 ```
 
@@ -93,7 +93,7 @@ Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was conf
 ```groovy
 configurations.all {
     resolutionStrategy {
-        force 'org.xerial.snappy:snappy-java:1.1.4'
+        force 'org.xerial.snappy:snappy-java:1.1.2.2'
     }
 }
 ```

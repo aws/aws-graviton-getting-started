@@ -215,11 +215,13 @@ Current Version: 1.1.1.7
 Status: MUST UPGRADE
 Reason: JAR contains no org/xerial/snappy/native/Linux/aarch64/libsnappyjava.so
 Evidence: unzip -l snappy-java-1.1.1.7.jar | grep aarch64  → (no output)
-Minimum ARM64 Version: 1.1.4
+Minimum ARM64 Version: 1.1.2.2
 Resolution: dependencyManagement override or exclusion+re-add
 ```
 
-> ⚠️ **Verify the JAR, never the version number.** Do not infer "old version → missing ARM64 binary." Confirm by inspecting the *resolved* artifact: `unzip -l <jar> | grep -i aarch64`, then `file` the extracted `.so` to confirm `ARM aarch64`. Counter-examples that look old but are already fine on Graviton: **JNA 5.6.0** ships `linux-aarch64/libjnidispatch.so` (COMPATIBLE — 5.8.0 only adds macOS/Windows ARM), and **snappy-java ≥ 1.1.4** ships `Linux/aarch64/libsnappyjava.so`. Only versions whose JAR genuinely lacks the `linux/aarch64` binary are MUST UPGRADE.
+> ⚠️ **Verify the JAR, never the version number.** Do not infer "old version → missing ARM64 binary." Confirm by inspecting the *resolved* artifact: `unzip -l <jar> | grep -i aarch64`, then `file` the extracted `.so` to confirm `ARM aarch64`. Counter-examples that look old but are already fine on Graviton: **JNA 5.6.0** ships `linux-aarch64/libjnidispatch.so` (COMPATIBLE — 5.8.0 only adds macOS/Windows ARM), and **snappy-java 1.1.2.2** (2016) already ships `Linux/aarch64/libsnappyjava.so` — about fifteen releases below the 1.1.4 usually assumed to be the floor. Only versions whose JAR genuinely lacks the `linux/aarch64` binary are MUST UPGRADE.
+>
+> Also make a **missing** artifact fail loudly: `curl` without `--fail` saves the 404 body, and `unzip -l | grep aarch64` on that non-archive returns empty — identical to a genuine "no aarch64 binary" result, i.e. a false MUST UPGRADE. Fetch with `curl -sSL --fail` (check the exit status) or run `unzip -t` first, and confirm the version is actually listed in `maven-metadata.xml` before trusting any grep output.
 
 ### Build-Tool Artifacts with OS/Arch Classifiers
 
