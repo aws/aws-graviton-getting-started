@@ -188,9 +188,11 @@ file libname.so  # Must show "ARM aarch64"
 The `-Dincludes` / grep filters below are a convenience view of *well-known* native artifacts. They are NOT the source of truth — a native lib whose coordinates are not listed (e.g. `jansi`, `commons-crypto`) will not appear here. The authoritative native inventory is the §1.2.1 content scan of the resolved JARs; cross-check the two and treat any JAR the content scan flagged as in scope even if it is absent from this filtered tree.
 
 ```bash
-# Maven
+# Maven — REDIRECT stdout here too, for the same reason as the full tree above
+# (-DoutputFile writes a separate per-module file in a reactor → false all-clear).
 mvn dependency:tree -Dincludes=net.java.dev.jna,io.netty,org.xerial.snappy,org.lz4,com.github.luben,org.rocksdb,org.xerial,org.conscrypt,com.google.protobuf \
-  -DoutputFile=graviton-validation/raw/dependency-tree-native.txt
+  --no-transfer-progress \
+  > graviton-validation/raw/dependency-tree-native.txt
 
 # Gradle
 ./gradlew dependencies --configuration runtimeClasspath | grep -E "jna|netty-transport-native|snappy|lz4|zstd|rocksdb|sqlite|conscrypt|protobuf|jnr|leveldbjni" \
