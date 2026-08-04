@@ -65,21 +65,31 @@ Build-time tools (annotation processors, compiler plugins) may not support the l
 
 ### Detect Project Target Version
 
-Use POSIX-portable extraction (`sed -nE` / `grep -oE`) — `grep -oP` (PCRE lookbehind) is GNU-only and silently returns empty on stock macOS/BSD, which this skill supports.
+Ask the build tool for the resolved value first; fall back to text extraction only when the project cannot build. Any text fallback must be POSIX-portable (`sed -nE` / `grep -oE`) — `grep -oP` (PCRE lookbehind) is GNU-only and silently returns empty on stock macOS/BSD, which this skill supports.
 
 ```bash
-# Maven — query each tag group in PRIORITY order with short-circuit fallback:
-# release (authoritative) > target/source > java.version. Do NOT collapse these into one
-# combined alternation + `head -1` — that returns whichever tag appears FIRST physically in
-# the file (commonly <properties><java.version> before the <build> plugin block), silently
-# selecting the wrong build JDK (e.g. 21 when a compiler-plugin <release>17 is authoritative).
-# The `${v#1.}` step maps legacy "1.8"/"1.5" to "8"/"5".
-mvn_tag() { sed -nE "s/.*<($1)>([0-9.]+)<.*/\2/p" pom.xml 2>/dev/null | head -1; }
-PROJECT_TARGET=$(mvn_tag 'maven\.compiler\.release|release')
-[ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(mvn_tag 'maven\.compiler\.target|target|maven\.compiler\.source|source')
-[ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(mvn_tag 'java\.version')
+# Maven — ASK MAVEN FIRST. help:evaluate returns the fully resolved effective value, so it is
+# immune to both tag-precedence ordering and to pretty-printed tags whose value sits on its own
+# line. Do NOT anchor the match with ^...$ — Maven pads -DforceStdout output with whitespace.
+PROJECT_TARGET=$(mvn help:evaluate -Dexpression=maven.compiler.release -q -DforceStdout 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)*' | head -1)
+[ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(mvn help:evaluate -Dexpression=maven.compiler.target -q -DforceStdout 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)*' | head -1)
+
+# Text fallback for when the project cannot build (or Maven is unavailable). Query each tag
+# group in PRIORITY order with short-circuit fallback: release > target/source > java.version.
+# Do NOT collapse these into one combined alternation + `head -1` — that returns whichever tag
+# appears FIRST physically in the file (commonly <properties><java.version> before the <build>
+# block), silently selecting the wrong build JDK (e.g. 21 when a <release>17 is authoritative).
+# CAUTION: these patterns are line-based, so a multi-line <release>\n  17\n</release> is invisible
+# to tier 1 and the chain then falls THROUGH to java.version and returns a confidently wrong
+# number. That failure is silent — which is exactly why help:evaluate above is tried first.
+if [ -z "$PROJECT_TARGET" ]; then
+  mvn_tag() { sed -nE "s/.*<($1)>[[:space:]]*([0-9.]+)[[:space:]]*<.*/\2/p" pom.xml 2>/dev/null | head -1; }
+  PROJECT_TARGET=$(mvn_tag 'maven\.compiler\.release|release')
+  [ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(mvn_tag 'maven\.compiler\.target|target|maven\.compiler\.source|source')
+  [ -z "$PROJECT_TARGET" ] && PROJECT_TARGET=$(mvn_tag 'java\.version')
+fi
+# Maps legacy "1.8"/"1.5" to "8"/"5".
 PROJECT_TARGET=${PROJECT_TARGET#1.}
-# Most robust when the project builds: mvn help:evaluate -Dexpression=maven.compiler.release -q -DforceStdout
 
 # Gradle (Groovy)
 if [ -z "$PROJECT_TARGET" ]; then
