@@ -10,6 +10,8 @@ author: "AWS"
 
 Validate a Java application's readiness to run on AWS Graviton instances. This transformation identifies architecture-specific incompatibilities, validates native library ARM64 support, updates only ARM64-blocking dependencies, and tests on ARM64.
 
+[summaries.md](summaries.md) indexes every file in this skill and when to read it — consult it for the full file map, or if you entered mid-skill without reading this file top to bottom.
+
 ## Scope Guardrails
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
@@ -17,6 +19,10 @@ Validate a Java application's readiness to run on AWS Graviton instances. This t
 **In scope:** Native library ARM64 binaries, ARM64-blocking dependency updates, architecture detection code, Graviton JVM flags, ARM64 build/test validation.
 
 **Out of scope:** Java version changes, JDK distribution changes, general dependency modernization, security updates, code refactoring, .gitignore/.dockerignore changes.
+
+## Skill Configuration (Optional)
+
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (build/validation JDK, build command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope — `agent-scope-boundaries.md` still binds, and the application's shipped JDK distribution stays unchanged (a configured JDK preference selects only the build/validation environment per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md). Record any applied overrides in `01-project-assessment.md`.
 
 ## Entry Criteria
 
@@ -142,7 +148,7 @@ ARM64 failures are blocking. Do not skip tests; the failing build is the final b
 
 - Performance benchmarking and load testing
 - Integration testing with external services
-- CI/CD pipeline configuration for ARM64 builds
+- CI/CD pipeline configuration for ARM64 builds (if `skill-config.md` defines `ci.system`, phrase this recommendation in that system's vocabulary; the skill makes no CI changes itself)
 
 ## Notes
 

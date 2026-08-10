@@ -128,7 +128,7 @@ Reference detail files: 02-native-library-report.md, 03-dependency-compatibility
 | Dependency | Artifact | Extracts Native Code | ARM64 Support in Current Version | Verdict | Resolution |
 |------------|----------|---------------------|----------------------------------|---------|------------|
 | netty-transport-native-epoll | 4.1.68.Final | Yes | Yes (linux-aarch_64 classifier) | PASS | No action needed |
-| snappy-java | 1.1.7.3 | Yes | No (x86_64 only) | FAIL | Upgraded to 1.1.10.5 |
+| snappy-java | 1.1.1.7 | Yes | No (JAR has no Linux/aarch64/libsnappyjava.so) | FAIL | Upgraded to 1.1.2.2 |
 
 ## Resolution Details
 <For each FAIL or WARN, describe the resolution approach>
@@ -155,7 +155,7 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 ## MUST UPGRADE (Blocking)
 | Dependency | Current Version | Minimum ARM64 Version | Applied Version | ARM64 Issue | Evidence |
 |------------|----------------|----------------------|-----------------|-------------|----------|
-| net.java.dev.jna:jna | 5.6.0 | 5.8.0 | 5.14.0 | Missing ARM64 .so | UnsatisfiedLinkError on aarch64 |
+| org.xerial.snappy:snappy-java | 1.1.1.7 | 1.1.2.2 | 1.1.2.2 | JAR has no Linux/aarch64/libsnappyjava.so | `unzip -l ... \| grep aarch64` empty; UnsatisfiedLinkError on aarch64 |
 
 ## RECOMMENDED UPGRADE (Non-Blocking)
 | Dependency | Current Version | Recommended Version | Reason | Action Taken |
@@ -171,7 +171,7 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 ## Transitive Dependency Resolutions
 | Transitive Dependency | Pulled In By | Issue | Resolution Method |
 |-----------------------|-------------|-------|-------------------|
-| org.xerial.snappy:snappy-java 1.1.7.3 | kafka-clients 2.7.0 | No linux-aarch64 binary | dependencyManagement override to 1.1.10.5 |
+| org.xerial.snappy:snappy-java 1.1.1.7 | kafka-clients 2.7.0 | JAR has no Linux/aarch64 binary | dependencyManagement override to 1.1.2.2 |
 ```
 
 ---

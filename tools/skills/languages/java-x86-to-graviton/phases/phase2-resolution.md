@@ -46,18 +46,18 @@ try {
 
 > **Output: update `graviton-validation/03-dependency-compatibility-report.md`**
 
-Update ONLY dependencies flagged as MUST UPGRADE. Do NOT upgrade compatible dependencies.
+Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was confirmed to lack the `linux/aarch64` binary — see the verification note in Phase 1.3). Do NOT upgrade compatible dependencies. Prefer the *lowest* version that includes the ARM64 binary, not the latest, to stay minimal — and **confirm that candidate's JAR actually contains the aarch64 binary** (`unzip -l | grep aarch64`) rather than trusting a remembered version number; the exact floor varies by library and some intermediate versions are unpublished.
 
-**Direct dependencies (Maven):**
+**Direct dependencies (Maven):** e.g. snappy-java confirmed lacking `Linux/aarch64/libsnappyjava.so`:
 ```xml
 <dependency>
-    <groupId>net.java.dev.jna</groupId>
-    <artifactId>jna</artifactId>
-    <version>5.14.0</version> <!-- Minimum 5.8.0 for ARM64 -->
+    <groupId>org.xerial.snappy</groupId>
+    <artifactId>snappy-java</artifactId>
+    <version>1.1.2.2</version> <!-- a version verified to ship Linux/aarch64/libsnappyjava.so (confirm the chosen version's JAR) -->
 </dependency>
 ```
 
-**Transitive dependencies (Maven):**
+**Transitive dependencies (Maven):** e.g. an old snappy-java pulled in via kafka-clients:
 ```xml
 <!-- Option A: dependencyManagement override -->
 <dependencyManagement>
@@ -65,7 +65,7 @@ Update ONLY dependencies flagged as MUST UPGRADE. Do NOT upgrade compatible depe
         <dependency>
             <groupId>org.xerial.snappy</groupId>
             <artifactId>snappy-java</artifactId>
-            <version>1.1.10.5</version>
+            <version>1.1.2.2</version>
         </dependency>
     </dependencies>
 </dependencyManagement>
@@ -85,7 +85,7 @@ Update ONLY dependencies flagged as MUST UPGRADE. Do NOT upgrade compatible depe
 <dependency>
     <groupId>org.xerial.snappy</groupId>
     <artifactId>snappy-java</artifactId>
-    <version>1.1.10.5</version>
+    <version>1.1.2.2</version>
 </dependency>
 ```
 
@@ -93,7 +93,7 @@ Update ONLY dependencies flagged as MUST UPGRADE. Do NOT upgrade compatible depe
 ```groovy
 configurations.all {
     resolutionStrategy {
-        force 'org.xerial.snappy:snappy-java:1.1.10.5'
+        force 'org.xerial.snappy:snappy-java:1.1.2.2'
     }
 }
 ```
@@ -141,26 +141,54 @@ if ("aarch64".equals(arch)) {
 
 PRESERVE the current base image distribution and version. Do NOT change JDK distribution or version.
 
-Single-stage:
+> **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `eclipse-temurin:17-jdk` → `<registry>/eclipse-temurin:17-jdk`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting** — like the `./mvnw` wrapper fallback, this is verify-then-apply: if the configured registry does not resolve/pull (e.g. an internal mirror unreachable from the build host, `no such host`), do NOT rewrite the `FROM` — an unconditional redirect turns a compatibility migration into a hard build failure. Keep the original registry (same distro/version) and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets** (host-based or library project), `container.base_image_registry` / `container.runtime` have nothing to apply to — record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md` rather than silently ignoring it. If Phase 3 later synthesizes an image purely for ARM64 validation, honor the configured registry there. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+
+Single-stage (the whole image is the deployable artifact — it must be built for the target arch):
 ```dockerfile
-FROM --platform=$BUILDPLATFORM <current-base-image>:<current-version>
+# Omit --platform and let the build's --platform linux/arm64 drive it,
+# or pin explicitly to the target. Do NOT use $BUILDPLATFORM here.
+FROM <current-base-image>:<current-version>
 ```
 
-Multi-stage:
+Multi-stage — **Maven** (builder produces `target/*.jar`):
 ```dockerfile
-# Builder: BUILDPLATFORM for native build speed
+# Builder: $BUILDPLATFORM = run the build natively on the builder's arch (faster; Java bytecode is arch-neutral)
 FROM --platform=$BUILDPLATFORM <current-builder-image>:<current-version> AS builder
 WORKDIR /app
 COPY . .
 RUN mvn clean package -DskipTests
 
-# Runtime: TARGETPLATFORM for ARM64 execution
+# Runtime: $TARGETPLATFORM = the arch the image will actually run on (Graviton)
 FROM --platform=$TARGETPLATFORM <current-runtime-image>:<current-version>
 COPY --from=builder /app/target/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-Key: Builder stage uses `$BUILDPLATFORM`, runtime stage uses `$TARGETPLATFORM`. If original has no `--platform` annotations, add them. Host-based deployments skip Docker steps.
+Multi-stage — **Gradle** (differs from Maven: output is `build/libs/`, and a plain `application`-plugin jar has no `Main-Class` manifest, so `java -jar` on it fails with "no main manifest attribute"):
+```dockerfile
+FROM --platform=$BUILDPLATFORM <current-gradle-builder-image>:<current-version> AS builder
+WORKDIR /app
+COPY . .
+# Use the Shadow/fat-jar task if the project has one (produces a runnable uber-jar):
+RUN ./gradlew clean shadowJar -x test     # or: bootJar (Spring Boot) / build if a runnable jar is produced
+
+FROM --platform=$TARGETPLATFORM <current-runtime-image>:<current-version>
+COPY --from=builder /app/build/libs/*.jar app.jar   # Gradle output dir is build/libs, not target/
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+> If the project only produces a **plain** (non-fat) Gradle jar via the `application` plugin, `java -jar` won't work — either add the Shadow plugin, use Spring Boot's `bootJar`, or launch via `installDist`'s generated start script (`COPY --from=builder /app/build/install/<app> /app` then `ENTRYPOINT ["/app/bin/<app>"]`).
+
+Key rules:
+- **`$BUILDPLATFORM` is only valid on a *builder* stage.** Any stage that produces the shippable image — the single-stage `FROM`, or the multi-stage runtime `FROM` — must use `$TARGETPLATFORM` (or no `--platform`, letting the CLI `--platform linux/arm64` decide). Using `$BUILDPLATFORM` on a deployable image pins it to the *builder's* architecture, so an x86 CI builder would ship an x86 image even though `--platform linux/arm64` was requested — the opposite of the migration goal. If the original Dockerfile has no `--platform` annotations, the simplest correct change is to leave them off and drive arch via the build command.
+- **Builder-stage tests run on `$BUILDPLATFORM`, not the target.** If you run the test suite inside the builder stage (`RUN mvn test` / `RUN ./gradlew test`) and build on an **x86** host/CI, those tests execute on x86 — an ARM64-only native failure would pass there, a **false PASS**. To validate on the target arch, either run tests in a stage pinned to `$TARGETPLATFORM`, or run them separately against a `linux/arm64` container (see phase3 §3.2). Building on an arm64 host masks this (builder = arm64), so don't rely on the builder stage alone for ARM64 test validation.
+
+Host-based deployments skip Docker steps.
+
+**Deployment manifests (only if the project already ships them):**
+
+If the project contains Kubernetes/Helm manifests (or similar deployment descriptors), ensure they can schedule onto ARM64 nodes. Only touch node selection, image registry, and ingress vocabulary — do NOT restructure manifests or add resources the project does not already have. If no manifests are present, skip this step.
+
+> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use a generic `kubernetes.io/arch: arm64` node selector and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
 ## 2.5 Graviton-Specific JVM Recommendations
 

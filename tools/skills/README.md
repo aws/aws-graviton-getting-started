@@ -143,7 +143,7 @@ Each skill folder contains:
 <skill-name>/
 ├── SKILL.md                    # Entry point (Agent Skills format)
 ├── POWER.md                    # Entry point (Kiro format)
-├── summaries.md                # File index for agent discovery
+├── summaries.md                # Canonical file index for agent discovery
 ├── phases/                     # Detailed phase instructions
 ├── document_references/        # Scope guardrails and output standards
 └── README.md                   # Human-readable overview
@@ -155,8 +155,9 @@ See the [skill template](_templates/SKILL.template.md) for the boilerplate struc
 
 1. Create a folder under `languages/` named to match the skill's `name` field
 2. Create both `SKILL.md` (Agent Skills frontmatter) and `POWER.md` (Kiro frontmatter) with the same body content
-3. Add a `summaries.md` listing all files in the skill for agent discovery
-4. Add a `README.md` with a human-readable overview
+3. Add a `summaries.md` listing every file in the skill, each with its purpose and when it is read. This is the **canonical** inventory — link it from `SKILL.md`/`POWER.md`, and do not duplicate the file list elsewhere in the skill
+4. Add a `README.md` with a human-readable overview that points at `summaries.md` for the file map
 5. Keep the main entry point under 500 lines — split detailed instructions into `phases/`, `references/`, or `scripts/` subdirectories
+6. Link each supporting file inline from the step that needs it, so an agent reading top to bottom reaches it just in time. `summaries.md` serves agents that enter mid-skill or need the whole map at once
 
 Fill in language-specific details based on the existing [Graviton documentation](../../) for each language.
