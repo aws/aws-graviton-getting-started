@@ -11,9 +11,9 @@ There are two ways to get llama.cpp running on Graviton:
 
 # Serve llama.cpp on Graviton with the AWS Deep Learning Container
 
-The [llama.cpp Deep Learning Container (DLC)](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) is a from-source build of upstream llama.cpp, built for the Graviton3 (Neoverse-V1) baseline and forward-compatible with newer Graviton generations. It is built on Amazon Linux 2023 with ongoing security patching, and runs the upstream `llama-server` on port **8080** with an OpenAI-compatible API.
+The [llama.cpp Deep Learning Container (DLC)](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) is a from-source build of upstream llama.cpp for the Graviton3 (Neoverse-V1) baseline, forward-compatible with newer Graviton generations. Running on Amazon Linux 2023 with ongoing security patching, it serves the upstream `llama-server` on port **8080**.
 
-The Graviton (ARM64) images are published in the `llama-cpp-arm64` repository on the ECR Public Gallery:
+AWS publishes the Graviton (ARM64) images in the `llama-cpp-arm64` repository on the Amazon ECR Public Gallery:
 
 | Platform | Device | Image |
 | --- | --- | --- |
@@ -22,11 +22,11 @@ The Graviton (ARM64) images are published in the `llama-cpp-arm64` repository on
 
 **Prerequisites**
 
-Launch a Graviton3(E), Graviton4, or Graviton5 based EC2 instance (for example, `c7g`, `m7g`, `r8g`, or `c8g`) with Docker installed. The server is **unauthenticated by default** and binds `0.0.0.0`, so run it inside a private network (security group / VPC).
+Launch a Graviton3(E)-, Graviton4-, or Graviton5-based EC2 instance (for example, `c7g`, `m7g`, `r8g`, or `c8g`) with Docker installed. The server is **unauthenticated by default** and binds `0.0.0.0`, so run it inside a private network (security group / VPC).
 
 **Serve a model from Hugging Face**
 
-The container forwards any `llama-server` arguments appended to `docker run` straight through. Fetch a quantized GGUF from Hugging Face at startup with `--hf-repo` / `--hf-file`:
+The container forwards any `llama-server` arguments appended to `docker run`. Fetch a quantized GGUF from Hugging Face at startup with `--hf-repo` / `--hf-file`:
 
 ```
 docker run -d -p 8080:8080 \
@@ -77,7 +77,7 @@ curl http://localhost:8080/v1/chat/completions \
   -d '{"messages": [{"role": "user", "content": "Hello!"}]}'
 ```
 
-All `llama-server` flags (`--ctx-size`, `--parallel`, `--threads`, `--batch-size`, …) are passed as container arguments. The image also bundles `llama-cli` and `llama-bench`; override the entrypoint to run them, e.g. `docker run --rm --entrypoint llama-bench <image> ...`.
+Pass any `llama-server` flag (`--ctx-size`, `--parallel`, `--threads`, `--batch-size`, …) as a container argument. The image also bundles `llama-cli` and `llama-bench`; override the entrypoint to run them, e.g. `docker run --rm --entrypoint llama-bench <image> ...`.
 
 # How to build llama.cpp on Graviton CPUs
 
@@ -204,4 +204,4 @@ Please refer to
 2. [Running Llama 3 70B on the AWS Graviton4 CPU with Human Readable Performance](https://developer.arm.com/community/arm-community-blogs/b/servers-and-cloud-computing-blog/posts/running-llama-3-70b-on-aws-graviton4) for LLM inference performance on AWS Graviton4 based EC2 Instances.
 3. [Intro to Llama on Graviton](https://dev.to/aws-heroes/intro-to-llama-on-graviton-1dc) for a step by step guide on how to deploy an LLM model on AWS Graviton-based EC2 Instances. Note: This guide refers to llama.cpp version from July 2024. If you are using the latest llama.cpp version, please replace the `Q4_0_4_8` and `Q4_0_8_8` with `Q4_0` format.
 4. [Run LLMs on CPU with Amazon SageMaker Real-time Inference](https://community.aws/content/2eazHYzSfcY9flCGKsuGjpwqq1B/run-llms-on-cpu-with-amazon-sagemaker-real-time-inference?lang=en) for running LLMs for real-time inference using AWS Graviton3 and Amazon SageMaker.
-5. [llama.cpp Deep Learning Container on the ECR Public Gallery](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) for the maintained, security-patched Graviton (ARM64) `llama-server` image.
+5. [llama.cpp Deep Learning Container on the Amazon ECR Public Gallery](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) for the maintained, security-patched Graviton (ARM64) `llama-server` image.
