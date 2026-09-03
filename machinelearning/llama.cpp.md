@@ -6,12 +6,12 @@ The main goal of [llama.cpp](https://github.com/ggerganov/llama.cpp) is to enabl
 
 There are two ways to get llama.cpp running on Graviton:
 
-1. **AWS Deep Learning Container (recommended for serving).** AWS publishes a ready-to-use, security-patched Graviton (ARM64) llama.cpp image on the Amazon ECR Public Gallery. It ships the upstream `llama-server` with an OpenAI-compatible API, so you can serve a quantized GGUF model with a single `docker run`. Start here if you want a maintained image without building anything.
+1. **AWS Deep Learning Container.** AWS publishes a production-ready Graviton (ARM64) llama.cpp image on the Amazon ECR Public Gallery. It ships the upstream `llama-server` with an OpenAI-compatible API, so you can serve a quantized GGUF model with a single `docker run`. Start here if you want a maintained image without building anything.
 2. **Build from source.** Compile llama.cpp with `-mcpu=native` for full control over build flags and the CLI tools. Start here if you need a custom build or want to run `llama-cli`/`llama-bench` directly.
 
 # Serve llama.cpp on Graviton with the AWS Deep Learning Container
 
-The [llama.cpp Deep Learning Container (DLC)](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) is a from-source build of upstream llama.cpp for the Graviton3 (Neoverse-V1) baseline, forward-compatible with newer Graviton generations. Running on Amazon Linux 2023 with ongoing security patching, it serves the upstream `llama-server` on port **8080**.
+The [llama.cpp Deep Learning Container (DLC)](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) is a from-source build of upstream llama.cpp for the Graviton3 (Neoverse-V1) baseline, forward-compatible with newer Graviton generations. Built on Amazon Linux 2023 and validated against quantized GGUF models before each release, it serves the upstream `llama-server` on port **8080**.
 
 AWS publishes the Graviton (ARM64) images in the `llama-cpp-arm64` repository on the Amazon ECR Public Gallery:
 
@@ -204,4 +204,4 @@ Please refer to
 2. [Running Llama 3 70B on the AWS Graviton4 CPU with Human Readable Performance](https://developer.arm.com/community/arm-community-blogs/b/servers-and-cloud-computing-blog/posts/running-llama-3-70b-on-aws-graviton4) for LLM inference performance on AWS Graviton4 based EC2 Instances.
 3. [Intro to Llama on Graviton](https://dev.to/aws-heroes/intro-to-llama-on-graviton-1dc) for a step by step guide on how to deploy an LLM model on AWS Graviton-based EC2 Instances. Note: This guide refers to llama.cpp version from July 2024. If you are using the latest llama.cpp version, please replace the `Q4_0_4_8` and `Q4_0_8_8` with `Q4_0` format.
 4. [Run LLMs on CPU with Amazon SageMaker Real-time Inference](https://community.aws/content/2eazHYzSfcY9flCGKsuGjpwqq1B/run-llms-on-cpu-with-amazon-sagemaker-real-time-inference?lang=en) for running LLMs for real-time inference using AWS Graviton3 and Amazon SageMaker.
-5. [llama.cpp Deep Learning Container on the Amazon ECR Public Gallery](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) for the maintained, security-patched Graviton (ARM64) `llama-server` image.
+5. [llama.cpp Deep Learning Container on the Amazon ECR Public Gallery](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) for the production-ready, actively maintained Graviton (ARM64) `llama-server` image.
