@@ -31,7 +31,7 @@ The container forwards any `llama-server` arguments appended to `docker run`. Fe
 ```
 docker run -d -p 8080:8080 \
   public.ecr.aws/deep-learning-containers/llama-cpp-arm64:server-cpu-v1 \
-  --hf-repo ggml-org/Qwen2.5-0.5B-Instruct-GGUF \
+  --hf-repo Qwen/Qwen2.5-0.5B-Instruct-GGUF \
   --hf-file qwen2.5-0.5b-instruct-q4_0.gguf \
   --ctx-size 4096
 ```
@@ -68,7 +68,7 @@ Set `LLAMA_API_KEY` to require a bearer token on every request:
 docker run -d -p 8080:8080 \
   -e LLAMA_API_KEY=my-secret-key \
   public.ecr.aws/deep-learning-containers/llama-cpp-arm64:server-cpu-v1 \
-  --hf-repo ggml-org/Qwen2.5-0.5B-Instruct-GGUF \
+  --hf-repo Qwen/Qwen2.5-0.5B-Instruct-GGUF \
   --hf-file qwen2.5-0.5b-instruct-q4_0.gguf
 
 curl http://localhost:8080/v1/chat/completions \
