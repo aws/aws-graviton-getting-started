@@ -13,12 +13,9 @@ There are two ways to get llama.cpp running on Graviton:
 
 The [llama.cpp Deep Learning Container (DLC)](https://gallery.ecr.aws/deep-learning-containers/llama-cpp-arm64) is a from-source build of upstream llama.cpp for the Graviton3 (Neoverse-V1) baseline, forward-compatible with newer Graviton generations. Built on Amazon Linux 2023 and validated against quantized GGUF models before each release, it serves the upstream `llama-server` on port **8080**.
 
-AWS publishes the Graviton (ARM64) images in the `llama-cpp-arm64` repository on the Amazon ECR Public Gallery:
+AWS publishes the Graviton (ARM64) image in the `llama-cpp-arm64` repository on the Amazon ECR Public Gallery. This guide uses the CPU image for Amazon EC2:
 
-| Platform | Device | Image |
-| --- | --- | --- |
-| Amazon EC2 | CPU | `public.ecr.aws/deep-learning-containers/llama-cpp-arm64:server-cpu-v1` |
-| Amazon SageMaker | CPU | `public.ecr.aws/deep-learning-containers/llama-cpp-arm64:server-sagemaker-cpu-v1` |
+`public.ecr.aws/deep-learning-containers/llama-cpp-arm64:server-cpu-v1`
 
 **Prerequisites**
 
@@ -81,7 +78,7 @@ Pass any `llama-server` flag (`--ctx-size`, `--parallel`, `--threads`, `--batch-
 
 # How to build llama.cpp on Graviton CPUs
 
-Building from sources is the recommended way to use llama.cpp on Graviton CPUs, and for other hardware platforms too. This section provides the instructions on how to build llama.cpp from sources and how to install python bindings.
+Building from source gives you full control over the build flags and direct access to the llama.cpp CLI tools, and works on other hardware platforms too. This section provides the instructions on how to build llama.cpp from sources and how to install python bindings.
 
 **Prerequisites**
 
