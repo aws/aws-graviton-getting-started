@@ -2,18 +2,75 @@
 
 **Introduction**
 
-vLLM is a fast and easy-to-use library for LLM inference and serving. It provides an OpenAI-compatible API server and support NVIDIA GPUs, CPUs and AWS Neuron. vLLM has been adapted to work on ARM64 CPUs with NEON support, leveraging the CPU backend initially developed for the x86 platform. ARM CPU backend currently supports Float32, FP16 and BFloat16 datatypes.
-This document covers how to build and run vLLM for LLM inference on AWS Graviton based Amazon EC2 Instances. 
+[vLLM](https://github.com/vllm-project/vllm) is a fast and easy-to-use library for LLM inference and serving. It provides an OpenAI-compatible API server and supports NVIDIA GPUs, CPUs, and AWS Neuron. vLLM runs on ARM64 CPUs with NEON support through its CPU backend, which was first developed for x86. The ARM CPU backend supports the Float32, FP16, and BFloat16 data types. This document covers how to run vLLM for LLM inference on AWS Graviton-based Amazon EC2 instances.
 
-# How to use vLLM on Graviton CPUs
+There are two ways to get vLLM running on Graviton:
 
-There are no pre-built wheels or images for Graviton CPUs, so you must build vLLM from source.
+1. **AWS Deep Learning Container.** AWS publishes a Graviton (ARM64) vLLM image on the Amazon ECR Public Gallery. It runs the upstream vLLM OpenAI-compatible server with the CPU backend prebuilt, so you can serve a Hugging Face model with a single `docker run`. Start here if you want a maintained image without building anything.
+2. **Build from source.** Compile the vLLM CPU backend yourself. Start here if you need a custom build or an unreleased vLLM version.
+
+# Serve vLLM on Graviton with the AWS Deep Learning Container
+
+The [vLLM Deep Learning Container (DLC)](https://gallery.ecr.aws/deep-learning-containers/vllm-arm64) builds vLLM from source with BFloat16 kernels for Graviton3 and later. It is built on Amazon Linux 2023, needs no GPU, and serves the OpenAI-compatible API on port **8000**.
+
+AWS publishes the image in the `vllm-arm64` repository on the Amazon ECR Public Gallery. This guide uses the CPU image for Amazon EC2:
+
+`public.ecr.aws/deep-learning-containers/vllm-arm64:server-cpu-v1`
+
+A SageMaker AI variant is also available as `vllm-arm64:server-sagemaker-cpu-v1`.
 
 **Prerequisites**
 
-Graviton3(E) (e.g. *7g instances) and Graviton4 (e.g. *8g instances) CPUs support BFloat16 format and MMLA instructions for machine learning (ML) acceleration. These hardware features are enabled starting with Linux Kernel version 5.10. So, it is highly recommended to use the AMIs based on Linux Kernel 5.10 and beyond for the best LLM inference performance on Graviton Instances. Use the following queries to list the AMIs with the recommended Kernel versions. New Ubuntu 22.04, 24.04, and AL2023 AMIs all have kernels newer than 5.10.
+Launch a Graviton3(E)- or Graviton4-based EC2 instance (for example, `c7g`, `m7g`, `c8g`, or `r8g`) with Docker installed. The server is **unauthenticated by default**, so run it inside a private network (security group / VPC), or pass `--api-key` to require a bearer token on every request.
 
-The following steps were tested on a Graviton3 R7g.4xlarge and Ubuntu 24.04.1
+**Serve a model from Hugging Face**
+
+The container forwards any `vllm serve` arguments appended to `docker run`:
+
+```
+docker run -d -p 8000:8000 --shm-size=4g \
+  public.ecr.aws/deep-learning-containers/vllm-arm64:server-cpu-v1 \
+  --model Qwen/Qwen3.5-2B \
+  --dtype bfloat16 \
+  --max-model-len 4096 \
+  --host 0.0.0.0 --port 8000
+```
+
+Wait for the model to load, then call the OpenAI-compatible API:
+
+```
+until curl -sf http://localhost:8000/health > /dev/null; do sleep 5; done
+
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3.5-2B",
+    "messages": [{"role": "user", "content": "Why is the sky blue?"}],
+    "max_tokens": 100
+  }'
+```
+
+**CPU defaults**
+
+The image sets these defaults at startup. Override any of them with `-e`, for example `-e VLLM_CPU_KVCACHE_SPACE=16`.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VLLM_CPU_KVCACHE_SPACE` | 40% of host RAM (minimum 2 GiB) | KV-cache size in GiB. GPU memory flags such as `--gpu-memory-utilization` have no effect on CPU. |
+| `VLLM_CPU_OMP_THREADS_BIND` | `nobind` | OpenMP thread binding. Set to `auto` or a core list (for example `0-31`) to pin threads. |
+| `LD_PRELOAD` | `libtcmalloc_minimal.so.4` | Uses tcmalloc for lower allocator overhead. |
+
+Use BFloat16 weights. The CPU backend does not support GGUF models; use [llama.cpp](llama.cpp.md) for those.
+
+# How to build vLLM on Graviton CPUs
+
+Building from source gives you full control over the build and lets you run any vLLM version, including unreleased commits.
+
+**Prerequisites**
+
+Graviton3(E) (e.g. *7g instances) and Graviton4 (e.g. *8g instances) CPUs support BFloat16 format and MMLA instructions for machine learning (ML) acceleration. These hardware features are enabled starting with Linux Kernel version 5.10. So, it is highly recommended to use the AMIs based on Linux Kernel 5.10 or later for the best LLM inference performance on Graviton Instances. Use the following queries to list the AMIs with the recommended Kernel versions. New Ubuntu 22.04, 24.04, and AL2023 AMIs all have kernels newer than 5.10.
+
+The following steps were tested on a Graviton3 r7g.4xlarge with Ubuntu 24.04.1.
 
 ```
 # For Kernel 5.10 based AMIs list
@@ -68,5 +125,8 @@ Sample output is as below.
 ```
 
 # Additional Resources
-https://learn.arm.com/learning-paths/servers-and-cloud-computing/vllm/vllm-server/
-https://docs.vllm.ai/en/latest/getting_started/installation/cpu/index.html?device=arm
+
+1. [vLLM Deep Learning Container on the Amazon ECR Public Gallery](https://gallery.ecr.aws/deep-learning-containers/vllm-arm64) for the maintained Graviton (ARM64) vLLM image.
+2. [AWS Deep Learning Containers vLLM documentation](https://aws.github.io/deep-learning-containers/vllm/) for EC2 and SageMaker AI deployment, including Graviton.
+3. [Arm Learning Path: Build and run a vLLM server on Arm](https://learn.arm.com/learning-paths/servers-and-cloud-computing/vllm/vllm-server/)
+4. [vLLM CPU installation guide](https://docs.vllm.ai/en/latest/getting_started/installation/cpu/index.html?device=arm)
