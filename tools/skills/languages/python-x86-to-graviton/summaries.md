@@ -1,0 +1,29 @@
+# Skill File Index
+
+This file is the canonical inventory of the skill. Every file in the skill folder is listed below with its purpose and when to read it. Keep it in sync when adding, removing, or renaming files.
+
+* "summaries.md": "This file. Canonical index of every file in the skill and when to read each one. Linked from SKILL.md and POWER.md; useful when entering mid-skill or needing the full file map."
+
+* "SKILL.md": "Main entry point (Agent Skills format). Contains scope guardrails, entry/exit criteria, transformation workflow overview with phase routing, test failure handling, and documentation output mapping. Read this first."
+
+* "POWER.md": "Main entry point (Kiro format). Same content as SKILL.md with Kiro-specific frontmatter (displayName, keywords, author)."
+
+* "phases/phase1-static-analysis.md": "Detailed steps for Phase 1: project structure analysis (deployment type, monorepo detection, package manager and interpreter detection, target OS and glibc (libc family, Lambda runtime, kernel page size), dependency tree and flat pinned list), native library validation (every committed or vendored native file, judged by its ELF header, Lambda layers, in-repo extensions, binaries downloaded at run, build or deploy time, OS packages) with the tiered FAIL/WARN/PASS policy, the aarch64 wheel probe over every resolved pin including transitives, hash-lock check, build-time binaries outside the dependency tree, architecture-specific code, ctypes/cffi load and build-flag detection, and the Python version check with live end-of-life lookup and the interpreter bump gate."
+
+* "phases/phase2-resolution.md": "Detailed steps for Phase 2: native library resolution (aarch64 builds on ARM64 hardware or cross-compiled for plain C libraries, side-by-side extensions, re-vendoring layers from aarch64 wheels), dependency updates for MUST UPGRADE items only (lowest version with an aarch64 wheel, constraints and per-manager override and lock regeneration, hash-lock fixes, substitutions and user decisions), architecture detection code updates, build configuration (x86-only flag guards, Dockerfile pip install on $TARGETPLATFORM, Lambda and manifest edits), and documented Graviton runtime recommendations with evidence levels."
+
+* "phases/phase3-validation.md": "Detailed steps for Phase 3: working container runtime detection, emulation limits on x86 hosts (bounded container runs, no source builds under QEMU, native aarch64 wheel download), Python runtime alignment and session-scoped interpreter switching, install and build validation with INFRA/ARM64/PRE-EXISTING failure classification, container validation including an ELF architecture scan, import smoke test and functional testing, startup checks with misleading-symptom table, and summary generation."
+
+* "document_references/agent-scope-boundaries.md": "CRITICAL guardrails. Decision tree for every dependency analysis, the MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE / OUT OF SCOPE labels, IN SCOPE vs OUT OF SCOPE definitions, the recommendation validation ladder, verified pure-Python packages (always compatible), red flags for scope creep, and case studies built from verified evidence. MUST be read before starting."
+
+* "document_references/wheel-verification.md": "Evidence standard for every dependency verdict: wheel tag vocabulary and pip version floors, the pip download probe and its verdict matrix, the PyPI JSON files-list method and verified floors for packages this repository documents, sdist inspection, interpreter ABI mismatches, glibc and manylinux tags with distro glibc versions, hash-locked requirements, private indexes, and false-verdict traps. Read during Phase 1.3 and whenever a verdict needs evidence."
+
+* "document_references/package-manager-mapping.md": "Detection markers and per-manager commands (flat-pin export, dependency tree, aarch64 probe, pin and override mechanism, lock regeneration, install and test) for pip, pip-tools, setuptools/PEP 621, uv, Poetry and conda, plus routes onto the pip path for Pipenv, PDM, Hatch, vendored site-packages and Lambda layers. Read in Phase 1.1 to identify the manager and whenever a step needs that manager's command."
+
+* "document_references/documentation-standards.md": "Defines the mandatory graviton-validation/ output folder structure, canonical filenames (00-summary.md through 06-build-test-results.md plus raw/), required sections for each file with the Required/Improvement/Compatible split, and mapping from transformation steps to output files. Read before Phase 1."
+
+* "document_references/skill-configuration.md": "Optional. Defines the skill-config.md configuration teams use to steer the package manager, package index, validation interpreter tool, test command, container registry, and deployment vocabulary without forking the skill. Includes the field reference and precedence rules (configuration steers HOW, never widens scope; the declared Python version changes only through python.interpreter_bump), plus the shared vs per-language section layout. Read before Phase 1 only if a skill-config.md is present."
+
+* "document_references/skill-config.template.md": "Copyable template for the optional skill configuration. Teams copy it to skill-config.md at their own project root and fill in shared (container/deployment/CI) and per-language (Python) preferences. Not read during a run; it is the authoring starting point for skill-configuration.md."
+
+* "README.md": "Human-facing overview: what the skill does, install quick start, how to enable the optional skill-config.md, and the graviton-validation/ output listing. Not read during a run; it points humans at this index for the file map."
