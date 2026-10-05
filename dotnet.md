@@ -31,7 +31,7 @@ Since version 5, .NET has added specific Arm64 optimizations in both the .NET li
 
 
 ## Building & Publishing for Linux Arm64
-The .NET SDK supports choosing a [Runtime Identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/rid-catalog) used to target platforms where the applications run. These RIDs are used by .NET dependencies (NuGet packages) to represent platform-specific resources in NuGet packages. The following values are examples of RIDs: linux-arm64, linux-x64, ubuntu.14.04-x64, win7-x64, or osx.10.12-x64. For the NuGet packages with native dependencies, the RID designates on which platforms the package can be restored.
+The .NET SDK supports choosing a [Runtime Identifier (RID)](https://docs.microsoft.com/en-us/dotnet/core/rid-catalog) used to target platforms where the applications run. These RIDs are used by .NET dependencies (NuGet packages) to represent platform-specific resources in NuGet packages. The following values are examples of RIDs: linux-arm64, linux-x64, linux-musl-arm64, win-x64, or osx-arm64. For the NuGet packages with native dependencies, the RID designates on which platforms the package can be restored. Starting with .NET 8, the SDK and runtime consider only RIDs that are not specific to an OS version or distribution, such as the ones above; version-specific RIDs such as `ubuntu.14.04-x64` or `win7-x64` are no longer used when selecting assets (see the [RID catalog](https://learn.microsoft.com/en-us/dotnet/core/rid-catalog)).
 
 You can build and publish on any host operating system. As an example, you can develop on Windows and build locally to target Arm64, or you can use a CI server like Jenkins on Linux. The commands are the same.
 
@@ -41,3 +41,7 @@ dotnet publish -c Release -r linux-arm64
 ```
 
 For more information about [publishing .NET apps with the .NET CLI](https://docs.microsoft.com/en-us/dotnet/core/deploying/deploy-with-cli) please see the offical documents.
+
+## Agent Skills for .NET Migration
+
+To automate the x86-to-Graviton migration process using an AI coding assistant (Claude Code, Kiro, Cursor, Codex, Windsurf, and others), use the [.NET x86-to-Graviton Agent Skill](tools/skills/languages/dotnet-x86-to-graviton/). It walks an agent through checking that every NuGet package ships an aarch64 native file for each target runtime identifier, validating native files and Windows-only APIs, moving Windows and .NET Framework applications to modern .NET on Linux, fixing project and Dockerfile settings, and validating publish outputs and tests on ARM64. See [tools/skills/](tools/skills/) for installation instructions.
