@@ -328,9 +328,16 @@ ships pip 20.0.2, so upgrade pip there first):
 python3 -m pip install confluent-kafka
 ```
 
-Each release has wheels only for the Python versions it supports (2.15.1: Python
-3.8 to 3.14), so on RHEL 8 use a newer Python than the default 3.6 (see
-[section 1.3](#13-python-on-al2-and-rhel-8)).
+Each release has aarch64 wheels for a range of Python versions (2.15.1: Python
+3.8 to 3.14). On RHEL 8, the default Python 3.6 is too old for current releases,
+and the pip packages for Python 3.6, 3.8 and 3.9 are older than 20.3, so pip
+tries to build from source instead. Python 3.12, available from RHEL 8.10, has a
+new enough pip:
+
+```
+sudo yum install python3.12 python3.12-pip
+python3.12 -m pip install confluent-kafka
+```
 
 Amazon Linux 2 has glibc 2.26, so pip cannot use these wheels there. On Amazon
 Linux 2, first install librdkafka and its development libraries by following the

@@ -10,7 +10,7 @@ Ubuntu | 22.04 LTS | Yes | 4KB | [jammy](https://cloud-images.ubuntu.com/locator
 Ubuntu | 20.04 LTS | Yes | 4KB | [focal](https://cloud-images.ubuntu.com/locator/ec2/) | Yes | 
 ~~Ubuntu~~ | ~~18.04 LTS~~ | ~~Yes (*)~~ | ~~4KB~~ | ~~[bionic](https://cloud-images.ubuntu.com/locator/ec2/)~~ | ~~Yes~~ | (*) needs `apt install libc6-lse`. Standard support ended 2023/05/31; ESM only.
 SuSE | 15 SP2 or later| Planned | 4KB | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07SPTXBDX) | Yes | 
-Redhat Enterprise Linux | 8.2 or later | Yes | 64KB on 8.x, 4KB on 9 and 10 (a `kernel-64k` package provides 64KB) | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07T2NH46P) | Yes |
+Redhat Enterprise Linux | 8.2 or later | Yes | 64KB on 8.x, 4KB on 9 and 10 (a `kernel-64k` package provides 64KB on 9 and 10) | [MarketPlace](https://aws.amazon.com/marketplace/pp/B07T2NH46P) | Yes |
 ~~Redhat Enterprise Linux~~ | ~~7.x~~ | ~~No~~ | ~~64KB~~ | ~~[MarketPlace](https://aws.amazon.com/marketplace/pp/B07KTFV2S8)~~ | | Supported on A1 instances but not on Graviton2 and later based ones
 AlmaLinux | 8.4 or later | Yes | 64KB on 8.x, 4KB on 9 and 10 (a `kernel-64k` package provides 64KB on 9 and 10) | [AMIs](https://wiki.almalinux.org/cloud/AWS.html) | Yes |
 Alpine Linux | 3.12.7 or later | Yes (*) | 4KB | [AMIs](https://www.alpinelinux.org/cloud/) | | (*) LSE enablement checked in version 3.14 |
