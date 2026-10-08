@@ -28,7 +28,7 @@ This needs the AWS CLI v2 with credentials and `python3` on your machine. It lau
 2. Same arm64 host, contraction on vs off.
 3. x86-64 vs arm64, both with contraction off.
 
-Then it terminates the instances and deletes the bucket, security group and IAM role it created. Every resource a run creates carries a unique run id: the instances and security group are tagged `Project=graviton-numerical-validation` and `RunId=<id>`, and the bucket (`gnv-results-<account>-<id>`) and IAM role (`graviton-numerical-validation-<id>`) carry the id in their names. Cleanup removes only that run's resources, so concurrent runs do not interfere, and `--cleanup-only --run-id <id>` removes one interrupted run. The run takes about ten minutes and the report and dumps are saved under `results/run-<id>/`.
+Then it terminates the instances and deletes the bucket and security group it created. The per-run resources carry a unique run id so concurrent runs do not interfere: the instances and security group are tagged `Project=graviton-numerical-validation` and `RunId=<id>`, and the bucket is named `gnv-results-<account>-<id>`. A single shared IAM role (`graviton-numerical-validation-role`) is left in place for reuse and removed only by the account-wide sweep (`--cleanup-only` with no `--run-id`). `--cleanup-only --run-id <id>` removes one run's instances, security group and bucket, and leaves the shared role alone. The run takes about ten minutes and the report and dumps are saved under `results/run-<id>/`.
 
 Instances are reached with SSM Run Command. No SSH key pair is created and the security group has no inbound rules.
 
@@ -59,12 +59,12 @@ The benchmark prices 16 million options on all hardware threads, best of 8 repea
 
 What the script creates in your account, and what each piece can do:
 
-- An IAM role and instance profile for the two instances, with the AWS managed policy `AmazonSSMManagedInstanceCore` and one inline statement allowing `s3:PutObject` to that run's results bucket only. The role has no other S3, EC2 or IAM rights.
+- A single IAM role and instance profile (`graviton-numerical-validation-role`, shared across runs), with the AWS managed policy `AmazonSSMManagedInstanceCore` and one inline statement allowing `s3:PutObject` to the `gnv-results-*` bucket prefix. The role has no other S3, EC2 or IAM rights. It is created on first run and removed only by the account-wide sweep (`--cleanup-only` with no `--run-id`).
 - A security group with no inbound rules.
 - An S3 bucket with all public access blocked, deleted at the end.
 - Two instances with IMDSv2 required and an encrypted root volume.
 
-The identity running the script needs the following. It is broader than the instance role because it creates and deletes the resources above. Scope the IAM statements to the role name used by the script and the S3 statements to the bucket prefix; EC2 launch and describe calls need `*` as their resource.
+The identity running the script needs the following. It is broader than the instance role because it creates and deletes the resources above. The IAM statements are scoped to the one fixed role and instance-profile name the script uses, and the S3 statements to the `gnv-results-*` bucket prefix; the EC2 launch and describe calls do not support resource-level scoping and need `*`.
 
 ```json
 {
@@ -193,7 +193,7 @@ The correctness comparison is the point of the harness; `pricer` and `compare.py
 - The CORE-MATH project, correctly rounded elementary functions being integrated into glibc and other libms. https://core-math.gitlabpages.inria.fr/
 - glibc source, x86-64 FMA variants of libm functions selected by ifunc: https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/fpu/multiarch/Makefile and https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/fpu/multiarch/e_exp.c
 - GCC manual, `-ffp-contract`. https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
-- Clang, discussion of the `-ffp-contract` default change to `on` (the LLVM issue tracking the change; the release notes record it landing in Clang 14). https://github.com/llvm/llvm-project/issues/50688
+- Clang User Manual, "Controlling Floating Point Behavior": the default floating-point model is `precise`, which sets `-ffp-contract=on`. https://clang.llvm.org/docs/UsersManual.html#controlling-floating-point-behavior The regression report when this default changed is https://github.com/llvm/llvm-project/issues/50688
 - Amazon Linux 2023, performance and operational optimizations (x86-64-v2 and `armv8.2-a+crypto` build targets). https://docs.aws.amazon.com/linux/al2023/ug/performance-optimizations.html
 - AWS Graviton Technical Guide, C/C++ on Graviton (compiler flags per generation). https://github.com/aws/aws-graviton-getting-started/blob/main/c-c++.md
 - Financial Services Grid Computing on AWS, Software considerations (IEEE 754 compliance and compiler variation). https://docs.aws.amazon.com/whitepapers/latest/financial-services-grid-computing/software-considerations.html

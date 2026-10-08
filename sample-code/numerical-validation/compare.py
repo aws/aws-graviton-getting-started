@@ -95,13 +95,22 @@ def main():
         sum_a += a
         sum_b += b
 
-        # A NaN or infinity on either side cannot be bounded by a numeric
-        # tolerance. If the two sides are not identical, record it as a
-        # mismatch that fails the check. Two bit-identical values (including
-        # the same NaN) are treated as equal here, since the raw-byte
-        # fingerprint is what detects differing NaN payloads.
-        if not (math.isfinite(a) and math.isfinite(b)):
-            if struct.pack("<d", a) != struct.pack("<d", b):
+        # A NaN or infinity cannot be bounded by a numeric tolerance. Compare
+        # these by value, not by bits: two NaNs are equal regardless of payload
+        # or sign (x86 and arm64 emit different NaN encodings for the same
+        # invalid operation, which is not a result difference), and infinities
+        # are equal when they have the same sign. Any other non-finite pairing
+        # (NaN vs a number, +inf vs -inf, inf vs a finite value) is a mismatch
+        # that fails the check.
+        a_nan, b_nan = math.isnan(a), math.isnan(b)
+        if a_nan or b_nan or math.isinf(a) or math.isinf(b):
+            if a_nan and b_nan:
+                equal = True            # both NaN: equal by value
+            elif a_nan or b_nan:
+                equal = False           # exactly one NaN
+            else:
+                equal = (a == b)        # inf vs inf/finite: +inf==+inf only
+            if not equal:
                 n_diff += 1
                 n_nonfinite += 1
                 if nonfinite_at is None:

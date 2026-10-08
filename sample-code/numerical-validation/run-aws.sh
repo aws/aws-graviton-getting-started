@@ -8,8 +8,10 @@
 # Nothing is installed locally. Instances are reached with SSM Run Command,
 # so no SSH key and no inbound security group rule are created.
 #
-# Every resource created by a run carries a unique run id, so concurrent runs
-# are isolated and cleaning up one run never touches another.
+# Each run's instances, security group and bucket carry a unique run id, so
+# concurrent runs stay isolated and cleaning up one run never touches another.
+# One IAM role is shared across runs under a fixed name; only the account-wide
+# --cleanup-only (no --run-id) removes it.
 #
 # Usage:
 #   ./run-aws.sh [--region R] [--x86 TYPE] [--arm TYPE] [--bench]
@@ -52,6 +54,7 @@ BENCH=0
 KEEP=0
 CLEANUP_ONLY=0
 RUN_ID=""
+RUN_ID_GIVEN=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -62,11 +65,22 @@ while [ $# -gt 0 ]; do
         --instance-profile) PROFILE_NAME="$2"; shift 2;;
         --keep)    KEEP=1; shift;;
         --cleanup-only) CLEANUP_ONLY=1; shift;;
-        --run-id)  RUN_ID="$2"; shift 2;;
+        --run-id)  RUN_ID="$2"; RUN_ID_GIVEN=1; shift 2;;
         -h|--help) awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$0"; exit 0;;
         *) echo "unknown option: $1" >&2; exit 2;;
     esac
 done
+
+# A run id becomes a resource name and an EC2 tag-filter value, so it is
+# validated before any AWS call. Reject anything but the characters the
+# generated ids use: a value like '*' would otherwise widen a cleanup tag
+# filter to match other runs, or even other projects. An explicitly empty
+# --run-id is rejected too, so the destructive account-wide sweep can only be
+# requested by omitting the flag, never by passing it blank by mistake.
+if [ "$RUN_ID_GIVEN" = 1 ] && ! printf '%s' "$RUN_ID" | grep -qE '^[A-Za-z0-9-]+$'; then
+    echo "error: --run-id must be non-empty and contain only letters, digits and hyphens" >&2
+    exit 2
+fi
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TAG="graviton-numerical-validation"
@@ -78,15 +92,21 @@ BUCKET_PREFIX="gnv-results-"
 # --run-id is the one exception: it sweeps every run's resources in the
 # account, which is why it has to be asked for explicitly.
 SWEEP_ALL=0
-if [ "$CLEANUP_ONLY" = 1 ] && [ -z "$RUN_ID" ]; then
+if [ "$CLEANUP_ONLY" = 1 ] && [ "$RUN_ID_GIVEN" = 0 ]; then
     SWEEP_ALL=1
 fi
-[ -n "$RUN_ID" ] || RUN_ID="$(date +%Y%m%d-%H%M%S)-$RANDOM"
+[ "$RUN_ID_GIVEN" = 1 ] || RUN_ID="$(date +%Y%m%d-%H%M%S)-$RANDOM"
 
 OUT_DIR="$HERE/results/run-$RUN_ID"
 SG_NAME="$TAG-$RUN_ID-sg"
-ROLE_NAME="$TAG-$RUN_ID"
-OWN_PROFILE=0
+# The IAM role has a fixed name and is shared across runs. This keeps the
+# caller's IAM permissions scoped to one exact role name (no wildcard), and
+# the role is safe to share because its inline policy grants PutObject to the
+# whole gnv-results-* bucket prefix, not to one run's bucket, so concurrent
+# runs do not race to rewrite it. Instances (RunId tag), the security group
+# and the bucket are still per-run; only the shared role is not deleted by a
+# single run's cleanup.
+ROLE_NAME="$TAG-role"
 BUCKET=""
 INSTANCE_IDS=()
 SG_ID=""
@@ -94,6 +114,15 @@ SG_ID=""
 aws_() { aws --region "$REGION" --output text "$@"; }
 log()  { printf '>> %s\n' "$*"; }
 die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+command -v aws >/dev/null || die "aws CLI not found"
+
+# Resolve the account up front so the bucket name is known even in
+# --cleanup-only mode, which exits before the normal run would set it. The
+# bucket name is a pure function of the account and the run id, so single-run
+# cleanup can delete it without the create step having run in this process.
+ACCOUNT=$(aws_ sts get-caller-identity --query Account) || die "AWS credentials not available"
+[ "$SWEEP_ALL" = 1 ] || BUCKET="$BUCKET_PREFIX$ACCOUNT-$RUN_ID"
 
 # ---------------------------------------------------------------- cleanup ---
 
@@ -116,16 +145,21 @@ cleanup() {
     fi
 
     # Instances: scope to this run by RunId tag, unless sweeping all runs.
-    local inst_filter ids
+    local inst_filter inst_filter_project="" ids
     if [ "$SWEEP_ALL" = 1 ]; then
         log "Cleaning up ALL $TAG runs in $REGION"
         inst_filter="Name=tag:Project,Values=$TAG"
     else
         log "Cleaning up run $RUN_ID"
+        # Always AND the Project tag with the RunId. Even if a RunId value
+        # somehow carried a wildcard (input validation already prevents this),
+        # the Project constraint keeps the match inside this harness and never
+        # reaches another project's instances.
+        inst_filter_project="Name=tag:Project,Values=$TAG"
         inst_filter="Name=tag:RunId,Values=$RUN_ID"
     fi
     ids=$(aws_ ec2 describe-instances \
-        --filters "$inst_filter" \
+        --filters ${inst_filter_project:+"$inst_filter_project"} "$inst_filter" \
                   "Name=instance-state-name,Values=pending,running,stopping,stopped" \
         --query 'Reservations[].Instances[].InstanceId')
     if [ -n "$ids" ]; then
@@ -137,20 +171,21 @@ cleanup() {
     # Security groups, buckets and roles: this run's by name, or every run's
     # when sweeping. A security group cannot be deleted until the instances
     # that used it are gone, so this retries.
+    # The IAM role has a fixed name and is shared across runs, so only the
+    # account-wide sweep (--cleanup-only with no --run-id) deletes it. Neither
+    # a normal run nor a single-run --cleanup-only --run-id touches it, since a
+    # concurrent run may still need it. The sweep finds the per-run security
+    # groups and buckets by prefix; a single run uses its own names.
     local sgs roles buckets
     if [ "$SWEEP_ALL" = 1 ]; then
         sgs=$(aws_ ec2 describe-security-groups \
             --filters "Name=group-name,Values=$TAG-*-sg" --query 'SecurityGroups[].GroupName')
-        roles=$(aws_ iam list-roles --query "Roles[?starts_with(RoleName, '$TAG-')].RoleName")
         buckets=$(aws_ s3api list-buckets --query "Buckets[?starts_with(Name, '$BUCKET_PREFIX')].Name")
+        roles="$ROLE_NAME"
     else
         sgs="$SG_NAME"
         buckets="$BUCKET"
-        if [ "$OWN_PROFILE" = 1 ] || [ "$CLEANUP_ONLY" = 1 ]; then
-            roles="$ROLE_NAME"
-        else
-            roles=""
-        fi
+        roles=""
     fi
 
     for sg in $sgs; do
@@ -175,11 +210,9 @@ if [ "$CLEANUP_ONLY" = 1 ]; then exit 0; fi
 
 # ------------------------------------------------------------- preflight ---
 
-command -v aws >/dev/null || die "aws CLI not found"
 command -v python3 >/dev/null || die "python3 not found"
 [ -f "$HERE/pricer.cpp" ] || die "pricer.cpp not found next to this script"
 
-ACCOUNT=$(aws_ sts get-caller-identity --query Account) || die "AWS credentials not available"
 log "Account $ACCOUNT, region $REGION"
 
 offered=$(aws_ ec2 describe-instance-type-offerings --location-type region \
@@ -200,7 +233,7 @@ log "AMIs: x86_64 $AMI_X86, arm64 $AMI_ARM"
 
 # ---------------------------------------------------------------- bucket ---
 
-BUCKET="$BUCKET_PREFIX$ACCOUNT-$RUN_ID"
+# BUCKET was computed up front (needed by --cleanup-only); create it now.
 if [ "$REGION" = "us-east-1" ]; then
     aws_ s3api create-bucket --bucket "$BUCKET" >/dev/null
 else
@@ -215,19 +248,26 @@ log "Results bucket $BUCKET"
 
 if [ -z "$PROFILE_NAME" ]; then
     PROFILE_NAME="$ROLE_NAME"
-    OWN_PROFILE=1
     if ! aws_ iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
-        log "Creating IAM role $ROLE_NAME (SSM core + put to results bucket)"
+        log "Creating IAM role $ROLE_NAME (SSM core + put to results buckets)"
+        # Tolerate EntityAlreadyExists: a concurrent run may create the shared
+        # role between the get-role check above and here. attach-role-policy is
+        # idempotent, so running it either way is safe.
         aws_ iam create-role --role-name "$ROLE_NAME" --assume-role-policy-document \
-            '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null 2>&1 || true
         aws_ iam attach-role-policy --role-name "$ROLE_NAME" \
-            --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+            --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore >/dev/null 2>&1 || true
     fi
+    # Scope the instance's write to the gnv-results-* bucket prefix, not one
+    # run's bucket. The role is shared, so a per-run resource here would race
+    # with concurrent runs; the prefix is stable and set once.
     aws_ iam put-role-policy --role-name "$ROLE_NAME" --policy-name results-bucket --policy-document \
-        "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"s3:PutObject\",\"Resource\":\"arn:aws:s3:::$BUCKET/*\"}]}"
+        "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"s3:PutObject\",\"Resource\":\"arn:aws:s3:::$BUCKET_PREFIX*/*\"}]}"
     if ! aws_ iam get-instance-profile --instance-profile-name "$ROLE_NAME" >/dev/null 2>&1; then
-        aws_ iam create-instance-profile --instance-profile-name "$ROLE_NAME" >/dev/null
-        aws_ iam add-role-to-instance-profile --instance-profile-name "$ROLE_NAME" --role-name "$ROLE_NAME"
+        # Tolerate a concurrent run having created these between the check and
+        # here (EntityAlreadyExists / LimitExceeded on the add are harmless).
+        aws_ iam create-instance-profile --instance-profile-name "$ROLE_NAME" >/dev/null 2>&1 || true
+        aws_ iam add-role-to-instance-profile --instance-profile-name "$ROLE_NAME" --role-name "$ROLE_NAME" >/dev/null 2>&1 || true
         log "Waiting for instance profile to propagate"; sleep 15
     fi
 fi
