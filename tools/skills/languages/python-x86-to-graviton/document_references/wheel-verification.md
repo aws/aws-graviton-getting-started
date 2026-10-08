@@ -42,7 +42,7 @@ A wheel filename is `{name}-{version}-{python tag}-{abi tag}-{platform tag}.whl`
 
 Legacy manylinux aliases, from [PEP 600](https://peps.python.org/pep-0600/): `manylinux1` = `manylinux_2_5`, `manylinux2010` = `manylinux_2_12`, `manylinux2014` = `manylinux_2_17`. Only `manylinux2014` and later have aarch64 variants; `manylinux1`/`manylinux2010` are x86 only.
 
-pip version floors (from [pip's changelog](https://pip.pypa.io/en/stable/news/)): `manylinux2014` tags were added in **pip 19.3** (2019-10-14), which is why the repo's [python.md](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md) and [README](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#python-installation-on-some-linux-distros) require pip > 19.3 on Graviton; perennial `manylinux_2_N` tags (PEP 600) were added in **pip 20.3** (2020-11-30). An older pip on the target cannot see aarch64 wheels at all and will build everything from source. Check `python3 -m pip --version` on the target before interpreting any install failure, and upgrade with `python3 -m pip install --upgrade pip` (the repo's documented workaround).
+pip version floors (from [pip's changelog](https://pip.pypa.io/en/stable/news/)): `manylinux2014` tags were added in **pip 19.3** (2019-10-14), which is why the repo's [python.md](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md) and [README](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#python-installation-on-some-linux-distros) require pip > 19.3 on Graviton; perennial `manylinux_2_N` tags (PEP 600) were added in **pip 20.3** (2020-11-30). An older pip on the target cannot see aarch64 wheels at all and will build everything from source. Check `python3 -m pip --version` on the target before interpreting any install failure, and upgrade with `python3 -m pip install --upgrade pip` (the repo's documented workaround). Current aarch64 wheels mostly carry `manylinux_2_N` tags only (numpy 2.5.3, pillow 12.3.0 and torch 2.14.1 publish no `manylinux2014` aarch64 wheel), so pip 20.3 is the floor that matters. Executed on an x86_64 host with Python 3.8 (pip applies the same tag rules on aarch64): pip 19.3.1 and 20.2.4 found no `confluent-kafka==2.5.0`, whose cp38 x86_64 wheel is tagged `manylinux_2_28` only, and pip 20.3 downloaded it.
 
 ## 3. The Probe: `pip download` Against the aarch64 Platform
 
@@ -64,13 +64,20 @@ platforms() { # $1=arch ; sets PLAT
 # Usage: probe <requirement> <arch>; prints the wheel filename on success.
 # --only-binary=:all: is mandatory: without it pip accepts the sdist and the
 # probe "passes" for a package that has no aarch64 wheel at all (false PASS).
+# --no-input and </dev/null: pip never prompts, so it cannot consume the caller's input (a loop's list of pins).
+# -vv logs every index request, so a request that failed (401, 403, 404, no connection) is reported as
+# CHECK INDEX (return code 4) instead of reading like a missing wheel. --disable-pip-version-check keeps
+# pip's own update check out of the log, so a failed request is always the probe's.
 probe() {
   local req="$1" arch="$2" pyver="${PYVER:-3.11}" d
   platforms "$arch"; d=$(mktemp -d "${TMPDIR:-/tmp}/probe.XXXXXX")
-  if python3 -m pip download --only-binary=:all: --no-deps -q -d "$d" "${PLAT[@]}" \
+  if python3 -m pip download --no-input --disable-pip-version-check --only-binary=:all: --no-deps -vv -d "$d" "${PLAT[@]}" \
        --python-version "$pyver" --implementation cp --abi "cp${pyver/./}" \
-       "$req" >"$d/log" 2>&1; then
+       "$req" </dev/null >"$d/log" 2>&1; then
     ls "$d" | grep '\.whl$' || echo "nothing downloaded: an environment marker excluded the pin on this host (section 10)"
+  elif grep -q 'Could not fetch URL' "$d/log"; then
+    echo "CHECK INDEX: $(grep -m1 'Could not fetch URL' "$d/log" | sed -E 's/^.*Could not fetch URL ([^ ]+): (.*) - skipping$/\2 (\1)/' | cut -c1-160)"
+    rm -rf "$d"; return 4
   else
     grep -E 'from versions|No matching' "$d/log" | head -n 2
     rm -rf "$d"; return 1
@@ -91,6 +98,7 @@ Executed results (pip 26.2.1, `PYVER=3.11`, glibc 2.34):
 | `probe pygeos==0.14 aarch64` | `(from versions: none)` | Same text as mkl, different cause: pygeos published aarch64 wheels up to 0.13 and dropped them in 0.14, and 0.13 has no cp311 wheel on any platform. See section 6. |
 | `probe docopt==0.6.2 aarch64` | `(from versions: none)` | Also fails for x86_64: the package ships an sdist only. Inspect the sdist (section 5) before labelling it. It is pure Python and COMPATIBLE. |
 | `probe polars==1.0.0 aarch64` | `polars-1.0.0-cp38-abi3-manylinux_2_24_aarch64.whl` | COMPATIBLE. A probe that offers only `manylinux2014`, `_2_17`, `_2_28` and `_2_34` misses this `_2_24` wheel and reports `from versions: 0.14.8, ...` while the x86_64 probe passes: a false MUST UPGRADE. |
+| `probe numpy==1.26.4 aarch64` with `PIP_INDEX_URL` set to an index that answers 401 | `CHECK INDEX: 401 Client Error: Unauthorized for url: <index>/numpy/ (<index>/numpy/)` (return code 4) | Not a verdict: the index refused the request. Without `-vv` the same failure reads `from versions: none`, like a missing wheel; with no `--no-input` pip prompts for a user name and reads it from the caller's input. Fix access to the index (section 9) and probe again. |
 
 The three distinct meanings of a FAIL are why the probe is always run twice (aarch64, then x86_64 with the same ABI):
 
@@ -100,13 +108,14 @@ The three distinct meanings of a FAIL are why the probe is always run twice (aar
 | FAIL with `from versions: <list>` | PASS | MUST UPGRADE to the **lowest** listed version (then confirm it with another PASS) |
 | FAIL `from versions: none` | PASS | Either x86-only by nature (section 4) or aarch64 dropped in later releases (pygeos case): decide from the full files list |
 | FAIL | FAIL | Not an architecture finding: sdist-only package (section 5) or interpreter ABI mismatch (section 6) |
+| CHECK INDEX | any | No verdict: the index did not answer (credentials, network, a mirror without the project). Fix access and probe again (section 9) |
 
 Transitive dependencies get the same treatment, but you do not need to enumerate them by hand. `pip install --dry-run --report` resolves the whole tree for the target platform:
 
 ```bash
+platforms aarch64   # the function above: one --platform per tag the target's libc accepts
 python3 -m pip install --dry-run --ignore-installed --only-binary=:all: \
-  --report graviton-validation/raw/wheel-availability.json -q \
-  --platform manylinux2014_aarch64 --platform manylinux_2_17_aarch64 --platform manylinux_2_28_aarch64 \
+  --report graviton-validation/raw/wheel-availability.json -q "${PLAT[@]}" \
   --python-version 3.11 --implementation cp --abi cp311 \
   --target /tmp/graviton-probe-target -r graviton-validation/raw/requirements-resolved.txt
 ```
@@ -146,12 +155,12 @@ Verified floors for packages this repo documents (source: `https://pypi.org/pypi
 |---|---|---|---|
 | numpy | [python.md](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md) section 2: "NumPy>=1.19.0 vend binary wheel packages for Aarch64"; correctness floor 1.21.1 | 1.19.0 (cp36-cp38); cp311 from 1.23.2 | `numpy-1.19.0-cp36-cp36m-manylinux2014_aarch64.whl` |
 | scipy | python.md section 2: "SciPy>=1.5.3"; correctness floor 1.7.2 | 1.5.3 (cp36-cp38) | `scipy-1.5.3-cp36-cp36m-manylinux2014_aarch64.whl` |
-| sentencepiece | python.md section 3.4: ">=0.1.94" | 0.1.94 | `sentencepiece-0.1.94-cp35-cp35m-manylinux2014_aarch64.whl` |
+| sentencepiece | python.md section 3.4 | 0.1.94 | `sentencepiece-0.1.94-cp35-cp35m-manylinux2014_aarch64.whl` |
 | torch | [pytorch.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/pytorch.md) | 1.8.0 | `torch-1.8.0-cp36-cp36m-manylinux2014_aarch64.whl` |
 | torchaudio | pytorch.md | 0.10.0 | `torchaudio-0.10.0-cp36-cp36m-manylinux2014_aarch64.whl` |
 | tensorflow | [tensorflow.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/tensorflow.md) | 2.10.0 | `tensorflow-2.10.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl` |
 | onnxruntime | [onnx.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/onnx.md) | 1.3.0 | `onnxruntime-1.3.0-cp35-cp35m-manylinux2014_aarch64.whl` |
-| confluent-kafka | python.md section 4: PyPI wheels on glibc 2.28 or later, a source build on Amazon Linux 2 | 2.1.0, but `manylinux_2_28_aarch64` only (glibc >= 2.28; see section 7) | `confluent_kafka-2.1.0-cp310-cp310-manylinux_2_28_aarch64.whl` |
+| confluent-kafka | python.md section 4 | 2.1.0, but `manylinux_2_28_aarch64` only (glibc >= 2.28; see section 7) | `confluent_kafka-2.1.0-cp310-cp310-manylinux_2_28_aarch64.whl` |
 | open3d | python.md section 4: glibc >= 2.27 | 0.14.1 | `open3d-0.14.1-cp36-cp36m-manylinux2014_aarch64.whl` |
 | vllm | [vllm.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/vllm.md) points to the AWS vLLM Deep Learning Container image for Graviton (`vllm-arm64` on the Amazon ECR Public Gallery) and describes a source build | PyPI has aarch64 wheels from 0.10.2 (`cp38-abi3`), but they are CUDA builds (0.10.2's `_C.abi3.so` links `libcudart.so.12` and `libcuda.so.1`; 0.30.0's `_C_stable_libtorch.abi3.so` links `libcudart.so.13` and `libcuda.so.1`); the CPU build is the `+cpu` wheel attached to the vLLM release | `vllm-0.29.0+cpu-cp38-abi3-manylinux_2_34_aarch64.whl` (ran on Graviton); 0.30.0's is `manylinux_2_39` |
 | llama-cpp-python | [llama.cpp.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/llama.cpp.md) source build | none (sdist only); source build remains the path | sdist |
@@ -164,14 +173,25 @@ The repo's [arm64 Python wheel tester](https://geoffreyblake.github.io/arm64-pyt
 
 A FAIL on both architectures usually means the project publishes no wheels at all. That is a Graviton finding only if the sdist contains native code.
 
+Read the sdist from the files list (section 4) and list its members. Do not use `pip download --no-binary=:all:` for this: pip prepares the sdist's metadata, which runs its build backend (`setup.py` or the `pyproject.toml` backend), and on an interpreter without setuptools it stops with `BackendUnavailable`.
+
 ```bash
-python3 -m pip download --no-binary=:all: --no-deps --no-build-isolation -q -d /tmp/sd "docopt==0.6.2"
-tar tzf /tmp/sd/docopt-0.6.2.tar.gz | grep -E '\.(c|cc|cpp|h|pyx|pxd|rs)$' \
-  && echo "native sources: needs the build prerequisites from python.md section 1.1 on aarch64" \
-  || echo "pure Python sdist: COMPATIBLE, installs anywhere"
+# Lists the files of one release's sdist (replace project and version); nothing is built or run.
+curl -sS --fail "https://pypi.org/pypi/docopt/0.6.2/json" | python3 -c '
+import io, json, sys, tarfile, urllib.request, zipfile
+sd = [u for u in json.load(sys.stdin)["urls"] if u["packagetype"] == "sdist"]
+if not sd:
+    sys.exit("no sdist for this release")
+data = urllib.request.urlopen(sd[0]["url"], timeout=120).read()
+names = (zipfile.ZipFile(io.BytesIO(data)).namelist() if sd[0]["filename"].endswith(".zip")
+         else tarfile.open(fileobj=io.BytesIO(data)).getnames())
+native = [n for n in names if n.rsplit(".", 1)[-1] in ("c", "cc", "cpp", "cxx", "h", "hpp", "pyx", "pxd", "rs", "f", "f90")]
+print("%s: %d files" % (sd[0]["filename"], len(names)))
+print("native sources: %s; needs the build prerequisites from python.md section 1.1 on aarch64" % ", ".join(native[:10])
+      if native else "pure Python sdist: COMPATIBLE, installs anywhere")'
 ```
 
-Executed: docopt 0.6.2 contains no C, C++, Cython or Rust sources. Verdict COMPATIBLE. Do not write "no wheel available" as a finding for a pure-Python sdist; the wheel tester marks these as "build required" and passing.
+Executed with Python 3.12 and no setuptools installed: docopt 0.6.2 (32 files) has no C, C++, Cython, Rust or Fortran sources, so its verdict is COMPATIBLE; pygeos 0.14 (68 files) lists `pygeos-0.14/pygeos/_geometry.pyx`, `.pxd` files and `pygeos-0.14/src/c_api.c`. Do not write "no wheel available" as a finding for a pure-Python sdist; the wheel tester marks these as "build required" and passing. For a package published only on a private index, download its sdist from that index with the index's credentials and list it with `tar tzf` (or `unzip -l`); do not `pip download` it.
 
 When the sdist does contain native code, the finding is COMPATIBLE-with-build-prerequisites if it compiles on aarch64 (document the toolchain from [python.md section 1.1](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#11-prerequisites-for-installing-python-packages-from-source): `"@Development tools" python3-devel` on AL/RHEL, `build-essential python3-dev` on Debian/Ubuntu, plus whatever headers the package needs) and MUST UPGRADE if the sources themselves are x86-only (intrinsics, inline assembly; see phase 1.4).
 
@@ -229,8 +249,8 @@ Adding the aarch64 wheel's hash as a second `--hash=` on the same line makes the
 
 ```bash
 # Any hashed requirement that resolves to a different file on aarch64 fails this dry run:
-python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q \
-  --platform manylinux2014_aarch64 --platform manylinux_2_17_aarch64 --platform manylinux_2_28_aarch64 \
+platforms aarch64   # section 3: one --platform per tag the target's libc accepts
+python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
   --python-version 3.11 --implementation cp --abi cp311 --target /tmp/graviton-probe-target \
   -r requirements-locked.txt
 ```
@@ -253,6 +273,8 @@ The 2024 Python Developers Survey reports about one in ten developers installing
 | Reading the first aarch64 release as the floor | quoting numpy 1.19.0 to a Python 3.11 project | The floor is per interpreter ABI (numpy 1.23.2 for cp311) |
 | Assuming availability is monotonic | upgrading blosc2 0.6.3 to 0.6.1, or pygeos 0.14 to "latest" | Check the exact candidate version; blosc2 0.3.1-0.6.3 and pygeos >= 0.14 have no aarch64 wheels |
 | Mirror gap read as package gap | FAIL against the internal index, PASS against PyPI | INFRA finding, not a dependency change |
+| Failed index request read as a missing wheel | `from versions: none` for every pin on both architectures (401, 403, no connection) | The probe prints CHECK INDEX with the reason; fix access to the index and probe again. Never label a pin from a failed request |
+| A prompt that reads the caller's input | a loop over pins prints fewer verdicts than pins, with no error | `--no-input` and `</dev/null` on every pip call in a loop (section 3) |
 | Pure-Python sdist read as missing wheel | docopt "has no wheel" | Inspect the sdist (section 5); COMPATIBLE |
 | Trusting the wheel tester for your pin | "package X passes" | It tests the latest version on the tester's interpreters; probe your pin |
 | Environment markers in the pin list (`; python_version < "3.12"`, `; platform_machine == "x86_64"`) | a pin is skipped ("nothing downloaded") or probed although the target would not install it | pip evaluates markers against the interpreter and machine running it, not against `--python-version`/`--platform`: probe with the project's interpreter, and judge pins with machine or platform markers by hand |

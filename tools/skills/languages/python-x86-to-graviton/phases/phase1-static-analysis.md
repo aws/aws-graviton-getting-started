@@ -4,7 +4,7 @@ Analyze the project without making changes. All findings are documented in `grav
 
 > **Skill config:** Wherever a step below runs `pip`, `uv`, `poetry` or `conda`, use `python.package_manager` from `skill-config.md` (if defined) to skip auto-detection, `python.index_url` / `python.extra_index_url` as the index for every probe (and probe PyPI as well, see §1.3), and `python.interpreter_bump` in §1.5. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
-Phase 1 runs on any host, including x86: every check below reads files or asks the package index. Nothing is installed or executed from the project until Phase 3.
+Phase 1 runs on any host, including x86, and installs nothing into the project or its environment. Most checks read files or ask the package index; three kinds of step run code. The §1.1 dry run (`pip install --dry-run` without `--only-binary`) runs the build backend (`setup.py` or the `pyproject.toml` backend) of every sdist it resolves, and of the project itself when the step installs `.`. The §1.1 target probe runs the base image's own `python3` in a container, and §1.2.2 runs the distribution's package tools in containers. The §1.3 probes pass `--only-binary=:all:`, so they never build or run a package. For a repository or an index you do not trust, run Phase 1 in a disposable container or VM. The project's own code and tests run only in Phase 3.
 
 ## 1.1 Project Structure Analysis
 
@@ -71,6 +71,8 @@ Also record where that interpreter comes from (official image, distribution pack
 
 The wheel a pin resolves to must also be accepted by the target's libc and pip, and native code also depends on the kernel page size of the hosts it runs on (see [../document_references/wheel-verification.md](../document_references/wheel-verification.md) §1, §2 and §7). Read the libc and the interpreter from the runtime image:
 
+`$CONTAINER_CMD` below is the working container runtime: run the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection) first, in the same shell (it also applies `container.runtime` from `skill-config.md`). With no working runtime, follow the "No container runtime" item after the block.
+
 ```bash
 IMG=$(awk '/^FROM/{img=$NF; for(i=2;i<=NF;i++) if($i !~ /^--platform/ && $i!="AS" && $i!="as") {img=$i; break}} END{print img}' Dockerfile)
 # Ask the image's own python3: no shell, ldd or pip needed, the image's ENTRYPOINT is bypassed,
@@ -116,7 +118,7 @@ The probe asks the image's own `python3`, because `sh -c` with `ldd --version` a
 - **Lambda functions deployed as .zip archives** have no image: the runtime identifier sets the OS. `python3.12` and later run on Amazon Linux 2023 (glibc 2.34), `python3.10` and `python3.11` on Amazon Linux 2 (glibc 2.26) ([Lambda Python runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html)); wheel-verification.md §7 shows a `manylinux_2_28` layer that imports on `python3.12` and fails on `python3.11`. For container-image functions, run the block against the image.
 - **No arm64 variant of the base image:** both runs stop with `no matching manifest for linux/arm64 in the manifest list entries` (executed with `amazonlinux:2018.03`, whose manifest list has only `amd64`). That is a MUST UPGRADE finding, and the replacement image is a user decision ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), OUT OF SCOPE).
 - **No container runtime:** use the table in wheel-verification.md §7 and say so. For host-based deployments read the AMI's distribution.
-- **Kernel page size of the deployment hosts.** A container uses its host's kernel, so the page size comes from the EC2 hosts or Kubernetes nodes, not from the image: a Debian 13 container on an AlmaLinux 8 Graviton2 host reported 65536. Run `getconf PAGESIZE` on a deployment host, or look up its OS in [os.md](https://github.com/aws/aws-graviton-getting-started/blob/main/os.md) (executed on Graviton: AlmaLinux 8.10 65536; AlmaLinux 9.8 and Amazon Linux 2023 4096). A 64KB-page target needs Phase 3 on a 64KB-page host: on AlmaLinux 8, polars 0.20.20 aborted with `<jemalloc>: Unsupported system page size`, as did every earlier release tested back to 0.15.1, while 0.20.21 and the later releases tested imported. On the 4KB AlmaLinux 9 host polars 0.15.1 imported, so a 4KB validation host hides the failure.
+- **Kernel page size of the deployment hosts.** A container uses its host's kernel, so the page size comes from the EC2 hosts or Kubernetes nodes, not from the image: a Debian 13 container on an AlmaLinux 8 Graviton2 host reported 65536. Run `getconf PAGESIZE` on a deployment host (executed on Graviton: AlmaLinux 8.10 65536; AlmaLinux 9.8 and Amazon Linux 2023 4096); if no host can be reached, ask the team that runs them and record the page size as unknown until then. A 64KB-page target needs Phase 3 on a 64KB-page host: on AlmaLinux 8, polars 0.20.20 aborted with `<jemalloc>: Unsupported system page size`, as did every earlier release tested back to 0.15.1, while 0.20.21 and the later releases tested imported. On the 4KB AlmaLinux 9 host polars 0.15.1 imported, so a 4KB validation host hides the failure.
 
 Record `pip` on the target: below 19.3 it cannot install aarch64 wheels at all (python.md section 1), and below 20.3 it cannot see `manylinux_2_N` tags; plan the `python3 -m pip install --upgrade pip` step for Phase 3. `pip=none` (the `python3` of Amazon Linux 2023 and AlmaLinux 9, and distroless) means pip has to come from a virtual environment or a distribution package; `venv=no` (distroless) means `python3 -m venv` does not work either.
 
@@ -295,7 +297,7 @@ grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='Dockerfile*' --inclu
 Executed on the fixture: `scripts_deploy.sh:5: curl ... tool-linux-amd64`; no OS packages.
 
 **Common packages that fetch or carry native binaries outside their wheel tags** (this list is a *prompt*, not an allowlist):
-- **selenium**: its `py3-none-any` wheel carries Selenium Manager executables. Up to 4.48.0 the only Linux build is an x86-64 executable (`selenium/webdriver/common/linux/selenium-manager`); 4.49.0 is the first release that also carries `linux-arm64/selenium-manager`. On Graviton, 4.48.0's executable fails with `Exec format error`, and 4.50.0 runs the arm64 one
+- **selenium**: its `py3-none-any` wheel carries Selenium Manager executables. Up to 4.48.0 the only Linux build is an x86-64 executable (`selenium/webdriver/common/linux/selenium-manager`); 4.49.0 is the first release that also carries `linux-arm64/selenium-manager`. On Linux aarch64, 4.48.0 stops before it starts any program, with `WebDriverException: Message: Unsupported platform/architecture combination: linux/aarch64` (its `selenium_manager.py` maps Linux to a binary only for `x86_64`); the bundled file itself, run directly on Graviton, fails with `Exec format error`. 4.50.0 runs the arm64 one
 - **pyppeteer**: downloads Chromium on first use from the `Linux_x64` snapshot path on every Linux host (2.0.0), so on Graviton it fetches an x86 browser (executed: `pyppeteer-install` downloaded an x86-64 `chrome` that fails with `Exec format error`)
 - **Browser and driver downloaders** (Selenium Manager, webdriver-manager): fetch Chrome for Testing builds at run time. The current Stable release lists `linux-arm64` for Chrome and ChromeDriver (154.0.8037.92), and on Graviton webdriver-manager 4.1.2 downloaded the `linux-arm64` ChromeDriver for that release; check the platform list for the version the project uses
 - **duckdb**: downloads extensions for its platform at first use; `linux_arm64` builds are published (on Graviton, duckdb 1.5.6 installed and loaded the `linux_arm64` `httpfs` extension)
@@ -358,18 +360,25 @@ platforms() { # $1=arch ; sets PLAT to one --platform flag per wheel tag the tar
   fi
 }
 probe() { # $1=requirement $2=arch ; prints the wheel filename (rc 0), the from-versions list (rc 1),
-          # or nothing (rc 3) when an environment marker excluded the pin on this host
+          # nothing (rc 3) when an environment marker excluded the pin on this host, or why the index
+          # did not answer (rc 4). --no-input and </dev/null: pip never reads the loop's list of pins;
+          # --disable-pip-version-check: the only index requests in the log are the probe's.
   local d f; platforms "$2"; d=$(mktemp -d "${TMPDIR:-/tmp}/probe.XXXXXX")
-  if python3 -m pip download --only-binary=:all: --no-deps -q -d "$d" "${PLAT[@]}" \
-       --python-version "$PYVER" --implementation cp --abi "$ABI" "$1" >"$d/log" 2>&1; then
+  if python3 -m pip download --no-input --disable-pip-version-check --only-binary=:all: --no-deps -vv -d "$d" "${PLAT[@]}" \
+       --python-version "$PYVER" --implementation cp --abi "$ABI" "$1" </dev/null >"$d/log" 2>&1; then
     f=$(ls "$d" | grep '\.whl$' | head -n 1); rm -rf "$d"
     [ -n "$f" ] && { echo "$f"; return 0; }; return 3
   else
+    if grep -q 'Could not fetch URL' "$d/log"; then   # 401, 403, 404, connection or TLS error from the index
+      grep -m1 'Could not fetch URL' "$d/log" | sed -E 's/^.*Could not fetch URL ([^ ]+): (.*) - skipping$/\2 (\1)/' | cut -c1-160
+      rm -rf "$d"; return 4
+    fi
     grep -oE 'from versions: [^)]*' "$d/log" | head -n 1; rm -rf "$d"; return 1
   fi
 }
 sed -E 's/[[:space:]]*#.*//' graviton-validation/raw/requirements-resolved.txt | grep '==' | while read -r req; do
   out=$(probe "$req" aarch64); rc=$?
+  if [ $rc -eq 4 ]; then echo "CHECK INDEX     $req  the index did not answer: $out"; continue; fi
   if [ $rc -eq 0 ]; then
     case "$out" in *-none-any.whl) echo "COMPATIBLE      $req  pure Python: $out";; *) echo "COMPATIBLE      $req  aarch64 wheel: $out";; esac
   elif [ $rc -eq 3 ]; then
@@ -393,9 +402,9 @@ Executed on the fixture (25 pins): `MUST UPGRADE` for `blosc2==0.6.3` (with `fro
 Then the hash-lock check for every hashed requirements file the deployment installs:
 
 ```bash
-python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q \
-  --platform manylinux2014_aarch64 --platform manylinux_2_17_aarch64 --platform manylinux_2_28_aarch64 \
-  --python-version 3.11 --implementation cp --abi cp311 --target /tmp/graviton-probe-target \
+platforms aarch64   # the same tag list as the loop above
+python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
+  --python-version "$PYVER" --implementation cp --abi "$ABI" --target /tmp/graviton-probe-target \
   -r requirements-locked.txt
 ```
 
@@ -412,6 +421,10 @@ Apply the decision tree in [../document_references/agent-scope-boundaries.md](..
 **COMPATIBLE (No action):** aarch64 wheel present, or `none-any` wheel, or pure-Python sdist. Age, CVEs and "newer is faster" do not move a package out of this class.
 
 **CHECK SDIST/ABI lines need one more step before they get a label:** download the sdist and list compiled sources (wheel-verification.md §5); if there are none it is COMPATIBLE. If the package has aarch64 wheels for a *different* `cp` tag (probe again with `--python-version 3.10 --abi cp310`, and x86_64 with the project's tag), it is an interpreter-ABI blocker, reported in its own table and resolved only through the gate in §1.5.
+
+**CHECK INDEX lines are not verdicts:** the index did not answer (credentials, network, or a mirror that lacks the project). Fix access, or probe PyPI as in the skill-config note above, and rerun the loop for those pins; never label a pin from a failed request.
+
+**A pin the decision tree sends to a user decision stays CHECK until the user chooses** (pygeos in [agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md): a source build is COMPATIBLE, a move to `shapely>=2.0` is MUST UPGRADE). The loop's line for it records only the probe result; the report lists it under User Decisions Pending.
 
 For transitive dependencies: record which direct dependency pulls each one in (the `# transitive via` provenance plus the manager's tree). Resolution usually happens at the parent (`mkl` removal removes all six Intel transitives).
 
@@ -448,11 +461,11 @@ grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.py' \
 
 # Architecture checks in Python, with file:line
 grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.py' \
-  'platform\.(machine|processor|architecture|uname)\(|os\.uname\(|"(x86_64|amd64|AMD64|i386|i686)"' .
+  "platform\.(machine|processor|architecture|uname)\(|os\.uname\(|[\"'](x86_64|amd64|AMD64|i386|i686)[\"']" .
 
 # The risky shape: files that COMPARE against x86 but never mention aarch64/arm64 (heuristic; read the hits above)
-grep -rlE --exclude-dir=.venv --exclude-dir=.git --include='*.py' '"(x86_64|amd64|AMD64)"' . \
-  | xargs grep -LE '"(aarch64|arm64)"' 2>/dev/null
+grep -rlE --exclude-dir=.venv --exclude-dir=.git --include='*.py' "[\"'](x86_64|amd64|AMD64)[\"']" . \
+  | xargs grep -LE "[\"'](aarch64|arm64)[\"']" 2>/dev/null
 
 # Shell scripts, Makefiles, CI
 grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' \
@@ -507,4 +520,4 @@ Flag code that checks for `x86_64`/`amd64` without `aarch64`/`arm64` handling, b
    A bump is only in scope when it is the sole path to an aarch64 wheel for a required package; "3.10 is end of life" alone never justifies it.
 
    **One interpreter for the whole dependency set.** The interpreter is one decision covering every pin, never made for one package at a time, because a bump made for one package changes the wheel every other pin needs. Before proposing or applying a bump, rerun the §1.3 loop for each candidate interpreter over the whole resolved list (`PYVER=3.Y`, run in a 3.Y environment from Phase 3.0), and record for each candidate which pins are not COMPATIBLE and the lowest versions that fix them (03 report, Interpreter-ABI Blockers). Keep the current interpreter when every MUST UPGRADE finding is fixable there; otherwise choose the lowest candidate at which every pin is, and apply the bump and all of its pin changes together. When no single interpreter works for every pin, report the table as a user decision and change nothing. Executed on the fixed fixture: at cp312 the two pins fixed for cp311, `blosc2==0.6.4` and `shapely==2.0.0`, have no wheel on either architecture (the lowest cp312 aarch64 releases are 2.2.8 and 2.0.2), so a move to 3.12 would be three changes decided together, not one.
-5. Record `pip` on the target (§1.1): the repo's floor for aarch64 wheels is pip 19.3 ([README, Python installation on some Linux distros](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#python-installation-on-some-linux-distros)); plan the upgrade in Phase 3 if it is older.
+5. Record `pip` on the target (§1.1): pip 19.3 is the first release that installs `manylinux2014` aarch64 wheels ([README, Python installation on some Linux distros](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#python-installation-on-some-linux-distros)), and pip 20.3 the first that sees the `manylinux_2_N` tags most current aarch64 wheels carry ([../document_references/wheel-verification.md](../document_references/wheel-verification.md) §2); plan the upgrade in Phase 3 if it is older than 20.3.

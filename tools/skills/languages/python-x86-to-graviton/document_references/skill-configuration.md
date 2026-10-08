@@ -55,7 +55,7 @@ Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`) th
 | Field | Section | Steers | Neutral default it overrides |
 |-------|---------|--------|------------------------------|
 | `container.base_image_registry` | Container (shared) | Where base images are pulled from | current base image, registry preserved (same distro/version); phase2 §2.4 "Dockerfile updates" |
-| `container.runtime` | Container (shared) | Container CLI | auto-detected `CONTAINER_CMD`; phase3 "Container Runtime Detection" |
+| `container.runtime` | Container (shared) | Container CLI | auto-detected `CONTAINER_CMD`; phase3 "Container Runtime Detection", run before the first container command (Phase 1.1) |
 | `deploy.arch_selector` / `deploy.nodepool_label` | Deployment (shared) | ARM64 node selection in manifests | generic `kubernetes.io/arch: arm64`, no nodepool label; phase2 §2.4 "Deployment manifests" |
 | `deploy.registry` / `deploy.ingress_convention` | Deployment (shared) | Manifest registry & ingress | existing registry/ingress left unchanged; phase2 §2.4 "Deployment manifests" |
 | `ci.system` | CI (shared) | CI vocabulary in the post-transformation note | generic CI/CD wording; SKILL.md "User Responsibility (Post-Transformation)" |

@@ -31,7 +31,7 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 2. **Use exactly these filenames.** Do not rename, renumber or add top-level files. Additional machine output goes under `raw/` with a descriptive name.
 3. **Write progressively.** Each phase step writes its section as it completes; do not batch everything at the end.
 4. **Every verdict cites its evidence.** A dependency row without a probe command and a wheel filename (or a `from versions:` list, or a PyPI files-list observation) is incomplete. The "validated by" and "evidence" columns below are mandatory.
-5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one.
+5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce (a CHECK line of the Phase 1.3 loop), is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the label each option leads to.
 6. **Empty sections stay, with "No findings".** Omitting a section is ambiguous (not checked, or nothing found?). Write the heading and an explicit statement.
 7. **`00-summary.md` is written last** and references the detail files rather than repeating them.
 8. **Nothing outside `graviton-validation/`.** No other documentation files are created by the transformation.
@@ -110,9 +110,9 @@ Monorepo / multiple packages: <No | Yes, list each package and its manager>
 - **Base image / AMI:** <python:3.11-slim (Debian 13) | amazonlinux:2023 | ...>
 - **libc:** <glibc 2.41 | musl 1.2>, measured by <the Phase 1.1 probe in the image | the Lambda runtime | repo table in wheel-verification.md section 7>
 - **Highest wheel tag accepted:** manylinux_2_<N> | musllinux_1_<N>
-- **Kernel page size on the deployment hosts:** <4KB | 64KB>, from <`getconf PAGESIZE` on <host> | os.md>
+- **Kernel page size on the deployment hosts:** <4KB | 64KB | unknown>, from <`getconf PAGESIZE` on <host> | the team that runs the hosts>
 - **Graviton generations deployed:** <e.g. Graviton2 and Graviton4 | unknown>; oldest: <generation>
-- **pip on target:** <version>; >= 19.3 required for aarch64 wheels (upgrade recorded if applied)
+- **pip on target:** <version>; >= 20.3 required for current aarch64 wheels, which carry `manylinux_2_N` tags (19.3 sees only `manylinux2014`) (upgrade recorded if applied)
 
 ## Private Index / Mirror
 <none | URL (from skill-config python.index_url or pip.conf); aarch64 coverage checked: yes/no>
@@ -301,7 +301,7 @@ Interpreter decision, one for the whole dependency set (Phase 1.5), one row per 
 ## Build Attempts
 | # | Command | Result | Packages from wheels / from source | Notes |
 |---|---|---|---|---|
-| 1 | pip install --require-hashes -r requirements-locked.txt | FAIL | | hash mismatch (D4) |
+| 1 | pip install --require-hashes -r requirements-locked.txt | FAIL | | hash mismatch: the lock lists only x86_64 hashes |
 | 2 | pip install -r requirements.txt | PASS | 11 wheels / 1 sdist (docopt) | |
 
 ## Import Smoke Test

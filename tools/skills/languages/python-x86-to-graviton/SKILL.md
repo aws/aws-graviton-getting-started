@@ -113,7 +113,7 @@ Apply fixes for ARM64-blocking issues only. See [phases/phase2-resolution.md](ph
 
 Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validation.md) for detailed steps.
 
-1. **3.0 Build Environment Prep** - Python runtime alignment (same minor version, pip >= 19.3; session-scoped only)
+1. **3.0 Build Environment Prep** - Python runtime alignment (same minor version, pip >= 20.3; session-scoped only)
 2. **3.1 Build Validation** - Install as the deployment does, build extensions, classify failures as INFRA/ARM64/PRE-EXISTING
 3. **3.2 Functional Testing** - Import smoke test, execute test suite, classify failures, determine final build
 4. **3.3 Startup Validation** - Verify application starts on aarch64, aarch64 binaries load, no import or glibc errors
