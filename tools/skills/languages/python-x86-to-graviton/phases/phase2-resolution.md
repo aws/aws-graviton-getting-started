@@ -10,6 +10,8 @@ For each x86-only binary and each x86-only build flag identified in Phase 1.2 an
 
 **If source code available:**
 
+`$CONTAINER_CMD` is the working container runtime found by the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection); run that block first, in the same shell.
+
 Build on aarch64 hardware: a Graviton host or an ARM64 CI runner, directly or inside a `linux/arm64` container, which runs natively there (the build prerequisites are in [python.md section 1.1](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#11-prerequisites-for-installing-python-packages-from-source): `"@Development tools" python3-devel` on Amazon Linux / RHEL, `build-essential python3-dev` on Debian / Ubuntu; `gcc libc6-dev` is enough for a plain C library on a `python:*-slim` image). On an x86 host the same container runs under emulation, where source builds are slow and can crash (Phase 3, "Emulation limits"), so do not run these commands there:
 
 ```bash
@@ -49,11 +51,12 @@ Before rebuilding, remove x86-only compiler flags, or apply them only on x86 (se
 **Lambda layers and vendored site-packages:** re-create them for arm64 from the pins listed by `*.dist-info` (Phase 1.2.2). pip can download aarch64 wheels from an x86 host; offer the tags the target's glibc accepts (Phase 1.1), which for a layer is the function runtime's:
 
 ```bash
+PYVER=3.11              # the function's runtime: python3.11 -> 3.11, python3.12 -> 3.12
 TARGET_LIBC_VER=2.26    # Phase 1.1: 2.26 for python3.10 and python3.11 (Amazon Linux 2), 2.34 for python3.12 and later
 PLAT=(); i=${TARGET_LIBC_VER#*.}
 while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
 python3 -m pip install "${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: \
-  --python-version 3.11 --implementation cp --target python/ -r layer-requirements.txt
+  --python-version "$PYVER" --implementation cp --target python/ -r layer-requirements.txt
 native_scan python   # the function from Phase 1.2.1: every file must report e_machine 183 (aarch64)
 ```
 
@@ -121,8 +124,11 @@ The uv and Poetry rows were executed on the fixture variants (each regenerated l
 **Hash-locked requirements:** add the aarch64 wheel's hash beside the x86 one, or regenerate the file with a tool that records every published file:
 
 ```bash
-python3 -m pip download --only-binary=:all: --no-deps -d /tmp/aarch64-wheels \
-  --platform manylinux_2_17_aarch64 --python-version 3.11 --implementation cp --abi cp311 "MarkupSafe==2.1.5"
+TARGET_LIBC_VER=2.41    # Phase 1.1 (python:3.11-slim): every tag the target's glibc accepts, as in the Phase 1.3 probe
+PLAT=(); i=${TARGET_LIBC_VER#*.}
+while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
+python3 -m pip download --only-binary=:all: --no-deps -d /tmp/aarch64-wheels "${PLAT[@]}" \
+  --platform manylinux2014_aarch64 --python-version 3.11 --implementation cp --abi cp311 "MarkupSafe==2.1.5"
 python3 -m pip hash --algorithm sha256 /tmp/aarch64-wheels/MarkupSafe-2.1.5-*.whl
 # append the printed --hash=sha256:... as a second --hash on the MarkupSafe line
 # or: pip-compile --generate-hashes requirements.in   (records the hashes of all published files)

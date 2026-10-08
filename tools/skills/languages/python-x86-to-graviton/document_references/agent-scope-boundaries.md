@@ -20,7 +20,8 @@ Is this dependency update required for ARM64 compatibility?
 │  │  │     ├─ Source build works on aarch64? → ✅ COMPATIBLE (build prerequisites documented;
 │  │  │     │     confirm the build in Phase 3)
 │  │  │     ├─ x86-only by nature? → ✅ MUST UPGRADE (substitute; user confirms)
-│  │  │     └─ More than one applies? → User decision with the options (Phase 2.2)
+│  │  │     └─ More than one applies (pygeos: a source build or a successor package)?
+│  │  │           → CHECK: user decision with the options (Phase 2.2); the label follows the choice
 │  │  └─ YES → ✅ COMPATIBLE (has ARM64 support)
 │  └─ NO (Pure Python: py3-none-any wheel or pure-Python sdist) → ✅ COMPATIBLE (pure Python works on all architectures)
 │
@@ -123,7 +124,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 - ❌ Base image distribution or version changes (`python:3.11-slim` to `python:3.12-alpine`): they change glibc, interpreter and ABI at once. The exception is the user-decision path in wheel-verification.md section 7 (glibc too old), which the skill documents but does not apply
 - ❌ Web server, worker model or async framework changes (gunicorn to uvicorn): no repo-documented Graviton requirement
 - ❌ `.gitignore`, `.dockerignore` or CI pipeline edits: phrased as a recommendation only (SKILL.md "User Responsibility")
-- ❌ SDK credential changes after an AMI change: botocore before 1.13.23 found no instance-role credentials on an instance that requires IMDSv2 (executed on Amazon Linux 2023: 1.13.22 none, 1.13.23 `iam-role`), and Amazon Linux 2023 AMIs require IMDSv2 by default. Not an architecture issue; when the migration also moves to such an AMI, note it once in `05-runtime-configuration.md`
+- ❌ SDK credential changes after an AMI change: the [EC2 User Guide](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html#use-a-supported-sdk-version-for-imdsv2) lists botocore 1.13.25 (boto3 1.12.6) as the minimum for IMDSv2. Executed on Amazon Linux 2023 with IMDSv2 required: botocore 1.13.22 found no instance-role credentials and 1.13.23 found `iam-role`; 1.13.25 added the handling of an HTTP 405 from the metadata service ("Add 405 case to metadata fetching logic" in botocore's changelog). Amazon Linux 2023 AMIs require IMDSv2 by default. Not an architecture issue; when the migration also moves to such an AMI, note it once in `05-runtime-configuration.md`
 
 ## 🔍 Decision Tree: Should I Update This Dependency?
 
@@ -236,7 +237,7 @@ Each case comes from the evidence gathered while building this skill (PyPI files
 - 0.13 has no cp311 wheel on any platform, so downgrading does not help a Python 3.11 project either.
 
 **Correct Analysis:**
-> "`pygeos==0.14`: no aarch64 wheel; no later release exists; 0.13 has aarch64 wheels for cp36-cp310 only; the PyPI description says PyGEOS was merged into Shapely 2.0. MUST UPGRADE, user decision: (a) build the 0.14 sdist on Graviton against the distribution's GEOS; on current toolchains this needs `setuptools<82` as a build constraint (its setup.py imports `pkg_resources`) and, with gcc 14, `CFLAGS=-Wno-error=incompatible-pointer-types`, on every architecture; or (b) move to `shapely>=2.0` (2.0.0 is the first release with cp311 Linux aarch64 wheels), an API change outside this skill. Not applied automatically."
+> "`pygeos==0.14`: no aarch64 wheel; no later release exists; 0.13 has aarch64 wheels for cp36-cp310 only; the PyPI description says PyGEOS was merged into Shapely 2.0. CHECK, user decision (User Decisions Pending in the report): (a) COMPATIBLE through a source build of the 0.14 sdist on Graviton against the distribution's GEOS; on current toolchains this needs `setuptools<82` as a build constraint (its setup.py imports `pkg_resources`) and, with gcc 14, `CFLAGS=-Wno-error=incompatible-pointer-types`, on every architecture, and the build is confirmed natively in Phase 3 (under emulation the compiler crashed); or (b) MUST UPGRADE by substitution: move to `shapely>=2.0` (2.0.0 is the first release with cp311 Linux aarch64 wheels), an API change outside this skill. Not applied automatically."
 
 **Lesson:** The same non-monotonic shape appears in blosc2 (aarch64 at 0.2.0 and 0.3.0, none from 0.3.1 to 0.6.3, back at 0.6.4), which is why the fix for `blosc2==0.6.3` is `0.6.4` and why "the previous release had one" proves nothing.
 
