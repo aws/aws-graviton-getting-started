@@ -44,11 +44,17 @@
 
 // Deterministic input generation.
 //
-// std::mt19937_64 produces identical output everywhere, but
-// std::uniform_real_distribution does not (libstdc++ and libc++ differ). To
-// guarantee every host prices the same book, raw 64-bit output is mapped to
-// [0,1) by hand. Without this the comparison measures input differences,
-// not pricing differences.
+// The generator is xorshift64* over a fixed seed. Its integer output is
+// identical on every platform, unlike std::uniform_real_distribution, whose
+// result varies between libstdc++ and libc++. Raw 64-bit output is mapped to
+// [0,1) by hand so every host draws the same sequence.
+//
+// range() is an a*b+c, which the compiler would otherwise contract into one
+// FMA on the default build (arm64 contracts by default) but not on the
+// -ffp-contract=off build, so the two builds would draw different inputs.
+// The volatile commits the product's rounding before the add, defeating that
+// FMA on GCC and Clang regardless of -ffp-contract, so every build and host
+// prices the same book and the comparison isolates the pricing arithmetic.
 struct Rng {
     uint64_t s;
     explicit Rng(uint64_t seed) : s(seed) {}
@@ -57,7 +63,10 @@ struct Rng {
         return s * 0x2545F4914F6CDD1DULL;
     }
     double unit() { return (next() >> 11) * (1.0 / 9007199254740992.0); }
-    double range(double lo, double hi) { return lo + (hi - lo) * unit(); }
+    double range(double lo, double hi) {
+        volatile double scaled = (hi - lo) * unit();
+        return lo + scaled;
+    }
 };
 
 // FNV-1a over the raw bytes of each price.

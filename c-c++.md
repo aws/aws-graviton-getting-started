@@ -158,10 +158,12 @@ please upgrade to a 5.4+ AL2 kernel.  Graviton3, Graviton4, and Graviton5 suppor
 
 ### Floating-point reproducibility across architectures
 
-IEEE 754 basic operations (add, subtract, multiply, divide, square root) are correctly rounded and therefore identical on Graviton and x86. The last bit of some results can still differ, for two reasons that are both settings rather than properties of the silicon:
+IEEE 754 basic operations (add, subtract, multiply, divide, square root) are correctly rounded and therefore identical on Graviton and x86. For well-defined finite results, the last bit can still differ, and the two usual causes are both settings you control rather than properties of the silicon:
 
 * Contraction. The compiler can fuse `a * b + c` into a single fused multiply-add (FMA) with one rounding instead of two. GCC and Clang contract by default when the target has the instruction. FMA is in the base arm64 instruction set, so the compiler contracts on Graviton by default; at the x86-64-v2 target that Amazon Linux 2023 defaults to there is no FMA instruction to fuse into. Building both sides with `-ffp-contract=off` removes this difference.
 * The math library. `exp`, `log`, `erf` and other elementary functions are recommended but not required by IEEE 754 to be correctly rounded, so glibc's implementations can differ in the last bit between architectures. This is outside your compiler flags; it is managed through your choice of library, and glibc is adopting correctly rounded routines from the CORE-MATH project.
+
+One case is a genuine property of the silicon, and it is the exception to the above: the NaN bit pattern from an invalid operation (such as `0.0/0.0` or `inf - inf`) is architecture-defined, so x86 and Graviton can produce different NaN encodings. This does not change a well-defined numeric result, but a comparison that hashes raw output bytes will see it, so guard inputs against invalid operations or compare NaNs by value.
 
 For a runnable demonstration that measures the size and origin of these differences on a closed-form pricing kernel, and a method you can apply to your own code, see the [numerical validation sample](sample-code/numerical-validation/). It builds the same source on an x86 and a Graviton instance, compares every result, and reports the differences against tolerances you set.
 

@@ -12,6 +12,15 @@ also checks them and exits 1 if any is exceeded, so it can gate a CI job.
   --rel-tol   largest allowed relative difference on any single price
   --ulp-tol   largest allowed difference in units in the last place (double)
   --net-tol   largest allowed absolute difference between the two book totals
+
+A NaN or infinity on only one side, or a difference that is not finite, is a
+mismatch no tolerance can bound, so it always fails the check regardless of
+the tolerances given.
+
+Exit codes:
+  0  success: no tolerances given, or every tolerance met
+  1  a tolerance was exceeded, or a non-finite difference was found
+  2  usage or input error (bad arguments, missing or malformed dump)
 """
 import argparse
 import array
@@ -20,9 +29,14 @@ import struct
 import sys
 
 def load(path):
+    """Read a dump of raw little-endian doubles. Raises ValueError on a size
+    that is not a whole number of doubles, OSError if the file is unreadable."""
     a = array.array("d")
     with open(path, "rb") as f:
-        a.frombytes(f.read())
+        raw = f.read()
+    if len(raw) % a.itemsize != 0:
+        raise ValueError(f"{path}: {len(raw)} bytes is not a multiple of {a.itemsize}")
+    a.frombytes(raw)
     if sys.byteorder != "little":
         a.byteswap()
     return a
@@ -48,13 +62,25 @@ def main():
     p.add_argument("--net-tol", type=float)
     args = p.parse_args()
 
-    xa, xb = load(args.a), load(args.b)
+    try:
+        xa, xb = load(args.a), load(args.b)
+    except OSError as e:
+        print(f"error: cannot read dump: {e}", file=sys.stderr)
+        return 2
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     if len(xa) != len(xb):
         print(f"error: {args.a} has {len(xa)} prices, {args.b} has {len(xb)}", file=sys.stderr)
         return 2
     n = len(xa)
+    if n == 0:
+        print("error: dumps are empty", file=sys.stderr)
+        return 2
 
     n_diff = 0
+    n_nonfinite = 0
+    nonfinite_at = None
     max_abs = 0.0
     max_abs_at = 0.0
     max_rel = 0.0
@@ -68,6 +94,20 @@ def main():
     for a, b in zip(xa, xb):
         sum_a += a
         sum_b += b
+
+        # A NaN or infinity on either side cannot be bounded by a numeric
+        # tolerance. If the two sides are not identical, record it as a
+        # mismatch that fails the check. Two bit-identical values (including
+        # the same NaN) are treated as equal here, since the raw-byte
+        # fingerprint is what detects differing NaN payloads.
+        if not (math.isfinite(a) and math.isfinite(b)):
+            if struct.pack("<d", a) != struct.pack("<d", b):
+                n_diff += 1
+                n_nonfinite += 1
+                if nonfinite_at is None:
+                    nonfinite_at = (a, b)
+            continue
+
         d = abs(a - b)
         if d == 0.0:
             continue
@@ -90,6 +130,9 @@ def main():
         print(f"largest relative difference  : {max_rel:.3e} (on a price of {max_rel_at:.6e})")
         print(f"largest ULP distance         : {max_ulp} (on a price of {max_ulp_at:.6e})")
         print(f"sum of absolute differences  : {sum_abs_diff:.6e}")
+    if n_nonfinite:
+        a0, b0 = nonfinite_at
+        print(f"non-finite mismatches        : {n_nonfinite:,} (first: {a0!r} vs {b0!r})")
     print(f"book total A                 : {sum_a:.6f}")
     print(f"book total B                 : {sum_b:.6f}")
     print(f"book total difference (net)  : {net:.6e}")
@@ -102,7 +145,9 @@ def main():
     ]
     enforced = [(name, tol, val) for name, tol, val in checks if tol is not None]
     if not enforced:
-        return 0
+        # Report-only mode. A non-finite mismatch is still a hard error, so
+        # it fails even when no tolerance was asked for.
+        return 1 if n_nonfinite else 0
 
     print()
     failed = False
@@ -110,6 +155,9 @@ def main():
         ok = val <= tol
         failed |= not ok
         print(f"{name:<8} {val:.3e} <= {tol:.3e}  {'PASS' if ok else 'FAIL'}")
+    if n_nonfinite:
+        failed = True
+        print(f"{'nonfinite':<8} {n_nonfinite} mismatch(es)        FAIL")
     return 1 if failed else 0
 
 if __name__ == "__main__":

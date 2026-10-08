@@ -28,7 +28,7 @@ This needs the AWS CLI v2 with credentials and `python3` on your machine. It lau
 2. Same arm64 host, contraction on vs off.
 3. x86-64 vs arm64, both with contraction off.
 
-Then it terminates the instances and deletes the bucket, security group and IAM role it created. Everything is tagged `Project=graviton-numerical-validation`. The run takes about eight minutes and the report and dumps are saved under `results/run-<timestamp>/`.
+Then it terminates the instances and deletes the bucket, security group and IAM role it created. Every resource a run creates carries a unique run id: the instances and security group are tagged `Project=graviton-numerical-validation` and `RunId=<id>`, and the bucket (`gnv-results-<account>-<id>`) and IAM role (`graviton-numerical-validation-<id>`) carry the id in their names. Cleanup removes only that run's resources, so concurrent runs do not interfere, and `--cleanup-only --run-id <id>` removes one interrupted run. The run takes about ten minutes and the report and dumps are saved under `results/run-<id>/`.
 
 Instances are reached with SSM Run Command. No SSH key pair is created and the security group has no inbound rules.
 
@@ -40,8 +40,9 @@ Options:
 --arm TYPE                 default c9g.xlarge
 --bench                    also run the throughput benchmark (see below)
 --instance-profile NAME    use an existing instance profile instead of creating an IAM role
---keep                     leave the instances running
---cleanup-only             remove anything left by an interrupted run
+--keep                     leave the instances running (prints the run id and the cleanup command)
+--run-id ID                reuse a specific run id, for cleaning up one earlier run
+--cleanup-only             remove resources and exit; with --run-id, only that run, otherwise every run in the region/account
 ```
 
 ### Optional: throughput benchmark
@@ -52,7 +53,7 @@ Options:
 
 After the correctness comparison, this builds and runs `bench.cpp` on both hosts and adds a table with options priced per second, cores and threads per core, CPU utilisation during the timed region, and, best effort, the current On-Demand and Spot price for each instance type in the region, so you get options per second per dollar. If the caller lacks `pricing:GetProducts` the price columns say `n/a` and the run still completes.
 
-The benchmark prices 16 million options on all hardware threads, best of 8 repeats, with inputs generated outside the timed region. It uses the same Black-Scholes kernel as `pricer.cpp`. Read the result as one data point about this kernel on one instance size. A closed-form formula with no memory pressure, no branching and no library calls beyond libm says little about a real pricing library, and prices change. The benchmark table is appended to the run's `report.txt` with the date it was taken.
+The benchmark prices 16 million options on all hardware threads, best of 8 repeats, with inputs generated outside the timed region. It uses the same Black-Scholes kernel as `pricer.cpp`. Read the result as one data point about this kernel on one instance size. A closed-form formula with no memory pressure, no branching and no library calls beyond libm says little about a real pricing library. The benchmark table is appended to the run's `report.txt` with the date it was taken.
 
 ### Permissions
 
@@ -167,15 +168,15 @@ Book value and fingerprint are the two results. The fingerprint is an FNV-1a has
 
 `pricer` uses the compiler's default for floating-point contraction. `pricer-strict` adds `-ffp-contract=off`.
 
-Contraction lets the compiler fuse `a * b + c` into a single fused multiply-add (FMA) instruction with one rounding instead of two. GCC contracts by default in its GNU language modes (`-ffp-contract=fast`); Clang has contracted within a statement by default (`-ffp-contract=on`) since Clang 14. On arm64, FMA is part of the base instruction set, so the fused form is always available. Amazon Linux 2023 builds its x86-64 packages and defaults its compiler to the x86-64-v2 level, which has no FMA instruction (FMA arrives in x86-64-v3), so on x86 the same compiler with the same default flags has nothing to fuse with unless you raise the target with `-march`. This is why the two builds produce identical results on x86-64 and different results on arm64. The difference comes from what the compiler is allowed to emit, not from the silicon, and disappears with `-ffp-contract=off` on both.
+Contraction lets the compiler fuse `a * b + c` into a single fused multiply-add (FMA) instruction with one rounding instead of two. GCC defaults to `-ffp-contract=fast` for C++ in every `-std`, including the `-std=c++17` this Makefile uses, and for C only outside a standards-conforming mode (`-std=gnu11` contracts, `-std=c11` does not). Clang has contracted within a statement by default (`-ffp-contract=on`) since Clang 14. On arm64, FMA is part of the base instruction set, so the fused form is always available. Amazon Linux 2023 builds its x86-64 packages and defaults its compiler to the x86-64-v2 level, which has no FMA instruction (FMA arrives in x86-64-v3), so on x86 the same compiler with the same default flags has nothing to fuse with unless you raise the target with `-march`. This is why the two builds produce identical results on x86-64 and different results on arm64. The difference comes from what the compiler is allowed to emit, not from the silicon, and disappears with `-ffp-contract=off` on both.
 
-What remains after contraction is disabled in your own code is the math library. `exp`, `log` and `erfc` are implemented in software, and IEEE 754 recommends but does not require that they be correctly rounded, so implementations may legitimately differ in the last bit. In glibc, the generic implementations of these functions are shared C source across architectures, but the library itself is compiled with contraction decisions you do not control. On aarch64 that code is built with FMA. On x86-64, glibc ships separate FMA-enabled variants of `exp`, `log`, `pow` and others, compiled with `-mfma -mavx2`, and selects one at load time based on the CPU it finds; `erfc` has no such variant, so the x86-64-v2 build runs the unfused generic code. The last-bit differences you see between architectures after setting `-ffp-contract=off` are therefore mostly the same contraction effect, occurring inside the C library rather than in your code.
+What remains after contraction is disabled in your own code is the math library. `exp`, `log` and `erfc` are implemented in software, and IEEE 754 recommends but does not require that they be correctly rounded, so implementations may legitimately differ in the last bit. In glibc, the generic implementations of these functions are shared C source across architectures, but the library itself is compiled with contraction decisions you do not control. On aarch64 that code is built with FMA. On x86-64, glibc ships separate FMA-enabled variants of core routines such as `exp`, `log` and `pow`, compiled with `-mfma -mavx2`, and selects one at load time (through an ifunc) based on the CPU it finds. `erfc` has no FMA variant of its own, but glibc's `__erfc` computes its tail through `__ieee754_exp` (`sysdeps/ieee754/dbl-64/s_erf.c`), and on x86-64 that `exp` is the ifunc, so the normal-distribution tail still routes through an FMA-built routine. The last-bit differences you see between architectures after setting `-ffp-contract=off` are therefore mostly the same contraction effect, occurring inside the C library rather than in your code.
 
 Two consequences follow. First, this is not an Arm property: an x86 fleet mixing CPUs with and without FMA would not be bit-identical with itself, because glibc would pick different `exp` implementations on different hosts. Every current-generation EC2 x86 instance supports FMA, which is why Intel and AMD hosts match each other. Second, the picture is changing: glibc has been importing correctly rounded implementations from the CORE-MATH project since 2.41, and 2.43 adds correctly rounded `erf` and `erfc`. A correctly rounded function returns the unique nearest double, so it is identical on every architecture by construction. Amazon Linux 2023 ships glibc 2.34 and does not have these yet.
 
 ## Results
 
-Each run of `run-aws.sh` prints the three comparisons and writes a report and the raw price dumps to `results/run-<timestamp>/` on your machine. The dumps are large and regenerable, so they are not committed; run the harness in your own account to produce them. Captured on Amazon Linux 2023 with GCC 11.5 and glibc 2.34, the strict build gives a book value of `116982007931.343628` on every x86 and Graviton instance tested, with 4.6% of individual prices differing in the last bits across architectures.
+Each run of `run-aws.sh` prints the three comparisons and writes a report and the raw price dumps to `results/run-<id>/` on your machine. The dumps are large and regenerable, so they are not committed; run the harness in your own account to produce them. Captured on Amazon Linux 2023 with GCC 11.5 and glibc 2.34, the strict build gives a book value of `116982007931.343628` on every x86 and Graviton instance tested, with 4.6% of individual prices differing in the last bits across architectures.
 
 ## What this does not show
 
@@ -183,16 +184,16 @@ The harness demonstrates the size and origin of differences for one closed-form 
 
 Results within a single architecture and build are reproducible. Results across architectures differ in the last bits of some prices. Whether those differences are acceptable is a question for your model validation process, and the tolerances in `compare.py` are there so you can encode the answer.
 
-The harness does not measure performance. It compares results.
+The correctness comparison is the point of the harness; `pricer` and `compare.py` say nothing about speed. The optional `--bench` mode (`bench.cpp`) measures throughput separately, and its one-kernel result is not a statement about a real pricing library.
 
 ## References
 
 - IEEE Std 754-2019, IEEE Standard for Floating-Point Arithmetic. Basic operations must be correctly rounded; correct rounding of `exp`, `log`, `erf` and other elementary functions is recommended, not required.
-- B. Gladman, V. Innocente, J. Mather, K. Ozaki, P. Zimmermann, "Accuracy of Mathematical Functions in Single, Double, Double Extended, and Quadruple Precision", 2026. Measured worst-case errors for glibc and other math libraries. https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+- B. Gladman, V. Innocente, J. Mather, K. Ozaki, P. Zimmermann, "Accuracy of Mathematical Functions in Single, Double, Extended Double and Quadruple Precision", 2026. Measured worst-case errors for glibc and other math libraries. https://members.loria.fr/PZimmermann/papers/accuracy.pdf
 - The CORE-MATH project, correctly rounded elementary functions being integrated into glibc and other libms. https://core-math.gitlabpages.inria.fr/
 - glibc source, x86-64 FMA variants of libm functions selected by ifunc: https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/fpu/multiarch/Makefile and https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/fpu/multiarch/e_exp.c
 - GCC manual, `-ffp-contract`. https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
-- Clang, change of `-ffp-contract` default to `on` in Clang 14. https://github.com/llvm/llvm-project/issues/50688
+- Clang, discussion of the `-ffp-contract` default change to `on` (the LLVM issue tracking the change; the release notes record it landing in Clang 14). https://github.com/llvm/llvm-project/issues/50688
 - Amazon Linux 2023, performance and operational optimizations (x86-64-v2 and `armv8.2-a+crypto` build targets). https://docs.aws.amazon.com/linux/al2023/ug/performance-optimizations.html
 - AWS Graviton Technical Guide, C/C++ on Graviton (compiler flags per generation). https://github.com/aws/aws-graviton-getting-started/blob/main/c-c++.md
 - Financial Services Grid Computing on AWS, Software considerations (IEEE 754 compliance and compiler variation). https://docs.aws.amazon.com/whitepapers/latest/financial-services-grid-computing/software-considerations.html

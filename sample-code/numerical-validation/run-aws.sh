@@ -8,9 +8,13 @@
 # Nothing is installed locally. Instances are reached with SSM Run Command,
 # so no SSH key and no inbound security group rule are created.
 #
+# Every resource created by a run carries a unique run id, so concurrent runs
+# are isolated and cleaning up one run never touches another.
+#
 # Usage:
 #   ./run-aws.sh [--region R] [--x86 TYPE] [--arm TYPE] [--bench]
-#                [--instance-profile NAME] [--keep] [--cleanup-only]
+#                [--instance-profile NAME] [--keep]
+#   ./run-aws.sh --cleanup-only [--run-id ID] [--region R]
 #
 # AWS credentials come from the environment as usual (AWS_PROFILE, env vars,
 # or the default profile).
@@ -23,8 +27,12 @@
 #   --instance-profile NAME
 #                   use an existing IAM instance profile that allows SSM and
 #                   s3:PutObject to the results bucket, instead of creating one
-#   --keep          leave instances running afterwards
-#   --cleanup-only  remove anything left behind by an earlier run, then exit
+#   --keep          leave instances running afterwards. The run prints its
+#                   run id and the --cleanup-only command to remove them later
+#   --run-id ID     reuse a specific run id, for cleaning up one earlier run
+#   --cleanup-only  remove resources and exit. With --run-id, removes only that
+#                   run. Without it, removes every run's resources in the
+#                   region and account (asked for explicitly)
 #
 # Permissions needed by the caller: ec2 (run/describe/terminate instances,
 # security groups), ssm (send-command, get-command-invocation), s3 (create,
@@ -43,6 +51,7 @@ PROFILE_NAME=""
 BENCH=0
 KEEP=0
 CLEANUP_ONLY=0
+RUN_ID=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -53,6 +62,7 @@ while [ $# -gt 0 ]; do
         --instance-profile) PROFILE_NAME="$2"; shift 2;;
         --keep)    KEEP=1; shift;;
         --cleanup-only) CLEANUP_ONLY=1; shift;;
+        --run-id)  RUN_ID="$2"; shift 2;;
         -h|--help) awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$0"; exit 0;;
         *) echo "unknown option: $1" >&2; exit 2;;
     esac
@@ -61,10 +71,21 @@ done
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TAG="graviton-numerical-validation"
 BUCKET_PREFIX="gnv-results-"
-RUN_ID="$(date +%Y%m%d-%H%M%S)-$RANDOM"
+
+# Every resource this script creates carries a unique run id, so that
+# concurrent runs, and cleanup of an interrupted run, never touch another
+# run's instances, bucket, security group or IAM role. --cleanup-only with no
+# --run-id is the one exception: it sweeps every run's resources in the
+# account, which is why it has to be asked for explicitly.
+SWEEP_ALL=0
+if [ "$CLEANUP_ONLY" = 1 ] && [ -z "$RUN_ID" ]; then
+    SWEEP_ALL=1
+fi
+[ -n "$RUN_ID" ] || RUN_ID="$(date +%Y%m%d-%H%M%S)-$RANDOM"
+
 OUT_DIR="$HERE/results/run-$RUN_ID"
-SG_NAME="$TAG-sg"
-ROLE_NAME="$TAG-role"
+SG_NAME="$TAG-$RUN_ID-sg"
+ROLE_NAME="$TAG-$RUN_ID"
 OWN_PROFILE=0
 BUCKET=""
 INSTANCE_IDS=()
@@ -76,17 +97,35 @@ die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- cleanup ---
 
+# Remove the IAM role and instance profile with the given name.
+delete_role() {
+    local role="$1"
+    aws_ iam remove-role-from-instance-profile --instance-profile-name "$role" --role-name "$role" >/dev/null 2>&1
+    aws_ iam delete-instance-profile --instance-profile-name "$role" >/dev/null 2>&1
+    aws_ iam detach-role-policy --role-name "$role" --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore >/dev/null 2>&1
+    aws_ iam delete-role-policy --role-name "$role" --policy-name results-bucket >/dev/null 2>&1
+    aws_ iam delete-role --role-name "$role" >/dev/null 2>&1 && log "Deleted IAM role $role"
+}
+
 cleanup() {
     set +e
     if [ "$KEEP" = 1 ] && [ "$CLEANUP_ONLY" = 0 ]; then
         log "--keep given, leaving instances running: ${INSTANCE_IDS[*]:-none}"
-        log "Run '$0 --region $REGION --cleanup-only' to remove them later."
+        log "Run '$0 --region $REGION --cleanup-only --run-id $RUN_ID' to remove this run later."
         return
     fi
-    log "Cleaning up"
-    local ids
+
+    # Instances: scope to this run by RunId tag, unless sweeping all runs.
+    local inst_filter ids
+    if [ "$SWEEP_ALL" = 1 ]; then
+        log "Cleaning up ALL $TAG runs in $REGION"
+        inst_filter="Name=tag:Project,Values=$TAG"
+    else
+        log "Cleaning up run $RUN_ID"
+        inst_filter="Name=tag:RunId,Values=$RUN_ID"
+    fi
     ids=$(aws_ ec2 describe-instances \
-        --filters "Name=tag:Project,Values=$TAG" \
+        --filters "$inst_filter" \
                   "Name=instance-state-name,Values=pending,running,stopping,stopped" \
         --query 'Reservations[].Instances[].InstanceId')
     if [ -n "$ids" ]; then
@@ -94,20 +133,40 @@ cleanup() {
         aws_ ec2 terminate-instances --instance-ids $ids >/dev/null
         aws_ ec2 wait instance-terminated --instance-ids $ids
     fi
-    for _ in 1 2 3 4 5 6; do
-        aws_ ec2 delete-security-group --group-name "$SG_NAME" >/dev/null 2>&1 && break
-        sleep 10
+
+    # Security groups, buckets and roles: this run's by name, or every run's
+    # when sweeping. A security group cannot be deleted until the instances
+    # that used it are gone, so this retries.
+    local sgs roles buckets
+    if [ "$SWEEP_ALL" = 1 ]; then
+        sgs=$(aws_ ec2 describe-security-groups \
+            --filters "Name=group-name,Values=$TAG-*-sg" --query 'SecurityGroups[].GroupName')
+        roles=$(aws_ iam list-roles --query "Roles[?starts_with(RoleName, '$TAG-')].RoleName")
+        buckets=$(aws_ s3api list-buckets --query "Buckets[?starts_with(Name, '$BUCKET_PREFIX')].Name")
+    else
+        sgs="$SG_NAME"
+        buckets="$BUCKET"
+        if [ "$OWN_PROFILE" = 1 ] || [ "$CLEANUP_ONLY" = 1 ]; then
+            roles="$ROLE_NAME"
+        else
+            roles=""
+        fi
+    fi
+
+    for sg in $sgs; do
+        for _ in 1 2 3 4 5 6; do
+            aws_ ec2 delete-security-group --group-name "$sg" >/dev/null 2>&1 && { log "Deleted security group $sg"; break; }
+            sleep 10
+        done
     done
-    for b in $(aws_ s3api list-buckets --query "Buckets[?starts_with(Name, '$BUCKET_PREFIX')].Name"); do
+    for b in $buckets; do
+        [ -n "$b" ] || continue
         aws_ s3 rb "s3://$b" --force >/dev/null 2>&1 && log "Deleted bucket $b"
     done
-    if [ "$OWN_PROFILE" = 1 ] || [ "$CLEANUP_ONLY" = 1 ]; then
-        aws_ iam remove-role-from-instance-profile --instance-profile-name "$ROLE_NAME" --role-name "$ROLE_NAME" >/dev/null 2>&1
-        aws_ iam delete-instance-profile --instance-profile-name "$ROLE_NAME" >/dev/null 2>&1
-        aws_ iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore >/dev/null 2>&1
-        aws_ iam delete-role-policy --role-name "$ROLE_NAME" --policy-name results-bucket >/dev/null 2>&1
-        aws_ iam delete-role --role-name "$ROLE_NAME" >/dev/null 2>&1 && log "Deleted IAM role $ROLE_NAME"
-    fi
+    for r in $roles; do
+        [ -n "$r" ] || continue
+        delete_role "$r"
+    done
     log "Cleanup complete"
 }
 trap cleanup EXIT
@@ -179,7 +238,9 @@ SG_ID=$(aws_ ec2 describe-security-groups --group-names "$SG_NAME" \
     --query 'SecurityGroups[0].GroupId' 2>/dev/null || true)
 if [ -z "$SG_ID" ] || [ "$SG_ID" = "None" ]; then
     SG_ID=$(aws_ ec2 create-security-group --group-name "$SG_NAME" \
-        --description "$TAG (no inbound rules, SSM only)" --query GroupId)
+        --description "$TAG run $RUN_ID (no inbound rules, SSM only)" \
+        --tag-specifications "ResourceType=security-group,Tags=[{Key=Project,Value=$TAG},{Key=RunId,Value=$RUN_ID}]" \
+        --query GroupId)
 fi
 
 # ---------------------------------------------------------------- launch ---
@@ -191,7 +252,7 @@ launch() {
             --iam-instance-profile "Name=$PROFILE_NAME" --security-group-ids "$SG_ID" \
             --metadata-options "HttpTokens=required,HttpEndpoint=enabled,HttpPutResponseHopLimit=1" \
             --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"Encrypted":true,"DeleteOnTermination":true}}]' \
-            --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=$TAG},{Key=Name,Value=$TAG-$label}]" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=$TAG},{Key=RunId,Value=$RUN_ID},{Key=Name,Value=$TAG-$RUN_ID-$label}]" \
             --query 'Instances[0].InstanceId' 2>/tmp/launch.err) && { echo "$iid"; return; }
         sleep 8
     done

@@ -1,10 +1,11 @@
 # Two builds of the same source.
 #
 #   pricer         compiler defaults for floating-point contraction. GCC
-#                  defaults to -ffp-contract=fast in GNU modes; Clang 14+
-#                  defaults to -ffp-contract=on. Either fuses a*b+c on arm64,
-#                  where FMA is in the base ISA. On x86-64 at the default
-#                  x86-64-v2 target there is no FMA instruction to fuse into.
+#                  defaults to -ffp-contract=fast for C++ in every -std,
+#                  including the -std=c++17 used here; Clang 14+ defaults to
+#                  -ffp-contract=on. Either fuses a*b+c on arm64, where FMA is
+#                  in the base ISA. On x86-64 at the default x86-64-v2 target
+#                  there is no FMA instruction to fuse into.
 #   pricer-strict  -ffp-contract=off: multiply and add are always rounded
 #                  separately, on every architecture.
 #
