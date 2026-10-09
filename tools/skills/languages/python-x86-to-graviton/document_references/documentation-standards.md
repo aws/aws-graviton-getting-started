@@ -22,7 +22,7 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
         ├── dependency-tree-full.txt          # Manager-native tree, or .json for a pip report (Phase 1.1)
         ├── requirements-resolved.txt         # Flat pinned list the probe ran on (Phase 1.3)
         ├── wheel-availability.txt            # Probe output, one verdict line per pin (Phase 1.3)
-        └── site-packages-so-scan.txt         # every ELF file found by content, with its architecture (Phase 1.2)
+        └── site-packages-so-scan.txt         # every native file found by content, its properties, FINDING lines (Phase 1.2)
 ```
 
 ## Agent Instructions
@@ -30,7 +30,7 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 1. **Create `graviton-validation/` and `graviton-validation/raw/` first.** `mkdir -p graviton-validation/raw` is the first action of Phase 1.
 2. **Use exactly these filenames.** Do not rename, renumber or add top-level files. Additional machine output goes under `raw/` with a descriptive name.
 3. **Write progressively.** Each phase step writes its section as it completes; do not batch everything at the end.
-4. **Every verdict cites its evidence.** A dependency row without a probe command and a wheel filename (or a `from versions:` list, or a PyPI files-list observation) is incomplete. The "validated by" and "evidence" columns below are mandatory.
+4. **Every verdict cites its evidence and says where it was established.** A dependency row without a probe command and a wheel filename (or a `from versions:` list, or a PyPI files-list observation) is incomplete. The "validated by" and "evidence" columns below are mandatory. The `Established` column says where the verdict comes from: `predicted` (read from files or the index, on any host, as everything in Phase 1 is), `emulated` (observed in a `linux/arm64` environment under emulation), `native arm64` (observed on an arm64 host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict. A `predicted` finding stays a finding when an observation passes, because a fallback can hide it in one setup (the loaded check in Phase 3.2).
 5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce (a CHECK line of the Phase 1.3 loop), is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the label each option leads to.
 6. **Empty sections stay, with "No findings".** Omitting a section is ambiguous (not checked, or nothing found?). Write the heading and an explicit statement.
 7. **`00-summary.md` is written last** and references the detail files rather than repeating them.
@@ -135,26 +135,26 @@ Monorepo / multiple packages: <No | Yes, list each package and its manager>
 # Native Library Report
 
 ## Statically Bundled Libraries
-| Library | Location | Architecture (ELF header) | aarch64 build present (confirmed by the scan) | Verdict | Resolution |
-|---|---|---|---|---|---|
-| libfastsum-x86_64.so | vendor/ | e_machine 62 (x86-64) | No | WARN (source in native/) | rebuilt from native/fastsum.c for aarch64 |
-| <name>.so | Lambda layer or vendored site-packages (<package>==<version>) | <architecture> | <yes/no> | <verdict> | <resolution> |
+| Library | Location | Scan (architecture, C library, FINDING lines) | aarch64 build present (confirmed by the scan) | Verdict | Established | Resolution |
+|---|---|---|---|---|---|---|
+| libfastsum-x86_64.so | vendor/ | e_machine 62 (x86-64); not aarch64 | No | WARN (source in native/) | predicted | rebuilt from native/fastsum.c for aarch64 |
+| <name>.so | Lambda layer or vendored site-packages (<package>==<version>) | <scan line> | <yes/no> | <verdict> | <predicted / emulated / native arm64 / target> | <resolution> |
 
 ## Runtime-Extracted Libraries
-| Source | Artifact | Downloads or unpacks native code | aarch64 support in current version | Verdict | Resolution |
-|---|---|---|---|---|---|
-| scripts_deploy.sh:5 | tool-linux-amd64 | Yes (curl at deploy time) | not confirmed | WARN | arm64 asset not confirmed (user decision) |
+| Source | Artifact | Downloads or unpacks native code | aarch64 support in current version | Verdict | Established | Resolution |
+|---|---|---|---|---|---|---|
+| scripts_deploy.sh:5 | tool-linux-amd64 | Yes (curl at deploy time) | not confirmed | WARN | predicted | arm64 asset not confirmed (user decision) |
 
 ## In-Repo Extension Modules
-| Build definition | Module | Language / tool | x86-only flags or headers | Verdict | Resolution |
-|---|---|---|---|---|---|
-| setup.py | _fixture_ext | C via setuptools | -mavx2, -march=haswell; immintrin.h (guarded) | WARN (source present) | flags arch-guarded (Phase 2.4); rebuilt on aarch64 hardware |
+| Build definition | Module | Language / tool | x86-only flags or headers | Verdict | Established | Resolution |
+|---|---|---|---|---|---|---|
+| setup.py | _fixture_ext | C via setuptools | -mavx2, -march=haswell; immintrin.h (guarded) | WARN (source present) | predicted | flags arch-guarded (Phase 2.4); rebuilt on aarch64 hardware |
 
 ## Resolution Details
 <For each FAIL or WARN, describe the resolution approach.> FAIL: x86-only binary with no aarch64 build path and no source. WARN: source available or pure-Python fallback exists. PASS: aarch64 binary present or built.
 
 ## Pure Python Fallbacks Documented
-<List any library where a pure-Python fallback path was chosen instead of native resolution, for example the fixture's `fast_sum`, which falls back to `sum()` when the native load fails; record that the fallback is slower.>
+<List any library where a pure-Python fallback path was chosen instead of native resolution, for example the fixture's `fast_sum`, which falls back to `sum()` when the native load fails; record that the fallback is slower. List also every package the loaded check (Phase 3.2) found running without its compiled code on ARM64, with its resolution.>
 
 ## No Findings
 <If nothing was found:> No bundled or runtime-extracted native libraries, in-repo extensions or layers detected. All native code arrives through PyPI wheels (see 03).
@@ -170,11 +170,11 @@ Monorepo / multiple packages: <No | Yes, list each package and its manager>
 Interpreter probed: cp3XY. Target libc: <glibc 2.NN | musl 1.N> (every manylinux or musllinux tag up to it offered). Index: PyPI | <mirror>. Probe date: YYYY-MM-DD.
 
 ## MUST UPGRADE (Blocking)
-| Dependency | Direct / via | Pinned | Issue | Evidence | Minimum aarch64 version (this cp tag) | Applied | Mechanism |
-|---|---|---|---|---|---|---|---|
-| blosc2 | direct | 0.6.3 | no cp311 aarch64 wheel; x86_64 wheel exists | probe -> `from versions: 0.6.4, ...`; `blosc2-0.6.3-cp311-...x86_64.whl` | 0.6.4 (`blosc2-0.6.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl`) | 0.6.4 | requirements.txt pin |
-| mkl | direct | 2026.1.0 | x86-only by nature (no aarch64 file in any release) | PyPI files list | none | removed (user confirmed) | requirements.txt |
-| requirements-locked.txt | lock | charset-normalizer 3.4.0, MarkupSafe 2.1.5 | x86_64 hashes only | `--require-hashes` dry run: Expected sha256 ... Got ... | n/a | aarch64 hashes added | pip hash |
+| Dependency | Direct / via | Pinned | Issue | Evidence | Established | Minimum aarch64 version (this cp tag) | Applied | Mechanism |
+|---|---|---|---|---|---|---|---|---|
+| blosc2 | direct | 0.6.3 | no cp311 aarch64 wheel; x86_64 wheel exists | probe -> `from versions: 0.6.4, ...`; `blosc2-0.6.3-cp311-...x86_64.whl` | predicted | 0.6.4 (`blosc2-0.6.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl`) | 0.6.4 | requirements.txt pin |
+| mkl | direct | 2026.1.0 | x86-only by nature (no aarch64 file in any release) | PyPI files list | predicted | none | removed (user confirmed) | requirements.txt |
+| requirements-locked.txt | lock | charset-normalizer 3.4.0, MarkupSafe 2.1.5 | x86_64 hashes only | `--require-hashes` dry run: Expected sha256 ... Got ... | predicted | n/a | aarch64 hashes added | pip hash |
 
 ## User Decisions Pending
 | Dependency | Pinned | Options | Recommendation |
@@ -187,11 +187,11 @@ Interpreter probed: cp3XY. Target libc: <glibc 2.NN | musl 1.N> (every manylinux
 | <dep> | <ver> | <ver> | documented Graviton improvement (source) | A or B | Documented for user |
 
 ## COMPATIBLE (No Action Needed)
-| Dependency | Direct / via | Pinned | Basis (wheel filename or pure-Python evidence) |
-|---|---|---|---|
-| numpy | direct | 1.26.4 | `numpy-1.26.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl`; >= 1.21.1 correctness floor |
-| six | direct | 1.11.0 | `six-1.11.0-py2.py3-none-any.whl`; modernisation out of scope |
-| docopt | direct | 0.6.2 | sdist only, no compiled sources |
+| Dependency | Direct / via | Pinned | Basis (wheel filename or pure-Python evidence) | Established |
+|---|---|---|---|---|
+| numpy | direct | 1.26.4 | `numpy-1.26.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl`; >= 1.21.1 correctness floor | emulated (Phase 3: imported, 13 native files loaded) |
+| six | direct | 1.11.0 | `six-1.11.0-py2.py3-none-any.whl`; modernisation out of scope | predicted |
+| docopt | direct | 0.6.2 | sdist only, no compiled sources | predicted |
 
 ## Transitive Dependency Resolutions
 | Transitive | Pulled in by | Issue | Mechanism used |
@@ -305,9 +305,9 @@ Interpreter decision, one for the whole dependency set (Phase 1.5), one row per 
 | 2 | pip install -r requirements.txt | PASS | 11 wheels / 1 sdist (docopt) | |
 
 ## Import Smoke Test
-| Package | Import | Native module loaded | Notes |
-|---|---|---|---|
-| numpy | OK | `_multiarray_umath.cpython-311-aarch64-linux-gnu.so`; np.__config__.show(): openblas | |
+| Package | Import | Native files loaded on ARM64 (loaded check) | On the x86 baseline | Notes |
+|---|---|---|---|---|
+| numpy | OK | 13 (`numpy/core/_multiarray_tests.cpython-311-aarch64-linux-gnu.so`, ...) | 13 | np.__config__.show(): openblas |
 
 ## Test Execution
 | Command | Result | Passed / failed / skipped |
@@ -358,7 +358,7 @@ Interpreter decision, one for the whole dependency set (Phase 1.5), one row per 
 ### `raw/site-packages-so-scan.txt`
 
 **Created:** Phase 1.2.1
-**Purpose:** `native_scan` output: every ELF file in the project tree, including members of layer zips and vendored wheels, with its architecture, and the `not aarch64:` list. Kept for traceability; not hand-edited.
+**Purpose:** `native_scan` output: every native file in the project tree, including members of layer zips, vendored wheels and static archives, with its properties (architecture, C library, `GLIBC_` and `GLIBCXX_` floors, page alignment, needed libraries), the target it was judged for, and one `FINDING` line per problem. Kept for traceability; not hand-edited.
 
 ---
 
@@ -390,6 +390,6 @@ Interpreter decision, one for the whole dependency set (Phase 1.5), one row per 
 | 2.5 improvements | all tables | `05-runtime-configuration.md` |
 | 3.0 environment and alignment | environment | `06-build-test-results.md` |
 | 3.1 install validation | install attempts, import smoke test | `06-build-test-results.md` |
-| 3.2 tests and classification | test tables, final build | `06-build-test-results.md` |
+| 3.2 tests, loaded check and classification | test tables, loaded check, final build | `06-build-test-results.md` |
 | 3.3 container and startup | container, startup sections | `06-build-test-results.md` |
 | End | summary and exit criteria | `00-summary.md` |

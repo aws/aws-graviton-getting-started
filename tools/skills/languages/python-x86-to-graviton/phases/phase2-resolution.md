@@ -52,15 +52,16 @@ Before rebuilding, remove x86-only compiler flags, or apply them only on x86 (se
 
 ```bash
 PYVER=3.11              # the function's runtime: python3.11 -> 3.11, python3.12 -> 3.12
-TARGET_LIBC_VER=2.26    # Phase 1.1: 2.26 for python3.10 and python3.11 (Amazon Linux 2), 2.34 for python3.12 and later
+TARGET_LIBC=glibc; TARGET_LIBC_VER=2.26    # Phase 1.1: 2.26 for python3.10 and python3.11 (Amazon Linux 2), 2.34 for python3.12 and later
+TARGET_PAGE_SIZE=       # the function's page size, if measured in it (getconf PAGESIZE); unset, the scan skips the page check
 PLAT=(); i=${TARGET_LIBC_VER#*.}
 while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
 python3 -m pip install "${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: \
   --python-version "$PYVER" --implementation cp --target python/ -r layer-requirements.txt
-native_scan python   # the function from Phase 1.2.1: every file must report e_machine 183 (aarch64)
+native_scan python   # the function from Phase 1.2.1: no FINDING line
 ```
 
-Executed for `numpy==1.26.4` and `selenium==4.48.0`: pip installed both for aarch64 and `numpy/core/_multiarray_umath.cpython-311-aarch64-linux-gnu.so` is aarch64, but the scan also reported `not aarch64: python/selenium/webdriver/common/linux/selenium-manager`, an x86-64 executable from selenium's `py3-none-any` wheel that a check of one file misses. Layer contents go in `python/` at the root of the zip ([AWS Lambda Python layers](https://docs.aws.amazon.com/lambda/latest/dg/python-layers.html)). A package with no aarch64 wheel fails this command; resolve it in §2.2 first. The tag list matters: confluent-kafka 2.15.1's only aarch64 wheel is `manylinux_2_28`, so with `TARGET_LIBC_VER=2.26` the command fails for it, and a layer built from that wheel anyway imported on an arm64 `python3.12` function and failed on `python3.11` with `version 'GLIBC_2.28' not found` (Phase 1.1).
+Executed for `numpy==1.26.4` and `selenium==4.48.0`: pip installed both for aarch64 and `numpy/core/_multiarray_umath.cpython-311-aarch64-linux-gnu.so` is aarch64, but the scan also printed `FINDING python/selenium/webdriver/common/linux/selenium-manager: not aarch64, e_machine 62 (x86-64)`, an x86-64 executable from selenium's `py3-none-any` wheel that a check of one file misses. NumPy's extension needs `GLIBC_2.17`, within Amazon Linux 2's 2.26. Layer contents go in `python/` at the root of the zip ([AWS Lambda Python layers](https://docs.aws.amazon.com/lambda/latest/dg/python-layers.html)). A package with no aarch64 wheel fails this command; resolve it in §2.2 first. The tag list matters: confluent-kafka 2.15.1's only aarch64 wheel is `manylinux_2_28`, so with `TARGET_LIBC_VER=2.26` the command fails for it, and a layer built from that wheel anyway imported on an arm64 `python3.12` function and failed on `python3.11` with `version 'GLIBC_2.28' not found` (Phase 1.1).
 
 **Update native library loading logic** to handle ARM64:
 

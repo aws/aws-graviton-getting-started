@@ -118,7 +118,7 @@ The probe asks the image's own `python3`, because `sh -c` with `ldd --version` a
 - **Lambda functions deployed as .zip archives** have no image: the runtime identifier sets the OS. `python3.12` and later run on Amazon Linux 2023 (glibc 2.34), `python3.10` and `python3.11` on Amazon Linux 2 (glibc 2.26) ([Lambda Python runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html)); wheel-verification.md §7 shows a `manylinux_2_28` layer that imports on `python3.12` and fails on `python3.11`. For container-image functions, run the block against the image.
 - **No arm64 variant of the base image:** both runs stop with `no matching manifest for linux/arm64 in the manifest list entries` (executed with `amazonlinux:2018.03`, whose manifest list has only `amd64`). That is a MUST UPGRADE finding, and the replacement image is a user decision ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), OUT OF SCOPE).
 - **No container runtime:** use the table in wheel-verification.md §7 and say so. For host-based deployments read the AMI's distribution.
-- **Kernel page size of the deployment hosts.** A container uses its host's kernel, so the page size comes from the EC2 hosts or Kubernetes nodes, not from the image: a Debian 13 container on an AlmaLinux 8 Graviton2 host reported 65536. Run `getconf PAGESIZE` on a deployment host (executed on Graviton: AlmaLinux 8.10 65536; AlmaLinux 9.8 and Amazon Linux 2023 4096); if no host can be reached, ask the team that runs them and record the page size as unknown until then. A 64KB-page target needs Phase 3 on a 64KB-page host: on AlmaLinux 8, polars 0.20.20 aborted with `<jemalloc>: Unsupported system page size`, as did every earlier release tested back to 0.15.1, while 0.20.21 and the later releases tested imported. On the 4KB AlmaLinux 9 host polars 0.15.1 imported, so a 4KB validation host hides the failure.
+- **Kernel page size of the deployment hosts.** A container uses its host's kernel, so the page size comes from the EC2 hosts or Kubernetes nodes, not from the image: a Debian 13 container on an AlmaLinux 8 Graviton2 host reported 65536. Run `getconf PAGESIZE` on a deployment host (executed on Graviton: AlmaLinux 8.10 65536; AlmaLinux 9.8 and Amazon Linux 2023 4096); if no host can be reached, ask the team that runs them and record the page size as unknown until then. Set `TARGET_PAGE_SIZE` to the value in bytes: the scan in §1.2.1 judges page alignment only when it is set. A 64KB-page target needs Phase 3 on a 64KB-page host: on AlmaLinux 8, polars 0.20.20 aborted with `<jemalloc>: Unsupported system page size`, as did every earlier release tested back to 0.15.1, while 0.20.21 and the later releases tested imported. On the 4KB AlmaLinux 9 host polars 0.15.1 imported, so a 4KB validation host hides the failure.
 
 Record `pip` on the target: below 19.3 it cannot install aarch64 wheels at all (python.md section 1), and below 20.3 it cannot see `manylinux_2_N` tags; plan the `python3 -m pip install --upgrade pip` step for Phase 3. `pip=none` (the `python3` of Amazon Linux 2023 and AlmaLinux 9, and distroless) means pip has to come from a virtual environment or a distribution package; `venv=no` (distroless) means `python3 -m venv` does not work either.
 
@@ -178,66 +178,225 @@ Executed on the fixture: 25 pins (11 direct, 14 transitive). `charset-normalizer
 
 Native code reaches a Python deployment in three ways: **wheels** from the index (handled in §1.3 by probing the index, not by scanning), **binaries committed to the repository** (vendored `.so`, Lambda layers, pre-built modules), and **extensions the project builds itself** (`setup.py` `ext_modules`, Cython, Rust, pybind11, CMake). This section covers the last two. All three depend on the target OS as well as the CPU (libc, page size, CPU generation, OS packages; [../document_references/wheel-verification.md](../document_references/wheel-verification.md) §1).
 
-**Preflight:** the scan needs `file`. Without it, `file {} +` prints nothing and an empty `raw/site-packages-so-scan.txt` is indistinguishable from "no binaries found".
-
-```bash
-command -v file >/dev/null || echo "WARN: 'file' missing; install it (yum/apt/microdnf install file) before trusting an empty scan"
-```
-
 ### 1.2.1 Statically Bundled .so Scanning
 
-Scan the project tree for every native file and record the architecture the file itself declares. Decide from the ELF header (the file's first bytes), never from its name, extension or folder: an executable can have no extension, a file named `libfoo-aarch64.so` can hold x86-64 code, and a Lambda layer zip or a vendored `py3-none-any` wheel can carry binaries. The scan opens every file and the members of zip archives. It skips installed environments (directories with `pyvenv.cfg` or `conda-meta`), whose packages are judged by wheel in §1.3 and scanned the same way in Phase 3.1. It needs only Python 3.6 or later, so it also runs where `file` and `readelf` are missing:
+Scan the project tree for every native file and judge it by its content (its first bytes and its headers), never by its name, extension or folder: an executable can have no extension, a file named `libfoo-aarch64.so` can hold x86-64 code, and a Lambda layer zip or a vendored `py3-none-any` wheel can carry binaries. The scan opens every file, the members of zip archives and the objects in static archives (`.a`). It skips installed environments (directories with `pyvenv.cfg` or `conda-meta`), whose packages are judged by wheel in §1.3 and scanned the same way in Phase 3.1. For each Linux (ELF) file it prints the architecture, the C library the file was built for (glibc, musl, Android's bionic, or none), the highest `GLIBC_` version it needs from glibc's own libraries, the highest `GLIBCXX_` version it needs from libstdc++, its page alignment and the libraries it needs (`needs`, its DT_NEEDED list); Mach-O and PE files are listed as macOS and Windows builds. It then judges each file for the target of §1.1 (`TARGET_LIBC`, `TARGET_LIBC_VER`, `TARGET_PAGE_SIZE`) and prints one `FINDING` line per problem. The scan only reads files, so no project code runs. It needs only Python 3.6 or later, so it also runs where `file` and `readelf` are missing:
 
 ```bash
-# native_scan DIR: every ELF file under DIR, found by its first bytes (not its name or extension),
-# including members of zip archives (Lambda layer zips, vendored wheels, eggs).
+TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41; TARGET_PAGE_SIZE=4096   # from §1.1 (Alpine: TARGET_LIBC=musl TARGET_LIBC_VER=1.2)
+# native_scan PATH...: every native file under PATH, found by its first bytes (not its name or extension),
+# including members of zip archives (Lambda layer zips, vendored wheels, eggs) and of static archives (.a).
 # Installed environments (directories with pyvenv.cfg or conda-meta) are skipped: Phase 3 scans them.
+# Each Linux file is judged for the target in TARGET_LIBC, TARGET_LIBC_VER, TARGET_PAGE_SIZE (§1.1) and,
+# when known, TARGET_GLIBCXX: one FINDING line per problem, and exit status 1 when there is one.
 native_scan() {
-python3 - "$1" <<'EOF'
-import collections, io, os, struct, sys, zipfile
+TARGET_LIBC="${TARGET_LIBC-}" TARGET_LIBC_VER="${TARGET_LIBC_VER-}" TARGET_PAGE_SIZE="${TARGET_PAGE_SIZE-}" \
+  TARGET_GLIBCXX="${TARGET_GLIBCXX-}" python3 - "$@" <<'EOF'
+import collections, io, os, re, struct, sys, zipfile
 ARCH = {3: "i386", 40: "arm", 62: "x86-64", 183: "aarch64", 243: "riscv"}
-found = []
+GLIBC_LIBS = re.compile(r"(libc\.so\.6|libm\.so\.6|libpthread\.so\.0|libdl\.so\.2|librt\.so\.1|libresolv\.so\.2"
+                        r"|libutil\.so\.1|libanl\.so\.1|ld-linux[-a-z0-9_.]*\.so\.[0-9]+)$")
+LIBC, VER = os.environ["TARGET_LIBC"], os.environ["TARGET_LIBC_VER"]
+CXX = os.environ["TARGET_GLIBCXX"].replace("GLIBCXX_", "")
+if not re.match(r"[0-9]*$", os.environ["TARGET_PAGE_SIZE"]):
+    sys.exit("TARGET_PAGE_SIZE is a number of bytes, for example 65536")
+PAGE = int(os.environ["TARGET_PAGE_SIZE"] or 0)
+lines, findings, machines = [], [], collections.Counter()
 
-def elf(name, h):
-    machine = struct.unpack("<H", h[18:20])[0]
+def vkey(v):
+    return tuple(int(x) for x in re.findall(r"[0-9]+", v))
+
+def report(name, desc, problems=()):
+    lines.append("%s: %s" % (name, desc))
+    findings.extend("%s: %s" % (name, p) for p in problems)
+
+def reader(src):  # read(offset, size) on bytes or on an open file, never past its end
+    if isinstance(src, bytes):
+        return lambda o, n: src[o:o + n] if o >= 0 and n > 0 else b""
+    size = os.fstat(src.fileno()).st_size
+    def read(o, n):
+        if o < 0 or n <= 0 or o >= size:
+            return b""
+        src.seek(o)
+        return src.read(min(n, size - o))
+    return read
+
+def elf(name, read):
+    h = read(0, 64)
+    machine = struct.unpack(">H" if h[5] == 2 else "<H", h[18:20])[0]
+    machines[machine] += 1
     desc = "e_machine %d (%s)" % (machine, ARCH.get(machine, "other"))
-    if machine == 183 and h[4] == 2:  # smallest PT_LOAD alignment; 64KB-page targets need 0x10000 or more
-        off, n = struct.unpack("<Q", h[32:40])[0], struct.unpack("<H", h[56:58])[0]
-        al = [struct.unpack("<Q", h[o + 48:o + 56])[0] for o in range(off, off + 56 * n, 56)
-              if o + 56 <= len(h) and struct.unpack("<I", h[o:o + 4])[0] == 1]
-        if al:
-            desc += ", LOAD align %#x" % min(al)
-    found.append((machine, name, desc))
+    if machine != 183 or h[4] != 2 or h[5] != 1:
+        desc += (", ELF32" if h[4] == 1 else "") + (", big-endian" if h[5] == 2 else "")
+        return report(name, desc, ["not aarch64, " + desc])
+    etype, phoff = struct.unpack("<H", h[16:18])[0], struct.unpack("<Q", h[32:40])[0]
+    phentsize, phnum = struct.unpack("<HH", h[54:58])
+    if etype in (1, 4):
+        return report(name, desc + (", relocatable object" if etype == 1 else ", core dump"))
+    loads, dyn, interp, android, phentsize = [], b"", "", False, phentsize or 56
+    ph = read(phoff, phentsize * phnum)
+    for k in range(0, len(ph) - 55, phentsize):
+        p_type = struct.unpack("<I", ph[k:k + 4])[0]
+        p_offset, p_vaddr, _, p_filesz, _, p_align = struct.unpack("<6Q", ph[k + 8:k + 56])
+        if p_type == 1:
+            loads.append((p_vaddr, p_offset, p_filesz, p_align))
+        elif p_type == 2:
+            dyn = read(p_offset, p_filesz)
+        elif p_type == 3:
+            interp = read(p_offset, p_filesz).split(b"\0")[0].decode("latin-1")
+        elif p_type == 4:  # notes: one owned by "Android" marks a build for Android's C library (bionic)
+            n, o = read(p_offset, min(p_filesz, 65536)), 0
+            while o + 12 <= len(n):
+                namesz, descsz = struct.unpack("<II", n[o:o + 8])
+                android = android or n[o + 12:o + 12 + namesz].rstrip(b"\0") == b"Android"
+                o += 12 + (namesz + 3) // 4 * 4 + (descsz + 3) // 4 * 4
 
-def check(name, h, opener):
-    if h[:4] == b"\x7fELF":
-        elf(name, h)
-    elif h[:4] == b"PK\x03\x04":
+    def off(va):  # file offset of a virtual address
+        for v, o, sz, _ in loads:
+            if v <= va < v + sz:
+                return o + va - v
+        return -1
+    tags, needed = {}, []
+    for k in range(0, len(dyn) - 15, 16):
+        tag, val = struct.unpack("<qQ", dyn[k:k + 16])
+        if tag == 0:
+            break
+        if tag == 1:
+            needed.append(val)
+        else:
+            tags.setdefault(tag, val)
+    st = read(off(tags[5]), tags.get(10, 1 << 20)) if 5 in tags else b""
+
+    def string(o):
+        e = st.find(b"\0", o)
+        return st[o:e if e >= 0 else len(st)].decode("latin-1")
+    names, vers = [string(n) for n in needed], []
+    o = off(tags[0x6FFFFFFE]) if 0x6FFFFFFE in tags else -1  # DT_VERNEED: the versions needed, by library
+    for _ in range(tags.get(0x6FFFFFFF, 0) if o >= 0 else 0):
+        vn = read(o, 16)
+        if len(vn) < 16:
+            break
+        _, cnt, vfile, aux, nxt = struct.unpack("<HHIII", vn)
+        a = o + aux
+        for _ in range(cnt):
+            va = read(a, 16)
+            if len(va) < 16:
+                break
+            vname, anxt = struct.unpack("<II", va[8:16])
+            vers.append((string(vfile), string(vname)))
+            if not anxt:
+                break
+            a += anxt
+        if not nxt:
+            break
+        o += nxt
+
+    def top(prefix, lib):  # highest version with this prefix needed from the libraries lib() accepts
+        v = [n[len(prefix):] for f, n in vers if n.startswith(prefix) and lib(f) and re.match(r"[0-9.]+$", n[len(prefix):])]
+        return max(v, key=vkey) if v else ""
+    glibc = top("GLIBC_", GLIBC_LIBS.match)  # from glibc's own libraries only, not from libgcc_s or others
+    cxx = top("GLIBCXX_", lambda f: f.startswith("libstdc++"))
+    if "libc.so" in names or interp.startswith("/system/"):
+        libc = "android" if android or interp.startswith("/system/") else "musl"
+    elif any(n.startswith("libc.musl") for n in names) or "ld-musl" in interp:
+        libc = "musl"
+    elif any(GLIBC_LIBS.match(n) for n in names) or "ld-linux" in interp:
+        libc = "glibc"
+    elif not names and not interp:
+        libc = "needs no C library"
+    else:
+        libc = "C library not named"
+    align = min(a for _, _, _, a in loads) if loads else 0
+    voff = min([(v - o) & (o - v) for v, o, _, _ in loads if v != o] or [0])  # largest power of two dividing p_vaddr - p_offset
+    desc += ", " + libc + "".join(", " + x for x in ("GLIBC_" + glibc if glibc else "", "GLIBCXX_" + cxx if cxx else "") if x)
+    desc += (", LOAD align %#x" % align if loads else "") + (", vaddr-offset align %#x" % voff if 0 < voff < 0x10000 else "")
+    desc += ", needs " + " ".join(names) if names else ""
+    p = []
+    if libc == "android":
+        p.append("Android build (bionic C library), not for glibc or musl")
+    elif (LIBC, libc) in (("glibc", "musl"), ("musl", "glibc")):
+        p.append("%s build; the target uses %s" % (libc, LIBC))
+    if LIBC == "glibc" and VER and glibc and libc != "musl" and vkey(glibc) > vkey(VER):
+        p.append("needs GLIBC_%s; the target has glibc %s" % (glibc, VER))
+    if CXX and cxx and vkey(cxx) > vkey(CXX):
+        p.append("needs GLIBCXX_%s; the target's libstdc++ provides up to GLIBCXX_%s" % (cxx, CXX))
+    if PAGE and loads:
+        # glibc 2.34 and earlier refuse a PT_LOAD whose p_align is not a multiple of the page size; glibc 2.35 and
+        # later, and musl, need p_vaddr - p_offset to be one. Unknown target C library or version: both rules.
+        old = not (LIBC == "musl" or LIBC == "glibc" and VER and vkey(VER) >= (2, 35))
+        new = not (LIBC == "glibc" and VER and vkey(VER) < (2, 35))
+        bad = [a for _, _, _, a in loads if a % PAGE]
+        if old and bad:
+            p.append("LOAD align %#x is not a multiple of the %d-byte page size" % (min(bad), PAGE))
+        if new and any((v - o) % PAGE for v, o, _, _ in loads):
+            p.append("LOAD vaddr-offset align %#x is not a multiple of the %d-byte page size" % (voff, PAGE))
+    report(name, desc, p)
+
+def archive(name, data):  # static library: the ELF objects it holds
+    o, m = 8, collections.Counter()
+    while o + 60 <= len(data):
         try:
-            with zipfile.ZipFile(opener()) as z:
+            size = int(data[o + 48:o + 58].decode("ascii").strip() or "0")
+        except ValueError:
+            break
+        h = data[o + 60:o + 80]
+        if h[:4] == b"\x7fELF" and len(h) == 20:
+            m[struct.unpack(">H" if h[5] == 2 else "<H", h[18:20])[0]] += 1
+        o += 60 + size + (size & 1)
+    other = ", ".join("e_machine %d (%s)" % (k, ARCH.get(k, "other")) for k in sorted(m) if k != 183)
+    report(name, "static archive, ELF objects by e_machine %s" % dict(sorted(m.items())),
+           ["static archive with %s objects; an aarch64 build cannot link it" % other] if other else [])
+
+def check(name, h, load):
+    try:
+        if h[:4] == b"\x7fELF":
+            elf(name, reader(load()))
+        elif h[:8] == b"!<arch>\n":
+            src = load()
+            archive(name, src if isinstance(src, bytes) else reader(src)(0, os.fstat(src.fileno()).st_size))
+        elif h[:4] in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce") or \
+                h[:4] == b"\xca\xfe\xba\xbe" and len(h) >= 8 and struct.unpack(">I", h[4:8])[0] < 30:  # a universal binary; other formats share the magic
+            report(name, "Mach-O (a macOS build; Linux does not load it)")
+        elif h[:2] == b"MZ" and len(h) >= 64 and h[struct.unpack("<I", h[60:64])[0]:][:4] == b"PE\0\0":
+            report(name, "PE (a Windows build; Linux does not load it)")
+        elif h[:4] == b"PK\x03\x04":
+            src = load()
+            with zipfile.ZipFile(io.BytesIO(src) if isinstance(src, bytes) else src) as z:
                 for m in z.infolist():
                     if not m.filename.endswith("/"):
                         with z.open(m) as f:
-                            check(name + "!" + m.filename, f.read(4096), lambda m=m: io.BytesIO(z.read(m)))
-        except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError):
-            print("could not open archive:", name)
+                            mh = f.read(4096)
+                        check(name + "!" + m.filename, mh, lambda m=m, z=z: z.read(m))
+    except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, struct.error, ValueError) as e:
+        print("could not read: %s (%s)" % (name, e))
 
-for root, dirs, files in os.walk(sys.argv[1]):
-    dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "graviton-validation")
-               and not os.path.exists(os.path.join(root, d, "pyvenv.cfg"))
-               and not os.path.isdir(os.path.join(root, d, "conda-meta"))]
-    for n in files:
-        p = os.path.join(root, n)
-        if os.path.isfile(p) and not os.path.islink(p):
-            with open(p, "rb") as f:
-                check(p, f.read(4096), lambda p=p: p)
+missing = [p for p in sys.argv[1:] if not os.path.exists(p)]
+for p in missing:
+    print("no such file or directory:", p)
+for top in sys.argv[1:]:
+    walk = [(os.path.dirname(top), [], [os.path.basename(top)])] if os.path.isfile(top) else os.walk(top)
+    for root, dirs, files in walk:
+        dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "graviton-validation")
+                   and not os.path.exists(os.path.join(root, d, "pyvenv.cfg"))
+                   and not os.path.isdir(os.path.join(root, d, "conda-meta"))]
+        for n in files:
+            p = os.path.join(root, n)
+            if os.path.isfile(p) and not os.path.islink(p):
+                with open(p, "rb") as f:
+                    check(p, f.read(4096), lambda f=f: f)
 
-for machine, name, desc in sorted(found, key=lambda t: t[1]):
-    print("%s: %s" % (name, desc))
-print("ELF files by e_machine:", dict(sorted(collections.Counter(m for m, _, _ in found).items())))
-for machine, name, desc in sorted(found, key=lambda t: t[1]):
-    if machine != 183:
-        print("not aarch64:", name)
+for line in sorted(lines):
+    print(line)
+print("ELF files by e_machine:", dict(sorted(machines.items())))
+if LIBC:
+    print("target: %s %s, %s" % (LIBC, VER or "(version not set)",
+                                 "page size %d" % PAGE if PAGE else "page size not set (LOAD alignment not judged)"))
+else:
+    print("target: not set (TARGET_LIBC, TARGET_LIBC_VER, TARGET_PAGE_SIZE from Phase 1.1); only the architecture and Android checks ran")
+for f in sorted(findings):
+    print("FINDING " + f)
+print("findings: %d" % len(findings))
+sys.exit(2 if missing else 1 if findings else 0)
 EOF
 }
 native_scan . | tee graviton-validation/raw/site-packages-so-scan.txt
@@ -249,11 +408,22 @@ Executed on the fixture:
 ./vendor/_fixture_ext.cpython-311-x86_64-linux-gnu.so: e_machine 62 (x86-64)
 ./vendor/libfastsum-x86_64.so: e_machine 62 (x86-64)
 ELF files by e_machine: {62: 2}
-not aarch64: ./vendor/_fixture_ext.cpython-311-x86_64-linux-gnu.so
-not aarch64: ./vendor/libfastsum-x86_64.so
+target: glibc 2.41, page size 4096
+FINDING ./vendor/_fixture_ext.cpython-311-x86_64-linux-gnu.so: not aarch64, e_machine 62 (x86-64)
+FINDING ./vendor/libfastsum-x86_64.so: not aarch64, e_machine 62 (x86-64)
+findings: 2
 ```
 
-Every `not aarch64:` line is a finding (e_machine 183 is aarch64, 62 is x86-64, 3 is 32-bit x86, 40 is 32-bit Arm). An x86-64 file is acceptable only next to an aarch64 build of the same library that this scan confirms and that the code selects on aarch64 (§1.4); a name that says aarch64 is not evidence. Executed on a test tree holding an x86-64 executable with no extension, an x86-64 library named `libfoo-aarch64.so`, a 32-bit x86 library, and x86-64 members of a Lambda layer zip and of a vendored `py3-none-any` wheel: the scan reported all eight non-aarch64 files and the one real aarch64 build. On a project that vendors `selenium-4.48.0-py3-none-any.whl` it reported `...!selenium/webdriver/common/linux/selenium-manager: e_machine 62 (x86-64)`. A CPython extension's filename states the target it was built for (`*.cpython-311-x86_64-linux-gnu.so` for x86_64 Python 3.11, `*.cpython-311-aarch64-linux-gnu.so` for Graviton; see the side-by-side listing in [configuring_your_sut.md](https://github.com/aws/aws-graviton-getting-started/blob/main/perfrunbook/configuring_your_sut.md)); the scan confirms that the content matches.
+Every `FINDING` line is a finding, and the scan exits with status 1 when it prints one. It judges one target per run: when the project deploys to several (for example an Alpine image and an arm64 Lambda function), run it once with each target's values, because a pass for one target says nothing about another.
+
+- `not aarch64`: built for another architecture (e_machine 183 is aarch64, 62 is x86-64, 3 is 32-bit x86, 40 is 32-bit Arm). An x86-64 file is acceptable only next to an aarch64 build of the same library that this scan confirms and that the code selects on aarch64 (§1.4); a name that says aarch64 is not evidence.
+- `Android build`: the file needs a bare `libc.so` and carries Android's ELF note, so it was built against Android's C library (bionic), not glibc or musl.
+- `musl build` or `glibc build`: built for the other C library than the target's.
+- `needs GLIBC_2.N`: newer than the target's glibc, which refuses to load it with `version 'GLIBC_2.N' not found`. Only versions needed from glibc's own libraries count.
+- `needs GLIBCXX_3.4.N`: newer than the target image's libstdc++ (judged only when `TARGET_GLIBCXX` is set, below).
+- `LOAD align` or `LOAD vaddr-offset align`: not linked for the target's page size (below).
+
+Wheels from the index get the C library and glibc checks through their tags in §1.3. The scan's checks matter most for files committed to the repository, which no tag describes. The `needs` list names the libraries the loader must find on the target: each must come from the target image or travel with the file, and a load that cannot find one fails (executed on arm64 with NumPy 1.26.4's `numpy.libs` folder removed: `OSError: libopenblas64_p-r0-17488984.3.23.dev.so: cannot open shared object file: No such file or directory` from `ctypes.CDLL`). Executed on a test tree holding an x86-64 executable with no extension, an x86-64 library named `libfoo-aarch64.so`, a 32-bit x86 library, and x86-64 members of a Lambda layer zip and of a vendored `py3-none-any` wheel: the scan printed a `FINDING` line for each of the eight non-aarch64 files and none for the one real aarch64 build. On a project that vendors `selenium-4.48.0-py3-none-any.whl` it reported `...!selenium/webdriver/common/linux/selenium-manager: e_machine 62 (x86-64)` with its `FINDING` line, and listed the wheel's macOS and Windows builds of the same tool as `Mach-O` and `PE`. On 224 ELF files on disk (aarch64 and x86_64 installs of the fixture's native packages, test builds and third-party binaries), every property it printed matched `readelf`; files inside a zip got the same lines as on disk, and Python 3.6.15, 3.8.20 and 3.12.14 printed the same output. A CPython extension's filename states the target it was built for (`*.cpython-311-x86_64-linux-gnu.so` for x86_64 Python 3.11, `*.cpython-311-aarch64-linux-gnu.so` for Graviton; see the side-by-side listing in [configuring_your_sut.md](https://github.com/aws/aws-graviton-getting-started/blob/main/perfrunbook/configuring_your_sut.md)); the scan confirms that the content matches.
 
 Lambda layers and vendored `site-packages` also carry package metadata. The scan above already checked their binaries; find them so their pins also get the wheel check of §1.3:
 
@@ -266,7 +436,26 @@ find . \( -path ./.venv -o -path ./.git \) -prune -o \
 For a Lambda layer or vendored directory, list `*.dist-info` to get `name==version` pins and feed them to §1.3; the repo's [aws-lambda/README.md](https://github.com/aws/aws-graviton-getting-started/blob/main/aws-lambda/README.md) asks for exactly this check of "binaries in dependencies, Lambda layers, and Lambda extensions".
 Executed on the fixture: no layers or vendored `site-packages`.
 
-For a target with 64KB pages (§1.1), an aarch64 object must also be linked for 64KB pages: the scan prints each aarch64 file's smallest `LOAD align`, which must be `0x10000` or more (`readelf -lW <file>` shows the same values; they matched for 101 aarch64 files from the fixture's wheels). Executed on Graviton2 with AlmaLinux 8: a library linked with `-z max-page-size=4096` (`0x1000`) failed to load with `ELF load command alignment not page-aligned`; linked with GNU ld's aarch64 default (`0x10000`, binutils 2.41), it loaded. A test library cross-linked both ways reported `LOAD align 0x1000` and `LOAD align 0x10000`.
+For a target with 64KB pages (§1.1), an aarch64 file must also be linked for that page size, and which value the loader checks depends on the target's C library: glibc 2.34 and earlier refuse a `PT_LOAD` segment whose `p_align` is not a multiple of the page size (`ELF load command alignment not page-aligned`). glibc 2.35 and later instead refuse one whose `p_vaddr - p_offset` is not a multiple of it (`ELF load command address/offset not page-aligned`). musl's loader rounds both values down to the page size and maps the segment without checking either. The scan prints each aarch64 file's smallest `LOAD align`, and its `vaddr-offset align` (the largest power of two dividing every segment's `p_vaddr - p_offset`) when that is below `0x10000`. With `TARGET_PAGE_SIZE` set, it applies the rule of the target's C library and version, and both rules when the version is not set. Executed on Graviton2 with AlmaLinux 8: a library linked with `-z max-page-size=4096` (`0x1000`) failed to load with `ELF load command alignment not page-aligned`; linked with GNU ld's aarch64 default (`0x10000`, binutils 2.41), it loaded. The scan reports the two test builds as `LOAD align 0x1000, vaddr-offset align 0x1000` and `LOAD align 0x10000`, and with `TARGET_LIBC_VER=2.28 TARGET_PAGE_SIZE=65536` prints a `FINDING` for the first only.
+
+When the scan prints `GLIBCXX_` for a file committed to the repository, set `TARGET_GLIBCXX` to the highest version the target image's libstdc++ provides, so the scan judges it:
+
+```bash
+# The highest GLIBCXX_ version the target image's libstdc++ provides: the image's own loader finds the
+# library (ctypes), /proc/self/maps names the file it loaded, and its version names are read from it.
+$CONTAINER_CMD run --rm --init --platform linux/arm64 --entrypoint python3 "$IMG" -c '
+import ctypes, re, signal
+signal.alarm(120)
+try:
+    ctypes.CDLL("libstdc++.so.6")
+except OSError:
+    raise SystemExit("glibcxx=none (the image has no libstdc++.so.6)")
+path = [l.split()[-1] for l in open("/proc/self/maps") if "/libstdc++.so" in l][0]
+v = re.findall(rb"GLIBCXX_(3\.4\.[0-9]+)\x00", open(path, "rb").read())
+print("glibcxx=%s (%s)" % (max((x.decode() for x in v), key=lambda s: tuple(map(int, s.split("."))), default="none"), path))'
+```
+
+Executed on `linux/arm64` images: `python:3.11-slim` (Debian 13) and the Lambda base image `public.ecr.aws/lambda/python:3.12` (Amazon Linux 2023) printed `glibcxx=3.4.33`, `public.ecr.aws/lambda/python:3.11` (Amazon Linux 2) `glibcxx=3.4.24`, and `python:3.11-alpine` `glibcxx=none`, so on Alpine a file whose `needs` list names `libstdc++.so.6` also needs the image to install it.
 
 Then find extensions the project builds and their sources:
 
@@ -324,17 +513,17 @@ Executed (22 seconds): `libgeos-dev arm64: 3.13.1-1`, `libmkl-dev arm64:` with n
 ### 1.2.3 Tiered Validation Policy
 
 **FAIL immediately if:**
-- the §1.2.1 scan reports the file as not aarch64 AND confirms no aarch64 build of the same library AND no source in the repository AND the user cannot provide an aarch64 build
+- the §1.2.1 scan prints a `FINDING` for the file AND confirms no build of the same library without one AND no source in the repository AND the user cannot provide such a build
 
 **WARN but proceed if:**
 - Source is present (the extension or library can be rebuilt on aarch64 in Phase 2.1), OR a pure-Python fallback path exists (for example `fast_sum` falling back to `sum()` when the load fails), OR the binary is an optional accelerator
 
 **PASS if:**
-- the scan reports `e_machine 183 (aarch64)`, OR both an x86_64 and an aarch64 build are present (each confirmed by the scan, not by its name) and the code selects the aarch64 one at runtime
+- the scan prints no `FINDING` for the file, OR both an x86_64 and an aarch64 build are present (each confirmed by the scan, not by its name), the aarch64 one has no `FINDING`, and the code selects it at runtime
 
 For x86-only binaries: locate the source, document the rebuild, or ask the user for an aarch64 build. Validate with:
 ```bash
-file libname.so  # Must show "ARM aarch64"
+native_scan libname.so   # in the shell where §1.2.1 set the TARGET_* values: no FINDING line
 ```
 
 ## 1.3 Dependency ARM64 Compatibility Analysis

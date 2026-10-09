@@ -212,27 +212,18 @@ $CONTAINER_CMD build --platform linux/arm64 -t app:arm64 .
 $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 \
   -c 'import platform, sys; print(platform.machine(), sys.version.split()[0])'     # must print aarch64
 
-# Every ELF file in the environment must be aarch64 (e_machine 183; x86-64 is 62),
-# or sit next to an aarch64 build of the same file. Opens every file: wheels can carry executables.
-$CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 -c '
-import os, struct, collections, sysconfig
-c, other = collections.Counter(), []
-for root in {sysconfig.get_paths()[k] for k in ("purelib", "platlib")}:
-    for d, _, fs in os.walk(root):
-        for f in fs:
-            p = os.path.join(d, f)
-            try:
-                with open(p, "rb") as fh: h = fh.read(20)
-            except OSError:
-                continue
-            if h[:4] == b"\x7fELF":
-                m = struct.unpack("<H", h[18:20])[0]; c[m] += 1
-                if m != 183: other.append(p)
-print("ELF files by e_machine:", dict(c))
-for p in other: print("not aarch64:", p)'
+# Every native file in the image's Python environment, judged for the target by native_scan from Phase 1.2.1
+# (run this in the same shell, with the TARGET_* values of §1.1). The files are copied out of the image and
+# scanned here, so no part of the scan runs under emulation.
+GV_SITE=$(mktemp -d "${TMPDIR:-/tmp}/gv-site.XXXXXX"); CID=$($CONTAINER_CMD create --platform linux/arm64 app:arm64)
+$CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 -c \
+  'import sysconfig; print("\n".join(sorted({sysconfig.get_paths()[k] for k in ("purelib", "platlib")})))' |
+  while read -r d; do mkdir -p "$GV_SITE$d" && $CONTAINER_CMD cp "$CID:$d/." "$GV_SITE$d"; done
+$CONTAINER_CMD rm "$CID" >/dev/null
+native_scan "$GV_SITE"; rm -rf "$GV_SITE"
 ```
 
-On an x86 host these run under emulation; bound them inside the container as in "Emulation limits", for example `$CONTAINER_CMD run --rm --init --platform linux/arm64 --entrypoint timeout app:arm64 120 python3 -c '...'` (this also overrides the image's entrypoint). Do not accept image metadata as proof: an image built with `FROM --platform=linux/amd64` and `--platform linux/arm64` was reported by `image inspect` as `arm64`, yet its interpreter was an `x86-64` executable (Phase 2.4). The scan opens every file, not only `*.so` files, because a `py3-none-any` wheel can carry executables: for selenium 4.48.0 it reported `{62: 1}` with `not aarch64: .../selenium/webdriver/common/linux/selenium-manager` and no aarch64 build next to it (a blocker: on Graviton, selenium 4.48.0 raises `Unsupported platform/architecture combination: linux/aarch64` before starting it, and the file itself fails with `Exec format error`), and for 4.50.0 `{62: 1, 183: 1}`, the x86-64 file sitting next to `linux-arm64/selenium-manager`, which selenium picks and runs on Graviton (fine). Add any project directory that holds compiled objects (for example a `vendor/` directory) to the scan. Scan `platlib` as well as `purelib`: in a Poetry environment on Amazon Linux 2023 every compiled package sat in `lib64/.../site-packages` (platlib), and a purelib-only scan found nothing. Executed natively on Graviton: the image build took 14 seconds, `platform.machine()` inside the image printed `aarch64 3.11.17`, the scan reported `{183: 99}`, the image's default command started the service on aarch64, and its `/srv/vendor` held the two aarch64 builds next to the two x86-64 ones (`{183: 2, 62: 2}`).
+On an x86 host the `python3` commands run under emulation; bound them inside the container as in "Emulation limits", for example `$CONTAINER_CMD run --rm --init --platform linux/arm64 --entrypoint timeout app:arm64 120 python3 -c '...'` (this also overrides the image's entrypoint). The scan itself runs on the host, on the copied files. Do not accept image metadata as proof: an image built with `FROM --platform=linux/amd64` and `--platform linux/arm64` was reported by `image inspect` as `arm64`, yet its interpreter was an `x86-64` executable (Phase 2.4). The scan opens every file, not only `*.so` files, because a `py3-none-any` wheel can carry executables. Executed on test images built from `python:3.11-slim` for `linux/arm64` with the packages copied in (so no build step ran under emulation), in bash and zsh: for selenium 4.48.0 it reported `{62: 1}` with `FINDING .../selenium/webdriver/common/linux/selenium-manager: not aarch64, e_machine 62 (x86-64)` and no aarch64 build next to it (a blocker: on Graviton, selenium 4.48.0 raises `Unsupported platform/architecture combination: linux/aarch64` before starting it, and the file itself fails with `Exec format error`); for 4.50.0 `{62: 1, 183: 1}`, with a `FINDING` for the x86-64 file that sits next to `linux-arm64/selenium-manager`, which selenium picks and runs on Graviton (fine, by the rule of Phase 1.2.1); for the fixed fixture's 16 packages, `{183: 101}` and no `FINDING`. Copy any project directory that holds compiled objects (for example a `vendor/` directory, or `/var/task` in a Lambda container image) out the same way and scan it too. Scan `platlib` as well as `purelib`: in a Poetry environment on Amazon Linux 2023 every compiled package sat in `lib64/.../site-packages` (platlib), and a purelib-only scan found nothing. Executed natively on Graviton: the image build took 14 seconds, `platform.machine()` inside the image printed `aarch64 3.11.17`, the image's default command started the service on aarch64, and its `/srv/vendor` held the two aarch64 builds next to the two x86-64 ones (`{183: 2, 62: 2}`).
 
 Verify the image uses the SAME base image distribution and version and the same Python minor version as the original.
 
@@ -258,6 +249,38 @@ python3 -c 'import numpy as np; np.__config__.show()'
 ```
 
 Executed on the fixed fixture in a `linux/arm64` container: all imports succeeded and NumPy 1.26.4 reported `"name": "openblas64"`.
+
+An import can succeed without the package's compiled code, which the loaded check below catches. msgpack, MarkupSafe, charset-normalizer and wrapt fall back to pure Python when their compiled module is missing or built for another architecture, and pip can build such a package from its sdist without the compiled module, and without an error, when the image has no C compiler (executed below for wrapt). List the native files each package has mapped once imported, with the same modules in the ARM64 environment and on the x86 baseline (the production environment, or the same pins installed for x86). Run it where the smoke test runs. For an image, write the block to a file and run it in the image: `$CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$PWD/loaded-check.sh":/loaded-check.sh:ro --entrypoint timeout app:arm64 300 sh /loaded-check.sh` (the image needs `sh`, as the Option B command does):
+
+```bash
+# Loaded check: the native files each module's package has mapped into the process once imported
+# (from /proc/self/maps, so Linux only; on macOS run the x86 baseline in a linux/amd64 container).
+# Run it with the same modules on the x86 baseline and on ARM64. A module that maps native files on x86
+# and none on ARM64 runs without its compiled code on Graviton: a silent pure-Python fallback.
+python3 - numpy pandas PIL.Image blosc2 shapely msgpack markupsafe charset_normalizer <<'EOF'
+import importlib, os, sys
+mods = []
+for name in sys.argv[1:]:
+    try:
+        importlib.import_module(name)
+    except Exception as e:
+        print("%s: import failed: %s: %s" % (name, type(e).__name__, (str(e).splitlines() or [""])[0][:160]))
+        continue
+    top = sys.modules[name.split(".")[0]]
+    path = getattr(top, "__path__", None)
+    mods.append((name, os.path.realpath(list(path)[0] if path else top.__file__)))
+with open("/proc/self/maps") as f:
+    mapped = {os.path.realpath(p[5].strip()) for p in (l.split(None, 5) for l in f) if len(p) == 6 and p[5].startswith("/")}
+for name, base in mods:
+    own = sorted(os.path.relpath(p, os.path.dirname(base)) for p in mapped if p == base or p.startswith(base + os.sep))
+    if own:
+        print("%s: %d native file%s loaded (%s%s)" % (name, len(own), "s" if len(own) > 1 else "", own[0], ", ..." if len(own) > 1 else ""))
+    else:
+        print("%s: no native file loaded" % name)
+EOF
+```
+
+A module that loads native files on x86 and none on ARM64 runs without its compiled code on Graviton. It is a finding, resolved as Phase 2 resolves its cause. A layer or vendored `site-packages` built for x86 is rebuilt for arm64 (§2.1). A pin without an aarch64 wheel moves to a version with one (§2.2) or is built in a stage that has a compiler. A module that loads none on either architecture is pure Python or loads its code later; import the submodule that holds it (as `PIL.Image` above) or repeat the check after the tests. Executed with the fixed fixture's native packages for Python 3.11: on x86 and on `linux/arm64` each module loaded the same number of native files (numpy 13, pandas 42, `PIL.Image` 1, blosc2 1, shapely 3, msgpack 1, markupsafe 1, charset_normalizer 2). With the x86 install on ARM64 (a layer or vendored `site-packages` built on x86), numpy, pandas, `PIL.Image`, blosc2 and shapely failed to import, while msgpack, markupsafe and charset_normalizer imported and printed `no native file loaded`: `msgpack.Packer` came from `msgpack.fallback` and `markupsafe.escape` from `markupsafe._native`. With `wrapt==1.13.3` in `python:3.10-slim`, which has no C compiler, pip installed the x86 wheel on x86 (`1 native file loaded (wrapt/_wrappers.cpython-310-x86_64-linux-gnu.so)`), and on ARM64, where the release has no aarch64 wheel, built it from source and printed `Successfully installed wrapt-1.13.3` with no compiled module (`no native file loaded`). The §1.3 loop reports that pin as `MUST UPGRADE` (`from versions: 1.14.0rc1, 1.14.0, ...`), so the static finding stands even though the install succeeds.
 
 **Containerized:** the shippable runtime image usually contains the installed packages and the application, but not the tests or the test runner. Run the ARM64 test suite one of these ways:
 
