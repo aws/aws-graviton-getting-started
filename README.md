@@ -4,7 +4,7 @@ This repository provides technical guidance for users and developers using [Amaz
 
 # Contents
 * [Transitioning to Graviton](#transitioning-to-graviton)
-* [Building for Graviton](#building-for-graviton2-graviton3-and-graviton3e)
+* [Building for Graviton](#building-for-graviton)
 * [Optimizing for Graviton](optimizing.md)
 * [Taking advantage of Arm Advanced SIMD instructions](SIMD_and_vectorization.md)
 * [Recent software updates relevant to Graviton](#recent-software-updates-relevant-to-graviton)
@@ -238,6 +238,8 @@ NOTE: Linux versions of OpenJDK and current Amazon Corretto releases (Corretto 1
 
 Available skills:
  * [Java x86-to-Graviton migration](tools/skills/languages/java-x86-to-graviton/) - dependency audit, native library validation, JVM optimization, ARM64 build validation
+ * [Python x86-to-Graviton migration](tools/skills/languages/python-x86-to-graviton/) - aarch64 wheel verification for every pinned dependency, native extension validation, runtime recommendations, ARM64 install and test validation
+ * [.NET x86-to-Graviton migration](tools/skills/languages/dotnet-x86-to-graviton/) - per-RID native file verification for every NuGet package, Windows-only API and native file validation, the move to Linux for Windows and .NET Framework applications, ARM64 publish and test validation
 
 See [tools/skills/](tools/skills/) for installation instructions and the full catalogue.
 
