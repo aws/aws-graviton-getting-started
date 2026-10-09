@@ -286,7 +286,7 @@ Follow the [install from source](https://github.com/dmlc/dgl/blob/master/docs/so
 
 ### 3.4 Sentencepiece
 
-[Sentencepiece>=1.94 now has pre-compiled binary wheels available for Graviton](https://pypi.org/project/sentencepiece/0.1.94/#history).
+[Sentencepiece>=0.1.94 now has pre-compiled binary wheels available for Graviton](https://pypi.org/project/sentencepiece/0.1.94/#history).
 
 ### 3.5	Morfeusz
 
@@ -318,7 +318,29 @@ sudo PYTHONPATH=`which python3` make install-builder
 
 ### confluent_kafka
 
-First, install librdkafka and its development libraries by following the
+Since version 2.1.0, `confluent-kafka` publishes Linux aarch64 wheels on PyPI
+that include librdkafka. The wheels are tagged `manylinux_2_28`, so they install
+with pip 20.3 or later on distributions with glibc 2.28 or later, such as Amazon
+Linux 2023, Red Hat Enterprise Linux 8, and Ubuntu 20.04 and later (Ubuntu 20.04
+ships pip 20.0.2, so upgrade pip there first):
+
+```
+python3 -m pip install confluent-kafka
+```
+
+Each release has aarch64 wheels for a range of Python versions (2.15.1: Python
+3.8 to 3.14). On RHEL 8, the default Python 3.6 is too old for current releases,
+and the pip packages for Python 3.6, 3.8 and 3.9 are older than 20.3, so pip
+tries to build from source instead. Python 3.12, available from RHEL 8.10, has a
+new enough pip:
+
+```
+sudo yum install python3.12 python3.12-pip
+python3.12 -m pip install confluent-kafka
+```
+
+Amazon Linux 2 has glibc 2.26, so pip cannot use these wheels there. On Amazon
+Linux 2, first install librdkafka and its development libraries by following the
 instructions on [this page](software/librdkafka.md). As part of this process,
 you will install `gcc`, `pip` for Python3, and Python development headers.
 
@@ -335,3 +357,6 @@ Open3d required glibc version 2.27 or higher. Amazon Linux 2 includes glibc 2.26
 use open3d, please use Amazon Linux 2023 or later, Ubuntu Bionic (18.04) or later, or another supported distribution.
 See [open3d documentation](http://www.open3d.org/docs/release/getting_started.html) for more information.
 
+## 5. Agent Skills for Python Migration
+
+To automate the x86-to-Graviton migration process using an AI coding assistant (Claude Code, Kiro, Cursor, Codex, Windsurf, and others), use the [Python x86-to-Graviton Agent Skill](tools/skills/languages/python-x86-to-graviton/). It walks an agent through checking that every pinned dependency publishes an aarch64 wheel for the project's interpreter, validating native extensions and vendored binaries, fixing Dockerfile platform settings, and validating installs and tests on ARM64. See [tools/skills/](tools/skills/) for installation instructions.
