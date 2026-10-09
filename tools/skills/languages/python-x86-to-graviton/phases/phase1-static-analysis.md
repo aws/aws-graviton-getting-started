@@ -549,33 +549,44 @@ platforms() { # $1=arch ; sets PLAT to one --platform flag per wheel tag the tar
   fi
 }
 probe() { # $1=requirement $2=arch ; prints the wheel filename (rc 0), the from-versions list (rc 1),
-          # nothing (rc 3) when an environment marker excluded the pin on this host, or why the index
-          # did not answer (rc 4). --no-input and </dev/null: pip never reads the loop's list of pins;
+          # nothing (rc 3) when an environment marker excluded the pin on this host, or why the indexes
+          # give no verdict (rc 4). --no-input and </dev/null: pip never reads the loop's list of pins;
           # --disable-pip-version-check: the only index requests in the log are the probe's.
-  local d f; platforms "$2"; d=$(mktemp -d "${TMPDIR:-/tmp}/probe.XXXXXX")
+  local d f miss; platforms "$2"; d=$(mktemp -d "${TMPDIR:-/tmp}/probe.XXXXXX")
   if python3 -m pip download --no-input --disable-pip-version-check --only-binary=:all: --no-deps -vv -d "$d" "${PLAT[@]}" \
        --python-version "$PYVER" --implementation cp --abi "$ABI" "$1" </dev/null >"$d/log" 2>&1; then
     f=$(ls "$d" | grep '\.whl$' | head -n 1); rm -rf "$d"
     [ -n "$f" ] && { echo "$f"; return 0; }; return 3
-  else
-    if grep -q 'Could not fetch URL' "$d/log"; then   # 401, 403, 404, connection or TLS error from the index
-      grep -m1 'Could not fetch URL' "$d/log" | sed -E 's/^.*Could not fetch URL ([^ ]+): (.*) - skipping$/\2 (\1)/' | cut -c1-160
-      rm -rf "$d"; return 4
-    fi
-    grep -oE 'from versions: [^)]*' "$d/log" | head -n 1; rm -rf "$d"; return 1
   fi
+  # pip skips an index whose request fails ("Could not fetch URL") and decides from the others. A 403 or 404
+  # means that index does not have the project: keep the verdict and name the index. Any other failure (401,
+  # a server error, no connection, TLS) leaves an index that may have the wheel unread: no verdict.
+  miss=$(sed -nE 's/^.*Could not fetch URL ([^ ]+): (40[34]) Client Error.*$/\1 (\2)/p' "$d/log" | awk 'NR > 1 {printf ", "} {printf "%s", $0}')
+  if grep 'Could not fetch URL' "$d/log" | grep -qvE ': 40[34] Client Error'; then
+    echo "an index did not answer: $(grep 'Could not fetch URL' "$d/log" | grep -vE ': 40[34] Client Error' | head -n 1 | sed -E 's/^.*Could not fetch URL ([^ ]+): (.*) - skipping$/\2 (\1)/' | cut -c1-160)"
+    rm -rf "$d"; return 4
+  elif ! grep -q 'Fetched page' "$d/log"; then
+    echo "no index has the project: ${miss:-no index was searched}"; rm -rf "$d"; return 4
+  fi
+  echo "$(grep -oE 'from versions: [^)]*' "$d/log" | head -n 1)${miss:+; not on $miss}"; rm -rf "$d"; return 1
 }
 sed -E 's/[[:space:]]*#.*//' graviton-validation/raw/requirements-resolved.txt | grep '==' | while read -r req; do
   out=$(probe "$req" aarch64); rc=$?
-  if [ $rc -eq 4 ]; then echo "CHECK INDEX     $req  the index did not answer: $out"; continue; fi
+  if [ $rc -eq 4 ]; then echo "CHECK INDEX     $req  $out"; continue; fi
   if [ $rc -eq 0 ]; then
     case "$out" in *-none-any.whl) echo "COMPATIBLE      $req  pure Python: $out";; *) echo "COMPATIBLE      $req  aarch64 wheel: $out";; esac
   elif [ $rc -eq 3 ]; then
     echo "CHECK MARKER    $req  skipped: its environment marker does not match this host; judge it for Linux aarch64 by hand"
-  elif probe "$req" x86_64 >/dev/null; then
-    echo "MUST UPGRADE    $req  x86_64 wheel exists for $ABI, no aarch64 wheel; $out"
   else
-    echo "CHECK SDIST/ABI $req  no $ABI wheel for either arch: pure-Python sdist, interpreter ABI mismatch, or a libc older than every wheel (wheel-verification.md sections 5 to 7)"
+    x86=$(probe "$req" x86_64); xrc=$?
+    if [ $xrc -eq 0 ]; then
+      echo "MUST UPGRADE    $req  x86_64 wheel exists for $ABI, no aarch64 wheel; $out"
+    elif [ $xrc -eq 4 ]; then
+      echo "CHECK INDEX     $req  $x86"
+    else
+      note=; case "$out" in *'; not on '*) note="; not on ${out#*; not on }";; esac
+      echo "CHECK SDIST/ABI $req  no $ABI wheel for either arch: pure-Python sdist, interpreter ABI mismatch, or a libc older than every wheel (wheel-verification.md sections 5 to 7)$note"
+    fi
   fi
 done | tee graviton-validation/raw/wheel-availability.txt
 ```
@@ -611,7 +622,7 @@ Apply the decision tree in [../document_references/agent-scope-boundaries.md](..
 
 **CHECK SDIST/ABI lines need one more step before they get a label:** download the sdist and list compiled sources (wheel-verification.md §5); if there are none it is COMPATIBLE. If the package has aarch64 wheels for a *different* `cp` tag (probe again with `--python-version 3.10 --abi cp310`, and x86_64 with the project's tag), it is an interpreter-ABI blocker, reported in its own table and resolved only through the gate in §1.5.
 
-**CHECK INDEX lines are not verdicts:** the index did not answer (credentials, network, or a mirror that lacks the project). Fix access, or probe PyPI as in the skill-config note above, and rerun the loop for those pins; never label a pin from a failed request.
+**CHECK INDEX lines are not verdicts:** an index that may have the wheel did not answer (credentials, network, a server error), or no configured index has the project. Fix access or the index settings, or probe PyPI as in the skill-config note above, and rerun the loop for those pins; never label a pin from a failed request. An index that answers 403 or 404 for a project page does not have that project, and pip uses the other indexes: the loop keeps their verdict and appends `not on <url> (403)`. Executed with `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`, which answers 403 for projects it does not carry, the loop gave the fixture's pins the same verdicts as with PyPI alone. A private index can also answer 403 or 404 when the probe may not read it; when a note names one that should carry the package, check access to it (wheel-verification.md §9).
 
 **A pin the decision tree sends to a user decision stays CHECK until the user chooses** (pygeos in [agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md): a source build is COMPATIBLE, a move to `shapely>=2.0` is MUST UPGRADE). The loop's line for it records only the probe result; the report lists it under User Decisions Pending.
 

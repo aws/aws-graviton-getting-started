@@ -65,24 +65,31 @@ platforms() { # $1=arch ; sets PLAT
 # --only-binary=:all: is mandatory: without it pip accepts the sdist and the
 # probe "passes" for a package that has no aarch64 wheel at all (false PASS).
 # --no-input and </dev/null: pip never prompts, so it cannot consume the caller's input (a loop's list of pins).
-# -vv logs every index request, so a request that failed (401, 403, 404, no connection) is reported as
-# CHECK INDEX (return code 4) instead of reading like a missing wheel. --disable-pip-version-check keeps
+# -vv logs every index request. pip skips an index whose request fails and decides from the others: a 403
+# or 404 means that index does not have the project, and the verdict stands with a note naming the index.
+# Any other failure (401, a server error, no connection, TLS), or a project that no index has, is reported
+# as CHECK INDEX (return code 4) instead of reading like a missing wheel. --disable-pip-version-check keeps
 # pip's own update check out of the log, so a failed request is always the probe's.
 probe() {
-  local req="$1" arch="$2" pyver="${PYVER:-3.11}" d
+  local req="$1" arch="$2" pyver="${PYVER:-3.11}" d miss
   platforms "$arch"; d=$(mktemp -d "${TMPDIR:-/tmp}/probe.XXXXXX")
   if python3 -m pip download --no-input --disable-pip-version-check --only-binary=:all: --no-deps -vv -d "$d" "${PLAT[@]}" \
        --python-version "$pyver" --implementation cp --abi "cp${pyver/./}" \
        "$req" </dev/null >"$d/log" 2>&1; then
     ls "$d" | grep '\.whl$' || echo "nothing downloaded: an environment marker excluded the pin on this host (section 10)"
-  elif grep -q 'Could not fetch URL' "$d/log"; then
-    echo "CHECK INDEX: $(grep -m1 'Could not fetch URL' "$d/log" | sed -E 's/^.*Could not fetch URL ([^ ]+): (.*) - skipping$/\2 (\1)/' | cut -c1-160)"
-    rm -rf "$d"; return 4
-  else
-    grep -E 'from versions|No matching' "$d/log" | head -n 2
-    rm -rf "$d"; return 1
+    rm -rf "$d"; return 0
   fi
-  rm -rf "$d"
+  miss=$(sed -nE 's/^.*Could not fetch URL ([^ ]+): (40[34]) Client Error.*$/\1 (\2)/p' "$d/log" | awk 'NR > 1 {printf ", "} {printf "%s", $0}')
+  if grep 'Could not fetch URL' "$d/log" | grep -qvE ': 40[34] Client Error'; then
+    echo "CHECK INDEX: an index did not answer: $(grep 'Could not fetch URL' "$d/log" | grep -vE ': 40[34] Client Error' | head -n 1 | sed -E 's/^.*Could not fetch URL ([^ ]+): (.*) - skipping$/\2 (\1)/' | cut -c1-160)"
+    rm -rf "$d"; return 4
+  elif ! grep -q 'Fetched page' "$d/log"; then
+    echo "CHECK INDEX: no index has the project: ${miss:-no index was searched}"
+    rm -rf "$d"; return 4
+  fi
+  grep -E 'from versions|No matching' "$d/log" | head -n 2
+  [ -z "$miss" ] || echo "not on $miss"
+  rm -rf "$d"; return 1
 }
 ```
 
@@ -98,7 +105,9 @@ Executed results (pip 26.2.1, `PYVER=3.11`, glibc 2.34):
 | `probe pygeos==0.14 aarch64` | `(from versions: none)` | Same text as mkl, different cause: pygeos published aarch64 wheels up to 0.13 and dropped them in 0.14, and 0.13 has no cp311 wheel on any platform. See section 6. |
 | `probe docopt==0.6.2 aarch64` | `(from versions: none)` | Also fails for x86_64: the package ships an sdist only. Inspect the sdist (section 5) before labelling it. It is pure Python and COMPATIBLE. |
 | `probe polars==1.0.0 aarch64` | `polars-1.0.0-cp38-abi3-manylinux_2_24_aarch64.whl` | COMPATIBLE. A probe that offers only `manylinux2014`, `_2_17`, `_2_28` and `_2_34` misses this `_2_24` wheel and reports `from versions: 0.14.8, ...` while the x86_64 probe passes: a false MUST UPGRADE. |
-| `probe numpy==1.26.4 aarch64` with `PIP_INDEX_URL` set to an index that answers 401 | `CHECK INDEX: 401 Client Error: Unauthorized for url: <index>/numpy/ (<index>/numpy/)` (return code 4) | Not a verdict: the index refused the request. Without `-vv` the same failure reads `from versions: none`, like a missing wheel; with no `--no-input` pip prompts for a user name and reads it from the caller's input. Fix access to the index (section 9) and probe again. |
+| `probe numpy==1.26.4 aarch64` with `PIP_INDEX_URL` set to an index that answers 401 | `CHECK INDEX: an index did not answer: 401 Client Error: Unauthorized for url: <index>/numpy/ (<index>/numpy/)` (return code 4) | Not a verdict: the index refused the request. Without `-vv` the same failure reads `from versions: none`, like a missing wheel; with no `--no-input` pip prompts for a user name and reads it from the caller's input. Fix access to the index (section 9) and probe again. |
+| `probe blosc2==0.6.3 aarch64` with `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu` | `(from versions: 0.6.4, 0.6.5, ...)`, then `not on https://download.pytorch.org/whl/cpu/blosc2/ (403)` (return code 1) | The verdict PyPI alone gives: that index answers 403 for a project it does not carry, and pip used PyPI's files. `docopt==0.6.2` gave `from versions: none` the same way, and an extra index that answers 404 gave the same results (section 9). |
+| `probe graviton-skill-review-no-such-project==1.0 aarch64`, a project on no index | `CHECK INDEX: no index has the project: https://pypi.org/simple/graviton-skill-review-no-such-project/ (404)` (return code 4) | Not a verdict: check the name and which index carries the project. |
 
 The three distinct meanings of a FAIL are why the probe is always run twice (aarch64, then x86_64 with the same ABI):
 
@@ -108,7 +117,7 @@ The three distinct meanings of a FAIL are why the probe is always run twice (aar
 | FAIL with `from versions: <list>` | PASS | MUST UPGRADE to the **lowest** listed version (then confirm it with another PASS) |
 | FAIL `from versions: none` | PASS | Either x86-only by nature (section 4) or aarch64 dropped in later releases (pygeos case): decide from the full files list |
 | FAIL | FAIL | Not an architecture finding: sdist-only package (section 5) or interpreter ABI mismatch (section 6) |
-| CHECK INDEX | any | No verdict: the index did not answer (credentials, network, a mirror without the project). Fix access and probe again (section 9) |
+| CHECK INDEX | any | No verdict: an index that may have the wheel did not answer (credentials, network, a server error), or no index has the project. Fix access or the index settings and probe again (section 9) |
 
 Transitive dependencies get the same treatment, but you do not need to enumerate them by hand. `pip install --dry-run --report` resolves the whole tree for the target platform:
 
@@ -261,6 +270,8 @@ Fix per manager (details in [package-manager-mapping.md](package-manager-mapping
 
 The 2024 Python Developers Survey reports about one in ten developers installing from a private index or an internal PyPI mirror. A mirror that was populated from x86 builds will fail the probe for packages PyPI serves fine. Run the probe twice when `skill-config.md` sets `python.index_url` (or `PIP_INDEX_URL`/`pip.conf` points somewhere other than PyPI): once with `PIP_INDEX_URL=<mirror>` and once with `PIP_INDEX_URL=https://pypi.org/simple` (pip reads the variable, and an explicit PyPI URL overrides a `pip.conf` that points at the mirror). Executed with a local index that carried only the x86_64 numpy 1.26.4 wheel: the Phase 1.3 loop reported `MUST UPGRADE numpy==1.26.4 ... x86_64 wheel exists for cp311, no aarch64 wheel` against it and `COMPATIBLE` against PyPI. If the mirror fails and PyPI passes, the dependency is COMPATIBLE and the finding is **INFRA**: "mirror lacks the aarch64 wheel for X; populate the mirror or allow PyPI fallback". Never upgrade a package to work around a mirror gap.
 
+An extra index (`PIP_EXTRA_INDEX_URL`, `extra-index-url` in `pip.conf`, or `python.extra_index_url` in `skill-config.md`) is asked for every pin, and most extra indexes carry only a few projects. pip skips an index that answers 403 or 404 for a project page and uses the others, so the probe keeps that verdict and adds `not on <url> (403)`. Executed with `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`, which answers 403 for projects it does not carry, the Phase 1.3 loop gave the fixture's pins the same verdicts as with PyPI alone. A 403 or 404 can also come from an index the probe may not read: 403 means the server refuses the request, and [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.4) lets a server answer 404 instead to hide a resource. When the note names a private index that should carry the package (an internal package, or an aarch64 wheel built in-house), check that the probe can read that index: probe a pin it carries with `PIP_INDEX_URL` set to that index alone.
+
 ## 10. False-Verdict Traps (Checklist)
 
 | Trap | What you see | Correct handling |
@@ -273,7 +284,7 @@ The 2024 Python Developers Survey reports about one in ten developers installing
 | Reading the first aarch64 release as the floor | quoting numpy 1.19.0 to a Python 3.11 project | The floor is per interpreter ABI (numpy 1.23.2 for cp311) |
 | Assuming availability is monotonic | upgrading blosc2 0.6.3 to 0.6.1, or pygeos 0.14 to "latest" | Check the exact candidate version; blosc2 0.3.1-0.6.3 and pygeos >= 0.14 have no aarch64 wheels |
 | Mirror gap read as package gap | FAIL against the internal index, PASS against PyPI | INFRA finding, not a dependency change |
-| Failed index request read as a missing wheel | `from versions: none` for every pin on both architectures (401, 403, no connection) | The probe prints CHECK INDEX with the reason; fix access to the index and probe again. Never label a pin from a failed request |
+| Failed index request read as a missing wheel | `from versions: none` for every pin on both architectures (401, no connection, a server error) | The probe prints CHECK INDEX with the reason; fix access to the index and probe again. Never label a pin from a failed request. A 403 or 404 from one index means only that it lacks the project: the probe keeps the verdict from the others and names that index (section 9) |
 | A prompt that reads the caller's input | a loop over pins prints fewer verdicts than pins, with no error | `--no-input` and `</dev/null` on every pip call in a loop (section 3) |
 | Pure-Python sdist read as missing wheel | docopt "has no wheel" | Inspect the sdist (section 5); COMPATIBLE |
 | Trusting the wheel tester for your pin | "package X passes" | It tests the latest version on the tester's interpreters; probe your pin |
