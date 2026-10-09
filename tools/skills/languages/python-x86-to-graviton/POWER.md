@@ -94,7 +94,7 @@ Output files produced:
 Analyze the project without making changes. See [phases/phase1-static-analysis.md](phases/phase1-static-analysis.md) for detailed steps; per-manager commands are in [document_references/package-manager-mapping.md](document_references/package-manager-mapping.md).
 
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, package manager and interpreter detection, target OS/glibc, dependency tree generation, component risk categorization
-2. **1.2 Native Library Validation** - Scan every committed or vendored native file by its ELF header (not its name), layers and in-repo extensions, binaries downloaded at run, build or deploy time, apply tiered FAIL/WARN/PASS policy
+2. **1.2 Native Library Validation** - Scan every committed or vendored native file by its content (not its name) for the target's architecture, C library, glibc and libstdc++ versions and page size, layers and in-repo extensions, binaries downloaded at run, build or deploy time, apply tiered FAIL/WARN/PASS policy
 3. **1.3 Dependency ARM64 Compatibility** - Probe every resolved pin (including transitives) for an aarch64 wheel, check hash locks, classify as MUST UPGRADE / RECOMMENDED / COMPATIBLE
 4. **1.4 Architecture-Specific Code Detection** - Find `platform.machine()` checks, ctypes/cffi loads, x86-only build flags and intrinsics, shell architecture gates, amd64 Dockerfile pins
 5. **1.5 Python Version Check** - Document version and live support status (do NOT change it unless `python.interpreter_bump` allows; a change is one decision for the whole dependency set)
@@ -115,7 +115,7 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 1. **3.0 Build Environment Prep** - Python runtime alignment (same minor version, pip >= 20.3; session-scoped only)
 2. **3.1 Build Validation** - Install as the deployment does, build extensions, classify failures as INFRA/ARM64/PRE-EXISTING
-3. **3.2 Functional Testing** - Import smoke test, execute test suite, classify failures, determine final build
+3. **3.2 Functional Testing** - Import smoke test, loaded check against the x86 baseline, execute test suite, classify failures, determine final build
 4. **3.3 Startup Validation** - Verify application starts on aarch64, aarch64 binaries load, no import or glibc errors
 5. **Write 00-summary.md** - Consolidate exit criteria using template from documentation-standards.md
 
