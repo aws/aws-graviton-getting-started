@@ -45,8 +45,8 @@ What `assets` does:
 - **Reads the assets files of its own restore.** Before restoring, it deletes every `project.assets.json` and `project.nuget.cache` in the copy, then reads each `project.assets.json` the restore writes, in any folder (`obj/`, `artifacts/obj/<project>/`, a custom `BaseIntermediateOutputPath`), so a file left by an earlier restore or a removed project is never read.
 - **Runs the repository's MSBuild files.** The restore imports the copy's `Directory.Build.props` and `Directory.Build.targets`, reads its `Directory.Build.rsp`, and runs any target hooked to restore. The start of [Phase 1](../phases/phase1-static-analysis.md) lists the steps that do this and how to list such code first.
 - **Reports every package with native files for these RIDs**, one line per target RID and file:
-  - `OK` when the file is an aarch64 build for the target's libc, with the highest `GLIBC_` and `GLIBCXX_` versions it needs and its smallest LOAD alignment;
-  - `FINDING` when the target RID gets no file, or gets one that is not an aarch64 build, is built for the other libc, or is a Windows or macOS binary.
+  - `OK` when the file is an aarch64 build for the target's libc, with the highest `GLIBC_` and `GLIBCXX_` versions it needs, its smallest LOAD alignment (and its `vaddr-offset align` when that is below `0x10000`, §6), and after `needs` the libraries it needs. Each of those comes from the package or must come from the target image: libSkiaSharp.so 2.80.0 needs `libfontconfig.so.1`, which `mcr.microsoft.com/dotnet/aspnet:8.0` and `:10.0` do not contain, so the fixture's Dockerfile installs `libfontconfig1`. Without it, the fixture's thumbnail test failed under arm64 emulation with `libfontconfig.so.1: cannot open shared object file`;
+  - `FINDING` when the target RID gets no file, or gets one that is not an aarch64 build, is an Android build, is built for the other libc, needs a newer glibc or libstdc++ than the target's, is linked for a smaller page size than the target's (§6), or is a Windows or macOS binary.
   - Under each `FINDING` and `CHECK`, an indented `via` line with the shortest reference chain from a project to the package, so the direct reference to change is named.
 - **Accepts packages that ship both C libraries in one RID folder.** librdkafka.redist 2.15.1 has `librdkafka.so` (glibc) and `alpine-librdkafka.so` (musl) in `runtimes/linux-arm64/native/` and loads one of them at run time. When the target's C library has a build there, the other build is a `NOTE`, not a `FINDING`; Phase 3 confirms which one loads.
 - **Judges RID-specific packages as a family.** When a package has no file for the target but another package of the same family does, the line is `OK`. Families are names that differ only by a RID or architecture part: `NetVips.Native.linux-x64` and `NetVips.Native.linux-arm64`, `runtime.linux-x64.*` and `runtime.linux-arm64.*`, `Magick.NET-Q16-x64` and `Magick.NET-Q16-arm64`.
@@ -60,7 +60,8 @@ What `assets` does:
 - **Options:**
   - `--target-rid linux-musl-arm64` adds Alpine; the option can be repeated;
   - `--glibc 2.34` reports natives that need a newer glibc than the target's (§6);
-  - `--page-size 65536` reports natives aligned below the target's page size (§6);
+  - `--glibcxx 3.4.30` reports natives that need a newer libstdc++ than the target's (§6); it applies to glibc RIDs only;
+  - `--page-size 65536` reports natives linked for a smaller page size than the target's, by the rule of the target's loader (§6);
   - `--tree FILE` also writes every resolved package, per project and target framework, with its reference chain (JSON).
 
 Executed on the fixture (`linux-x64` to `linux-arm64`, 3 seconds with a warm package cache; long lines shortened):
@@ -74,7 +75,7 @@ FINDING linux-arm64 native runtimes/linux/native/selenium-manager of Selenium.We
   via tests/Fixture.UiTests (direct reference)
 FINDING no linux-arm64 native: SkiaSharp.NativeAssets.Linux/1.68.3 (linux-x64 has 1; runtimes/ folders: linux-x64); used by src/Fixture.Api, ...
   via src/Fixture.Core (direct reference)
-OK linux-arm64 SQLitePCLRaw.lib.e_sqlite3/2.1.12: runtimes/linux-arm64/native/libe_sqlite3.so (glibc GLIBC_2.34 align 0x10000)
+OK linux-arm64 SQLitePCLRaw.lib.e_sqlite3/2.1.12: runtimes/linux-arm64/native/libe_sqlite3.so (glibc GLIBC_2.34 align 0x10000; needs libc.so.6 ld-linux-aarch64.so.1)
 FINDING no linux-arm64 native: Stub.System.Data.SQLite.Core.NetStandard/1.0.119 (linux-x64 has 1; runtimes/ folders: linux-x64, osx-x64, win-x64, win-x86); used by src/Fixture.Api, ...
   via src/Fixture.Core > System.Data.SQLite.Core 1.0.119 > Stub.System.Data.SQLite.Core.NetStandard 1.0.119
 CHECK ELF files outside runtimes/ in Microsoft.CodeCoverage/17.11.1 are x86-64 only (they fail only if a build target copies them to the output or a tool runs them), e.g. build/netstandard2.0/InstrumentationEngine/alpine/x64/libCoverageInstrumentationMethod.so, ...
@@ -189,8 +190,42 @@ No linux-arm64 build in any stable release, so a substitute is a user decision:
   | `public.ecr.aws/amazonlinux/amazonlinux:2` | Amazon Linux 2 | glibc 2.26 |
 
   For EC2 hosts, run `ldd --version | head -n 1` (glibc) or check for `/lib/ld-musl-aarch64.so.1` on the instance.
+- **Android builds.** A file built for Android's C library (bionic) needs a bare `libc.so`, as a musl build does, and carries an ELF note owned by `Android`. The check reports it for every Linux RID instead of reading it as musl. Packages keep such files under `runtimes/android-*` (SQLitePCLRaw.lib.e_sqlite3 3.53.3 has `runtimes/android-arm64/native/libe_sqlite3.so`), which `assets` and `scan` skip for Linux RIDs; the rule matters when such a file is committed to the repository or copied into an image by hand.
 - **Natives can need more than .NET does.** SQLitePCLRaw.lib.e_sqlite3 2.1.12 needs GLIBC_2.34, Magick.NET-Q16-arm64 14.17.2 needs GLIBC_2.29, and SkiaSharp.NativeAssets.Linux 3.119.0 needs GLIBC_2.27. Pass the target's version with `--glibc`. Executed on the fixed fixture with `--glibc 2.26`: `needs GLIBC_2.34 (target glibc 2.26)` for libe_sqlite3.so. On AlmaLinux 8 (glibc 2.28, Graviton2), `assets` and `scan` with `--glibc 2.28` (run with the system Python 3.6.8) reported the same file, and the fixed tool then failed both SQLite checks with `TypeInitializationException: The type initializer for 'Microsoft.Data.Sqlite.SqliteConnection' threw an exception.`; the innermost exception was `DllNotFoundException: Unable to load shared library 'e_sqlite3'`, and `ldd` named the cause: ``/lib64/libc.so.6: version `GLIBC_2.33' not found``.
-- **Page size.** On kernels with 64KB pages, glibc 2.34 and earlier refuse a library whose LOAD segments are aligned to less than the page size (`ELF load command alignment not page-aligned`); glibc 2.35 and later refuse one whose segment addresses and file offsets differ by other than a multiple of the page size (`ELF load command address/offset not page-aligned`), which a library linked for 4KB pages usually does. The default aarch64 kernels of AlmaLinux 8 and Rocky Linux 8 use 64KB pages (AlmaLinux 8.10 on Graviton2 reported 65536); their 9 and 10 releases default to 4KB. Pass `--page-size 65536` for such targets: it compares each LOAD alignment with the page size, the rule of glibc 2.34 and earlier; both 4KB-linked libraries tested break both rules. Every arm64 native resolved by the fixed fixture is aligned to `0x10000`. Executed on AlmaLinux 8.10 (Graviton2, 65536-byte pages, glibc 2.28): an aarch64 build of the fixture's library linked with `-Wl,-z,max-page-size=4096` failed with `DllNotFoundException` and `ELF load command alignment not page-aligned`, while the same file loaded on Graviton4 (4096-byte pages); `scan --page-size 65536` reported it on both hosts (`LOAD alignment 0x1000 is below the target page size 0x10000`).
+- **The target's libstdc++.** A native that needs `libstdc++.so.6` needs its `GLIBCXX_` versions too (the `OK` lines show the highest). Pass the highest version the target image's libstdc++ defines with `--glibcxx`. This block reads it without emulation, from a container that is created but never started, so it also works on images without a shell:
+
+  ```bash
+  IMG=mcr.microsoft.com/dotnet/aspnet:8.0
+  command -v timeout > /dev/null 2>&1 || timeout() { shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit
+  # The container is created, never started: no emulation is needed, and images without a shell work too
+  cid=$(timeout 300 docker create --platform linux/arm64 "$IMG" none) || cid=
+  d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-libstdcxx.XXXXXX")
+  for f in /usr/lib/aarch64-linux-gnu/libstdc++.so.6 /lib/aarch64-linux-gnu/libstdc++.so.6 /usr/lib64/libstdc++.so.6 /usr/lib/libstdc++.so.6; do
+    [ -n "$cid" ] && docker cp -L "$cid:$f" "$d/libstdc++.so.6" 2> /dev/null && break
+  done
+  [ -n "$cid" ] && docker rm "$cid" > /dev/null
+  if [ -s "$d/libstdc++.so.6" ]; then
+    v=$(grep -ao 'GLIBCXX_3\.4\.[0-9][0-9]*' "$d/libstdc++.so.6" | sort -u -t. -k3,3n | tail -n 1)
+    echo "$IMG: $f: ${v:-defines no GLIBCXX_ versions (musl images: leave --glibcxx out)}"
+  else
+    echo "$IMG: no libstdc++.so.6 (a native file that needs it fails to load until the image installs it)"
+  fi
+  rm -rf "$d"
+  ```
+
+  Executed on arm64 images, in bash and zsh (each value equals the highest version definition that `readelf -V` reads from the same file):
+
+  | Image | libstdc++ |
+  |---|---|
+  | `mcr.microsoft.com/dotnet/aspnet:8.0` | GLIBCXX_3.4.30 |
+  | `mcr.microsoft.com/dotnet/aspnet:10.0`, `mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled` | GLIBCXX_3.4.33 |
+  | `mcr.microsoft.com/dotnet/aspnet:8.0-azurelinux3.0` | GLIBCXX_3.4.32 |
+  | `public.ecr.aws/lambda/dotnet:8`, `:10`, `public.ecr.aws/amazonlinux/amazonlinux:2023` | GLIBCXX_3.4.33 |
+  | `public.ecr.aws/amazonlinux/amazonlinux:2` | GLIBCXX_3.4.24 |
+  | `mcr.microsoft.com/dotnet/aspnet:8.0-alpine`, `:10.0-alpine` | defines no `GLIBCXX_` versions |
+
+  musl's loader does not check the versions a file needs, so `--glibcxx` applies to glibc RIDs only. The linux-arm64 natives in the packages this skill was tested with need at most GLIBCXX_3.4.22 (`libhostpolicy.so` of the .NET 10.0.12 runtime pack), below every image above. Executed with an aarch64 library that needs GLIBCXX_3.4.31: `scan --glibc 2.41 --glibcxx 3.4.24` reported `needs GLIBCXX_3.4.31 (target libstdc++ provides up to GLIBCXX_3.4.24)`, and `--glibcxx 3.4.33` gave `findings: 0`.
+- **Page size.** On kernels with 64KB pages, glibc 2.34 and earlier refuse a library whose LOAD segments are aligned to less than the page size (`ELF load command alignment not page-aligned`); glibc 2.35 and later refuse one whose segment addresses and file offsets differ by other than a multiple of the page size (`ELF load command address/offset not page-aligned`), which a library linked for 4KB pages usually does. The default aarch64 kernels of AlmaLinux 8 and Rocky Linux 8 use 64KB pages (AlmaLinux 8.10 on Graviton2 reported 65536); their 9 and 10 releases default to 4KB. Pass `--page-size 65536` for such targets, and the check applies the target loader's rule. With `--glibc` 2.34 or earlier it compares each LOAD alignment with the page size; with 2.35 or later it checks that each segment's `p_vaddr - p_offset` is a multiple of the page size, and the file's line shows that value's alignment (`vaddr-offset align`) when it is below `0x10000`; without `--glibc` it applies both rules. musl's loader checks neither value: it maps each segment from its file offset rounded down to the page size at its address rounded down to the page size ([`ldso/dynlink.c`](https://git.musl-libc.org/cgit/musl/tree/ldso/dynlink.c)), which places the segment correctly only when the two differ by a multiple of the page size, so for musl RIDs the check applies the second rule. Both 4KB-linked libraries tested break both rules. Every arm64 native resolved by the fixed fixture is aligned to `0x10000`. Executed on AlmaLinux 8.10 (Graviton2, 65536-byte pages, glibc 2.28): an aarch64 build of the fixture's library linked with `-Wl,-z,max-page-size=4096` failed with `DllNotFoundException` and `ELF load command alignment not page-aligned`, while the same file loaded on Graviton4 (4096-byte pages). For that file, `scan --glibc 2.28 --page-size 65536` reports `LOAD alignment 0x1000 is below the target page size 0x10000`, and `scan --target-rid linux-musl-arm64 --page-size 65536` reports `LOAD vaddr-offset alignment 0x1000 is below the target page size 0x10000`.
 
 ## 7. Scanning Build and Publish Outputs
 
@@ -206,7 +241,7 @@ cat graviton-validation/raw/output-scan.txt; echo "exit status $rc (0 no finding
 For a repository rather than an output, add `--source-tree`: it skips `.git`, `.vs`, `bin`, `obj`, `node_modules` and `graviton-validation` (Phase 1.2.1).
 
 What `scan` reports:
-- every ELF file, which must be aarch64, with the target's libc and glibc version (`--target-rid`, `--glibc` and `--page-size` work as in §3);
+- every ELF file, which must be aarch64, built for the target's libc (an Android build is a finding for every RID), within the target's glibc and libstdc++ versions, and linked for its page size (`--target-rid`, `--glibc`, `--glibcxx` and `--page-size` work as in §3); the line of an aarch64 file ends with the libraries it needs;
 - managed assemblies, which must be `AnyCPU`, `arm64`, or ReadyToRun for linux-arm64; an assembly built for x64 or x86 is a finding;
 - a `.runtimeconfig.json` that needs `Microsoft.WindowsDesktop.App` (Windows Forms or WPF), which is a finding;
 - the `.deps.json`: its runtime target must be in the target's RID chain, and, for output built without a RID, every package that lists a native file for the source RID must list one for the target too, or another package of its family must (the family rule of §3; `OK ... of the same family, provides it` for NetVips.Native.linux-x64 when NetVips.Native.linux-arm64 is in the same `.deps.json`);
@@ -323,16 +358,18 @@ def vtuple(s):
 
 
 def elf_info(b):
-    """Architecture, libc, highest GLIBC_ and GLIBCXX_ versions needed, smallest PT_LOAD alignment."""
+    """Architecture, libc, highest GLIBC_ and GLIBCXX_ versions needed, smallest PT_LOAD alignment, alignment of
+    p_vaddr - p_offset over the PT_LOAD segments (voff), and the libraries the file needs (DT_NEEDED)."""
     if len(b) < 20:
-        return {"arch": "truncated", "libc": "", "glibc": "", "glibcxx": "", "align": 0}
+        return {"arch": "truncated", "libc": "", "glibc": "", "glibcxx": "", "align": 0, "voff": 0, "needed": []}
     machine = struct.unpack_from("<H", b, 18)[0]
-    i = {"arch": ELF_ARCH.get(machine, "e_machine %d" % machine), "libc": "", "glibc": "", "glibcxx": "", "align": 0}
+    i = {"arch": ELF_ARCH.get(machine, "e_machine %d" % machine), "libc": "", "glibc": "", "glibcxx": "", "align": 0,
+         "voff": 0, "needed": []}
     if len(b) < 64 or b[4] != 2 or b[5] != 1:
         return i  # only 64-bit little-endian files are parsed further
     phoff = struct.unpack_from("<Q", b, 32)[0]
     phentsize, phnum = struct.unpack_from("<HH", b, 54)
-    loads, dyn = [], None
+    loads, dyn, android = [], None, False
     for k in range(phnum):
         o = phoff + k * phentsize
         if o + 56 > len(b):
@@ -345,8 +382,16 @@ def elf_info(b):
             loads.append((p_vaddr, p_offset, p_filesz, p_align))
         elif p_type == 2:
             dyn = (p_offset, p_filesz)
+        elif p_type == 4:  # notes: one owned by "Android" marks a build for Android's C library (bionic)
+            q = p_offset
+            while q + 12 <= min(len(b), p_offset + p_filesz):
+                namesz, descsz = struct.unpack_from("<II", b, q)
+                android = android or b[q + 12:q + 12 + namesz].rstrip(b"\0") == b"Android"
+                q += 12 + (namesz + 3) // 4 * 4 + (descsz + 3) // 4 * 4
     if loads:
         i["align"] = min(x[3] for x in loads)
+        d = [v - o for v, o, _, _ in loads if v != o]
+        i["voff"] = min(x & -x for x in d) if d else 0  # largest power of two dividing every p_vaddr - p_offset
     if dyn is None:
         i["libc"] = "static"
         return i
@@ -375,8 +420,11 @@ def elf_info(b):
         e = b.find(b"\0", strtab + o)
         return b[strtab + o:e].decode("latin-1")
     names = [string(n) for n in needed]
+    i["needed"] = names
     if "libc.so.6" in names:
         i["libc"] = "glibc"
+    elif "libc.so" in names and android:
+        i["libc"] = "android"
     elif any(n == "libc.so" or n.startswith("libc.musl") for n in names):
         i["libc"] = "musl"
     vers = []
@@ -403,9 +451,9 @@ def elf_info(b):
         v = [n[len(prefix):] for lib, n in vers if lib not in skip and n.startswith(prefix)
              and re.match(r"^[0-9]+(\.[0-9]+)*$", n[len(prefix):])]
         return prefix + max(v, key=vtuple) if v else ""
-    if i["libc"] != "musl":  # musl builds need no glibc; a GLIBC_ version requested from libgcc_s is not a glibc need
+    if i["libc"] not in ("musl", "android"):  # they need no glibc; a GLIBC_ version requested from libgcc_s is not a glibc need
         i["glibc"] = highest("GLIBC_", skip=("libgcc_s.so.1",))
-        i["glibcxx"] = highest("GLIBCXX_")
+    i["glibcxx"] = highest("GLIBCXX_")  # GLIBCXX_ versions come from libstdc++, on musl targets too
     return i
 
 
@@ -475,19 +523,39 @@ def elf_problems(i, args, target):
     if i["arch"] != "aarch64":
         return ["is %s" % i["arch"]]
     p = []
-    if "musl" in target and i["libc"] == "glibc":
+    musl = "musl" in target
+    if i["libc"] == "android":
+        p.append("is an Android build (bionic C library; target uses %s)" % ("musl" if musl else "glibc"))
+    if musl and i["libc"] == "glibc":
         p.append("is a glibc build (target uses musl)")
-    if "musl" not in target and i["libc"] == "musl":
+    if not musl and i["libc"] == "musl":
         p.append("is a musl build (target uses glibc)")
     if args.glibc and i["glibc"] and vtuple(i["glibc"][6:]) > vtuple(args.glibc):
         p.append("needs %s (target glibc %s)" % (i["glibc"], args.glibc))
-    if args.page_size and i["align"] and i["align"] < args.page_size:
-        p.append("LOAD alignment %#x is below the target page size %#x" % (i["align"], args.page_size))
+    if not musl and args.glibcxx and i["glibcxx"] and vtuple(i["glibcxx"][8:]) > vtuple(args.glibcxx):
+        # glibc targets only: musl's loader does not check version needs, and Alpine's libstdc++ defines no versions
+        p.append("needs %s (target libstdc++ provides up to GLIBCXX_%s)" % (i["glibcxx"], args.glibcxx))
+    if args.page_size:
+        # glibc 2.34 and earlier refuse a PT_LOAD whose p_align is not a multiple of the page size; glibc 2.35 and
+        # later, and musl, need p_vaddr - p_offset to be one. A glibc target without --glibc: both rules.
+        old = not musl and not (args.glibc and vtuple(args.glibc) >= (2, 35))
+        new = musl or not (args.glibc and vtuple(args.glibc) < (2, 35))
+        if old and i["align"] and i["align"] < args.page_size:
+            p.append("LOAD alignment %#x is below the target page size %#x" % (i["align"], args.page_size))
+        if new and i["voff"] and i["voff"] < args.page_size:
+            p.append("LOAD vaddr-offset alignment %#x is below the target page size %#x" % (i["voff"], args.page_size))
     return p
 
 
 def describe(i):
-    return " ".join(x for x in (i["libc"], i["glibc"], i["glibcxx"], ("align %#x" % i["align"]) if i["align"] else "") if x)
+    voff = "vaddr-offset align %#x" % i["voff"] if i["arch"] == "aarch64" and 0 < i["voff"] < 0x10000 else ""
+    return " ".join(x for x in (i["libc"], i["glibc"], i["glibcxx"], ("align %#x" % i["align"]) if i["align"] else "", voff)
+                    if x)
+
+
+def needs(i):
+    """The libraries an aarch64 file needs (DT_NEEDED): each comes from the target image or ships with the file."""
+    return "needs " + " ".join(i["needed"]) if i["arch"] == "aarch64" and i["needed"] else ""
 
 
 def base_name(name):
@@ -726,7 +794,7 @@ def report_assets(root, args):
                     finding("%s native %s of %s %s%s" % (t, f, name, "; ".join(probs), used(r)))
                     via(name)
                 else:
-                    print("OK %s %s: %s (%s)" % (t, name, f, describe(i)))
+                    print("OK %s %s: %s (%s)" % (t, name, f, "; ".join(x for x in (describe(i), needs(i)) if x)))
     for g in sorted(groups.values(), key=lambda g: g["names"][0].lower()):
         arches = sorted(set(a for a, _ in g["elfs"]))
         sample = ", ".join(f for _, f in g["elfs"][:3])
@@ -927,7 +995,7 @@ def scan_one(root, args, target):
                 i = elf_info(read_all(p))
                 kind = "ELF " + i["arch"]
                 probs = elf_problems(i, args, target)
-                print("%-12s %-40s %s" % (kind, describe(i), rel))
+                print("%-12s %-40s %s%s" % (kind, describe(i), rel, "  (%s)" % needs(i) if needs(i) else ""))
                 lib = owners.get(rel)
                 if (lib and len(probs) == 1 and i["arch"] == "aarch64" and i["libc"] in ("glibc", "musl")
                         and i["libc"] != want and want in pkg_libcs.get(lib, ())):
@@ -963,6 +1031,8 @@ def main():
         p.add_argument("--source-rid", default="linux-x64")
         p.add_argument("--target-rid", action="append", help="repeatable; default linux-arm64 (add linux-musl-arm64 for Alpine)")
         p.add_argument("--glibc", help="target glibc version, for example 2.34; natives needing a newer GLIBC_ are findings")
+        p.add_argument("--glibcxx", help="highest GLIBCXX_ version of the glibc target's libstdc++, for example 3.4.30; "
+                       "natives needing a newer one are findings (musl RIDs ignore it)")
         p.add_argument("--page-size", type=int, help="target kernel page size in bytes, for example 65536")
         p.add_argument("--timeout", type=int, default=900, help="seconds per dotnet command")
         if name == "assets":
@@ -983,6 +1053,10 @@ def main():
         ap.print_help()
         return 2
     args.target_rid = args.target_rid or ["linux-arm64"]
+    args.glibcxx = (args.glibcxx or "").replace("GLIBCXX_", "")
+    if args.glibcxx and not re.match(r"^[0-9]+(\.[0-9]+)*$", args.glibcxx):
+        print("ERROR: --glibcxx takes a version such as 3.4.30, not %s" % args.glibcxx)
+        return 2
     return {"assets": cmd_assets, "scan": cmd_scan, "probe": cmd_probe, "config": cmd_config}[args.command](args)
 
 

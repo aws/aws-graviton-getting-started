@@ -241,7 +241,7 @@ Do not extend the list from memory. A package is managed only when the per-RID c
 
 | Dependency | Old → New | ARM64 Issue | Evidence |
 |------------|-----------|-------------|----------|
-| SkiaSharp.NativeAssets.Linux (and SkiaSharp, same version) | 1.68.3 → 2.80.0 | no linux-arm64 native file | `FINDING no linux-arm64 native: SkiaSharp.NativeAssets.Linux/1.68.3 (linux-x64 has 1; runtimes/ folders: linux-x64)`; probe of 2.80.0: `OK linux-arm64 ... libSkiaSharp.so (glibc GLIBC_2.17 align 0x10000)` |
+| SkiaSharp.NativeAssets.Linux (and SkiaSharp, same version) | 1.68.3 → 2.80.0 | no linux-arm64 native file | `FINDING no linux-arm64 native: SkiaSharp.NativeAssets.Linux/1.68.3 (linux-x64 has 1; runtimes/ folders: linux-x64)`; probe of 2.80.0: `OK linux-arm64 ... libSkiaSharp.so (glibc GLIBC_2.17 align 0x10000; needs ...)` |
 | Microsoft.ML.OnnxRuntime | 1.10.0 → 1.11.0 | aarch64 build in `runtimes/linux-aarch64/`, never selected | per-RID check: no linux-arm64 native; 1.11.0 is the first with `runtimes/linux-arm64` |
 ```
 

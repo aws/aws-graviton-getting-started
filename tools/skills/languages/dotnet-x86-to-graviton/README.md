@@ -6,7 +6,7 @@ Validates .NET application compatibility with AWS Graviton (ARM64) architecture 
 
 This skill guides an AI coding assistant through a complete .NET Graviton migration:
 
-1. **Static Analysis**: Checks, by content, that every resolved NuGet package (including transitives) ships an aarch64 native file for each target runtime identifier and the target's C library and glibc, and scans for native files committed to the repository, P/Invoke loads, x86 intrinsics, project settings that pin x64, amd64-pinned Dockerfiles, Lambda descriptors and Windows-only APIs
+1. **Static Analysis**: Checks, by content, that every resolved NuGet package (including transitives) ships an aarch64 native file for each target runtime identifier and the target's C library, glibc, libstdc++ and page size, and scans for native files committed to the repository, P/Invoke loads, x86 intrinsics, project settings that pin x64, amd64-pinned Dockerfiles, Lambda descriptors and Windows-only APIs
 2. **Compatibility Resolution**: Updates only ARM64-blocking packages (to the lowest version whose linux-arm64 native files load on the target), regenerates lock files through the project's own package management, adds Arm64 code paths, fixes project and deployment settings, and documents Graviton runtime recommendations without applying them
 3. **Validation**: Builds, publishes, tests and starts the application on ARM64, scans every publish output and container image by content, classifies failures, and produces a structured migration report
 

@@ -1,7 +1,7 @@
 ---
 name: dotnet-x86-to-graviton
 displayName: ".NET x86 to Graviton Migration"
-description: "Validates .NET application compatibility with AWS Graviton (ARM64) architecture by checking, by content, that every resolved NuGet package (including transitive) ships an aarch64 native file for each target runtime identifier and the target's C library and glibc, and by checking committed native files, P/Invoke loads, x86 intrinsics, x64 project settings, Dockerfiles, Lambda descriptors and Windows-only APIs. Performs static analysis, applies ARM64-required package, code and build fixes (including the move from Windows or .NET Framework to modern .NET on Linux, after approval), documents Graviton runtime recommendations, and validates builds, publish outputs, tests and startup on ARM64."
+description: "Validates .NET application compatibility with AWS Graviton (ARM64) architecture by checking, by content, that every resolved NuGet package (including transitive) ships an aarch64 native file for each target runtime identifier and the target's C library, glibc, libstdc++ and page size, and by checking committed native files, P/Invoke loads, x86 intrinsics, x64 project settings, Dockerfiles, Lambda descriptors and Windows-only APIs. Performs static analysis, applies ARM64-required package, code and build fixes (including the move from Windows or .NET Framework to modern .NET on Linux, after approval), documents Graviton runtime recommendations, and validates builds, publish outputs, tests and startup on ARM64."
 keywords: ["dotnet", ".net", "csharp", "graviton", "arm64", "aarch64", "migration", "nuget", "native libraries", "dependencies"]
 author: "AWS"
 ---
@@ -20,7 +20,7 @@ Validate a .NET application's readiness to run on AWS Graviton instances. This t
 
 **Out of scope:** target framework and SDK changes other than those Graviton requires (gated by `dotnet.framework_bump`), package-management switches (central package management, lock files, Paket), base image changes, general dependency modernization, security updates (including NuGet audit warnings), code refactoring, .gitignore/.dockerignore and CI changes. Windows Forms, WPF and ASP.NET Web Forms have no Linux path: they are BLOCKERs, documented with options ([document_references/windows-to-linux.md](document_references/windows-to-linux.md)).
 
-> **Verify the native files, never the package name or the exit code.** Whether a package runs on Graviton is a fact about the files its exact version ships for each RID, judged by content: the ELF machine, the C library and the glibc versions they need. `dotnet publish -r linux-arm64` exits 0 with native files missing, and a Windows Forms project publishes for linux-arm64 too. Every verdict cites the per-RID check or the output scan; see [document_references/nuget-native-assets.md](document_references/nuget-native-assets.md).
+> **Verify the native files, never the package name or the exit code.** Whether a package runs on Graviton is a fact about the files its exact version ships for each RID, judged by content: the ELF machine, the C library, the glibc and libstdc++ versions and the other libraries they need, and the page size they were linked for. `dotnet publish -r linux-arm64` exits 0 with native files missing, and a Windows Forms project publishes for linux-arm64 too. Every verdict cites the per-RID check or the output scan; see [document_references/nuget-native-assets.md](document_references/nuget-native-assets.md).
 
 ## Skill Configuration (Optional)
 
@@ -125,7 +125,7 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 ## Exit Criteria
 
 ### Must Pass
-1. Every resolved package gives each target RID an aarch64 native file for the target's libc and glibc, or is managed only, or is a documented user decision
+1. Every resolved package gives each target RID an aarch64 native file for the target's libc, glibc, libstdc++ and page size, or is managed only, or is a documented user decision
 2. Committed native files and assemblies run on ARM64 (aarch64 builds, AnyCPU assemblies), or documented fallbacks function
 3. All MUST UPGRADE items applied, or documented as user decisions
 4. Every project that moves to Linux publishes for each target RID, and every output scans without findings

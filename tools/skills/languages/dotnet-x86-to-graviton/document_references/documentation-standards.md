@@ -35,7 +35,7 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 1. **Create `graviton-validation/` and `graviton-validation/raw/` first.** `mkdir -p graviton-validation/raw` is the first action of Phase 1.
 2. **Use exactly these filenames.** Do not rename, renumber or add top-level files. Additional machine output goes under `raw/` with a descriptive name.
 3. **Write progressively.** Each phase step writes its section as it completes; do not batch everything at the end.
-4. **Every verdict cites its evidence.** A package row without the per-RID line (`OK`, `FINDING`, `CHECK`) or a `probe` result is incomplete; a code finding without file:line is incomplete. The "evidence" columns below are mandatory.
+4. **Every verdict cites its evidence and says where it was established.** A package row without the per-RID line (`OK`, `FINDING`, `CHECK`) or a `probe` result is incomplete; a code finding without file:line is incomplete. The "evidence" columns below are mandatory. The `Established` column says where the verdict comes from: `predicted` (read from files on any host, as `assets`, `probe` and `scan` do), `emulated` (observed in a `linux/arm64` environment under emulation), `native arm64` (observed on an arm64 host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict. A `predicted` finding stays a finding when a Phase 3 run passes, because a run shows only the code paths it exercised.
 5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes and BLOCKER items). Never list a recommendation among required changes, and never apply one.
 6. **Empty sections stay, with "No findings".** Omitting a section is ambiguous (not checked, or nothing found?). Write the heading and an explicit statement.
 7. **`00-summary.md` is written last** and references the detail files rather than repeating them.
@@ -143,16 +143,16 @@ Projects no solution lists: <none | list>
 Summary of raw/native-assets.txt: <N> packages, <M> with native files for these RIDs, <F> findings, <C> checks (detail per package in 03).
 
 ## Statically Bundled Libraries
-| File | Location | Architecture (by content) | aarch64 build present | Verdict | Resolution |
-|---|---|---|---|---|---|
-| libfastsum.so | src/Fixture.Core/native/x64/ | ELF x86-64, GLIBC_2.2.5 | No | WARN (source in native/fastsum.c) | cross-compiled to native/arm64/libfastsum.so (aarch64) |
+| File | Location | Architecture (by content) | aarch64 build present | Verdict | Established | Resolution |
+|---|---|---|---|---|---|---|
+| libfastsum.so | src/Fixture.Core/native/x64/ | ELF x86-64, GLIBC_2.2.5 | No | WARN (source in native/fastsum.c) | predicted | cross-compiled to native/arm64/libfastsum.so (aarch64) |
 
 ## Runtime-Extracted Libraries
-| Source | Artifact | Loaded, run or downloaded at run time | aarch64 support | Verdict | Resolution |
-|---|---|---|---|---|---|
-| src/Fixture.Core/Native.cs:26 | NativeLibrary.Load of native/<arch>/libfastsum.so | loaded | resolver knew only X64 | FAIL until fixed | Arm64 branch (Phase 2.1) |
-| deploy/deploy.sh:10 | awscli-exe-linux-x86_64.zip | downloaded | aarch64 asset answers HTTP 200 | WARN | ${ARCH} in the URL (Phase 2.3) |
-| Dockerfile | libfontconfig1 (apt) | installed | arm64 build in Debian 12 | PASS | none |
+| Source | Artifact | Loaded, run or downloaded at run time | aarch64 support | Verdict | Established | Resolution |
+|---|---|---|---|---|---|---|
+| src/Fixture.Core/Native.cs:26 | NativeLibrary.Load of native/<arch>/libfastsum.so | loaded | resolver knew only X64 | FAIL until fixed | predicted | Arm64 branch (Phase 2.1) |
+| deploy/deploy.sh:10 | awscli-exe-linux-x86_64.zip | downloaded | aarch64 asset answers HTTP 200 | WARN | predicted | ${ARCH} in the URL (Phase 2.3) |
+| Dockerfile | libfontconfig1 (apt) | installed | arm64 build in Debian 12 | PASS | emulated (Phase 3.2 tests) | none |
 
 ## Resolution Details
 <For each FAIL or WARN, describe the resolution approach.> FAIL: x86-only native with no aarch64 build path and no source. WARN: source available, a managed fallback exists, or the file is used only by tools and tests (CHECK). PASS: aarch64 build present or built.
@@ -174,10 +174,10 @@ Summary of raw/native-assets.txt: <N> packages, <M> with native files for these 
 Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>. Target glibc: <2.NN>. Feeds: <nuget.org | NuGet.config sources>. Check date: YYYY-MM-DD.
 
 ## MUST UPGRADE (Blocking)
-| Package | Direct / via | Version | Issue | Evidence (per-RID line) | Minimum ARM64 version | Applied | Where written |
-|---|---|---|---|---|---|---|---|
-| SkiaSharp.NativeAssets.Linux | direct (src/Fixture.Core) | 1.68.3 | no linux-arm64 native | `FINDING no linux-arm64 native: SkiaSharp.NativeAssets.Linux/1.68.3 (linux-x64 has 1; runtimes/ folders: linux-x64)` | 2.80.0 with SkiaSharp 2.80.0 (probe: `OK ... linux-arm64: runtimes/linux-arm64/native/libSkiaSharp.so (glibc GLIBC_2.17 ...)`) | pending (user decision below) | |
-| AWSSDK.Core | via AWSSDK.S3 3.3.107.1 | 3.3.103.65 | no IMDSv2 support; the target AMI requires IMDSv2 | Phase 1.3 SDK check | 3.3.103.66 (AWSSDK.S3 3.3.107.2) | 3.3.107.2 | Directory.Packages.props |
+| Package | Direct / via | Version | Issue | Evidence (per-RID line) | Established | Minimum ARM64 version | Applied | Where written |
+|---|---|---|---|---|---|---|---|---|
+| SkiaSharp.NativeAssets.Linux | direct (src/Fixture.Core) | 1.68.3 | no linux-arm64 native | `FINDING no linux-arm64 native: SkiaSharp.NativeAssets.Linux/1.68.3 (linux-x64 has 1; runtimes/ folders: linux-x64)` | predicted | 2.80.0 with SkiaSharp 2.80.0 (probe: `OK ... linux-arm64: runtimes/linux-arm64/native/libSkiaSharp.so (glibc GLIBC_2.17 ...)`) | pending (user decision below) | |
+| AWSSDK.Core | via AWSSDK.S3 3.3.107.1 | 3.3.103.65 | no IMDSv2 support; the target AMI requires IMDSv2 | Phase 1.3 SDK check | predicted | 3.3.103.66 (AWSSDK.S3 3.3.107.2) | 3.3.107.2 | Directory.Packages.props |
 
 ## User Decisions Pending
 | Item | Current | Options | Recommendation |
@@ -191,10 +191,10 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 | <package> | <ver> | <ver> | documented Graviton improvement (source) | A or B | Documented for user |
 
 ## COMPATIBLE (No Action Needed)
-| Package | Direct / via | Version | Basis |
-|---|---|---|---|
-| Newtonsoft.Json | direct | 12.0.3 | managed only; NU1903 is out of scope |
-| SQLitePCLRaw.lib.e_sqlite3 | via Microsoft.Data.Sqlite 8.0.31 | 2.1.12 | `OK linux-arm64 ... (glibc GLIBC_2.34 align 0x10000)` |
+| Package | Direct / via | Version | Basis | Established |
+|---|---|---|---|---|
+| Newtonsoft.Json | direct | 12.0.3 | managed only; NU1903 is out of scope | predicted |
+| SQLitePCLRaw.lib.e_sqlite3 | via Microsoft.Data.Sqlite 8.0.31 | 2.1.12 | `OK linux-arm64 ... (glibc GLIBC_2.34 align 0x10000; needs libc.so.6 ld-linux-aarch64.so.1)` | predicted |
 
 ## CHECK Items (Tools and Tests)
 | Package | Via | Files | Where they run | Result |

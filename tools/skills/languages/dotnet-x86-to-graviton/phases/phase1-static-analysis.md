@@ -144,19 +144,20 @@ grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.template
 ```
 
 Then, for each target:
-- **Container images:** read the image's libc with the block in [nuget-native-assets.md §6](../document_references/nuget-native-assets.md#6-target-os-libc-glibc-version-page-size), which also lists the results for the common .NET and Lambda images.
+- **Container images:** read the image's libc, and for a glibc image its libstdc++ version, with the blocks in [nuget-native-assets.md §6](../document_references/nuget-native-assets.md#6-target-os-libc-glibc-version-page-size), which also list the results for the common .NET and Lambda images.
 - **Lambda managed runtimes:** `dotnet8` and `dotnet10` run on Amazon Linux 2023 (glibc 2.34); `dotnet6` and `dotnetcore3.1` ran on Amazon Linux 2 (glibc 2.26) ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)).
 - **EC2 hosts:** ask for the AMI if no file names it. Amazon Linux 2023 AMIs launch in IMDSv2-only mode by default ([Deprecated in AL2023](https://docs.aws.amazon.com/linux/al2023/ug/deprecated-al2023.html)); §1.3 uses this for the AWS SDK.
 
-Record three values for the rest of the skill:
+Record four values for the rest of the skill:
 - the **target RIDs**: `linux-arm64`, plus `linux-musl-arm64` when any target image is Alpine;
 - the **lowest glibc version** across the targets;
+- the **lowest libstdc++ version** (`GLIBCXX_3.4.N`) across the glibc targets, when it can be read for each of them (from an image, with the block in §6; a Lambda managed runtime has no image to read it from);
 - the **page size** when a target kernel uses 64KB pages (AlmaLinux 8 and Rocky Linux 8 aarch64).
 
 Executed:
 - **Linux solution:**
-  - `./Dockerfile: FROM mcr.microsoft.com/dotnet/aspnet:8.0` (Debian 12, glibc 2.36).
-  - The Lambda function: `Runtime: dotnetcore3.1` with `Architectures: - x86_64`, and the same in `aws-lambda-tools-defaults.json`. Its arm64 target is `dotnet8` or `dotnet10` (§1.5), so the lowest glibc is 2.34.
+  - `./Dockerfile: FROM mcr.microsoft.com/dotnet/aspnet:8.0` (Debian 12, glibc 2.36, libstdc++ GLIBCXX_3.4.30).
+  - The Lambda function: `Runtime: dotnetcore3.1` with `Architectures: - x86_64`, and the same in `aws-lambda-tools-defaults.json`. Its arm64 target is `dotnet8` or `dotnet10` (§1.5), so the lowest glibc is 2.34. The managed runtime's libstdc++ version cannot be read, so `--glibcxx` is left out.
   - `deploy/deploy.sh` installs the agent on an EC2 host whose AMI no file names: ask.
 - **Windows solution:** `FROM mcr.microsoft.com/dotnet/aspnet:8.0-nanoserver-ltsc2022`, a Windows image; the Linux image is part of the move to Linux.
 - **.NET Framework solution:** no deployment file names a target: ask.
@@ -170,7 +171,8 @@ One scratch restore gives both the dependency tree (every resolved package with 
 ```bash
 GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
 mkdir -p graviton-validation/raw
-# --source-rid: linux-x64 for a Linux starting point, win-x64 for Windows. --glibc: the target's version (Determine Target OS and libc).
+# --source-rid: linux-x64 for a Linux starting point, win-x64 for Windows. --glibc: the target's version (Determine Target OS and libc);
+# add --glibcxx and --page-size when those values were recorded there.
 python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 --glibc 2.34 \
   --tree graviton-validation/raw/dependency-tree.json > graviton-validation/raw/native-assets.txt; rc=$?
 cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
@@ -207,8 +209,8 @@ The per-RID report from §1.1 covers the first two. This section reads it, scans
 Statically bundled native code sits in two places. Judge both by content, never by name: a Linux library can be named `SQLite.Interop.dll`, and an executable has no extension.
 
 1. **NuGet packages.** Read `graviton-validation/raw/native-assets.txt` from §1.1. Each package with native files for the source or target RIDs gets one line per target RID and file:
-   - `OK`: an aarch64 build for the target's libc, with the GLIBC_ version it needs and its LOAD alignment;
-   - `FINDING`: no file for the target RID, or a file that is x86-64, built for the other libc, too new for the target's glibc, or a Windows or macOS binary;
+   - `OK`: an aarch64 build for the target's libc, with the GLIBC_ and GLIBCXX_ versions it needs, its LOAD alignment and the libraries it needs;
+   - `FINDING`: no file for the target RID, or a file that is x86-64, an Android build, built for the other libc, too new for the target's glibc or libstdc++, linked for a smaller page size than the target's, or a Windows or macOS binary;
    - `CHECK`: x86-only files outside `runtimes/`, which fail only if a build target copies them or a tool runs them;
    - an indented `via` line under each `FINDING` and `CHECK`, with the reference chain from a project.
 
