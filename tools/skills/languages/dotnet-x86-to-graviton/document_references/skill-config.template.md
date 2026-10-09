@@ -46,7 +46,7 @@ ci.system: <internal CI system>   # vocabulary for the post-transformation CI no
 # the session-scoped BUILD / VALIDATION SDK (Phase 3.0); target frameworks change only through
 # dotnet.framework_bump, and only when Graviton requires it.
 dotnet.target_rids:     <e.g. linux-arm64 | linux-arm64;linux-musl-arm64>
-dotnet.framework_bump:  ask     # ask | approved=<tfm, e.g. net8.0> | never
+dotnet.framework_bump:  ask     # ask | approved=<tfm, e.g. net10.0> | never
 dotnet.sdk_select:      <e.g. installed | install-script | container>
 dotnet.install_hint:    <internal install command; surfaced to the user, never auto-run>
 dotnet.test_command:    <e.g. dotnet test Fixture.sln --filter Category!=Integration>

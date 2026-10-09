@@ -4,7 +4,12 @@ Analyze the project without making changes. All findings are documented in `grav
 
 > **Skill config:** Wherever a step below picks target runtime identifiers (RIDs), use `dotnet.target_rids` from `skill-config.md` (if defined) in place of the default `linux-arm64`, and use `dotnet.framework_bump` in §1.5. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
-Phase 1 runs on any host, including x86: every check below reads files, evaluates project files, or restores scratch copies. Nothing from the project is built for the target or run until Phase 3. The commands were executed in bash 5.2 and zsh 5.9 on Linux. They need the .NET SDK, Python 3.6 or later, and the check program, written once per session with the block in [nuget-native-assets.md §11](../document_references/nuget-native-assets.md#11-the-check-program):
+Phase 1 runs on any host, including x86, and changes nothing in the repository. Three steps execute the repository's MSBuild files:
+- the property listing in §1.1 (`dotnet msbuild -getProperty`), which evaluates every project with its `Directory.Build.props` and `Directory.Build.targets`;
+- `assets` in §1.1, whose restore of a scratch copy also runs any target hooked to restore (a test target with `BeforeTargets="Restore"` ran its `Exec`);
+- for a Windows starting point, the CA1416 build of a scratch copy in §1.4, which runs the whole build.
+
+MSBuild also reads `Directory.Build.rsp` for these steps, and that file can add targets: with `-t:` in it, the property listing ran a target of the repository. List what the repository's MSBuild files can run (block below) before the first of them, and for a repository you do not trust, run Phase 1 in a disposable container or VM. `scan` only reads files, and `probe` and `config` restore a project that the check program writes in a scratch folder, copying only `NuGet.config`. Two steps run container images, with the image's own tools: the libc check of each target image (§1.1) and the OS package lookups (§1.2.2). No test or application of the project runs until Phase 3. The commands were executed in bash 5.2 and zsh 5.9 on Linux. They need the .NET SDK, Python 3.6 or later, and the check program, written once per session with the block in [nuget-native-assets.md §11](../document_references/nuget-native-assets.md#11-the-check-program):
 
 ```bash
 dotnet --list-sdks
@@ -15,6 +20,17 @@ GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
 ```
 
 > **If `dotnet --version` fails** with `A compatible .NET SDK was not found.`, the repository's `global.json` pins an SDK that is not installed. Apply the session-scoped SDK switch from [phase3-validation.md](phase3-validation.md) §3.0 now: the first `dotnet` command needs it, not only Phase 3.
+
+Before the property listing, `assets` and the CA1416 build, list the repository's MSBuild code that they can run. The block only reads files; read every line it prints, because an `Exec`, a `UsingTask` or an imported file runs during those steps:
+
+```bash
+grep -rnE --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=artifacts \
+  --include='*.csproj' --include='*.fsproj' --include='*.vbproj' --include='*.props' --include='*.targets' --include='*.proj' \
+  '<(Exec|UsingTask|Import)[[:space:]>]|(Before|After)Targets=|InitialTargets=' . | cut -c1-200
+find . \( -name bin -o -name obj -o -name .git -o -name node_modules \) -prune -o -name '*.rsp' -print
+```
+
+Executed: on a test repository whose `Directory.Build.targets` holds a target with `BeforeTargets="Restore"` and an `Exec`, it printed both lines and `./Directory.Build.rsp`. On the Linux and Windows solutions it printed nothing; on the .NET Framework solution, the four `<Import>` lines of the web project, which import MSBuild's own props and targets.
 
 "Executed on" lines below refer to three test solutions:
 - the **Linux solution**: nine projects on .NET 8 for Linux x64, with central package versions and lock files;
@@ -157,7 +173,7 @@ mkdir -p graviton-validation/raw
 # --source-rid: linux-x64 for a Linux starting point, win-x64 for Windows. --glibc: the target's version (Determine Target OS and libc).
 python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 --glibc 2.34 \
   --tree graviton-validation/raw/dependency-tree.json > graviton-validation/raw/native-assets.txt; rc=$?
-cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed)"
+cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 # Sanity check: nothing resolved is a failed restore, not an all-clear (unless the solution references no packages)
 grep -q '^packages: [1-9]' graviton-validation/raw/native-assets.txt || echo "WARNING: no packages resolved; read the restore errors above"
 ```
@@ -404,7 +420,7 @@ Executed on the Linux solution: `Microsoft.NET.Test.Sdk` in both test projects (
 | Grpc.Tools | `tools/linux_arm64` from 2.37.0 | `probe Grpc.Tools 2.36.4`: `CHECK ELF files outside runtimes/ in Grpc.Tools/2.36.4 are i386, x86-64 only ..., e.g. tools/linux_x64/grpc_csharp_plugin, tools/linux_x64/protoc, ...`; 2.37.0: `OK ... aarch64, i386, x86-64` |
 | Native AOT (`PublishAot`) | restore adds `runtime.<rid>.Microsoft.DotNet.ILCompiler` for each RID; the compiler and linker run on the build host | publishing linux-arm64 from x64 without a cross toolchain failed: `gcc : error : unrecognized command-line option ‘--target=aarch64-linux-gnu’`. Build on arm64 (Phase 2.4) |
 | Microsoft.CodeCoverage (via Microsoft.NET.Test.Sdk) | no arm64 build of its dynamic instrumentation engine | dynamic instrumentation runs on Linux x64 only, static instrumentation everywhere ([dotnet-coverage](https://learn.microsoft.com/en-us/dotnet/core/additional-tools/dotnet-coverage)); confirm coverage collection on arm64 in Phase 3.2 |
-| Selenium.WebDriver.ChromeDriver | none | x86-64 Linux driver in all 281 stable releases |
+| Selenium.WebDriver.ChromeDriver | none | an x86-64 Linux driver in every release from 2.29.0 on, none in earlier releases, no aarch64 build in any |
 
 Match the RID to the *target*, not the developer machine. **Graviton is Linux, so `linux-arm64` (and `linux-musl-arm64` for Alpine) decides the verdict.** `osx-arm64` and `win-arm64` matter only for local builds on Apple silicon or Windows on Arm, and are never a Graviton blocker.
 

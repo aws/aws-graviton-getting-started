@@ -70,7 +70,7 @@ python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0 --target-rid linux
 
 > **Skill config:** If `skill-config.md` defines `dotnet.target_rids`, the candidate must probe clean for each of those RIDs. Probes use the repository's `NuGet.config`; if the repository's feeds lack the candidate, record an INFRA item ("the feed needs SkiaSharp.NativeAssets.Linux 2.80.0") rather than choosing a different version. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
-**Read the NuGet audit lines of each probe.** `probe` prints the NU1901 to NU1904 warnings of the probed package as `NOTE NuGet audit:` lines (not those of its dependencies, so probe every package whose version changes). If the candidate has a warning that the current version does not have, present the floor and the lowest version without the warning as one user decision. Executed: SkiaSharp 1.68.3 had no audit warning; 2.80.0, the arm64 floor, reported `warning NU1903: Package 'SkiaSharp' 2.80.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-j7hp-h8jx-5ppr`; 2.88.6 was the lowest release without it and probed clean for linux-arm64 (GLIBC_2.17). An advisory that the current version already has stays out of scope.
+**Read the NuGet audit lines of each probe.** `probe` prints the NU1901 to NU1904 warnings of the probed package and of its dependencies as `NOTE NuGet audit:` lines, each naming its package (its scratch project sets `NuGetAuditMode` to `all`; `assets` keeps the repository's own setting). If the candidate has a warning that the current version does not have, present the floor and the lowest version without the warning as one user decision. Executed: SkiaSharp 1.68.3 had no audit warning; 2.80.0, the arm64 floor, reported `warning NU1903: Package 'SkiaSharp' 2.80.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-j7hp-h8jx-5ppr`; 2.88.6 was the lowest release without it and probed clean for linux-arm64 (GLIBC_2.17). An advisory that the current version already has stays out of scope.
 
 **Where to write the version** depends on how the solution manages packages ([../document_references/package-management-mapping.md](../document_references/package-management-mapping.md)):
 
@@ -124,7 +124,7 @@ dotnet restore Fixture.sln --locked-mode; echo "locked restore: exit $?"
 
 Executed on a clone of the Linux solution: `--force-evaluate` rewrote all 9 lock files, and the locked restore then exited 0 ([../document_references/nuget-native-assets.md](../document_references/nuget-native-assets.md) §8). Commit the lock files with the change.
 
-**Target framework changes:** follow `dotnet.framework_bump` (Phase 1.5): `ask` presents the options and waits; `approved=<tfm>` applies the change to every project that needs it and records it in `01-project-assessment.md`; `never` documents the blocker and changes nothing. The Linux solution's Lambda function needed one: `dotnetcore3.1` blocks updates, so its move to arm64 includes the move to `net8.0` and the `dotnet8` runtime (§2.4). Its packages (Amazon.Lambda.Core 2.3.0, Amazon.Lambda.Serialization.SystemTextJson 2.4.4) also support `net8.0`, so they did not change; executed, the project built for `net8.0`. When a package does not support the approved framework, choose its lowest version that does and probe it.
+**Target framework changes:** follow `dotnet.framework_bump` (Phase 1.5): `ask` presents the options and waits; `approved=<tfm>` applies the change to every project that needs it and records it in `01-project-assessment.md`; `never` documents the blocker and changes nothing. The Linux solution's Lambda function needed one: `dotnetcore3.1` blocks updates, so its move to arm64 includes a move to `net10.0` and the `dotnet10` runtime (§2.4); `net8.0` and `dotnet8` reach end of support on November 10, 2026 (Phase 1.5). The solution pins SDK 8.0.400 in `global.json`, so the same approval covers the pin: with it, the build stopped at `NETSDK1045: The current .NET SDK does not support targeting .NET 10.0`, and with `10.0.100` (`latestFeature`) it passed. Executed on a copy of the solution with both changes: `restore --force-evaluate` rewrote the Lambda project's lock file, the Lambda project and the whole solution built with SDK 10.0.401, `publish -r linux-arm64` produced a `net10.0` runtimeconfig, and the function's packages (Amazon.Lambda.Core 2.3.0, Amazon.Lambda.Serialization.SystemTextJson 2.4.4) did not change. When a package does not support the approved framework, choose its lowest version that does and probe it.
 
 After the changes, keep the Phase 1 evidence that `03-dependency-compatibility-report.md` cites, then re-run the Phase 1.1 check:
 
@@ -134,7 +134,7 @@ cp graviton-validation/raw/dependency-tree.json graviton-validation/raw/dependen
 GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
 python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 --glibc 2.34 \
   --tree graviton-validation/raw/dependency-tree.json > graviton-validation/raw/native-assets.txt; rc=$?
-cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed)"
+cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 ```
 
 Executed on the fixed Linux solution: `packages: 38; with native files for these RIDs: 4; natives for other platforms only: 1; managed only: 33; findings: 0; checks: 1` (the remaining `CHECK` is Microsoft.CodeCoverage, confirmed in Phase 3.2). Newtonsoft.Json 12.0.3 and Dapper 2.0.123 were not touched.
@@ -271,13 +271,13 @@ Host-based deployments skip Docker steps.
 
 ```yaml
 # template.yaml
-      Runtime: dotnet8          # was dotnetcore3.1 (updates blocked since May 3, 2023)
+      Runtime: dotnet10         # was dotnetcore3.1 (updates blocked since May 3, 2023)
       Architectures:
         - arm64                 # was x86_64
 ```
 
 ```json
-"function-runtime": "dotnet8",
+"function-runtime": "dotnet10",
 "function-architecture": "arm64",
 ```
 

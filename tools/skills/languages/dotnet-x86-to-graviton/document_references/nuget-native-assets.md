@@ -17,7 +17,7 @@
 
 ## 2. How the SDK Selects Native Files
 
-- Restore resolves assets for each RID in `<RuntimeIdentifiers>` (or `<RuntimeIdentifier>`) and records them in `obj/project.assets.json`, under targets such as `net8.0/linux-arm64`. A build or publish with `-r` uses that RID. A build without a RID copies the `runtimes/<rid>/` folders of every RID, and the host picks one at run time from the `.deps.json`.
+- Restore resolves assets for each RID in `<RuntimeIdentifiers>` (or `<RuntimeIdentifier>`) and records them in the project's `project.assets.json`, under targets such as `net8.0/linux-arm64`. The file is in `obj/` by default, in `artifacts/obj/<project>/` with `UseArtifactsOutput`, and wherever `BaseIntermediateOutputPath` points; MSBuild's `ProjectAssetsFile` property gives the path. A build or publish with `-r` uses that RID. A build without a RID copies the `runtimes/<rid>/` folders of every RID, and the host picks one at run time from the `.deps.json`.
 - Each RID falls back along the portable RID graph that ships with the SDK (`PortableRuntimeIdentifierGraph.json`; identical in SDK 8.0.425 and 10.0.401):
   - `linux-arm64` → `linux` → `unix-arm64` → `unix` → `any`
   - `linux-musl-arm64` → `linux-musl` → `linux-arm64` → `linux` → `unix-arm64` → `unix` → `any`
@@ -37,11 +37,13 @@ GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"   # written by the block in 
 [ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (document_references/nuget-native-assets.md, section 11)"
 mkdir -p graviton-validation/raw
 python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 > graviton-validation/raw/native-assets.txt; rc=$?
-cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed)"
+cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 ```
 
 What `assets` does:
 - **Works on a copy.** It copies the tree to a temporary folder (without `bin`, `obj`, `.git`, `.vs`, `node_modules`, `graviton-validation`), restores every solution at the root (or every project if there is none) for the source and target RIDs, and deletes the copy afterwards. The repository is not touched. A restore with extra RIDs in the repository itself rewrites its tracked `packages.lock.json` files (§8).
+- **Reads the assets files of its own restore.** Before restoring, it deletes every `project.assets.json` and `project.nuget.cache` in the copy, then reads each `project.assets.json` the restore writes, in any folder (`obj/`, `artifacts/obj/<project>/`, a custom `BaseIntermediateOutputPath`), so a file left by an earlier restore or a removed project is never read.
+- **Runs the repository's MSBuild files.** The restore imports the copy's `Directory.Build.props` and `Directory.Build.targets`, reads its `Directory.Build.rsp`, and runs any target hooked to restore. The start of [Phase 1](../phases/phase1-static-analysis.md) lists the steps that do this and how to list such code first.
 - **Reports every package with native files for these RIDs**, one line per target RID and file:
   - `OK` when the file is an aarch64 build for the target's libc, with the highest `GLIBC_` and `GLIBCXX_` versions it needs and its smallest LOAD alignment;
   - `FINDING` when the target RID gets no file, or gets one that is not an aarch64 build, is built for the other libc, or is a Windows or macOS binary.
@@ -54,7 +56,7 @@ What `assets` does:
   - `CHECK` when they are x86-only. They fail only if a build target copies them to the output or a tool runs them, so decide from how the project uses the package (§4).
 - **Prints NuGet audit warnings** (NU1901 to NU1904) from its restores as `NOTE NuGet audit:` lines, once each. They are security findings, out of scope unless an ARM64 change introduces them (§5).
 - **Flags `packages.config` projects.** Their packages are not restored by PackageReference, so `assets` prints a `CHECK` line that names the `config` command for each such file (below).
-- **Exit status:** 0 no findings (`CHECK` lines may remain), 1 findings, 2 the restore failed.
+- **Exit status:** 0 no findings (`CHECK` lines may remain), 1 findings, 2 the restore failed or wrote no `project.assets.json` inside the copy (an intermediate path outside the repository). A restore whose projects resolve no NuGet package prints `restored 1 project(s); none of them resolves a NuGet package` and exits 0.
 - **Options:**
   - `--target-rid linux-musl-arm64` adds Alpine; the option can be repeated;
   - `--glibc 2.34` reports natives that need a newer glibc than the target's (§6);
@@ -107,7 +109,7 @@ Executed on the .NET Framework fixture: `assets` printed `CHECK Orders.Web/packa
 | Linux native named `.dll` | Stub.System.Data.SQLite.Core.NetStandard 1.0.119: `runtimes/linux-x64/native/SQLite.Interop.dll` is an x86-64 ELF file | no linux-arm64 file in any release; `DllNotFoundException: Unable to load shared library 'SQLite.Interop.dll' or one of its dependencies` |
 | one package per RID | NetVips.Native.linux-x64 (x64 only) and NetVips.Native.linux-arm64 (from 8.10.0); Magick.NET-Q16-x64 (no linux-arm64 in any release), Magick.NET-Q16-arm64 and Magick.NET-Q16-AnyCPU (linux-arm64 from 11.0.0) | the x64 package never works on arm64. The NetVips.Native meta-package resolves the per-RID packages, including linux-arm64 |
 | glibc build given to a musl target | SkiaSharp.NativeAssets.Linux 2.80.0 and Microsoft.ML.OnnxRuntime 1.11.0 (no `linux-musl-arm64`) | on Alpine arm64 (emulated), both failed with `DllNotFoundException` |
-| executables or libraries outside `runtimes/` | Selenium.WebDriver.ChromeDriver: `driver/linux64/chromedriver` is x86-64 in all 281 stable releases (2.2.0 to 154.0.8037.9200) and copied to the output; Microsoft.CodeCoverage (pulled in by Microsoft.NET.Test.Sdk): x86-64 libraries in `build/` in every release from 16.10.0 to 18.10.1; Grpc.Tools: `tools/linux_arm64` from 2.37.0 | the per-RID comparison does not see them, so the check lists them as `CHECK`. ChromeDriver's file is run by UI tests. The CodeCoverage files are the dynamic instrumentation engine: Microsoft documents dynamic instrumentation on Linux for x64 only and static instrumentation on all platforms ([dotnet-coverage](https://learn.microsoft.com/en-us/dotnet/core/additional-tools/dotnet-coverage)), so confirm coverage collection on arm64 in Phase 3.2 |
+| executables or libraries outside `runtimes/` | Selenium.WebDriver.ChromeDriver: every release from 2.29.0 on carries an x86-64 Linux driver (`driver/linux64/chromedriver`), copied to the output; earlier releases carry none, and no release has an aarch64 build; Microsoft.CodeCoverage (pulled in by Microsoft.NET.Test.Sdk): x86-64 libraries in `build/` in every release from 16.10.0 to 18.10.1; Grpc.Tools: `tools/linux_arm64` from 2.37.0 | the per-RID comparison does not see them, so the check lists them as `CHECK`. ChromeDriver's file is run by UI tests. The CodeCoverage files are the dynamic instrumentation engine: Microsoft documents dynamic instrumentation on Linux for x64 only and static instrumentation on all platforms ([dotnet-coverage](https://learn.microsoft.com/en-us/dotnet/core/additional-tools/dotnet-coverage)), so confirm coverage collection on arm64 in Phase 3.2 |
 | natives in a transitive package | Microsoft.Data.Sqlite → SQLitePCLRaw.lib.e_sqlite3; Confluent.Kafka → librdkafka.redist; LibGit2Sharp → LibGit2Sharp.NativeBinaries; NetVips.Native → NetVips.Native.linux-arm64 | the direct reference looks managed; check the resolved tree |
 
 ## 5. Finding the Lowest Version That Works
@@ -142,7 +144,7 @@ Floors found by reading every stable release on nuget.org at the time of writing
 | Selenium.WebDriver | 4.49.0 | uses the linux-arm64 build, which is statically linked | |
 | SQLitePCLRaw.lib.e_sqlite3 | 2.0.0 | 2.1.0 | see below |
 
-**The floor can carry an advisory that the current version does not have.** NuGet audit reported `warning NU1903: Package 'SkiaSharp' 2.80.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-j7hp-h8jx-5ppr` for SkiaSharp 2.80.0 to 2.88.5, and nothing for 1.68.3 or 2.88.6. SkiaSharp.NativeAssets.Linux 2.88.6 also probes clean for linux-arm64 (GLIBC_2.17; no linux-musl-arm64). `probe` prints these warnings as `NOTE NuGet audit:` lines for the probed package itself, not for its dependencies (SkiaSharp.NativeAssets.Linux 2.80.0 printed none, SkiaSharp 2.80.0 printed the NU1903 above), so probe every package whose version changes. When the arm64 floor brings a new NU1901 to NU1904 warning, present the floor and the lowest version without the warning as one user decision (Phase 2.2); the skill does not fix advisories that the current version already has ([agent-scope-boundaries.md](agent-scope-boundaries.md)).
+**The floor can carry an advisory that the current version does not have.** NuGet audit reported `warning NU1903: Package 'SkiaSharp' 2.80.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-j7hp-h8jx-5ppr` for SkiaSharp 2.80.0 to 2.88.5, and nothing for 1.68.3 or 2.88.6. SkiaSharp.NativeAssets.Linux 2.88.6 also probes clean for linux-arm64 (GLIBC_2.17; no linux-musl-arm64). `probe` prints these warnings as `NOTE NuGet audit:` lines for the probed package and for its dependencies, each naming its package: its scratch project sets `NuGetAuditMode` to `all`, which NuGet applies by default only to projects that target `net10.0` or later. `probe SkiaSharp.NativeAssets.Linux 2.80.0` printed the NU1903 of its dependency SkiaSharp 2.80.0 above, with `--framework net8.0` and with `net10.0`. When the arm64 floor brings a new NU1901 to NU1904 warning, present the floor and the lowest version without the warning as one user decision (Phase 2.2); the skill does not fix advisories that the current version already has ([agent-scope-boundaries.md](agent-scope-boundaries.md)).
 
 Floors are not always monotonic. The arm64 glibc build of SQLitePCLRaw.lib.e_sqlite3, measured in all 24 stable releases, needs:
 - GLIBC_2.17 in 2.0.0 to 2.1.4, except 2.0.5, which needs GLIBC_2.28;
@@ -188,7 +190,7 @@ No linux-arm64 build in any stable release, so a substitute is a user decision:
 
   For EC2 hosts, run `ldd --version | head -n 1` (glibc) or check for `/lib/ld-musl-aarch64.so.1` on the instance.
 - **Natives can need more than .NET does.** SQLitePCLRaw.lib.e_sqlite3 2.1.12 needs GLIBC_2.34, Magick.NET-Q16-arm64 14.17.2 needs GLIBC_2.29, and SkiaSharp.NativeAssets.Linux 3.119.0 needs GLIBC_2.27. Pass the target's version with `--glibc`. Executed on the fixed fixture with `--glibc 2.26`: `needs GLIBC_2.34 (target glibc 2.26)` for libe_sqlite3.so. On AlmaLinux 8 (glibc 2.28, Graviton2), `assets` and `scan` with `--glibc 2.28` (run with the system Python 3.6.8) reported the same file, and the fixed tool then failed both SQLite checks with `TypeInitializationException: The type initializer for 'Microsoft.Data.Sqlite.SqliteConnection' threw an exception.`; the innermost exception was `DllNotFoundException: Unable to load shared library 'e_sqlite3'`, and `ldd` named the cause: ``/lib64/libc.so.6: version `GLIBC_2.33' not found``.
-- **Page size.** On kernels with 64KB pages, a library loads only if its LOAD segments are aligned to at least 64KB. The default aarch64 kernels of AlmaLinux 8 and Rocky Linux 8 use 64KB pages (AlmaLinux 8.10 on Graviton2 reported 65536); their 9 and 10 releases default to 4KB. Pass `--page-size 65536` for such targets. Every arm64 native resolved by the fixed fixture is aligned to `0x10000`. Executed on AlmaLinux 8.10 (Graviton2, 65536-byte pages): an aarch64 build of the fixture's library linked with `-Wl,-z,max-page-size=4096` failed with `DllNotFoundException` and `ELF load command alignment not page-aligned`, while the same file loaded on Graviton4 (4096-byte pages); `scan --page-size 65536` reported it on both hosts (`LOAD alignment 0x1000 is below the target page size 0x10000`).
+- **Page size.** On kernels with 64KB pages, glibc 2.34 and earlier refuse a library whose LOAD segments are aligned to less than the page size (`ELF load command alignment not page-aligned`); glibc 2.35 and later refuse one whose segment addresses and file offsets differ by other than a multiple of the page size (`ELF load command address/offset not page-aligned`), which a library linked for 4KB pages usually does. The default aarch64 kernels of AlmaLinux 8 and Rocky Linux 8 use 64KB pages (AlmaLinux 8.10 on Graviton2 reported 65536); their 9 and 10 releases default to 4KB. Pass `--page-size 65536` for such targets: it compares each LOAD alignment with the page size, the rule of glibc 2.34 and earlier; both 4KB-linked libraries tested break both rules. Every arm64 native resolved by the fixed fixture is aligned to `0x10000`. Executed on AlmaLinux 8.10 (Graviton2, 65536-byte pages, glibc 2.28): an aarch64 build of the fixture's library linked with `-Wl,-z,max-page-size=4096` failed with `DllNotFoundException` and `ELF load command alignment not page-aligned`, while the same file loaded on Graviton4 (4096-byte pages); `scan --page-size 65536` reported it on both hosts (`LOAD alignment 0x1000 is below the target page size 0x10000`).
 
 ## 7. Scanning Build and Publish Outputs
 
@@ -207,10 +209,12 @@ What `scan` reports:
 - every ELF file, which must be aarch64, with the target's libc and glibc version (`--target-rid`, `--glibc` and `--page-size` work as in §3);
 - managed assemblies, which must be `AnyCPU`, `arm64`, or ReadyToRun for linux-arm64; an assembly built for x64 or x86 is a finding;
 - a `.runtimeconfig.json` that needs `Microsoft.WindowsDesktop.App` (Windows Forms or WPF), which is a finding;
-- the `.deps.json`: its runtime target must be in the target's RID chain, and, for output built without a RID, every package that lists a native file for the source RID must list one for the target too;
+- the `.deps.json`: its runtime target must be in the target's RID chain, and, for output built without a RID, every package that lists a native file for the source RID must list one for the target too, or another package of its family must (the family rule of §3; `OK ... of the same family, provides it` for NetVips.Native.linux-x64 when NetVips.Native.linux-arm64 is in the same `.deps.json`);
 - a native built for the other C library is a `NOTE` when the `.deps.json` shows that the same package also ships a build for the target's C library in this output (the librdkafka.redist case in §3);
 - an x86-64 file is a `NOTE`, not a `FINDING`, when an aarch64 build of the same file name is in the same output: the application ships both and must load the right one, which Phase 3.3 confirms at startup (the fixed Linux solution ships `native/x64/libfastsum.so` and `native/arm64/libfastsum.so`);
 - files under `runtimes/` for RIDs outside the chain, native PE files and Mach-O files, which are ignored and counted.
+
+With more than one `--target-rid`, every check runs once per RID under a `== target <rid>` line, and `findings:` counts the findings of all of them: a glibc aarch64 library scanned with `--target-rid linux-arm64 --target-rid linux-musl-arm64`, in either order, gives one finding (`is a glibc build (target uses musl)`) and exit 1.
 
 A scan cannot see files that are missing. The fixture published with `-r linux-arm64` produced one finding, the vendored `native/x64/libfastsum.so`; the same output had no SkiaSharp, ONNX Runtime or SQLite.Interop library at all, and only the per-RID check (§3) reports those.
 
@@ -531,11 +535,12 @@ def load_packages(root):
     pkgs, graphs = {}, []
     for d, dirs, files in os.walk(root):
         dirs[:] = [x for x in dirs if x not in ("bin", ".git")]
-        if os.path.basename(d) != "obj" or "project.assets.json" not in files:
+        if "project.assets.json" not in files:
             continue
         a = json.load(open(os.path.join(d, "project.assets.json")))
         folders = list(a.get("packageFolders", {}))
-        proj = os.path.relpath(os.path.dirname(d), root)
+        pp = a.get("project", {}).get("restore", {}).get("projectPath", "")
+        proj = os.path.relpath(os.path.dirname(pp) if pp else os.path.dirname(d), root)
         for key, entries in a.get("targets", {}).items():
             rid = key.split("/", 1)[1] if "/" in key else ""
             for name, e in entries.items():
@@ -625,7 +630,11 @@ def report_assets(root, args):
         if c:
             print("  via " + c)
     if not pkgs:
-        print("no restored projects (obj/project.assets.json) found")
+        if graphs:
+            print("restored %d project(s); none of them resolves a NuGet package" % len(set(g[0] for g in graphs)))
+            return 1 if len(FINDINGS) > start else 0
+        print("restore passed, but it wrote no project.assets.json inside the scratch copy "
+              "(BaseIntermediateOutputPath or ArtifactsPath outside the repository?)")
         return 2
     used = lambda r: "; used by " + ", ".join(sorted(r["projects"]))
     groups = {}
@@ -750,6 +759,10 @@ def cmd_assets(args):
         work = os.path.join(tmp, "src")
         shutil.copytree(src, work, symlinks=True,
                         ignore=shutil.ignore_patterns("bin", "obj", ".git", ".vs", "node_modules", "graviton-validation"))
+        for d, dirs, files in os.walk(work):  # read only the assets files this restore writes
+            for f in files:
+                if f in ("project.assets.json", "project.nuget.cache"):
+                    os.remove(os.path.join(d, f))
         if not restore(work, [args.source_rid] + args.target_rid, args.timeout):
             return 2
         return report_assets(work, args)
@@ -764,7 +777,8 @@ def cmd_probe(args):
         os.makedirs(os.path.dirname(proj))
         with open(proj, "w") as f:
             f.write('<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <TargetFramework>%s</TargetFramework>\n'
-                    '    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>\n  </PropertyGroup>\n'
+                    '    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>\n'
+                    '    <NuGetAuditMode>all</NuGetAuditMode>\n  </PropertyGroup>\n'
                     '  <ItemGroup>\n    <PackageReference Include="%s" Version="[%s]" />\n  </ItemGroup>\n</Project>\n'
                     % (args.framework, args.id, args.version))
         if not restore(tmp, [args.source_rid] + args.target_rid, args.timeout):
@@ -798,11 +812,21 @@ def deps_check(path, rel, chain, source):
     if rid and rid not in chain:
         finding("%s was built for %s" % (rel, rid))
     for libs in d.get("targets", {}).values():
+        def native_rids(e):
+            return set(v.get("rid") for v in e.get("runtimeTargets", {}).values() if v.get("assetType") == "native")
+        family = {}  # family name -> [(package, RIDs with a native)]
         for lib, e in libs.items():
-            rids = set(v.get("rid") for v in e.get("runtimeTargets", {}).values() if v.get("assetType") == "native")
+            family.setdefault(base_name(lib.split("/")[0]).lower(), []).append((lib, native_rids(e)))
+        for lib, e in libs.items():
+            rids = native_rids(e)
             if source in rids and not rids & set(chain):
-                finding("%s lists a %s native for %s but none for %s (RIDs: %s)" % (
-                    rel, source, lib, chain[0], ", ".join(sorted(rids))))
+                sib = [x for x, r in family.get(base_name(lib.split("/")[0]).lower(), []) if r & set(chain)]
+                if sib:
+                    print("OK %s: %s has no %s native of its own; %s, of the same family, provides it" % (
+                        rel, lib, chain[0], sib[0]))
+                else:
+                    finding("%s lists a %s native for %s but none for %s (RIDs: %s)" % (
+                        rel, source, lib, chain[0], ", ".join(sorted(rids))))
 
 
 def deps_owners(root):
@@ -831,7 +855,16 @@ def cmd_scan(args):
     if not os.path.isdir(root):
         print("ERROR: %s is not a folder" % args.dir)
         return 2
-    target = args.target_rid[0]
+    for target in args.target_rid:
+        if len(args.target_rid) > 1:
+            print("== target %s" % target)
+        scan_one(root, args, target)
+    print("findings: %d" % len(FINDINGS))
+    return 1 if FINDINGS else 0
+
+
+def scan_one(root, args, target):
+    """Every check of scan for one target RID."""
     chain = RID_CHAIN.get(target, [target, "linux", "unix", "any"])
     want = "musl" if "musl" in target else "glibc"
     owners = deps_owners(root)
@@ -920,8 +953,6 @@ def cmd_scan(args):
     print("files by kind: " + (", ".join("%s %d" % kv for kv in sorted(counts.items())) or "none"))
     if ignored or other_rid:
         print("not loaded on %s, ignored: %d native PE or Mach-O, %d under runtimes/ for other RIDs" % (target, ignored, other_rid))
-    print("findings: %d" % len(FINDINGS))
-    return 1 if FINDINGS else 0
 
 
 def main():

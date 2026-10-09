@@ -209,7 +209,7 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 ## Target Framework Decision
 | Project | Current | Reason a change is needed | Options (support dates, glibc) | Decision |
 |---|---|---|---|---|
-| src/Fixture.Lambda | netcoreapp3.1, Lambda dotnetcore3.1 | updates blocked since May 3, 2023 | net8.0 / dotnet8 (until Nov 10, 2026); net10.0 / dotnet10 (until Nov 14, 2028) | approved net8.0 |
+| src/Fixture.Lambda | netcoreapp3.1, Lambda dotnetcore3.1 | updates blocked since May 3, 2023 | net8.0 / dotnet8 (until Nov 10, 2026); net10.0 / dotnet10 (until Nov 14, 2028) | approved net10.0 (with the SDK pin in `global.json` moved to 10.0.100) |
 ```
 
 ### `04-code-scan-findings.md` — Architecture-Specific Code Detection

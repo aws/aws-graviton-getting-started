@@ -24,12 +24,12 @@ grep -rlE --include='*.props' --include='*.targets' --include='*.csproj' --inclu
 | `global.json` | SDK selection | which SDK runs restore and build (§2.7) |
 | `dotnet-tools.json` | local tools | tool versions, run on the build host (§2.8). SDK 8.0.425 wrote it to `.config/`, SDK 10.0.401 to the current folder |
 
-To read which version restore actually resolved for a package, after a restore of the project:
+To read which version restore actually resolved for a package, after a restore of the project (MSBuild's `ProjectAssetsFile` property gives the assets file in every layout: `obj/`, `artifacts/obj/<project>/`, a custom `BaseIntermediateOutputPath`):
 
 ```bash
-PROJECT_DIR=src/Fixture.Core          # the project folder
-PACKAGE=SkiaSharp.NativeAssets.Linux  # the package
-python3 - "$PROJECT_DIR/obj/project.assets.json" "$PACKAGE" <<'EOF'
+PROJECT=src/Fixture.Core/Fixture.Core.csproj   # the project file
+PACKAGE=SkiaSharp.NativeAssets.Linux           # the package
+python3 - "$(dotnet msbuild "$PROJECT" -getProperty:ProjectAssetsFile)" "$PACKAGE" <<'EOF'
 import json, sys
 a = json.load(open(sys.argv[1]))
 for target, entries in sorted(a["targets"].items()):

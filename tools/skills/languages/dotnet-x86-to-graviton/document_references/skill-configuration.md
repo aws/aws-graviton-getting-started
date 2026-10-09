@@ -37,7 +37,9 @@ Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`) th
    (the default), the agent presents the reason, the options with their support dates and glibc
    needs, and waits; with `approved=<tfm>`, it applies that framework and records it in
    `01-project-assessment.md` and `00-summary.md`; with `never`, it documents the change as a
-   blocker and applies nothing. No value permits a change for any other reason (end of support,
+   blocker and applies nothing. When the repository's `global.json` pins an SDK that cannot
+   target the approved framework (`NETSDK1045`), moving the pin is part of the same approval.
+   No value permits a change for any other reason (end of support,
    performance, "newer is better").
 5. **Registry/mirror redirects preserve substance.** A `container.base_image_registry`
    override changes only WHERE an image is pulled from; it must keep the same base-image
