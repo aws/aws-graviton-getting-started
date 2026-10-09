@@ -1,0 +1,8 @@
+# Build artifacts
+pricer
+pricer-strict
+__pycache__/
+
+# Local run output: reports and raw price dumps are large and regenerable.
+*.bin
+results/run-*/
