@@ -95,19 +95,19 @@ Then scan every resolved JAR — the materialized deps plus any built fat JAR un
 
 ```bash
 #!/usr/bin/env bash
-scan_archive() {  # $1 = path to a .jar/.war/.ear on disk
-  local archive="$1" d; d=$(mktemp -d)
+scan_archive() {  # $1 = path to a .jar/.war/.ear on disk; $2 = label for nested archives
+  local archive="$1" label="${2:-$1}" d; d=$(mktemp -d)
   unzip -q -o "$archive" -d "$d" 2>/dev/null
-  # Native libs bundled directly (any platform extension)
-  find "$d" \( -name "*.so" -o -name "*.dll" -o -name "*.dylib" -o -name "*.jnilib" \) -print0 |
-    while IFS= read -r -d '' lib; do
-      echo "  [native] $archive -> ${lib#"$d"/}"
-      case "$lib" in *.so) file "$lib" | sed 's/^/           /';; esac
-    done
+  # Native code of any platform: every file that `file` reports as ELF, Mach-O or PE32, whatever
+  # its name (Selenium Manager has no extension; protoc-jar's Linux protoc is a .exe), plus every
+  # file named like a native library. One line per file: archive, path inside it, `file` output.
+  find "$d" -type f ! -name "*.class" -exec file {} + 2>/dev/null |
+    grep -E ':[[:space:]]+(ELF|Mach-O|PE32)|\.(so|dll|dylib|jnilib)(\.[0-9]+)*:' | sed 's/, BuildID.*//' |
+    while IFS= read -r line; do printf '%s\n' "  [native] $label -> ${line#"$d"/}"; done
   # Recurse into nested archives (Spring Boot BOOT-INF/lib jars, WAR WEB-INF/lib jars,
   # EAR-of-WAR, shaded jars). Match .jar AND .war so an EAR bundling a WAR is fully walked.
   find "$d" \( -name "*.jar" -o -name "*.war" \) -print0 |
-    while IFS= read -r -d '' nested; do scan_archive "$nested"; done
+    while IFS= read -r -d '' nested; do scan_archive "$nested" "$label"'!'"${nested#"$d"/}"; done
   rm -rf "$d"
 }
 
@@ -125,7 +125,7 @@ find . \( -name "*.jar" -o -name "*.war" -o -name "*.ear" \) -print0 2>/dev/null
 
 If a dependency could not be materialized (offline/blocked `copy-dependencies`), fall back to scanning its JAR directly in the cache: `find "$HOME/.m2/repository" "$HOME/.gradle/caches" -name '<artifact>-*.jar' -print0 | while IFS= read -r -d '' jar; do scan_archive "$jar"; done` for the specific coordinates from the dependency tree — rather than sweeping the entire cache.
 
-Any line whose `file` output says `ELF ... ARM aarch64` is ARM64-ready; a `.so` that is only `x86-64` (with no aarch64 sibling in the same JAR) is a blocker. Match `.so` paths for both `x86_64`/`amd64` and `aarch64`/`arm64` directories to decide multi-arch vs single-arch.
+Any line whose `file` output says `ELF ... ARM aarch64` is ARM64-ready unless it names another system (JNA's `freebsd-aarch64/libjnidispatch.so` says `ARM aarch64` and `for FreeBSD`); a native file that is only `x86-64` (with no `ARM aarch64` build of the same library in the same JAR) is a blocker. Decide from the `file` output, not from the path: folder names do not always state the architecture (lazysodium-java keeps its x86-64, 32-bit x86 and 32-bit Arm builds of libsodium in `linux64/`, `linux/` and `armv6/`), and `ELF 32-bit ... ARM, EABI5` is a 32-bit Arm build that a 64-bit JVM cannot load (`wrong ELF class: ELFCLASS32`). Only `ELF` files built for Linux load on Linux: `Mach-O` lines are macOS code, `PE32` lines are Windows code, and `ELF` lines that name another system, such as `for FreeBSD`, `for OpenBSD` or `(Solaris)`, are builds for that system. Files that are none of these and are not named `.so`, `.dll`, `.dylib` or `.jnilib` are not listed, such as JNA's AIX builds (`aix-ppc64/libjnidispatch.a`, which `file` reports as `64-bit XCOFF executable or object module`).
 
 **Fat/Uber JAR types:** Spring Boot fat JARs nest native libs in `BOOT-INF/lib/*.jar`; WARs in `WEB-INF/lib/*.jar`; Maven Shade / Gradle Shadow flatten them into one JAR. The recursive `scan_archive` above covers all of these — the earlier version only unzipped one level and missed nested JARs.
 
@@ -156,6 +156,8 @@ grep -rnE "netty-transport-native|netty-tcnative|io\.grpc.*netty|conscrypt|jnr-f
 - **SQLite JDBC** (`sqlite-jdbc`): Bundles and extracts native SQLite
 - **LZ4/Zstd/Snappy** (`lz4-java`, `zstd-jni`, `snappy-java`): Native compression accelerators
 - **LevelDB** (`leveldbjni`): Native key-value store bindings
+- **JNA-based bindings** (`Native.load`, for example `lazysodium-java`): JNA's own `libjnidispatch.so` is not enough; the library the binding bundles needs an `ARM aarch64` build too. lazysodium-java 5.1.1 bundles no aarch64 libsodium, and on an arm64 JVM it loads its 32-bit Arm build and fails with `wrong ELF class: ELFCLASS32`; 5.1.4 adds `arm64/libsodium.so` and loads
+- **Executables in JARs** (no `.so` name): `org.seleniumhq.selenium:selenium-manager` 4.6.0 to 4.48.0, a dependency of `selenium-remote-driver`, carries one Linux build, `org/openqa/selenium/manager/linux/selenium-manager`, an x86-64 executable (4.49.0 adds `linux-arm64/`); `com.github.os72:protoc-jar` 3.11.4, its latest release, carries no aarch64 build, and its Linux protoc executables are x86-64 files named `*.exe`
 
 **Do not rely on the named list alone.** The authoritative signal is the §1.2.1 content scan: any resolved JAR that contains a `.so`/`.dll`/`.dylib`/`.jnilib` extracts or loads native code and must be checked for an `aarch64` binary — whether or not its name appears above. The grep is only a fast-path hint; the content scan is what actually determines the finding.
 
@@ -170,7 +172,7 @@ For each native-bearing JAR found: check whether it includes a `linux/aarch64` b
 - Multi-arch JAR with both x86 and ARM64, OR pure Java fallback exists, OR source available for recompilation
 
 **PASS if:**
-- .so shows "ARM aarch64" OR JAR contains .so in both `/linux/amd64/` and `/linux/aarch64/`
+- .so shows "ARM aarch64" OR the JAR contains both an x86-64 and an `ARM aarch64` build of the library, each confirmed by `file` (a folder name such as `/linux/aarch64/` is not evidence)
 
 For x86-only .so files: check for source in repo, document recompilation needs, or prompt user. Validate with:
 ```bash
@@ -221,7 +223,7 @@ Minimum ARM64 Version: 1.1.2.2
 Resolution: dependencyManagement override or exclusion+re-add
 ```
 
-> ⚠️ **Verify the JAR, never the version number.** Do not infer "old version → missing ARM64 binary." Confirm by inspecting the *resolved* artifact: `unzip -l <jar> | grep -i aarch64`, then `file` the extracted `.so` to confirm `ARM aarch64`. Counter-examples that look old but are already fine on Graviton: **JNA 5.6.0** ships `linux-aarch64/libjnidispatch.so` (COMPATIBLE — 5.8.0 only adds macOS/Windows ARM), and **snappy-java 1.1.2.2** (2016) already ships `Linux/aarch64/libsnappyjava.so` — about fifteen releases below the 1.1.4 usually assumed to be the floor. Only versions whose JAR genuinely lacks the `linux/aarch64` binary are MUST UPGRADE.
+> ⚠️ **Verify the JAR, never the version number.** Do not infer "old version → missing ARM64 binary." Confirm by inspecting the *resolved* artifact: run `scan_archive <jar>` from §1.2.1 and look for an `ARM aarch64` line (a path search such as `unzip -l <jar> | grep -i aarch64` misses builds stored under names such as `arm64/`). Counter-examples that look old but are already fine on Graviton: **JNA 5.6.0** ships `linux-aarch64/libjnidispatch.so` (COMPATIBLE; later releases only add Windows ARM and Apple Silicon builds, both in 5.7.0, the Apple Silicon one as an aarch64 slice of the universal `darwin/libjnidispatch.jnilib` before the separate `darwin-aarch64/` folder of 5.8.0), and **snappy-java 1.1.2.2** (2016) already ships `Linux/aarch64/libsnappyjava.so`, about fifteen releases below the 1.1.4 usually assumed to be the floor. Only versions whose JAR genuinely lacks the `linux/aarch64` binary are MUST UPGRADE.
 >
 > Also make a **missing** artifact fail loudly: `curl` without `--fail` saves the 404 body, and `unzip -l | grep aarch64` on that non-archive returns empty — identical to a genuine "no aarch64 binary" result, i.e. a false MUST UPGRADE. Fetch with `curl -sSL --fail` (check the exit status) or run `unzip -t` first, and confirm the version is actually listed in `maven-metadata.xml` before trusting any grep output.
 
