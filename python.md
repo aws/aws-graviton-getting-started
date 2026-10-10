@@ -5,7 +5,7 @@ Python is an interpreted, high-level, general-purpose programming language, with
 ## 1. Installing Python packages
 
 When *pip* (the standard package installer for Python) is used, it pulls the packages from [Python Package Index](https://pypi.org) and other indexes. To ensure you
-can install binary packages from [Python Package Index](https://pypi.org), make sure to update your pip installation to a new enough version \(>19.3\).
+can install binary packages from [Python Package Index](https://pypi.org), make sure to update your pip installation to version 20.3 or later. pip 19.3 added the `manylinux2014` tag, the first manylinux tag for aarch64, and pip 20.3 added the `manylinux_x_y` tags (PEP 600) that newer wheels use, such as `manylinux_2_28`.
 
 ```
 # To ensure an up-to-date pip version
@@ -59,9 +59,14 @@ For some packages, it is still possible to use the default Python by using the d
 from the package manager. For example `numpy` no longer publishes Python 3.6 wheels,
 but can be installed from the package manager: `yum install python3-numpy`.
 
-Another option is to use Python 3.8 instead of the default Python pacakge. You can
-install Python 3.8 and pip: `yum install python38-pip`. Then use pip to install
-the latest versions of packages: `pip3 install numpy`.  On AL2, you will need to use `amazon-linux-extras enable python3.8` to expose Python 3.8 packages.
+Another option is to use a newer Python than the default. On RHEL 8.10, you can
+install Python 3.12 and its pip: `yum install python3.12 python3.12-pip`. Then use
+that pip to install the latest versions of packages: `python3.12 -m pip install numpy`.
+Python 3.8 and 3.9 are also available on RHEL 8, but their pip packages are older
+than 20.3, so they do not install wheels tagged `manylinux_2_28`. On AL2,
+`amazon-linux-extras enable python3.8` exposes Python 3.8 packages. Python 3.8's pip
+(21.0.1) supports the `manylinux_x_y` tags, but AL2's glibc 2.26 is too old for wheels
+tagged `manylinux_2_28`.
 
 Some common Python packages that are distributed by the package manager are:
 1. python3-numpy
