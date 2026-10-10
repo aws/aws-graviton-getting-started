@@ -31,7 +31,7 @@ Since version 5, .NET has added specific Arm64 optimizations in both the .NET li
 
 
 ## Building & Publishing for Linux Arm64
-The .NET SDK supports choosing a [Runtime Identifier (RID)](https://learn.microsoft.com/en-us/dotnet/core/rid-catalog) used to target platforms where the applications run. These RIDs are used by .NET dependencies (NuGet packages) to represent platform-specific resources in NuGet packages. The following values are examples of RIDs: linux-arm64, linux-x64, linux-musl-arm64, win-x64, or osx-arm64. For the NuGet packages with native dependencies, the RID designates on which platforms the package can be restored. Starting with .NET 8, the SDK and runtime by default consider only RIDs that are not specific to an OS version or distribution, such as the ones above. As a result, passing a version-specific RID such as `ubuntu.14.04-x64` or `win7-x64` to `-r` fails with error NETSDK1083, and assets that packages ship for such RIDs are not found at run time. A .NET build made by a Linux distribution can also find assets for that distribution's own RID, such as `ubuntu.24.04-arm64` for the .NET packages in Ubuntu 24.04 (see [Host determines RID-specific assets](https://learn.microsoft.com/en-us/dotnet/core/compatibility/deployment/8.0/rid-asset-list)).
+The .NET SDK supports choosing a [Runtime Identifier (RID)](https://learn.microsoft.com/en-us/dotnet/core/rid-catalog) used to target platforms where the applications run. These RIDs are used by .NET dependencies (NuGet packages) to represent platform-specific resources in NuGet packages. The following values are examples of RIDs: linux-arm64, linux-x64, linux-musl-arm64, win-x64, or osx-arm64. For the NuGet packages with native dependencies, the RID designates on which platforms the package can be restored. For projects that target .NET 8 or later, the SDK by default considers only RIDs that are not specific to an OS version or distribution, such as the ones above, so passing a version-specific RID such as `ubuntu.14.04-x64` or `win7-x64` to `-r` when building an app fails with error NETSDK1083. Projects that target .NET 6 or 7 still accept such RIDs. From .NET 8, the runtime by default looks only for assets built for portable RIDs, so assets that packages ship for version-specific RIDs are not found at run time. A .NET build made by a Linux distribution can also find assets for that distribution's own RID, such as `ubuntu.24.04-arm64` for the .NET packages in Ubuntu 24.04 (see [Host determines RID-specific assets](https://learn.microsoft.com/en-us/dotnet/core/compatibility/deployment/8.0/rid-asset-list)).
 
 You can build and publish on any host operating system. As an example, you can develop on Windows and build locally to target Arm64, or you can use a CI server like Jenkins on Linux. The commands are the same.
 
@@ -40,7 +40,7 @@ dotnet build -r linux-arm64
 dotnet publish -c Release -r linux-arm64
 ```
 
-For more information about [publishing .NET apps with the .NET CLI](https://docs.microsoft.com/en-us/dotnet/core/deploying/deploy-with-cli) please see the offical documents.
+For more information about [publishing .NET apps with the .NET CLI](https://learn.microsoft.com/en-us/dotnet/core/deploying/) please see the official documents.
 
 ## Agent Skills for .NET Migration
 
