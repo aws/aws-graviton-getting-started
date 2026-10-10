@@ -25,6 +25,7 @@ Both files contain the same instructions — only the frontmatter differs. Your 
 |-------|----------|--------|-------------|
 | [java-x86-to-graviton](languages/java-x86-to-graviton/) | Java | Stable | Full x86-to-Graviton migration: dependency audit, native library validation, JVM optimization, ARM64 build validation |
 | [python-x86-to-graviton](languages/python-x86-to-graviton/) | Python | Beta | Full x86-to-Graviton migration: aarch64 wheel verification for every pinned dependency (including transitives), native extension and vendored binary validation, runtime recommendations, ARM64 install and test validation |
+| [dotnet-x86-to-graviton](languages/dotnet-x86-to-graviton/) | .NET | Beta | Full x86-to-Graviton migration: per-RID native file verification for every resolved NuGet package (including transitives), committed native file and Windows-only API validation, the move to Linux for Windows and .NET Framework starting points, runtime recommendations, ARM64 build, publish and test validation |
 
 ## How to Install
 
@@ -37,6 +38,7 @@ Open the **Agent Steering & Skills** panel, click **+** > **Import a skill** > *
 ```
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/java-x86-to-graviton
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/python-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/dotnet-x86-to-graviton
 ```
 
 ### Cursor
@@ -46,12 +48,13 @@ Open **Settings** (`Cmd+Shift+J` / `Ctrl+Shift+J`) > **Rules** > **Add Rule** > 
 ```
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/java-x86-to-graviton
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/python-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/dotnet-x86-to-graviton
 ```
 
 ### Claude Code
 
 ```bash
-SKILL=java-x86-to-graviton   # or python-x86-to-graviton
+SKILL=java-x86-to-graviton   # or python-x86-to-graviton, dotnet-x86-to-graviton
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
   mkdir -p ~/.claude/skills && \
@@ -62,7 +65,7 @@ git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-gettin
 ### GitHub Copilot / VS Code
 
 ```bash
-SKILL=java-x86-to-graviton   # or python-x86-to-graviton
+SKILL=java-x86-to-graviton   # or python-x86-to-graviton, dotnet-x86-to-graviton
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
   mkdir -p .github/skills && \
@@ -73,7 +76,7 @@ git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-gettin
 ### OpenAI Codex
 
 ```bash
-SKILL=java-x86-to-graviton   # or python-x86-to-graviton
+SKILL=java-x86-to-graviton   # or python-x86-to-graviton, dotnet-x86-to-graviton
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
   mkdir -p ~/.codex/skills && \
@@ -84,7 +87,7 @@ git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-gettin
 ### Windsurf
 
 ```bash
-SKILL=java-x86-to-graviton   # or python-x86-to-graviton
+SKILL=java-x86-to-graviton   # or python-x86-to-graviton, dotnet-x86-to-graviton
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
   mkdir -p .windsurf/skills && \
@@ -95,7 +98,7 @@ git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-gettin
 ### Gemini CLI
 
 ```bash
-SKILL=java-x86-to-graviton   # or python-x86-to-graviton
+SKILL=java-x86-to-graviton   # or python-x86-to-graviton, dotnet-x86-to-graviton
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
   mkdir -p ~/.gemini/skills && \
@@ -106,7 +109,7 @@ git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-gettin
 ### Roo Code
 
 ```bash
-SKILL=java-x86-to-graviton   # or python-x86-to-graviton
+SKILL=java-x86-to-graviton   # or python-x86-to-graviton, dotnet-x86-to-graviton
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
   mkdir -p .roo/skills && \
@@ -117,7 +120,7 @@ git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-gettin
 ### Goose
 
 ```bash
-SKILL=java-x86-to-graviton   # or python-x86-to-graviton
+SKILL=java-x86-to-graviton   # or python-x86-to-graviton, dotnet-x86-to-graviton
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
   mkdir -p ~/.config/goose/skills && \
@@ -130,7 +133,7 @@ git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-gettin
 Copy the skill folder into the cross-platform standard path:
 
 ```bash
-SKILL=java-x86-to-graviton   # or python-x86-to-graviton
+SKILL=java-x86-to-graviton   # or python-x86-to-graviton, dotnet-x86-to-graviton
 git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
   git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
   mkdir -p .agents/skills && \
