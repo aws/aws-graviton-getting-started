@@ -146,7 +146,7 @@ For Ubuntu 20.04, we recommend using the PostgreSQL PPA instead of the packages 
 Please follow [the instructions to set up the PostgreSQL PPA.](https://www.postgresql.org/download/linux/ubuntu/)
 
 ## Python installation on some Linux distros
-The default installation of pip on some Linux distributions is old \(<19.3\) to install binary wheel packages released for Graviton.  To work around this, it is recommended to upgrade your pip installation using:
+The default installation of pip on some Linux distributions is too old \(<20.3\) to install all binary wheel packages released for Graviton.  To work around this, it is recommended to upgrade your pip installation using:
 ```
 sudo python3 -m pip install --upgrade pip
 ```
