@@ -4,7 +4,7 @@ Build and test on ARM64 architecture. Supported platforms: Linux, macOS, WSL.
 
 ## Container Runtime Detection
 
-Before skipping build validation, check for local container runtimes. Apple Silicon Macs run ARM64 containers natively via Docker or Finch, making full ARM64 validation possible without a remote Graviton instance.
+Before skipping build validation, check for local container runtimes. A `linux/arm64` container runs natively on a Graviton host, under QEMU emulation on an x86 Linux host, and in a Linux VM on an Apple Silicon Mac's own cores. Only a run on Graviton passes a check ("Match the production hosts" below).
 
 > **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below — but only after verifying it is installed; if the pinned runtime is not present, fall back to the auto-detection cascade. If `container.runtime` is absent, auto-detect as below. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
@@ -35,12 +35,14 @@ echo "Host architecture: $ARCH"
 **Decision logic:**
 - **ARM64 host (aarch64/arm64) + container runtime:** Build and validate in containers using `$CONTAINER_CMD`. This is the ideal path.
 - **ARM64 host (aarch64/arm64) + no container runtime:** Build and validate directly on host.
-- **x86 host + container runtime with ARM64 support:** Use `--platform linux/arm64` to build and validate. Docker Desktop and Finch on Apple Silicon support this natively. On x86 Linux, `docker buildx` with QEMU emulation may work but is slower.
-- **x86 host + no container runtime:** Static analysis only. Document that ARM64 build validation requires an ARM64 environment and recommend the user run validation on a Graviton instance or ARM64 Mac.
+- **x86 host + container runtime with ARM64 support:** Use `--platform linux/arm64` to build and find failures early. On x86 Linux this runs under QEMU emulation, which is slower.
+- **x86 host + no container runtime:** Static analysis only. Document that ARM64 build validation needs a Graviton host or the target, and recommend one.
 
-**Do NOT skip build validation if a container runtime is available.** Even on macOS, if Docker or Finch is installed, attempt the ARM64 container build. Only recommend external validation as a last resort when no container runtime is found.
+**Do NOT skip the ARM64 container build if a container runtime is available.** Even on macOS, if Docker or Finch is installed, attempt it: it finds failures early. A pass there counts only after a run on Graviton (below).
 
-Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands (e.g., `$CONTAINER_CMD build`, `$CONTAINER_CMD run`).
+**Match the production hosts.** A Phase 3 check passes only on a Graviton host with the production OS and page size, or on the target itself, such as the arm64 Lambda function. A `linux/arm64` run under emulation or on another arm64 machine finds failures early, but its CPU and kernel differ from Graviton's: QEMU on the x86 host used to validate this skill reported SVE with 512-bit vectors and SME, while Graviton2 has no SVE, Graviton3 has 256-bit SVE, Graviton4 and Graviton5 have 128-bit SVE and SVE2, and none has SME (measured on each; [processor table](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#building-for-graviton)); Apple's M1 to M3 cores have no SVE, and the M4 has SME without SVE ([LLVM's processor definitions](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/AArch64/AArch64Processors.td)); and a container uses its host's kernel, so a host whose page size is smaller than production's (an x86 host has 4KB pages; on a Mac, run `getconf PAGESIZE` in its VM) does not show the failures of 64KB pages. When the project ships native code it builds, run its tests on the oldest Graviton generation it deploys to: a newer generation does not show `Illegal instruction`. Record where each check ran in `06-build-test-results.md`.
+
+Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands (e.g., `$CONTAINER_CMD build`, `$CONTAINER_CMD run`). `CONTAINER_CMD` exists only in the shell that set it: if each command runs in a new shell, start a later block with `CONTAINER_CMD=<the detected runtime>`.
 
 ## 3.0 Build Environment Preparation
 
@@ -255,10 +257,10 @@ Classify all failures (INFRA/ARM64/PRE-EXISTING). Test architecture-specific fun
 
 Verify:
 1. Application starts without errors
-2. JVM flags accepted without errors
+2. The project's existing JVM options (start scripts, Dockerfile, `JAVA_TOOL_OPTIONS`) accepted without errors; an x86-only option such as `-XX:UseAVX=2` stops the JVM on ARM64 with `Unrecognized VM option`
 3. No immediate runtime crashes
 
-> **macOS-host false FAIL.** When running host-based startup/tests on an Apple-Silicon Mac (`os.name=Mac, os.arch=aarch64`), a runtime-extracting native lib may load its `Linux/aarch64` binary fine on Graviton yet throw on macOS because the resolved JAR has no *Mac*/aarch64 binary (e.g. snappy-java added `Mac/aarch64/libsnappyjava.dylib` only in 1.1.8.2; the minimal Graviton floor 1.1.2.2 has `Linux/aarch64` but not Mac). A native-load failure on the macOS host is a **host-dev artifact, not a Graviton verdict** when the JAR contains a verified `Linux/aarch64` binary (per §1.2.1) — confirm on a `linux/arm64` container, which is authoritative, rather than marking the migration FAILED. Same principle as the JNA darwin-aarch64 case in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md).
+> **macOS-host false FAIL.** When running host-based startup/tests on an Apple-Silicon Mac (`os.name=Mac, os.arch=aarch64`), a runtime-extracting native lib may load its `Linux/aarch64` binary fine on Graviton yet throw on macOS because the resolved JAR has no *Mac*/aarch64 binary (e.g. snappy-java added `Mac/aarch64/libsnappyjava.dylib` only in 1.1.8.2; the minimal Graviton floor 1.1.2.2 has `Linux/aarch64` but not Mac). A native-load failure on the macOS host is a **host-dev artifact, not a Graviton verdict** when the JAR contains a verified `Linux/aarch64` binary (per §1.2.1); check in a `linux/arm64` container instead, and settle the check on a Graviton host ("Match the production hosts"), rather than marking the migration FAILED. Same principle as the JNA darwin-aarch64 case in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md).
 
 Recommend to user for independent testing: performance benchmarking, load testing, resource utilization measurement.
 

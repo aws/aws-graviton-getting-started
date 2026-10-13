@@ -39,6 +39,7 @@ Is this dependency update required for ARM64 compatibility?
 
 RESULT:
 - If no ARM64-specific issue found → Mark COMPATIBLE, do NOT upgrade
+- If the evidence does not decide either way → Mark CHECK, do NOT upgrade; settle it in Phase 3
 - If ARM64-specific issue found → Document evidence and upgrade
 ```
 
@@ -86,8 +87,10 @@ A successful `dotnet publish -r linux-arm64` answers none of these questions: it
 ### 6. Deployment Configuration
 - ✅ Dockerfiles that pin `--platform=linux/amd64` or publish with `-r linux-x64`, and Windows container images (Phase 2.4)
 - ✅ Lambda functions where the project ships the template or `aws-lambda-tools-defaults.json` (architecture `arm64`, and a supported runtime when the current one blocks updates)
-- ✅ Kubernetes node selection only when the project already ships manifests, and only the node-selection, registry and ingress lines
+- ✅ Kubernetes node selection only when the project already ships manifests, and only the node-selection, registry and ingress lines (an arm64 selector only together with arm64 capacity, phase2 §2.4)
 - ✅ Deployment and install scripts that gate on `uname -m` or download x86_64 assets
+- ✅ ECS `cpuArchitecture`, EKS node groups and instance types in files the project ships, only together with arm64 capacity; an instance type gets the same family and size in the newest Graviton generation the region offers, recorded as a user decision (phase2 §2.4)
+- ✅ CI changes that only add or switch an architecture, in pipelines the project ships (phase2 §2.4), unless `ci.changes` is `recommend`
 - ✅ AWS SDK for .NET versions without IMDSv2 support, when a target requires IMDSv2 (AWSSDK.Core before 3.3.103.66; Amazon Linux 2023 AMIs require IMDSv2 by default)
 
 ### 7. The Move to Linux (Windows and .NET Framework Starting Points)
@@ -127,7 +130,7 @@ A successful `dotnet publish -r linux-arm64` answers none of these questions: it
 - ❌ Moving to or from central package management, lock files or Paket ([package-management-mapping.md](package-management-mapping.md))
 - ❌ Base image distribution or version changes (Debian to Alpine, `aspnet:8.0` to `aspnet:10.0`): they change the C library and its version at once. The exception is a target whose glibc is too old for a required native, which the skill documents as a user decision
 - ❌ Web server, hosting model or logging framework changes beyond what Linux requires (keeping `UseIIS()` is harmless on Linux; removing it is out of scope)
-- ❌ `.gitignore`, `.dockerignore` or CI pipeline edits: phrased as a recommendation only (SKILL.md "User Responsibility")
+- ❌ `.gitignore` or `.dockerignore` edits, and CI changes beyond architecture: phrased as a recommendation only (SKILL.md "User Responsibility")
 
 ## 🔍 Decision Tree: Should I Update This Dependency?
 
@@ -354,7 +357,7 @@ Do not extend the list from memory. A package is managed only when the per-RID c
 - "Is there concrete evidence this current version breaks on ARM64?"
 - "Am I updating this because it's old, or because ARM64 requires it?"
 
-**If unsure:** Mark as COMPATIBLE and document reasoning. It's better to under-fix than to introduce unnecessary scope creep.
+**If unsure:** Mark it CHECK, not COMPATIBLE, and change nothing. Name the evidence that would settle it and collect it in Phase 3 on ARM64; until then it stays CHECK. It's better to under-fix than to introduce unnecessary scope creep.
 
 ---
 

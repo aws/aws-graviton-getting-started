@@ -30,8 +30,8 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 1. **Create `graviton-validation/` and `graviton-validation/raw/` first.** `mkdir -p graviton-validation/raw` is the first action of Phase 1.
 2. **Use exactly these filenames.** Do not rename, renumber or add top-level files. Additional machine output goes under `raw/` with a descriptive name.
 3. **Write progressively.** Each phase step writes its section as it completes; do not batch everything at the end.
-4. **Every verdict cites its evidence and says where it was established.** A dependency row without a probe command and a wheel filename (or a `from versions:` list, or a PyPI files-list observation) is incomplete. The "validated by" and "evidence" columns below are mandatory. The `Established` column says where the verdict comes from: `predicted` (read from files or the index, on any host, as everything in Phase 1 is), `emulated` (observed in a `linux/arm64` environment under emulation), `native arm64` (observed on an arm64 host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict. A `predicted` finding stays a finding when an observation passes, because a fallback can hide it in one setup (the loaded check in Phase 3.2).
-5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce (a CHECK line of the Phase 1.3 loop), is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the label each option leads to.
+4. **Every verdict cites its evidence and says where it was established.** A dependency row without a probe command and a wheel filename (or a `from versions:` list, or a PyPI files-list observation) is incomplete. The "validated by" and "evidence" columns below are mandatory. The `Established` column says where the verdict comes from: `predicted` (read from files or the index, on any host, as everything in Phase 1 is), `emulated` (observed in a `linux/arm64` environment under emulation), `other arm64` (observed on arm64 hardware that is not Graviton, such as an Apple Silicon Mac), `graviton` (observed on a Graviton host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict; only `graviton` and `target` observations pass a check or settle a CHECK. A `predicted` finding stays a finding when an observation passes, because a fallback can hide it in one setup (the loaded check in Phase 3.2).
+5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce (a CHECK line of the Phase 1.3 loop), is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the label each option leads to and the recommended option, the smallest change the evidence supports (an unattended run applies it and says how to reverse it), and the rest under CHECK Items with the step that settles each.
 6. **Empty sections stay, with "No findings".** Omitting a section is ambiguous (not checked, or nothing found?). Write the heading and an explicit statement.
 7. **`00-summary.md` is written last** and references the detail files rather than repeating them.
 8. **Nothing outside `graviton-validation/`.** No other documentation files are created by the transformation.
@@ -70,7 +70,7 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 | 10 | Python version unchanged, or changed only through an approved `python.interpreter_bump` | ✅ PASS / ❌ FAIL | |
 | 11 | All files in `graviton-validation/` use the canonical names | ✅ PASS / ❌ FAIL | |
 
-NOT RUN is only for a check that needs ARM64 hardware the run did not have (for example an image build that does not finish under emulation); give the reason in Notes and list the check under Remaining Concerns.
+A criterion that runs on ARM64 passes only on a Graviton host or the target (Phase 3, "Match the production hosts"). NOT RUN is for one that did not run there: give where it did run, or why it could not (for example an image build that does not finish under emulation), in Notes, and list it under Remaining Concerns.
 
 ## Changes Made
 <Short list; link to 02, 03, 04 for detail>
@@ -138,7 +138,7 @@ Monorepo / multiple packages: <No | Yes, list each package and its manager>
 | Library | Location | Scan (architecture, C library, FINDING lines) | aarch64 build present (confirmed by the scan) | Verdict | Established | Resolution |
 |---|---|---|---|---|---|---|
 | libfastsum-x86_64.so | vendor/ | e_machine 62 (x86-64); not aarch64 | No | WARN (source in native/) | predicted | rebuilt from native/fastsum.c for aarch64 |
-| <name>.so | Lambda layer or vendored site-packages (<package>==<version>) | <scan line> | <yes/no> | <verdict> | <predicted / emulated / native arm64 / target> | <resolution> |
+| <name>.so | Lambda layer or vendored site-packages (<package>==<version>) | <scan line> | <yes/no> | <verdict> | <predicted / emulated / other arm64 / graviton / target> | <resolution> |
 
 ## Runtime-Extracted Libraries
 | Source | Artifact | Downloads or unpacks native code | aarch64 support in current version | Verdict | Established | Resolution |
@@ -177,9 +177,14 @@ Interpreter probed: cp3XY. Target libc: <glibc 2.NN | musl 1.N> (every manylinux
 | requirements-locked.txt | lock | charset-normalizer 3.4.0, MarkupSafe 2.1.5 | x86_64 hashes only | `--require-hashes` dry run: Expected sha256 ... Got ... | predicted | n/a | aarch64 hashes added | pip hash |
 
 ## User Decisions Pending
-| Dependency | Pinned | Options | Recommendation |
-|---|---|---|---|
-| pygeos | 0.14 | (a) build the sdist on Graviton with `libgeos-dev`, `setuptools<82` as a build constraint and, with gcc 14, `CFLAGS=-Wno-error=incompatible-pointer-types`; (b) move to `shapely>=2.0` (API change, out of scope to apply) | (a), the smaller change; (b) if the team plans the Shapely 2 migration anyway |
+| Dependency | Pinned | Options | Recommendation | Applied |
+|---|---|---|---|---|
+| pygeos | 0.14 | (a) build the sdist on Graviton with `libgeos-dev`, `setuptools<82` as a build constraint and, with gcc 14, `CFLAGS=-Wno-error=incompatible-pointer-types`; (b) move to `shapely>=2.0` (API change, out of scope to apply) | (a), the smaller change; (b) if the team plans the Shapely 2 migration anyway | no (the user chooses) |
+
+## CHECK Items
+| Item | Via | Why it is not settled | Settled by | Result |
+|---|---|---|---|---|
+| <dependency> | <direct or via> | <the CHECK line, for example CHECK INDEX: an index did not answer> | <the step: the sdist listing, the index answering, the Phase 3 import> | <the label it got, or still CHECK with the reason> |
 
 ## RECOMMENDED UPGRADE (Non-Blocking)
 | Dependency | Pinned | Recommended version | Reason | Evidence level | Action taken |
@@ -292,7 +297,7 @@ Interpreter decision, one for the whole dependency set (Phase 1.5), one row per 
 
 ## Build Environment
 - **Architecture:** <uname -m; must be aarch64>
-- **How:** Graviton host | linux/arm64 container on <host arch> (emulated: yes/no)
+- **Where:** Graviton host (<instance type>) | the target | linux/arm64 container on <host arch> (emulated: yes/no) | another arm64 machine (<which>); only a Graviton host or the target passes a check
 - **Host kernel page size and Graviton generation:** <getconf PAGESIZE>, <lscpu "BIOS Model name">; must match the production page size and the oldest deployed generation, or say why not
 - **Interpreter:** <python3 --version>, pip <version>
 - **Session-scoped interpreter alignment:** none | <tool and version used, why>

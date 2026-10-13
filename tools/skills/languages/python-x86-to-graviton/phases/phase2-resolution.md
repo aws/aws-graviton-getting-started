@@ -1,6 +1,6 @@
 # Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses.
+Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes stays unchanged and listed.
 
 ## 2.1 Native Library Resolution
 
@@ -10,7 +10,7 @@ For each x86-only binary and each x86-only build flag identified in Phase 1.2 an
 
 **If source code available:**
 
-`$CONTAINER_CMD` is the working container runtime found by the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection); run that block first, in the same shell.
+`$CONTAINER_CMD` is the working container runtime found by the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection); run that block first (in a new shell, set `CONTAINER_CMD` again).
 
 Build on aarch64 hardware: a Graviton host or an ARM64 CI runner, directly or inside a `linux/arm64` container, which runs natively there (the build prerequisites are in [python.md section 1.1](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#11-prerequisites-for-installing-python-packages-from-source): `"@Development tools" python3-devel` on Amazon Linux / RHEL, `build-essential python3-dev` on Debian / Ubuntu; `gcc libc6-dev` is enough for a plain C library on a `python:*-slim` image). On an x86 host the same container runs under emulation, where source builds are slow and can crash (Phase 3, "Emulation limits"), so do not run these commands there:
 
@@ -51,6 +51,7 @@ Before rebuilding, remove x86-only compiler flags, or apply them only on x86 (se
 **Lambda layers and vendored site-packages:** re-create them for arm64 from the pins listed by `*.dist-info` (Phase 1.2.2). pip can download aarch64 wheels from an x86 host; offer the tags the target's glibc accepts (Phase 1.1), which for a layer is the function runtime's:
 
 ```bash
+. "${TMPDIR:-/tmp}/graviton-python-native_scan.sh" || echo "run the Phase 1.2.1 scan block first: it writes this file"
 PYVER=3.11              # the function's runtime: python3.11 -> 3.11, python3.12 -> 3.12
 TARGET_LIBC=glibc; TARGET_LIBC_VER=2.26    # Phase 1.1: 2.26 for python3.10 and python3.11 (Amazon Linux 2), 2.34 for python3.12 and later
 TARGET_PAGE_SIZE=       # the function's page size, if measured in it (getconf PAGESIZE); unset, the scan skips the page check
@@ -137,7 +138,7 @@ python3 -m pip hash --algorithm sha256 /tmp/aarch64-wheels/MarkupSafe-2.1.5-*.wh
 
 Executed on the fixture: after adding the aarch64 hashes, the Phase 1.3 `--require-hashes` dry run against the aarch64 platform passed.
 
-**Packages with no aarch64 build in any release:** these need a substitute, and substitutions change behaviour, so present the evidence and wait for the user. `mkl` (and its transitives `intel-openmp`, `tbb`, `intel-cmplr-lib-ur`, `tcmlib`, `umf`, `onemkl-license`) has no Linux aarch64 file in any release. Confirm nothing imports it directly, then remove it:
+**Packages with no aarch64 build in any release:** these need a substitute, and substitutions change behaviour, so present the evidence and wait for the user (an unattended run applies the recommended substitute, as stated at the top of this phase). `mkl` (and its transitives `intel-openmp`, `tbb`, `intel-cmplr-lib-ur`, `tcmlib`, `umf`, `onemkl-license`) has no Linux aarch64 file in any release. Confirm nothing imports it directly, then remove it:
 
 ```bash
 grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.py' '^[[:space:]]*(import|from)[[:space:]]+mkl([^[:alnum:]_]|$)' .   # no output = safe to remove
@@ -258,6 +259,17 @@ If the project contains Kubernetes/Helm manifests (or similar deployment descrip
 > **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use a generic `kubernetes.io/arch: arm64` node selector and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
 Executed on a single-node k3s cluster on Graviton (node label `kubernetes.io/arch=arm64`): a Deployment with `nodeSelector: kubernetes.io/arch: amd64` stayed `Pending` (`0/1 nodes are available: 1 node(s) didn't match Pod's node affinity/selector`); after the change to `arm64` the pod ran and printed `aarch64`.
+
+Change a node selector, a node affinity or the `cpuArchitecture` of an ECS task on EC2 capacity to arm64 only together with arm64 capacity in the files the project ships (a node group, NodePool, capacity provider or instance type): a pod whose selector no node matches stays `Pending`. Without that capacity, allow both architectures (a node affinity on `kubernetes.io/arch` with `operator: In` and the values `amd64` and `arm64`) and ship a multi-architecture image, so the workload keeps its x86 nodes until arm64 nodes exist. An instance type in those files gets the same family, suffix and size in the newest Graviton generation the region offers, recorded under User Decisions Pending because sizing is the team's call (an unattended run applies it). With AWS credentials, list the candidates for `m5.xlarge`:
+
+```bash
+aws ec2 describe-instance-type-offerings --region us-west-2 --location-type region \
+  --filters 'Name=instance-type,Values=m*g.xlarge' --query 'InstanceTypeOfferings[].InstanceType' --output text
+```
+
+Executed in us-west-2, it listed `m6g.xlarge`, `m7g.xlarge`, `m8g.xlarge` and `m9g.xlarge`, so the default is `m9g.xlarge`.
+
+**CI pipelines (only if the project already ships them):** apply the changes that only add or switch an architecture, and leave the rest of the pipeline as it is: add `linux/arm64` to the platforms an image build publishes (`docker buildx build --platform linux/amd64,linux/arm64`, or the `platforms` input of `docker/build-push-action`; Docker Engine 29.0 and later and Docker Desktop build multi-platform images by default, and older engines need the containerd image store or a `docker-container` builder, which `docker/setup-buildx-action` creates); add `aarch64` to cibuildwheel's `archs`, with QEMU registered on an x86 runner (cibuildwheel's documentation uses `docker/setup-qemu-action`), or add an arm64 job beside the x86 one (a GitHub-hosted `ubuntu-24.04-arm` runner, a CodeBuild `ARM_CONTAINER` environment). Record each change in `04-code-scan-findings.md`. Anything else the pipeline needs (credentials, deployment steps, triggers, tool versions) is a recommendation in `00-summary.md`; with `ci.changes: recommend` in `skill-config.md`, the architecture changes are recommendations too.
 
 ## 2.5 Graviton-Specific Runtime Recommendations
 

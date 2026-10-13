@@ -16,7 +16,7 @@ Validate a Python application's readiness to run on AWS Graviton instances. This
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
-**In scope:** aarch64 wheel availability for every pinned dependency (direct and transitive), ARM64-blocking dependency updates and lock regeneration, native extensions and vendored binaries, architecture detection code, x86-only build flags and Dockerfile platform settings, Graviton runtime recommendations (documented, never applied), ARM64 install/build/test validation.
+**In scope:** aarch64 wheel availability for every pinned dependency (direct and transitive), ARM64-blocking dependency updates and lock regeneration, native extensions and vendored binaries, architecture detection code, x86-only build flags and Dockerfile platform settings, Graviton runtime recommendations (documented, never applied), CI changes that only add or switch an architecture, ARM64 install/build/test validation.
 
 **Out of scope:** Python version changes (unless `python.interpreter_bump` allows a bump that is the only path to an aarch64 wheel), package manager switches, base image changes, general dependency modernization, security updates, code refactoring, .gitignore/.dockerignore changes.
 
@@ -121,6 +121,8 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 ## Exit Criteria
 
+A criterion that runs on ARM64 passes only on a Graviton host or the target, such as the arm64 Lambda function; one that ran only under emulation or on another arm64 machine is NOT RUN (Phase 3, "Match the production hosts").
+
 ### Must Pass
 1. Dependencies install on ARM64 from wheels or documented source builds
 2. Native extensions and vendored binaries build or load on ARM64 (or documented fallbacks function)
@@ -154,7 +156,7 @@ ARM64 failures are blocking. Do not skip tests or packages; the failing build is
 
 - Performance benchmarking and load testing
 - Integration testing with external services
-- CI/CD pipeline configuration for ARM64 builds (if `skill-config.md` defines `ci.system`, phrase this recommendation in that system's vocabulary; the skill makes no CI changes itself)
+- CI/CD changes beyond architecture (credentials, deployment steps, triggers, tool versions), recommended in the vocabulary of `ci.system` when `skill-config.md` defines it; changes that only add or switch an architecture are applied in Phase 2.4 unless `ci.changes` is `recommend`
 
 ## Notes
 

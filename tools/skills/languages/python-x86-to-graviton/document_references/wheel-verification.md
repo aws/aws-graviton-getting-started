@@ -61,6 +61,7 @@ platforms() { # $1=arch ; sets PLAT
     PLAT+=(--platform "manylinux2014_$1")
   fi
 }
+typeset -f platforms > "${TMPDIR:-/tmp}/graviton-python-platforms.sh"   # later blocks, perhaps in a new shell, load it from here
 # Usage: probe <requirement> <arch>; prints the wheel filename on success.
 # --only-binary=:all: is mandatory: without it pip accepts the sdist and the
 # probe "passes" for a package that has no aarch64 wheel at all (false PASS).
@@ -122,7 +123,9 @@ The three distinct meanings of a FAIL are why the probe is always run twice (aar
 Transitive dependencies get the same treatment, but you do not need to enumerate them by hand. `pip install --dry-run --report` resolves the whole tree for the target platform:
 
 ```bash
-platforms aarch64   # the function above: one --platform per tag the target's libc accepts
+. "${TMPDIR:-/tmp}/graviton-python-platforms.sh" || echo "run the section 3 block first: it writes this file"
+TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
+platforms aarch64   # one --platform per tag the target's libc accepts
 python3 -m pip install --dry-run --ignore-installed --only-binary=:all: \
   --report graviton-validation/raw/wheel-availability.json -q "${PLAT[@]}" \
   --python-version 3.11 --implementation cp --abi cp311 \
@@ -258,7 +261,9 @@ Adding the aarch64 wheel's hash as a second `--hash=` on the same line makes the
 
 ```bash
 # Any hashed requirement that resolves to a different file on aarch64 fails this dry run:
-platforms aarch64   # section 3: one --platform per tag the target's libc accepts
+. "${TMPDIR:-/tmp}/graviton-python-platforms.sh" || echo "run the section 3 block first: it writes this file"
+TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
+platforms aarch64   # one --platform per tag the target's libc accepts
 python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
   --python-version 3.11 --implementation cp --abi cp311 --target /tmp/graviton-probe-target \
   -r requirements-locked.txt

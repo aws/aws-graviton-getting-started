@@ -71,7 +71,7 @@ Also record where that interpreter comes from (official image, distribution pack
 
 The wheel a pin resolves to must also be accepted by the target's libc and pip, and native code also depends on the kernel page size of the hosts it runs on (see [../document_references/wheel-verification.md](../document_references/wheel-verification.md) §1, §2 and §7). Read the libc and the interpreter from the runtime image:
 
-`$CONTAINER_CMD` below is the working container runtime: run the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection) first, in the same shell (it also applies `container.runtime` from `skill-config.md`). With no working runtime, follow the "No container runtime" item after the block.
+`$CONTAINER_CMD` below is the working container runtime: run the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection) first (in a new shell, set `CONTAINER_CMD` again; the block also applies `container.runtime` from `skill-config.md`). With no working runtime, follow the "No container runtime" item after the block.
 
 ```bash
 IMG=$(awk '/^FROM/{img=$NF; for(i=2;i<=NF;i++) if($i !~ /^--platform/ && $i!="AS" && $i!="as") {img=$i; break}} END{print img}' Dockerfile)
@@ -399,6 +399,7 @@ print("findings: %d" % len(findings))
 sys.exit(2 if missing else 1 if findings else 0)
 EOF
 }
+typeset -f native_scan > "${TMPDIR:-/tmp}/graviton-python-native_scan.sh"   # later blocks, perhaps in a new shell, load it from here
 native_scan . | tee graviton-validation/raw/site-packages-so-scan.txt
 ```
 
@@ -523,7 +524,9 @@ Executed (22 seconds): `libgeos-dev arm64: 3.13.1-1`, `libmkl-dev arm64:` with n
 
 For x86-only binaries: locate the source, document the rebuild, or ask the user for an aarch64 build. Validate with:
 ```bash
-native_scan libname.so   # in the shell where §1.2.1 set the TARGET_* values: no FINDING line
+. "${TMPDIR:-/tmp}/graviton-python-native_scan.sh" || echo "run the Phase 1.2.1 scan block first: it writes this file"
+TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41; TARGET_PAGE_SIZE=4096   # the §1.1 values, as in §1.2.1
+native_scan libname.so   # no FINDING line
 ```
 
 ## 1.3 Dependency ARM64 Compatibility Analysis
@@ -548,6 +551,7 @@ platforms() { # $1=arch ; sets PLAT to one --platform flag per wheel tag the tar
     PLAT+=(--platform "manylinux2014_$1")
   fi
 }
+typeset -f platforms > "${TMPDIR:-/tmp}/graviton-python-platforms.sh"   # later blocks, perhaps in a new shell, load it from here
 probe() { # $1=requirement $2=arch ; prints the wheel filename (rc 0), the from-versions list (rc 1),
           # nothing (rc 3) when an environment marker excluded the pin on this host, or why the indexes
           # give no verdict (rc 4). --no-input and </dev/null: pip never reads the loop's list of pins;
@@ -602,6 +606,8 @@ Executed on the fixture (25 pins): `MUST UPGRADE` for `blosc2==0.6.3` (with `fro
 Then the hash-lock check for every hashed requirements file the deployment installs:
 
 ```bash
+. "${TMPDIR:-/tmp}/graviton-python-platforms.sh" || echo "run the probe block above first: it writes this file"
+PYVER=3.11; ABI="cp${PYVER/./}"; TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41   # the values of the probe block
 platforms aarch64   # the same tag list as the loop above
 python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
   --python-version "$PYVER" --implementation cp --abi "$ABI" --target /tmp/graviton-probe-target \
@@ -665,7 +671,7 @@ grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.py' \
 
 # The risky shape: files that COMPARE against x86 but never mention aarch64/arm64 (heuristic; read the hits above)
 grep -rlE --exclude-dir=.venv --exclude-dir=.git --include='*.py' "[\"'](x86_64|amd64|AMD64)[\"']" . \
-  | xargs grep -LE "[\"'](aarch64|arm64)[\"']" 2>/dev/null
+  | while IFS= read -r f; do grep -qE "[\"'](aarch64|arm64)[\"']" "$f" || printf '%s\n' "$f"; done
 
 # Shell scripts, Makefiles, CI
 grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' \
@@ -685,7 +691,7 @@ grep -rniE --exclude-dir=.venv --exclude-dir=.git --include='*.y*ml' --include='
 
 The descriptor pattern is case-insensitive and allows an optional quote and `:` or `=`, so it catches CloudFormation JSON (`"Architectures": ["x86_64"]`) and YAML, ECS task definitions (`"cpuArchitecture": "X86_64"`) and Terraform (`architectures = ["x86_64"]`, `cpu_architecture`, `ami_type`, `instance_type`). Executed on a Terraform file, a CloudFormation template, an ECS task definition, an eksctl file and a Kubernetes manifest, it matched all 14 architecture-specific lines; on a SAM template, a JSON template and a Kubernetes manifest it matched the `Architectures` and `nodeSelector` lines. Note the `--` before the pattern in the flags and Dockerfile greps: those patterns start with `-`, and without `--` grep reads them as options (`grep: unrecognized option '--platform=...'`). Keep the `--include` flags **before** the `--`, or grep treats them as file names.
 
-Instance types and AMI IDs need arm64 counterparts. A Graviton instance type is a sizing decision: record it for the user. An AMI ID names one architecture: `aws ec2 describe-images --image-ids <id> --query 'Images[].[ImageId,Architecture,Name]'` shows which (executed: `al2023-ami-2023.12.20260930.0-kernel-6.18-x86_64` reports `x86_64` and its `-arm64` sibling `arm64`), and the arm64 AMI of the same release replaces it; the public SSM parameter `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` has an `-arm64` counterpart. ECS `cpuArchitecture` takes `X86_64` or `ARM64` (Fargate defaults to `X86_64`), and EKS `amiType` values come in pairs (`AL2023_x86_64_STANDARD` and `AL2023_ARM_64_STANDARD`). Change these only where the project ships the files ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), IN SCOPE 6).
+Instance types and AMI IDs need arm64 counterparts. A Graviton instance type is a sizing decision: record it under User Decisions Pending with the default from Phase 2.4 (same family and size, newest Graviton generation in the region). An AMI ID names one architecture: `aws ec2 describe-images --image-ids <id> --query 'Images[].[ImageId,Architecture,Name]'` shows which (executed: `al2023-ami-2023.12.20260930.0-kernel-6.18-x86_64` reports `x86_64` and its `-arm64` sibling `arm64`), and the arm64 AMI of the same release replaces it; the public SSM parameter `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` has an `-arm64` counterpart. ECS `cpuArchitecture` takes `X86_64` or `ARM64` (Fargate defaults to `X86_64`), and EKS `amiType` values come in pairs (`AL2023_x86_64_STANDARD` and `AL2023_ARM_64_STANDARD`). Change these only where the project ships the files ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), IN SCOPE 6).
 
 Executed on the fixture:
 - `app/service.py:29: return ctypes.CDLL(path)` (the path is chosen by the architecture check below) and `app/service.py:46: ctypes.util.find_library("c")` (harmless: libc resolves everywhere). For each `CDLL`/`dlopen`, read the code that builds the path: a hard-coded x86 filename or a lookup table without an `aarch64` key is a FAIL.

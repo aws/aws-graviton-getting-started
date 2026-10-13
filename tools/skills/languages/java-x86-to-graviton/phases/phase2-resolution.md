@@ -1,6 +1,6 @@
 # Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility.
+Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility. Findings that need a user decision are listed with their options and a recommendation under User Decisions Pending (`03-dependency-compatibility-report.md`) and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes stays unchanged and listed.
 
 ## 2.1 Native Library Resolution
 
@@ -190,19 +190,29 @@ If the project contains Kubernetes/Helm manifests (or similar deployment descrip
 
 > **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use a generic `kubernetes.io/arch: arm64` node selector and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
+Change a node selector, a node affinity or the `cpuArchitecture` of an ECS task on EC2 capacity to arm64 only together with arm64 capacity in the files the project ships (a node group, NodePool, capacity provider or instance type): a pod whose selector no node matches stays `Pending`. Without that capacity, allow both architectures (a node affinity on `kubernetes.io/arch` with `operator: In` and the values `amd64` and `arm64`) and ship a multi-architecture image, so the workload keeps its x86 nodes until arm64 nodes exist. An instance type in those files gets the same family, suffix and size in the newest Graviton generation the region offers, recorded under User Decisions Pending because sizing is the team's call (an unattended run applies it). With AWS credentials, list the candidates for `m5.xlarge`:
+
+```bash
+aws ec2 describe-instance-type-offerings --region us-west-2 --location-type region \
+  --filters 'Name=instance-type,Values=m*g.xlarge' --query 'InstanceTypeOfferings[].InstanceType' --output text
+```
+
+Executed in us-west-2, it listed `m6g.xlarge`, `m7g.xlarge`, `m8g.xlarge` and `m9g.xlarge`, so the default is `m9g.xlarge`.
+
+**CI pipelines (only if the project already ships them):** apply the changes that only add or switch an architecture, and leave the rest of the pipeline as it is: add `linux/arm64` to the platforms an image build publishes (`docker buildx build --platform linux/amd64,linux/arm64`, or the `platforms` input of `docker/build-push-action`; Docker Engine 29.0 and later and Docker Desktop build multi-platform images by default, and older engines need the containerd image store or a `docker-container` builder, which `docker/setup-buildx-action` creates), or add an arm64 job beside the x86 one (a GitHub-hosted `ubuntu-24.04-arm` runner, a CodeBuild `ARM_CONTAINER` environment). Record each change in `04-code-scan-findings.md`. Anything else the pipeline needs (credentials, deployment steps, triggers, tool versions) is a recommendation in `00-summary.md`; with `ci.changes: recommend` in `skill-config.md`, the architecture changes are recommendations too.
+
 ## 2.5 Graviton-Specific JVM Recommendations
 
 > **Output: `graviton-validation/05-jvm-configuration.md`**
 
 Do NOT apply JVM flags automatically. Graviton runs well with default JVM settings. Document recommendations in the report for the team to evaluate during performance testing.
 
-**JDK 21+:** Most Graviton optimizations are already enabled by default (AES-CTR intrinsics, improved tiered compilation). No flags to recommend unless performance testing shows a specific issue.
+**JDK 21+:** No flags to recommend unless performance testing shows a specific issue. AES and AES-CTR intrinsics need no flag on JDK 11 and later: on Graviton2 to Graviton5, `-XX:+PrintFlagsFinal` showed `UseAESIntrinsics` and `UseAESCTRIntrinsics` true by default on Corretto 11, 17 and 21; check an older JDK build the same way.
 
 **JDK 11-17:** Document the following as recommendations to try if performance testing shows a regression:
 
 | Flag | Workload type | Notes |
 |------|---------------|-------|
-| `-XX:+UnlockDiagnosticVMOptions -XX:+UseAESCTRIntrinsics` | Crypto-heavy (TLS termination, encryption) | Enabled by default in 21+ |
 | `-XX:-TieredCompilation` | Long-running services (not latency-sensitive startup) | Trades startup time for steady-state throughput |
 | `-XX:ReservedCodeCacheSize=64M` | Large apps with many classes | Only if code cache pressure observed |
 

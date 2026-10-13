@@ -291,7 +291,7 @@ grep -rnE 'System\.getProperty\("os\.(arch|name)"\)|Native\.load|System\.loadLib
 # otherwise be wrongly cleared. This remains a heuristic: always eyeball the os.arch hits
 # from the first grep, which is the authoritative signal.
 grep -rlE '"(amd64|x86_64)"' --include="*.java" --include="*.kt" . 2>/dev/null \
-  | xargs grep -LE '"aarch64"|"arm64"' 2>/dev/null   # files comparing amd64/x86_64 but NOT aarch64
+  | while IFS= read -r f; do grep -qE '"aarch64"|"arm64"' "$f" || printf '%s\n' "$f"; done   # files comparing amd64/x86_64 but NOT aarch64
 ```
 
 Flag code that checks for "amd64" or "x86_64" without "aarch64" handling, loads native libraries without architecture-aware paths, or contains x86-specific assumptions.

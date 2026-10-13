@@ -7,7 +7,7 @@ Validates Java application compatibility with AWS Graviton (ARM64) architecture 
 This skill guides an AI coding assistant through a complete Java Graviton migration:
 
 1. **Static Analysis** — Scans for native libraries (.so files), architecture-specific code, and ARM64-incompatible dependencies (including transitives)
-2. **Compatibility Resolution** — Updates only ARM64-blocking dependencies, adds aarch64 code paths, configures Graviton JVM flags
+2. **Compatibility Resolution** — Updates only ARM64-blocking dependencies, adds aarch64 code paths, documents Graviton JVM flag recommendations
 3. **Validation** — Builds and tests on ARM64, classifies failures, produces a structured migration report
 
 The skill is scoped strictly to ARM64 compatibility. It will not upgrade Java versions, modernize dependencies, or fix security issues — only what's required for Graviton.
@@ -54,7 +54,7 @@ The skill produces a `graviton-validation/` folder in the project root with stru
 - `02-native-library-report.md` — Native library findings and resolutions
 - `03-dependency-compatibility-report.md` — Per-dependency ARM64 verdicts
 - `04-code-scan-findings.md` — Architecture-specific code patterns
-- `05-jvm-configuration.md` — Graviton JVM flags
+- `05-jvm-configuration.md` — Graviton JVM flag recommendations (documented, not applied)
 - `06-build-test-results.md` — Build and test results
 
 ## Related

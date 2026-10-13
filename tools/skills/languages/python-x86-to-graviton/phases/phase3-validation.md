@@ -4,7 +4,7 @@ Install, build and test on ARM64 architecture. Supported platforms: Linux, macOS
 
 ## Container Runtime Detection
 
-Before skipping validation, check for a container runtime that can run `linux/arm64` images. Apple Silicon Macs and Graviton hosts run them natively; x86 Linux hosts run them through QEMU emulation.
+Before skipping validation, check for a container runtime that can run `linux/arm64` images. Graviton hosts run them natively, x86 Linux hosts through QEMU emulation, and an Apple Silicon Mac in a Linux VM on Apple's own cores. Only a run on Graviton passes a check ("Match the production hosts" below).
 
 > **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
@@ -18,6 +18,7 @@ try: sys.exit(subprocess.run(sys.argv[2:], timeout=float(sys.argv[1])).returncod
 except subprocess.TimeoutExpired: sys.exit(124)' "$@"
   fi
 }
+typeset -f host_timeout > "${TMPDIR:-/tmp}/graviton-python-host_timeout.sh"   # later blocks, perhaps in a new shell, load it from here
 
 # Detect a WORKING container runtime. Being on PATH is not enough: a runtime can be installed
 # but unusable (no daemon, no VM, missing permissions), so ask each one for `info`.
@@ -44,18 +45,19 @@ On the x86 host used to validate this skill, `finch` was on PATH but `finch info
 - **ARM64 host (aarch64/arm64) + container runtime:** Install, build and validate in containers using `$CONTAINER_CMD`. This is the ideal path.
 - **ARM64 host (aarch64/arm64) + no container runtime:** Validate directly on the host, in a virtual environment (§3.0).
 - **x86 host + container runtime with ARM64 support:** Use `--platform linux/arm64`. On x86 Linux this runs under QEMU emulation, which works for installing wheels, importing and testing, but is slow (see "Emulation limits" below).
-- **x86 host + no container runtime:** Static analysis only (Phase 1). Document that ARM64 validation requires an ARM64 environment and recommend a Graviton instance or an ARM64 Mac with a container runtime.
+- **x86 host + no container runtime:** Static analysis only (Phase 1). Document that ARM64 validation needs a Graviton host or the target, and recommend one.
 
-**Match the production hosts.** A container uses its host's kernel, so validate on a host with the production page size (Phase 1.1): a 4KB-page host, including any x86 host under emulation and an Apple Silicon Mac, does not show failures that happen on 64KB pages. When the project builds its own native code, run its tests on the oldest Graviton generation it deploys to (Phase 2.5): a newer generation does not show `Illegal instruction`. Record both in `06-build-test-results.md`.
+**Match the production hosts.** A Phase 3 check passes only on a Graviton host with the production OS and page size (Phase 1.1), or on the target itself, such as the arm64 Lambda function. A `linux/arm64` run under emulation or on another arm64 machine finds failures early, but its CPU and kernel differ from Graviton's: QEMU on the x86 host used to validate this skill reported SVE with 512-bit vectors and SME, while Graviton2 has no SVE, Graviton3 has 256-bit SVE, Graviton4 and Graviton5 have 128-bit SVE and SVE2, and none has SME (measured on each; [processor table](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#building-for-graviton)), and numpy's `np.dot` computed there matched no Graviton generation's result, because OpenBLAS picks its kernel from the CPU it sees; Apple's M1 to M3 cores have no SVE, and the M4 has SME without SVE ([LLVM's processor definitions](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/AArch64/AArch64Processors.td)); and a container uses its host's kernel, so a host whose page size is smaller than production's (an x86 host has 4KB pages; on a Mac, run `getconf PAGESIZE` in its VM) does not show the failures of 64KB pages. When the project builds its own native code, run its tests on the oldest Graviton generation it deploys to (Phase 2.5): a newer generation does not show `Illegal instruction`. Record where each check ran in `06-build-test-results.md`.
 
 **Do NOT skip validation if a working container runtime is available.** Only recommend external validation as a last resort.
 
-Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands.
+Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CONTAINER_CMD` exists only in the shell that set it: if each command runs in a new shell, start a later block with `CONTAINER_CMD=<the detected runtime>`. A function a later block calls is saved to a file under `${TMPDIR:-/tmp}` by the block that defines it, and the later block loads it in its first lines.
 
 **Emulation limits (x86 host).** Observed while validating this skill with Docker 25.0 and QEMU registered through binfmt_misc:
 
 - **Bound every container run, inside the container.** Five runs wrapped as `timeout N docker run ...` did not stop at their limit: Docker forwarded the stop signal into the emulated container, the container froze (even a plain `sleep 60` never finished), and the command waited until it was cancelled while the container kept running for hours until `docker rm -f`. Put the limit inside the container and remove the container afterwards:
   ```bash
+  . "${TMPDIR:-/tmp}/graviton-python-host_timeout.sh" || echo "run the Container Runtime Detection block first: it writes this file"
   run_arm64() {  # usage: run_arm64 <seconds> <image> <command...>
     local limit="$1" img="$2" name="graviton-check-$$"; shift 2
     host_timeout "$((limit + 20))" $CONTAINER_CMD run --rm --init --name "$name" --platform linux/arm64 \
@@ -213,8 +215,10 @@ $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 \
   -c 'import platform, sys; print(platform.machine(), sys.version.split()[0])'     # must print aarch64
 
 # Every native file in the image's Python environment, judged for the target by native_scan from Phase 1.2.1
-# (run this in the same shell, with the TARGET_* values of §1.1). The files are copied out of the image and
+# (loaded on the next line, with the TARGET_* values of §1.1). The files are copied out of the image and
 # scanned here, so no part of the scan runs under emulation.
+. "${TMPDIR:-/tmp}/graviton-python-native_scan.sh" || echo "run the Phase 1.2.1 scan block first: it writes this file"
+TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41; TARGET_PAGE_SIZE=4096   # the §1.1 values
 GV_SITE=$(mktemp -d "${TMPDIR:-/tmp}/gv-site.XXXXXX"); CID=$($CONTAINER_CMD create --platform linux/arm64 app:arm64)
 $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 -c \
   'import sysconfig; print("\n".join(sorted({sysconfig.get_paths()[k] for k in ("purelib", "platlib")})))' |
@@ -330,7 +334,7 @@ Several ARM64 failures do not mention the architecture. The first three rows wer
 | `ImportError: Error importing numpy: you should not try to import numpy from its source directory` | on Lambda, an aarch64 layer attached to an `x86_64` function, or the reverse |
 | `ImportError: /lib64/libm.so.6: version 'GLIBC_2.27' not found` | wheel built for a newer glibc than the OS ([python.md](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#python-wheel-glibc-requirements)) |
 
-> **macOS-host false PASS.** A package can publish macOS arm64 wheels without any Linux aarch64 wheel: `tfx-bsl` 1.21.0 ships `macosx_11_0_arm64` wheels and no `aarch64` file. An install that works on an Apple-Silicon Mac therefore does not show that the package installs on Graviton. Validate in a `linux/arm64` container or on a Graviton host, which is authoritative.
+> **macOS-host false PASS.** A package can publish macOS arm64 wheels without any Linux aarch64 wheel: `tfx-bsl` 1.21.0 ships `macosx_11_0_arm64` wheels and no `aarch64` file. An install that works on an Apple-Silicon Mac therefore does not show that the package installs on Graviton. Check in a `linux/arm64` container instead, and settle the check on a Graviton host ("Match the production hosts").
 
 Recommend to the user for independent testing: performance benchmarking, load testing, resource utilization measurement.
 

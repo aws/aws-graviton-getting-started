@@ -1,6 +1,6 @@
 ---
 name: java-x86-to-graviton
-description: Validates Java application compatibility with AWS Graviton (ARM64) architecture by analyzing native libraries, dependencies (including transitive), and architecture-specific code. Performs static analysis, applies ARM64-required dependency updates, configures Graviton JVM flags, and validates builds on ARM64. Use when migrating Java workloads from x86 to Graviton, validating ARM64 readiness, or running AWS Transform Custom java-x86-to-graviton transformations.
+description: Validates Java application compatibility with AWS Graviton (ARM64) architecture by analyzing native libraries, dependencies (including transitive), and architecture-specific code. Performs static analysis, applies ARM64-required dependency updates, documents Graviton JVM flag recommendations, and validates builds on ARM64. Use when migrating Java workloads from x86 to Graviton, validating ARM64 readiness, or running AWS Transform Custom java-x86-to-graviton transformations.
 metadata:
   author: AWS
   version: "1.0"
@@ -16,7 +16,7 @@ Validate a Java application's readiness to run on AWS Graviton instances. This t
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
-**In scope:** Native library ARM64 binaries, ARM64-blocking dependency updates, architecture detection code, Graviton JVM flags, ARM64 build/test validation.
+**In scope:** Native library ARM64 binaries, ARM64-blocking dependency updates, architecture detection code, Graviton JVM flag recommendations (documented, not applied), CI changes that only add or switch an architecture, ARM64 build/test validation.
 
 **Out of scope:** Java version changes, JDK distribution changes, general dependency modernization, security updates, code refactoring, .gitignore/.dockerignore changes.
 
@@ -57,7 +57,7 @@ fi
 4. After dependency updates (Phase 2.2 - pom.xml/build.gradle changed)
 5. After architecture code updates (Phase 2.3 - Java source changed)
 6. After Dockerfile/build config updates (Phase 2.4)
-7. After JVM optimization config (Phase 2.5)
+7. After JVM recommendations are documented (Phase 2.5)
 8. After build validation (Phase 3.1 - build results documented)
 9. After final validation and summary (Phase 3.3 + 00-summary.md written)
 
@@ -79,7 +79,7 @@ Output files produced:
 | `02-native-library-report.md` | 1.2, 2.1 | Native library findings and resolutions |
 | `03-dependency-compatibility-report.md` | 1.3, 2.2 | Per-dependency ARM64 verdicts |
 | `04-code-scan-findings.md` | 1.4, 2.3 | Architecture-specific code patterns |
-| `05-jvm-configuration.md` | 2.5 | Graviton JVM flags |
+| `05-jvm-configuration.md` | 2.5 | Graviton JVM flag recommendations (documented, not applied) |
 | `06-build-test-results.md` | 3.0-3.3 | Build, test results, startup checks |
 | `raw/dependency-tree-full.txt` | 1.1 | Raw dependency tree |
 | `raw/dependency-tree-native.txt` | 1.3 | Filtered native-artifact tree |
@@ -103,7 +103,7 @@ Apply fixes for ARM64-blocking issues only. See [phases/phase2-resolution.md](ph
 2. **2.2 Dependency Updates** - Update ONLY MUST UPGRADE dependencies (including transitive via dependencyManagement)
 3. **2.3 Architecture Code Updates** - Add `aarch64` handling to architecture detection code
 4. **2.4 Build Config Updates** - Add ARM64 Maven profile, Dockerfile `--platform` annotations (preserve current base images)
-5. **2.5 JVM Optimizations** - Apply version-gated Graviton JVM flags, validate with `java <flags> -version`
+5. **2.5 JVM Recommendations** - Document version-gated Graviton JVM flags for the team to evaluate; do not apply them
 
 ### Phase 3: ARM64 Validation & Testing
 
@@ -112,10 +112,12 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 1. **3.0 Build Environment Prep** - Java runtime alignment for annotation processor compatibility (session-scoped only)
 2. **3.1 Build Validation** - Full build, classify failures as INFRA/ARM64/PRE-EXISTING
 3. **3.2 Functional Testing** - Execute test suite, classify failures, determine final build
-4. **3.3 Startup Validation** - Verify application starts, JVM flags accepted, no crashes
+4. **3.3 Startup Validation** - Verify application starts with its existing JVM options, no crashes
 5. **Write 00-summary.md** - Consolidate exit criteria using template from documentation-standards.md
 
 ## Exit Criteria
+
+A criterion that runs on ARM64 passes only on a Graviton host or the target, such as the arm64 Lambda function; one that ran only under emulation or on another arm64 machine is NOT RUN (Phase 3, "Match the production hosts").
 
 ### Must Pass
 1. Application compiles on ARM64 without errors
@@ -131,7 +133,7 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 ### Startup Criteria
 9. Application starts on ARM64 without crashes
-10. JVM flags accepted without errors
+10. The project's existing JVM options accepted on ARM64 without errors
 
 ### Documentation Criteria
 11. All files in `graviton-validation/` using canonical names from documentation-standards.md
@@ -148,7 +150,7 @@ ARM64 failures are blocking. Do not skip tests; the failing build is the final b
 
 - Performance benchmarking and load testing
 - Integration testing with external services
-- CI/CD pipeline configuration for ARM64 builds (if `skill-config.md` defines `ci.system`, phrase this recommendation in that system's vocabulary; the skill makes no CI changes itself)
+- CI/CD changes beyond architecture (credentials, deployment steps, triggers, tool versions), recommended in the vocabulary of `ci.system` when `skill-config.md` defines it; changes that only add or switch an architecture are applied in Phase 2.4 unless `ci.changes` is `recommend`
 
 ## Notes
 

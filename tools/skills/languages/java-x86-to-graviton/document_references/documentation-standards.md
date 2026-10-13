@@ -15,7 +15,7 @@ All transformation output documents MUST be written to a single folder named `gr
     ├── 02-native-library-report.md          # All .so / native library findings and resolutions
     ├── 03-dependency-compatibility-report.md # Per-dependency ARM64 compatibility verdicts
     ├── 04-code-scan-findings.md             # Architecture-specific code patterns detected
-    ├── 05-jvm-configuration.md              # Graviton-optimized JVM flags and profiles
+    ├── 05-jvm-configuration.md              # Graviton JVM flag recommendations (not applied)
     ├── 06-build-test-results.md             # Build validation, test results, failure classification
     └── raw/                                 # Machine-generated artifacts (not hand-authored)
         ├── dependency-tree-full.txt         # Full dependency tree output
@@ -31,6 +31,7 @@ All transformation output documents MUST be written to a single folder named `gr
 5. **`00-summary.md` is written last**, after all other files are complete. It references (not duplicates) the detail in files 01–06.
 6. **If a section has no findings**, include the section header with an explicit "No findings" statement. Do not omit empty sections — their absence is ambiguous.
 7. **Do not create documentation files outside `graviton-validation/`.** All transformation documentation lives in this single folder.
+8. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce, is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the recommended option, the smallest change the evidence supports (an unattended run applies it and says how to reverse it), and the rest under CHECK Items with the step that settles each.
 
 ---
 
@@ -65,14 +66,16 @@ All transformation output documents MUST be written to a single folder named `gr
 | 6 | Test suite executes on ARM64 | ✅ PASS / ❌ FAIL | |
 | 7 | No ARM64-related test failures | ✅ PASS / ❌ FAIL | |
 | 8 | Application starts on ARM64 | ✅ PASS / ❌ FAIL | |
-| 9 | JVM flags accepted without errors | ✅ PASS / ❌ FAIL | |
+| 9 | The project's existing JVM options accepted on ARM64 | ✅ PASS / ❌ FAIL | |
+
+A criterion that runs on ARM64 passes only on a Graviton host or the target (Phase 3, "Match the production hosts"); otherwise its status is NOT RUN, with where it did run in Notes.
 
 ## Changes Made
 <Brief summary of dependency updates, native library resolutions, code changes.
 Reference detail files: 02-native-library-report.md, 03-dependency-compatibility-report.md, 04-code-scan-findings.md>
 
 ## Remaining Concerns
-<Any unresolved issues, user-responsibility items, or known limitations>
+<Any unresolved issues, user decisions pending, CHECK items not settled, user-responsibility items, or known limitations>
 ```
 
 ---
@@ -157,6 +160,16 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 |------------|----------------|----------------------|-----------------|-------------|----------|
 | org.xerial.snappy:snappy-java | 1.1.1.7 | 1.1.2.2 | 1.1.2.2 | JAR has no Linux/aarch64/libsnappyjava.so | `unzip -l ... \| grep aarch64` empty; UnsatisfiedLinkError on aarch64 |
 
+## User Decisions Pending
+| Item | Current | Options | Recommendation | Applied |
+|---|---|---|---|---|
+| <dependency or file> | <version> | (a) <option, and the label it leads to>; (b) <option> | <the smallest change the evidence supports> | <no (the user chooses), or yes (unattended run) and how to reverse it> |
+
+## CHECK Items
+| Item | Via | Why it is not settled | Settled by | Result |
+|---|---|---|---|---|
+| <dependency or file> | <direct or the dependency that pulls it in> | <for example: a native library extracted or downloaded at run time> | <the Phase 3 step on ARM64> | <the label it got, or still CHECK with the reason> |
+
 ## RECOMMENDED UPGRADE (Non-Blocking)
 | Dependency | Current Version | Recommended Version | Reason | Action Taken |
 |------------|----------------|--------------------|---------|----|
@@ -208,7 +221,7 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 ### `05-jvm-configuration.md` — Graviton JVM Optimization
 
 **Created:** Phase 2.5
-**Purpose:** Records the JVM flags applied, version-gated rationale, and validation results.
+**Purpose:** Records the JVM flag recommendations, their version-gated rationale, and the check that the target JVM accepts them. Nothing in this file is applied by the skill.
 
 **Required sections:**
 ```markdown
@@ -217,22 +230,21 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 ## Target Java Version
 <JDK version used for flag selection, e.g., JDK 17>
 
-## Applied JVM Flags
+## Recommended JVM Flags (Not Applied)
 | Flag | Applicable JDK Versions | Workload Type | Expected Impact |
 |------|------------------------|---------------|-----------------|
-| -XX:-TieredCompilation | 11, 17, 21+ | Moderate lock contention | Reduced compilation overhead |
+| -XX:-TieredCompilation | 11, 17 | Long-running services (not latency-sensitive startup) | Trades startup time for steady-state throughput |
 
-## Flags NOT Applied (Version-Gated)
-| Flag | Reason Not Applied |
-|------|--------------------|
-| -XX:CompilationMode=high-only | Removed in JDK 21+; project uses JDK 21 |
+## Flags Not Recommended (Version-Gated)
+| Flag | Reason Not Recommended |
+|------|------------------------|
+| -XX:+UnlockDiagnosticVMOptions -XX:+UseAESCTRIntrinsics | On by default: `-XX:+PrintFlagsFinal` on the target JDK shows `UseAESCTRIntrinsics = true {diagnostic} {default}` |
 
 ## Flag Validation
-<Output of: java <flags> -version>
-<Confirm all flags accepted without errors>
+<Output of: java <recommended flags> -version on ARM64, to confirm the target JVM accepts them; nothing is written to the project>
 
 ## Configuration Profiles
-<If multiple profiles were created for different workload types, list them here>
+<If the recommendations differ by workload type, list each set here>
 ```
 
 ---
@@ -248,6 +260,7 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 
 ## Build Environment
 - **Architecture:** <output of `uname -m`, should be aarch64>
+- **Where:** Graviton host (<instance type>) | the target | linux/arm64 container on <host arch> (emulated: yes/no) | another arm64 machine (<which>); only a Graviton host or the target passes a check
 - **Java Runtime:** <output of `java -version`>
 - **Build Tool:** <Maven/Gradle version>
 - **Build Environment Notes:** <any Java runtime alignment applied per Phase 3.0>
@@ -277,7 +290,7 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 
 ## Startup Validation
 - **Application starts without errors:** ✅ Yes | ❌ No
-- **JVM flags accepted:** ✅ Yes | ❌ No
+- **Existing JVM options accepted on ARM64:** ✅ Yes | ❌ No
 - **Runtime crashes:** None | <description>
 ```
 

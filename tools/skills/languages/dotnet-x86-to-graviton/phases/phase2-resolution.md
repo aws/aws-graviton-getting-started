@@ -1,6 +1,6 @@
 # Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses.
+Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes stays unchanged and listed.
 
 For a .NET Framework or Windows starting point (Phase 1.1), the approved move to modern .NET on Linux comes first, following [../document_references/windows-to-linux.md](../document_references/windows-to-linux.md); the steps below then apply to the moved projects.
 
@@ -93,7 +93,7 @@ python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0 --target-rid linux
 
 **Transitive dependencies:** when a parent pulls in a native package without an arm64 build, raise the parent if a version of it brings a working one (Confluent.Kafka 1.5.3 to 1.6.1 brings librdkafka.redist 1.6.1); otherwise reference the transitive package directly. Executed: a direct `<PackageReference Include="librdkafka.redist" Version="1.6.1" />` next to Confluent.Kafka 1.5.3 resolved 1.6.1, and so did a central `<PackageVersion>` with `CentralPackageTransitivePinningEnabled`. A version below the parent's requirement fails restore (`NU1605`, or `NU1109` with central management).
 
-**Packages with no linux-arm64 build in any release:** these need a substitute, and substitutions change behavior, so present the evidence and wait for the user. Example from the Linux solution: System.Data.SQLite.Core (through Stub.System.Data.SQLite.Core.NetStandard, no linux-arm64 file up to 1.0.119) replaced by Microsoft.Data.Sqlite, which the solution already used:
+**Packages with no linux-arm64 build in any release:** these need a substitute, and substitutions change behavior, so present the evidence and wait for the user (an unattended run applies the recommended substitute, as stated at the top of this phase). Example from the Linux solution: System.Data.SQLite.Core (through Stub.System.Data.SQLite.Core.NetStandard, no linux-arm64 file up to 1.0.119) replaced by Microsoft.Data.Sqlite, which the solution already used:
 
 ```csharp
 // Before (System.Data.SQLite)
@@ -291,7 +291,16 @@ If the project contains Kubernetes/Helm manifests (or similar deployment descrip
 
 The Linux solution's `deploy/k8s/deployment.yaml` changed one line, `kubernetes.io/arch: amd64` to `kubernetes.io/arch: arm64`; the image it names must be built for linux/arm64 (or as a multi-architecture image) before the deployment can run.
 
-**CI pipelines:** a CI system that publishes for `linux-x64` only, runs on Windows, or builds one image architecture is recorded with the change it needs (for example a `linux-arm64` publish, an arm64 runner for Native AOT, `docker buildx build --platform linux/amd64,linux/arm64`) as a recommendation in `00-summary.md`; the skill makes no CI changes itself (SKILL.md "User Responsibility").
+Change a node selector, a node affinity or the `cpuArchitecture` of an ECS task on EC2 capacity to arm64 only together with arm64 capacity in the files the project ships (a node group, NodePool, capacity provider or instance type): a pod whose selector no node matches stays `Pending`. Without that capacity, allow both architectures (a node affinity on `kubernetes.io/arch` with `operator: In` and the values `amd64` and `arm64`) and ship a multi-architecture image, so the workload keeps its x86 nodes until arm64 nodes exist. An instance type in those files gets the same family, suffix and size in the newest Graviton generation the region offers, recorded under User Decisions Pending because sizing is the team's call (an unattended run applies it). With AWS credentials, list the candidates for `m5.xlarge`:
+
+```bash
+aws ec2 describe-instance-type-offerings --region us-west-2 --location-type region \
+  --filters 'Name=instance-type,Values=m*g.xlarge' --query 'InstanceTypeOfferings[].InstanceType' --output text
+```
+
+Executed in us-west-2, it listed `m6g.xlarge`, `m7g.xlarge`, `m8g.xlarge` and `m9g.xlarge`, so the default is `m9g.xlarge`.
+
+**CI pipelines (only if the project already ships them):** apply the changes that only add or switch an architecture, and leave the rest of the pipeline as it is: add `linux/arm64` to the platforms an image build publishes (`docker buildx build --platform linux/amd64,linux/arm64`, or the `platforms` input of `docker/build-push-action`; Docker Engine 29.0 and later and Docker Desktop build multi-platform images by default, and older engines need the containerd image store or a `docker-container` builder, which `docker/setup-buildx-action` creates); add a `linux-arm64` publish beside a `linux-x64` one (Native AOT on an arm64 runner), or add an arm64 job beside the x86 one (a GitHub-hosted `ubuntu-24.04-arm` runner, a CodeBuild `ARM_CONTAINER` environment). Record each change in `04-code-scan-findings.md`. Anything else the pipeline needs (credentials, deployment steps, triggers, tool versions) is a recommendation in `00-summary.md`; with `ci.changes: recommend` in `skill-config.md`, the architecture changes are recommendations too.
 
 ## 2.5 Graviton-Specific Runtime Recommendations
 

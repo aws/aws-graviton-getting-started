@@ -16,7 +16,7 @@ Validate a .NET application's readiness to run on AWS Graviton instances. This t
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
-**In scope:** linux-arm64 native files (and linux-musl-arm64 for Alpine targets) for every resolved package, direct and transitive; ARM64-blocking package updates and lock file regeneration; native files committed to the repository and the code that loads them; architecture detection code and x86 intrinsics; project settings that pin x64 (`PlatformTarget`, `RuntimeIdentifier`); Dockerfile platform settings, Lambda architectures and deployment scripts; AWS SDK versions without IMDSv2 support where the target requires it; for Windows and .NET Framework starting points, the move to modern .NET on Linux (one decision for the solution, after one approval); Graviton runtime recommendations (documented, never applied); ARM64 build, publish, test and startup validation.
+**In scope:** linux-arm64 native files (and linux-musl-arm64 for Alpine targets) for every resolved package, direct and transitive; ARM64-blocking package updates and lock file regeneration; native files committed to the repository and the code that loads them; architecture detection code and x86 intrinsics; project settings that pin x64 (`PlatformTarget`, `RuntimeIdentifier`); Dockerfile platform settings, Lambda architectures and deployment scripts; AWS SDK versions without IMDSv2 support where the target requires it; for Windows and .NET Framework starting points, the move to modern .NET on Linux (one decision for the solution, after one approval); Graviton runtime recommendations (documented, never applied); CI changes that only add or switch an architecture; ARM64 build, publish, test and startup validation.
 
 **Out of scope:** target framework and SDK changes other than those Graviton requires (gated by `dotnet.framework_bump`), package-management switches (central package management, lock files, Paket), base image changes, general dependency modernization, security updates (including NuGet audit warnings), code refactoring, .gitignore/.dockerignore and CI changes. Windows Forms, WPF and ASP.NET Web Forms have no Linux path: they are BLOCKERs, documented with options ([document_references/windows-to-linux.md](document_references/windows-to-linux.md)).
 
@@ -124,6 +124,8 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 ## Exit Criteria
 
+A criterion that runs on ARM64 passes only on a Graviton host or the target, such as the arm64 Lambda function; one that ran only under emulation or on another arm64 machine is NOT RUN (Phase 3, "Match the production hosts").
+
 ### Must Pass
 1. Every resolved package gives each target RID an aarch64 native file for the target's libc, glibc, libstdc++ and page size, or is managed only, or is a documented user decision
 2. Committed native files and assemblies run on ARM64 (aarch64 builds, AnyCPU assemblies), or documented fallbacks function
@@ -155,7 +157,7 @@ ARM64 failures are blocking. Do not skip tests or projects; the failing build is
 
 - Performance benchmarking and load testing
 - Integration testing with external services
-- CI/CD pipeline configuration for ARM64 builds (if `skill-config.md` defines `ci.system`, phrase this recommendation in that system's vocabulary; the skill makes no CI changes itself)
+- CI/CD changes beyond architecture (credentials, deployment steps, triggers, tool versions), recommended in the vocabulary of `ci.system` when `skill-config.md` defines it; changes that only add or switch an architecture are applied in Phase 2.4 unless `ci.changes` is `recommend`
 
 ## Notes
 

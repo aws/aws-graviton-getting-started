@@ -10,7 +10,7 @@ This file is the canonical inventory of the skill. Every file in the skill folde
 
 * "phases/phase1-static-analysis.md": "Detailed steps for Phase 1: project structure analysis, native library validation (bundled and runtime-extracted .so files), tiered FAIL/WARN/PASS policy, dependency ARM64 compatibility analysis including transitive dependencies, Maven Central classifier verification for plugin-resolved build-tool artifacts (the central_has_classifier helper, plus verified protoc floors), architecture-specific code detection, and Java version check."
 
-* "phases/phase2-resolution.md": "Detailed steps for Phase 2: native library resolution (cross-compilation or fallback), dependency updates for MUST UPGRADE items only (Maven dependencyManagement and Gradle resolutionStrategy patterns for transitive deps), architecture detection code updates, Dockerfile platform annotations, and version-gated Graviton JVM flag configuration."
+* "phases/phase2-resolution.md": "Detailed steps for Phase 2: native library resolution (cross-compilation or fallback), dependency updates for MUST UPGRADE items only (Maven dependencyManagement and Gradle resolutionStrategy patterns for transitive deps), architecture detection code updates, Dockerfile platform annotations, and version-gated Graviton JVM flag recommendations (documented, never applied)."
 
 * "phases/phase3-validation.md": "Detailed steps for Phase 3: Java runtime alignment for annotation processor compatibility (session-scoped only), build validation strategy with INFRA/ARM64/PRE-EXISTING failure classification, container and host-based validation, functional testing, startup checks, and summary generation."
 

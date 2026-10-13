@@ -47,6 +47,7 @@ Is this dependency update required for ARM64 compatibility?
 
 RESULT:
 - If no ARM64-specific issue found → Mark COMPATIBLE, do NOT upgrade
+- If the evidence does not decide either way → Mark CHECK, do NOT upgrade; settle it in Phase 3
 - If ARM64-specific issue found → Document evidence and upgrade
 ```
 
@@ -89,8 +90,9 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 ### 6. Deployment Configuration
 - ✅ Dockerfiles that pin `--platform=linux/amd64`, an amd64 image digest, or run `pip install` in a `--platform=$BUILDPLATFORM` stage and copy the result into the runtime image (wheels are architecture-specific; see phase 2.4).
 - ✅ Lambda functions and layers with x86 binaries where the project ships the SAM/CloudFormation template (`Architectures: [arm64]` plus an arm64 layer build).
-- ✅ Kubernetes node selection only when the project already ships manifests, and only the node-selection, registry and ingress lines.
-- ✅ ECS `cpuArchitecture`, EKS `amiType` and AMI IDs, only in files the project ships (phase 1.4). Instance types are recorded as a user decision: choosing the Graviton type is sizing.
+- ✅ Kubernetes node selection only when the project already ships manifests, and only the node-selection, registry and ingress lines (an arm64 selector only together with arm64 capacity, phase2 §2.4).
+- ✅ ECS `cpuArchitecture`, EKS `amiType` and AMI IDs, only in files the project ships (phase 1.4). An instance type gets the same family and size in the newest Graviton generation the region offers, recorded as a user decision: choosing the Graviton type is sizing (phase2 §2.4).
+- ✅ CI changes that only add or switch an architecture, in pipelines the project ships (phase2 §2.4), unless `ci.changes` is `recommend`
 
 ## ❌ OUT OF SCOPE: What NOT to Fix
 
@@ -123,7 +125,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 - ❌ Switching package managers or indexes (pip to uv, Poetry to pip, PyPI to a mirror): a tooling choice, not compatibility
 - ❌ Base image distribution or version changes (`python:3.11-slim` to `python:3.12-alpine`): they change glibc, interpreter and ABI at once. The exception is the user-decision path in wheel-verification.md section 7 (glibc too old), which the skill documents but does not apply
 - ❌ Web server, worker model or async framework changes (gunicorn to uvicorn): no repo-documented Graviton requirement
-- ❌ `.gitignore`, `.dockerignore` or CI pipeline edits: phrased as a recommendation only (SKILL.md "User Responsibility")
+- ❌ `.gitignore` or `.dockerignore` edits, and CI changes beyond architecture: phrased as a recommendation only (SKILL.md "User Responsibility")
 - ❌ SDK credential changes after an AMI change: the [EC2 User Guide](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html#use-a-supported-sdk-version-for-imdsv2) lists botocore 1.13.25 (boto3 1.12.6) as the minimum for IMDSv2. Executed on Amazon Linux 2023 with IMDSv2 required: botocore 1.13.22 found no instance-role credentials and 1.13.23 found `iam-role`; 1.13.25 added the handling of an HTTP 405 from the metadata service ("Add 405 case to metadata fetching logic" in botocore's changelog). Amazon Linux 2023 AMIs require IMDSv2 by default. Not an architecture issue; when the migration also moves to such an AMI, note it once in `05-runtime-configuration.md`
 
 ## 🔍 Decision Tree: Should I Update This Dependency?
@@ -306,7 +308,7 @@ Each case comes from the evidence gathered while building this skill (PyPI files
 - "Is there concrete evidence this current version breaks on ARM64 (a probe result, a wheel filename, an error message)?"
 - "Am I updating this because it's old, or because ARM64 requires it?"
 
-**If unsure:** Mark as COMPATIBLE and document reasoning. It's better to under-fix than to introduce unnecessary scope creep.
+**If unsure:** Mark it CHECK, not COMPATIBLE, and change nothing. Name the evidence that would settle it and collect it in Phase 3 on ARM64; until then it stays CHECK. It's better to under-fix than to introduce unnecessary scope creep.
 
 ---
 

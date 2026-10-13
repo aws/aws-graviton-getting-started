@@ -35,8 +35,8 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 1. **Create `graviton-validation/` and `graviton-validation/raw/` first.** `mkdir -p graviton-validation/raw` is the first action of Phase 1.
 2. **Use exactly these filenames.** Do not rename, renumber or add top-level files. Additional machine output goes under `raw/` with a descriptive name.
 3. **Write progressively.** Each phase step writes its section as it completes; do not batch everything at the end.
-4. **Every verdict cites its evidence and says where it was established.** A package row without the per-RID line (`OK`, `FINDING`, `CHECK`) or a `probe` result is incomplete; a code finding without file:line is incomplete. The "evidence" columns below are mandatory. The `Established` column says where the verdict comes from: `predicted` (read from files on any host, as `assets`, `probe` and `scan` do), `emulated` (observed in a `linux/arm64` environment under emulation), `native arm64` (observed on an arm64 host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict. A `predicted` finding stays a finding when a Phase 3 run passes, because a run shows only the code paths it exercised.
-5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes and BLOCKER items). Never list a recommendation among required changes, and never apply one.
+4. **Every verdict cites its evidence and says where it was established.** A package row without the per-RID line (`OK`, `FINDING`, `CHECK`) or a `probe` result is incomplete; a code finding without file:line is incomplete. The "evidence" columns below are mandatory. The `Established` column says where the verdict comes from: `predicted` (read from files on any host, as `assets`, `probe` and `scan` do), `emulated` (observed in a `linux/arm64` environment under emulation), `other arm64` (observed on arm64 hardware that is not Graviton, such as an Apple Silicon Mac), `graviton` (observed on a Graviton host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict; only `graviton` and `target` observations pass a check or settle a CHECK. A `predicted` finding stays a finding when a Phase 3 run passes, because a run shows only the code paths it exercised.
+5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes and BLOCKER items). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce (a CHECK line of the check program), is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the recommended option, the smallest change the evidence supports (an unattended run applies it and says how to reverse it), and the rest under CHECK Items with the step that settles each.
 6. **Empty sections stay, with "No findings".** Omitting a section is ambiguous (not checked, or nothing found?). Write the heading and an explicit statement.
 7. **`00-summary.md` is written last** and references the detail files rather than repeating them.
 8. **Nothing outside `graviton-validation/`.** No other documentation files are created by the transformation.
@@ -75,13 +75,13 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 | 10 | Target frameworks and SDK unchanged, or changed only through an approved `dotnet.framework_bump` | ✅ PASS / ❌ FAIL | |
 | 11 | All files in `graviton-validation/` use the canonical names | ✅ PASS / ❌ FAIL | |
 
-NOT RUN is only for a check that needs ARM64 hardware the run did not have (for example a Native AOT publish on an x86 host without a cross toolchain); give the reason in Notes and list the check under Remaining Concerns.
+A criterion that runs on ARM64 passes only on a Graviton host or the target (Phase 3, "Match the production hosts"). NOT RUN is for one that did not run there: give where it did run, or why it could not (for example a Native AOT publish on an x86 host without a cross toolchain), in Notes, and list it under Remaining Concerns.
 
 ## Changes Made
 <Short list; link to 02, 03, 04 for detail>
 
 ## Recommendations Recorded (Not Applied)
-<Count and link to 05; CI changes for the user>
+<Count and link to 05; CI changes beyond architecture, for the user>
 
 ## Remaining Concerns
 <Blockers (Windows Forms, WPF, Web Forms), substitutions awaiting confirmation, target OS and glibc decisions, NOT RUN checks>
@@ -180,10 +180,10 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 | AWSSDK.Core | via AWSSDK.S3 3.3.107.1 | 3.3.103.65 | no IMDSv2 support; the target AMI requires IMDSv2 | Phase 1.3 SDK check | predicted | 3.3.103.66 (AWSSDK.S3 3.3.107.2) | 3.3.107.2 | Directory.Packages.props |
 
 ## User Decisions Pending
-| Item | Current | Options | Recommendation |
-|---|---|---|---|
-| SkiaSharp and SkiaSharp.NativeAssets.Linux | 1.68.3 | (a) 2.80.0, the arm64 floor, which restore flags with NU1903 (GHSA-j7hp-h8jx-5ppr); (b) 2.88.6, the lowest release without it | ask once; not the latest release (3.119.0 needs GLIBC_2.27) |
-| System.Data.SQLite.Core (its Stub.System.Data.SQLite.Core.NetStandard) | 1.0.119 | no linux-arm64 file in any release: substitute Microsoft.Data.Sqlite (a code change) | substitute, after confirmation |
+| Item | Current | Options | Recommendation | Applied |
+|---|---|---|---|---|
+| SkiaSharp and SkiaSharp.NativeAssets.Linux | 1.68.3 | (a) 2.80.0, the arm64 floor, which restore flags with NU1903 (GHSA-j7hp-h8jx-5ppr); (b) 2.88.6, the lowest release without it | ask once; not the latest release (3.119.0 needs GLIBC_2.27) | no (the user chooses) |
+| System.Data.SQLite.Core (its Stub.System.Data.SQLite.Core.NetStandard) | 1.0.119 | no linux-arm64 file in any release: substitute Microsoft.Data.Sqlite (a code change) | substitute, after confirmation | no (the user confirms) |
 
 ## RECOMMENDED UPGRADE (Non-Blocking)
 | Package | Version | Recommended version | Reason | Evidence level | Action taken |
@@ -196,10 +196,10 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 | Newtonsoft.Json | direct | 12.0.3 | managed only; NU1903 is out of scope | predicted |
 | SQLitePCLRaw.lib.e_sqlite3 | via Microsoft.Data.Sqlite 8.0.31 | 2.1.12 | `OK linux-arm64 ... (glibc GLIBC_2.34 align 0x10000; needs libc.so.6 ld-linux-aarch64.so.1)` | predicted |
 
-## CHECK Items (Tools and Tests)
-| Package | Via | Files | Where they run | Result |
+## CHECK Items
+| Item | Via | Why it is not settled | Settled by | Result |
 |---|---|---|---|---|
-| Microsoft.CodeCoverage | Microsoft.NET.Test.Sdk 17.11.1 | x86-64 instrumentation libraries in build/ | coverage collection | <collected on arm64 hardware (Phase 3.2), or NOT RUN with the reason> |
+| Microsoft.CodeCoverage | Microsoft.NET.Test.Sdk 17.11.1 | x86-64 instrumentation libraries in build/, used only for coverage collection | coverage collected on arm64 hardware (Phase 3.2) | <PASS, or NOT RUN with the reason> |
 
 ## Transitive Dependency Resolutions
 | Transitive | Pulled in by | Issue | Mechanism used |
@@ -253,7 +253,7 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 | File:line | Pattern | Action |
 |---|---|---|
 | deploy/deploy.sh:5 | uname -m gate for x86_64 only | case on x86_64 and aarch64 |
-| .github/workflows/ci.yml:14, 15 | linux-x64 Native AOT publish; `docker build` without `--platform` | recommendation for the user (CI) |
+| .github/workflows/ci.yml:14, 15 | linux-x64 Native AOT publish; `docker build` without `--platform` | architecture-only changes applied (Phase 2.4 "CI pipelines"): a linux-arm64 Native AOT publish on an arm64 runner, `--platform linux/amd64,linux/arm64` |
 
 ## Changes Applied
 <Summary of Phase 2.3 / 2.4 edits with file paths>
@@ -292,6 +292,7 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 
 ## Build Environment
 - **Host:** <uname -m>, <OS>; container runtime <docker | finch | none>; emulated runs: yes/no
+- **Where:** Graviton host (<instance type>) | the target | linux/arm64 container on <host arch> (emulated: yes/no) | another arm64 machine (<which>); only a Graviton host or the target passes a check
 - **Host kernel page size and Graviton generation:** <getconf PAGESIZE>, <instance type>; must match production, or say why not
 - **SDK:** <dotnet --version>; session-scoped switch: none | <how, why>
 - **Runtime used for arm64 runs:** <image and tag, or host package>

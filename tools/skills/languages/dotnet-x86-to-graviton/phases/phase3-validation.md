@@ -4,7 +4,7 @@ Build, publish and test for ARM64. Supported platforms: Linux, macOS, WSL.
 
 ## Container Runtime Detection
 
-Before skipping validation, check for a container runtime that can run `linux/arm64` images. Apple Silicon Macs and Graviton hosts run them natively; x86 Linux hosts run them through QEMU emulation.
+Before skipping validation, check for a container runtime that can run `linux/arm64` images. Graviton hosts run them natively, x86 Linux hosts through QEMU emulation, and an Apple Silicon Mac in a Linux VM on Apple's own cores. Only a run on Graviton passes a check ("Match the production hosts" below).
 
 > **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
@@ -18,6 +18,7 @@ try: sys.exit(subprocess.run(sys.argv[2:], timeout=float(sys.argv[1])).returncod
 except subprocess.TimeoutExpired: sys.exit(124)' "$@"
   fi
 }
+typeset -f host_timeout > "${TMPDIR:-/tmp}/graviton-dotnet-host_timeout.sh"   # later blocks, perhaps in a new shell, load it from here
 
 # Detect a WORKING container runtime. Being on PATH is not enough: a runtime can be installed
 # but unusable (no daemon, no VM, missing permissions), so ask each one for `info`.
@@ -44,18 +45,19 @@ Executed in bash and in zsh on the x86 host used to validate this skill: `finch`
 - **ARM64 host (aarch64/arm64) + container runtime:** Publish, test and validate in containers using `$CONTAINER_CMD`. This is the ideal path.
 - **ARM64 host (aarch64/arm64) + no container runtime:** Validate directly on the host with an SDK of the right version (§3.0).
 - **x86 host + container runtime with ARM64 support:** Publish for linux-arm64 natively on the host and run the output with `--platform linux/arm64`. On x86 Linux this runs under QEMU emulation (see "Emulation limits" below).
-- **x86 host + no container runtime:** Static analysis and native publishes with output scans only (Phase 1, §3.1). Document that ARM64 runtime validation requires an ARM64 environment and recommend a Graviton instance or an ARM64 Mac with a container runtime.
+- **x86 host + no container runtime:** Static analysis and native publishes with output scans only (Phase 1, §3.1). Document that ARM64 runtime validation needs a Graviton host or the target, and recommend one.
 
-**Match the production hosts.** A container uses its host's kernel, so validate on a host with the production page size (Phase 1.1): a 4KB-page host, including any x86 host under emulation and an Apple Silicon Mac, does not show failures that happen on 64KB pages (a library aligned for 4KB pages failed on a 64KB-page AlmaLinux 8 host and loaded on a 4KB-page Graviton4 host; [nuget-native-assets.md](../document_references/nuget-native-assets.md) §6). Record the host and its page size in `06-build-test-results.md`.
+**Match the production hosts.** A Phase 3 check passes only on a Graviton host with the production OS and page size (Phase 1.1), or on the target itself, such as the arm64 Lambda function. A `linux/arm64` run under emulation or on another arm64 machine finds failures early, but its CPU and kernel differ from Graviton's: QEMU on the x86 host used to validate this skill reported SVE with 512-bit vectors and SME, while Graviton2 has no SVE, Graviton3 has 256-bit SVE, Graviton4 and Graviton5 have 128-bit SVE and SVE2, and none has SME (measured on each; [processor table](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#building-for-graviton)); Apple's M1 to M3 cores have no SVE, and the M4 has SME without SVE ([LLVM's processor definitions](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/AArch64/AArch64Processors.td)); and a container uses its host's kernel, so a host whose page size is smaller than production's (an x86 host has 4KB pages; on a Mac, run `getconf PAGESIZE` in its VM) does not show the failures of 64KB pages (a library aligned for 4KB pages failed on a 64KB-page AlmaLinux 8 host and loaded on a 4KB-page Graviton4 host; [nuget-native-assets.md](../document_references/nuget-native-assets.md) §6). When the project ships native code it builds, run its tests on the oldest Graviton generation it deploys to: a newer generation does not show `Illegal instruction`. Record where each check ran, with the host's page size, in `06-build-test-results.md`.
 
 **Do NOT skip validation if a working container runtime is available.** Only recommend external validation as a last resort.
 
-Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CONTAINER_CMD`, `host_timeout` and `run_arm64` (below) exist only in the shell that defined them: if each command runs in a new shell, start every later block with `CONTAINER_CMD=<the detected runtime>` and include the function definitions in the same command as the block that calls them.
+Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CONTAINER_CMD` exists only in the shell that set it: if each command runs in a new shell, start a later block with `CONTAINER_CMD=<the detected runtime>`. `host_timeout` and `run_arm64` (below) are saved by their defining blocks to files under `${TMPDIR:-/tmp}`, and a later block that calls one loads it in its first line.
 
 **Emulation limits (x86 host).** Microsoft's supported-OS lists say "The QEMU emulator is not supported to run .NET apps" ([.NET 8](https://github.com/dotnet/core/blob/main/release-notes/8.0/supported-os.md)), so an emulated run is a smoke test, and the verdict for anything it cannot show comes from Graviton. Observed while validating this skill with Docker and QEMU registered through binfmt_misc:
 
 - **Bound every container run, inside the container,** and remove the container afterwards:
   ```bash
+  . "${TMPDIR:-/tmp}/graviton-dotnet-host_timeout.sh" || echo "run the Container Runtime Detection block first: it writes this file"
   run_arm64() {  # usage: run_arm64 <seconds> <image> <command...>; extra docker options go in RUN_ARM64_OPTS (a string)
     local limit="$1" img="$2" name="graviton-check-$$"; shift 2
     # The options go through $(printf) so that zsh splits them too (zsh does not split ${RUN_ARM64_OPTS}).
@@ -66,6 +68,7 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CON
     $CONTAINER_CMD rm -f "$name" >/dev/null 2>&1   # no-op if the container already exited
     return $rc
   }
+  typeset -f run_arm64 > "${TMPDIR:-/tmp}/graviton-dotnet-run_arm64.sh"   # later blocks, perhaps in a new shell, load it from here
   ```
   Executed with `mcr.microsoft.com/dotnet/runtime:8.0`: `sleep 60` given 5 seconds returned 124, `uname -m` printed `aarch64`, the two runs took 7 seconds together, and no container was left. The `--entrypoint timeout` form also works with images whose entrypoint is the application.
 - **Do not compile under emulation.** `dotnet test` of a test project inside the arm64 SDK image was killed (`exit 137`) during its restore and build. Build and publish natively for linux-arm64 on the host (the SDK cross-targets managed code), and run only the result in the container.
@@ -248,6 +251,7 @@ then the §3.1 build, publish and scan, and the tests in §3.2. The `dotnet --in
 **x86 host:** build the test project natively for linux-arm64 and run only the tests in the arm64 SDK image, with the OS packages the runtime image installs (Phase 1.2.2). A test stage in the Dockerfile pinned to `$TARGETPLATFORM` compiles under emulation, which was killed, so use it only on arm64 hosts.
 
 ```bash
+. "${TMPDIR:-/tmp}/graviton-dotnet-host_timeout.sh" && . "${TMPDIR:-/tmp}/graviton-dotnet-run_arm64.sh" || echo "run the Container Runtime Detection and Emulation limits blocks first: they write these files"
 TEST_PROJECT=tests/Fixture.Tests     # each test project
 OS_PACKAGES="libfontconfig1"         # what the runtime image installs (Phase 1.2.2); the SDK image lacks them
 out="${TMPDIR:-/tmp}/graviton-tests-arm64"
@@ -261,7 +265,7 @@ RUN_ARM64_OPTS="-v $out:/t:ro -w /tmp" run_arm64 480 mcr.microsoft.com/dotnet/sd
 echo "tests on arm64: exit $?"
 ```
 
-`run_arm64` and `host_timeout` come from "Container Runtime Detection" above (run that block first in the same shell). Executed on the fixed Linux solution: `Passed!  - Failed:     0, Passed:    10, Skipped:     0, Total:    10` in 47 seconds. Without the OS package the thumbnail test failed with `DllNotFoundException` naming `libfontconfig.so.1` (INFRA: the test environment lacked a package the runtime image has).
+`run_arm64` and `host_timeout` come from "Container Runtime Detection" and "Emulation limits" above; the block's first line loads them. Executed on the fixed Linux solution: `Passed!  - Failed:     0, Passed:    10, Skipped:     0, Total:    10` in 47 seconds. Without the OS package the thumbnail test failed with `DllNotFoundException` naming `libfontconfig.so.1` (INFRA: the test environment lacked a package the runtime image has).
 
 **Code coverage.** Microsoft's [dotnet-coverage](https://learn.microsoft.com/en-us/dotnet/core/additional-tools/dotnet-coverage) page says "Dynamic instrumentation is available on Windows (x86, x64 and Arm64), Linux (x64), and macOS (x64)" and "Static instrumentation is available on all platforms", and the per-RID check reports Microsoft.CodeCoverage's x86-64 instrumentation libraries as a `CHECK` (Phase 1.3). On Graviton4 with Microsoft.CodeCoverage 17.11.1, `dotnet test <project> --collect "Code Coverage"` wrote a `.coverage` file with data, and `--collect "Code Coverage;Format=cobertura"` counted 227 of 3,369 lines covered, against 233 on x64; the only lines that differed were the architecture branches (the resolver's X64 and Arm64 arms, the AVX2 loops on x64, the Vector128 loop on arm64). So the `CHECK` closes when coverage runs this way on arm64 hardware; record the result in `06-build-test-results.md`. Running a built test assembly (`dotnet test <dll>`) does not load the collector on any architecture (`Unable to find a datacollector with friendly name 'Code Coverage'` on x64 too), so it cannot answer this.
 
@@ -291,7 +295,7 @@ Executed on the fixed Linux solution in linux/arm64 containers:
 - **Lambda:** with the function moved to `net10.0` (Phase 2.2), `dotnet lambda deploy-function` (Amazon.Lambda.Tools 7.0.0) created a `dotnet10` function with `Architectures: arm64`, its log reported `Runtime Version: dotnet:10.mainline.v74`, and `dotnet lambda invoke-function --payload 100` returned `108.25`, as the `net8.0` build did on `dotnet8`.
 - **On AlmaLinux 8 (glibc 2.28, 64KB pages):** the two SQLite checks failed as the glibc check predicted ([nuget-native-assets.md](../document_references/nuget-native-assets.md) §6).
 
-> **macOS-host false FAIL.** On an Apple Silicon Mac, a host-based run (outside containers) uses the `osx-arm64` RID: a package with a verified linux-arm64 native file (Phase 1.3) can still fail to load there because it has no osx-arm64 build. That is a host-development artifact, not a Graviton verdict; confirm in a `linux/arm64` container, which runs natively on Apple Silicon and is authoritative for linux-arm64 (except for the page size, above).
+> **macOS-host false FAIL.** On an Apple Silicon Mac, a host-based run (outside containers) uses the `osx-arm64` RID: a package with a verified linux-arm64 native file (Phase 1.3) can still fail to load there because it has no osx-arm64 build. That is a host-development artifact, not a Graviton verdict; check in a `linux/arm64` container instead, and settle the check on a Graviton host ("Match the production hosts").
 
 Recommend to user for independent testing: performance benchmarking, load testing, resource utilization measurement.
 

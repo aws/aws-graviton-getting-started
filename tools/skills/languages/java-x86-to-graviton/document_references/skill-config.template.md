@@ -34,8 +34,8 @@ deploy.ingress_convention: <ingress class or annotation>
 ## CI (shared)
 
 ```
-ci.system: <internal CI system>   # vocabulary for the post-transformation CI note;
-                                   # the skill makes no CI changes itself
+ci.system:  <internal CI system>   # vocabulary for CI recommendations
+ci.changes: apply                  # apply | recommend: CI changes that only add or switch an architecture
 ```
 
 ## Java

@@ -36,6 +36,7 @@ Is this dependency update required for ARM64 compatibility?
 
 RESULT:
 - If no ARM64-specific issue found → Mark COMPATIBLE, do NOT upgrade
+- If the evidence does not decide either way → Mark CHECK, do NOT upgrade; settle it in Phase 3
 - If ARM64-specific issue found → Document evidence and upgrade
 ```
 
@@ -97,7 +98,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 ### 5. Code Refactoring
 - ❌ Code quality improvements
 - ❌ Design pattern changes
-- ❌ Performance optimizations (except Graviton-specific JVM flags)
+- ❌ Performance optimizations (Graviton-specific JVM flags are documented as recommendations, not applied)
 
 ## 🔍 Decision Tree: Should I Update This Dependency?
 
@@ -270,7 +271,7 @@ These are **almost always** ARM64-compatible without updates:
 - "Is there concrete evidence this current version breaks on ARM64?"
 - "Am I updating this because it's old, or because ARM64 requires it?"
 
-**If unsure:** Mark as COMPATIBLE and document reasoning. It's better to under-fix than to introduce unnecessary scope creep.
+**If unsure:** Mark it CHECK, not COMPATIBLE, and change nothing. Name the evidence that would settle it and collect it in Phase 3 on ARM64; until then it stays CHECK. It's better to under-fix than to introduce unnecessary scope creep.
 
 ---
 
