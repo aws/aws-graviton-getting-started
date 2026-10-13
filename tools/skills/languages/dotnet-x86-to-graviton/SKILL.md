@@ -99,7 +99,7 @@ Analyze the project without making changes. See [phases/phase1-static-analysis.m
 1. **1.1 Project Structure Analysis** - Deployment type, solution and project structure (including projects no solution lists), starting point (modern .NET on Linux or Windows, .NET Framework), target OS and libc, dependency tree with the per-RID native check, component risk categorization
 2. **1.2 Native Library Validation** - Scan every committed native file and assembly by content (never by name or folder), P/Invoke and `NativeLibrary` loads, executables run and binaries downloaded at run, build or deploy time, OS packages in images, apply tiered FAIL/WARN/PASS policy
 3. **1.3 Dependency ARM64 Compatibility** - Classify every resolved package (including transitives) by its per-RID native files as MUST UPGRADE / RECOMMENDED / COMPATIBLE, check AWS SDK IMDSv2 support, find build-tool packages with OS/arch RIDs
-4. **1.4 Architecture-Specific Code Detection** - Find architecture checks, x86 intrinsics without `IsSupported` checks, fixed vector widths, `PlatformTarget`/`RuntimeIdentifier` pins, Windows-only APIs (CA1416), amd64 Dockerfile pins and shell architecture gates
+4. **1.4 Architecture-Specific Code Detection** - Find architecture checks, x86 intrinsics without `IsSupported` checks, fixed vector widths, `PlatformTarget`/`RuntimeIdentifier` pins, Windows-only APIs (CA1416), amd64 Dockerfile pins and shell architecture gates, and deployment settings that pick x86, set or absent
 5. **1.5 .NET Version Compatibility Check** - Document target frameworks, SDK and live support status (do NOT change them unless `dotnet.framework_bump` allows; a change is one decision for the whole solution)
 
 ### Phase 2: Compatibility Resolution

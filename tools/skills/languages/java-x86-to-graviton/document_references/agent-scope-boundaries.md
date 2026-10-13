@@ -65,6 +65,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 
 ### 3. Architecture Detection
 - ✅ Code checking for "amd64" without "aarch64" handling
+- ✅ x86-only JVM options (`-XX:UseAVX=2`) in start scripts, Dockerfiles and deployment files, which an ARM64 JVM refuses at startup
 - ✅ Build plugins not detecting ARM64 architecture
 - ✅ Example: os-maven-plugin 1.4.1 → 1.7.0 (aarch64 detection)
 
@@ -124,7 +125,7 @@ For each dependency, ask in order:
 
 **Simple Rule:** If it builds and runs on ARM64 today → **DO NOT UPDATE**
 
-## 📋 Common Pure Java Libraries (Always ARM64-Compatible)
+## 📋 Common Pure Java Libraries (ARM64-Compatible)
 
 These are **almost always** ARM64-compatible without updates:
 

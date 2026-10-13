@@ -15,7 +15,7 @@ Every version floor quoted in this skill was verified against PyPI on the date s
 - The build succeeds but yields a slower, untested binary than the maintainer's wheel.
 - A hash-locked requirements file (`--require-hashes`) rejects the sdist or the aarch64 wheel outright because the lock only carries x86_64 hashes.
 
-**Pure Python and native code.** Pure-Python code (a `py3-none-any` wheel, or an sdist with no compiled sources) is the same on every operating system and CPU, so it is COMPATIBLE unless it reaches native code itself: a `ctypes` or `cffi` load, a binary it runs or downloads, or a branch on `platform.machine()` (Phase 1.2 and 1.4 find those). Native code (compiled extension modules in wheels, sdists that compile, vendored `.so` files, executables shipped inside wheels, packages from the OS) depends on the target in six ways, and wheel tags record three of them:
+**Pure Python and native code.** Pure-Python code (a `py3-none-any` wheel, or an sdist with no compiled sources) is the same on every operating system and CPU, so it is COMPATIBLE unless it reaches native code itself: a `ctypes` or `cffi` load, a binary it runs or downloads, or a branch on `platform.machine()` (Phase 1.2 and 1.4 find those), or x86_64 gets a compiled wheel of the same pin (CHECK FALLBACK in section 3). Native code (compiled extension modules in wheels, sdists that compile, vendored `.so` files, executables shipped inside wheels, packages from the OS) depends on the target in six ways, and wheel tags record three of them:
 
 | Native code depends on | Recorded in the wheel tags | Where the skill checks it |
 |---|---|---|
@@ -110,11 +110,13 @@ Executed results (pip 26.2.1, `PYVER=3.11`, glibc 2.34):
 | `probe blosc2==0.6.3 aarch64` with `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu` | `(from versions: 0.6.4, 0.6.5, ...)`, then `not on https://download.pytorch.org/whl/cpu/blosc2/ (403)` (return code 1) | The verdict PyPI alone gives: that index answers 403 for a project it does not carry, and pip used PyPI's files. `docopt==0.6.2` gave `from versions: none` the same way, and an extra index that answers 404 gave the same results (section 9). |
 | `probe graviton-skill-review-no-such-project==1.0 aarch64`, a project on no index | `CHECK INDEX: no index has the project: https://pypi.org/simple/graviton-skill-review-no-such-project/ (404)` (return code 4) | Not a verdict: check the name and which index carries the project. |
 
-The three distinct meanings of a FAIL are why the probe is always run twice (aarch64, then x86_64 with the same ABI):
+The three distinct meanings of a FAIL, and a pure-Python PASS that x86_64 does not share, are why the probe is run twice (aarch64, then x86_64 with the same ABI):
 
 | aarch64 | x86_64 | Verdict |
 |---|---|---|
-| PASS | any | COMPATIBLE |
+| PASS, a wheel with compiled code | any | COMPATIBLE |
+| PASS, a `none-any` wheel | PASS, a `none-any` wheel, or FAIL | COMPATIBLE |
+| PASS, a `none-any` wheel | PASS, a wheel with compiled code | CHECK FALLBACK: aarch64 runs the pure-Python code and x86_64 the compiled code (Phase 1.3) |
 | FAIL with `from versions: <list>` | PASS | MUST UPGRADE to the **lowest** listed version (then confirm it with another PASS) |
 | FAIL `from versions: none` | PASS | Either x86-only by nature (section 4) or aarch64 dropped in later releases (pygeos case): decide from the full files list |
 | FAIL | FAIL | Not an architecture finding: sdist-only package (section 5) or interpreter ABI mismatch (section 6) |

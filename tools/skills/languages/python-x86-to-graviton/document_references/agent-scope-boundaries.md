@@ -23,7 +23,9 @@ Is this dependency update required for ARM64 compatibility?
 │  │  │     └─ More than one applies (pygeos: a source build or a successor package)?
 │  │  │           → CHECK: user decision with the options (Phase 2.2); the label follows the choice
 │  │  └─ YES → ✅ COMPATIBLE (has ARM64 support)
-│  └─ NO (Pure Python: py3-none-any wheel or pure-Python sdist) → ✅ COMPATIBLE (pure Python works on all architectures)
+│  └─ NO (Pure Python on aarch64: a none-any wheel or a pure-Python sdist)
+│        ├─ Does x86_64 get a compiled wheel of the same pin? → CHECK FALLBACK (Phase 1.3; the Phase 3 loaded check settles it)
+│        └─ NO → ✅ COMPATIBLE (pure Python works on all architectures)
 │
 ├─ Does current version FAIL to install or build on ARM64?
 │  ├─ YES → Check why:
@@ -164,14 +166,15 @@ A recommendation (a RECOMMENDED UPGRADE or a runtime setting) may be recorded on
 
 A-level sources available in this repository: BLAS threading (`OMP_NUM_THREADS`, `BLIS_NUM_THREADS`) and BLIS as an alternative BLAS in [python.md sections 2.2 and 2.6](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#2-scientific-and-numerical-application-numpy-scipy-blas-etc); PyTorch runtime environment (`DNNL_DEFAULT_FPMATH_MODE=BF16` gated on `bf16` in `/proc/cpuinfo`, `LRU_CACHE_CAPACITY=1024`, `THP_MEM_ALLOC_ENABLE=1`, the OMP thread formula, `torch.compile`, channels-last) in [pytorch.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/pytorch.md); TensorFlow `TF_ENABLE_ONEDNN_OPTS=1` for versions before 2.14 and thread-pool settings in [tensorflow.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/tensorflow.md); ONNX Runtime 1.17+ BF16 session option in [onnx.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/onnx.md); interpreter `>= 3.11` in [python.md section 1.2](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#12-recommended-versions); `-mcpu` compiler flags for in-repo extensions in [c-c++.md](https://github.com/aws/aws-graviton-getting-started/blob/main/c-c++.md) and the README processor table.
 
-## 📋 Common Pure Python Libraries (Always ARM64-Compatible)
+## 📋 Common Pure Python Libraries (ARM64-Compatible)
 
 These publish only `none-any` wheels on PyPI (latest release at the time of writing): pytest, six, attrs, requests, urllib3, idna, certifi, click, jinja2, flask, django, fastapi, boto3, botocore, python-dateutil, pytz, packaging, typing-extensions, pydantic.
 
-Two traps in that list:
+Three traps in that list:
 
 - **Pure facade, native transitive.** `pydantic` is pure, but it depends on `pydantic-core`, which ships platform wheels (aarch64 present). The transitive gets its own verdict; the probe over the resolved tree catches it.
-- **Native with a pure fallback.** `sqlalchemy`, `charset-normalizer` and `wrapt` publish both `none-any` and platform wheels; `pyyaml`, `markupsafe`, `greenlet` publish platform wheels only but build from source anywhere. All have aarch64 wheels today. If a *pinned* version lacks one, the pure fallback or sdist build is COMPATIBLE unless the project depends on the accelerated path for performance (then it is an improvement note, not a blocker).
+- **Compiled on x86 only, in older releases.** pydantic 1.x is the reverse: its x86_64 wheels are compiled with Cython and no 1.x release has an aarch64 wheel, so a 1.x pin runs its pure-Python code on arm64 (executed for 1.10.26: `pydantic.compiled` is `True` on x86_64 and `False` on arm64). The probe reports it CHECK FALLBACK.
+- **Native with a pure fallback.** `sqlalchemy`, `charset-normalizer` and `wrapt` publish both `none-any` and platform wheels; `pyyaml`, `markupsafe`, `greenlet` publish platform wheels only but build from source anywhere. All have aarch64 wheels today. If a *pinned* version lacks one, aarch64 runs the pure fallback while x86_64 runs the compiled code: the probe reports CHECK FALLBACK, and the user decides (Phase 1.3). An sdist build gets the Phase 3 loaded check, which shows whether its compiled code was built.
 
 Do not extend the list from memory. A package is pure when its files list shows only `none-any` wheels or its sdist contains no compiled sources (wheel-verification.md section 5).
 

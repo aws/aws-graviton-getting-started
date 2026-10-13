@@ -139,7 +139,7 @@ if ("aarch64".equals(arch)) {
 
 **Dockerfile updates (containerized deployments only):**
 
-PRESERVE the current base image distribution and version. Do NOT change JDK distribution or version.
+PRESERVE the current base image distribution and version. Do NOT change JDK distribution or version. One tag change is in scope: a tag or repository that names one architecture (`public.ecr.aws/lambda/java:21-x86_64`, `amd64/eclipse-temurin:21-jre`) becomes the same image's multi-architecture tag (`public.ecr.aws/lambda/java:21`, `eclipse-temurin:21-jre`); the distribution and version stay.
 
 > **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `eclipse-temurin:17-jdk` → `<registry>/eclipse-temurin:17-jdk`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting** — like the `./mvnw` wrapper fallback, this is verify-then-apply: if the configured registry does not resolve/pull (e.g. an internal mirror unreachable from the build host, `no such host`), do NOT rewrite the `FROM` — an unconditional redirect turns a compatibility migration into a hard build failure. Keep the original registry (same distro/version) and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets** (host-based or library project), `container.base_image_registry` / `container.runtime` have nothing to apply to — record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md` rather than silently ignoring it. If Phase 3 later synthesizes an image purely for ARM64 validation, honor the configured registry there. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
@@ -183,6 +183,10 @@ Key rules:
 - **Builder-stage tests run on `$BUILDPLATFORM`, not the target.** If you run the test suite inside the builder stage (`RUN mvn test` / `RUN ./gradlew test`) and build on an **x86** host/CI, those tests execute on x86 — an ARM64-only native failure would pass there, a **false PASS**. To validate on the target arch, either run tests in a stage pinned to `$TARGETPLATFORM`, or run them separately against a `linux/arm64` container (see phase3 §3.2). Building on an arm64 host masks this (builder = arm64), so don't rely on the builder stage alone for ARM64 test validation.
 
 Host-based deployments skip Docker steps.
+
+**x86-only JVM options (§1.4):** remove each one where an ARM64 JVM reads it, or set it only on x86 (a start script can test `uname -m`). This is an ARM64-required change, not a tuning recommendation: a JVM that refuses the option does not start. Executed: with `JAVA_TOOL_OPTIONS=-XX:UseAVX=2`, arm64 JDK 8, 11, 17 and 21 stopped with `Unrecognized VM option 'UseAVX=2'`; without it they started.
+
+**Lambda functions (only if the project already ships the template):** set `Architectures: [arm64]` on each function in the SAM or CloudFormation template (`Architecture.ARM_64` in a CDK app, `architectures = ["arm64"]` in Terraform; a function that names none runs on x86_64). Do not add a template the project does not have, and do not change the runtime. The JAR the function deploys must pass §1.2 for Linux aarch64 like any other build. [Lambda instruction set architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html) documents the `arm64` value.
 
 **Deployment manifests (only if the project already ships them):**
 

@@ -170,7 +170,7 @@ A recommendation (a RECOMMENDED UPGRADE or a runtime setting) may be recorded on
 
 A-level sources available in this repository: the .NET version guidance (.NET 10 LTS for new Graviton workloads, .NET 8 or 9 when an earlier supported release is needed) in [dotnet.md](https://github.com/aws/aws-graviton-getting-started/blob/main/dotnet.md#recommended-versions) and the README's [software updates table](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#recent-software-updates-relevant-to-graviton).
 
-## 📋 Common Managed .NET Libraries (Always ARM64-Compatible)
+## 📋 Common Managed .NET Libraries (ARM64-Compatible)
 
 These packages had **no native files** in their latest stable release at the time of writing (checked by content with `probe`). Managed code runs on any architecture, but a resolved tree still goes through the per-RID check, because any version can add a native dependency:
 

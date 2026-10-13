@@ -259,6 +259,18 @@ Verify:
 1. Application starts without errors
 2. The project's existing JVM options (start scripts, Dockerfile, `JAVA_TOOL_OPTIONS`) accepted without errors; an x86-only option such as `-XX:UseAVX=2` stops the JVM on ARM64 with `Unrecognized VM option`
 3. No immediate runtime crashes
+4. The native libraries the x86 baseline loads are loaded on ARM64 too, including the CHECK items from Phase 1.2 (the loaded check below)
+
+```bash
+# Loaded check (JDK 9 and later): the native libraries the JVM loaded, from its own log. Run the project's start
+# command, or its tests, the same way on the x86 baseline and on ARM64, long enough to reach the code that loads them.
+JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Xlog:os=info" timeout 120 java -jar target/app.jar \
+  > "graviton-validation/raw/loaded-$(uname -m).txt" 2>&1
+grep -E 'shared library load of .* was successful' "graviton-validation/raw/loaded-$(uname -m).txt" |
+  sed -E 's#.* load of ##; s# was successful.*##; s#[0-9]{5,}#<n>#g' | sort -u
+```
+
+Compare the two lists without the JDK's own libraries (its `lib/` folder; the x86 JDK also loads `libjsvml.so`, which the ARM64 JDK does not have). A library the x86 run loads that the ARM64 run does not is a finding with its Phase 1.2 cause, or the user's recorded decision to keep the pure Java path. Executed with netty-transport-native-epoll 4.1.138: with only the `linux-x86_64` classifier JAR, the x86 run listed `/tmp/libnetty_transport_native_epoll_x86_<n>.so` and the arm64 run no Netty library; with the `linux-aarch_64` classifier JAR the arm64 run listed `/tmp/libnetty_transport_native_epoll_aarch_<n>.so`. In a container, pass the option with `-e JAVA_TOOL_OPTIONS=-Xlog:os=info`. JDK 8 has no `-Xlog` (`Unrecognized option: -Xlog:os=info`); there, list the files the running JVM has mapped with `grep -oE '/[^ ]+\.so[^ ]*( \(deleted\))?$' /proc/<pid>/maps | sort -u`, where a library its loader extracted and then deleted, as Netty does, ends in `(deleted)`.
 
 > **macOS-host false FAIL.** When running host-based startup/tests on an Apple-Silicon Mac (`os.name=Mac, os.arch=aarch64`), a runtime-extracting native lib may load its `Linux/aarch64` binary fine on Graviton yet throw on macOS because the resolved JAR has no *Mac*/aarch64 binary (e.g. snappy-java added `Mac/aarch64/libsnappyjava.dylib` only in 1.1.8.2; the minimal Graviton floor 1.1.2.2 has `Linux/aarch64` but not Mac). A native-load failure on the macOS host is a **host-dev artifact, not a Graviton verdict** when the JAR contains a verified `Linux/aarch64` binary (per §1.2.1); check in a `linux/arm64` container instead, and settle the check on a Graviton host ("Match the production hosts"), rather than marking the migration FAILED. Same principle as the JNA darwin-aarch64 case in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md).
 

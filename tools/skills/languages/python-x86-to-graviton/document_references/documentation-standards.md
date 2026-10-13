@@ -184,7 +184,7 @@ Interpreter probed: cp3XY. Target libc: <glibc 2.NN | musl 1.N> (every manylinux
 ## CHECK Items
 | Item | Via | Why it is not settled | Settled by | Result |
 |---|---|---|---|---|
-| <dependency> | <direct or via> | <the CHECK line, for example CHECK INDEX: an index did not answer> | <the step: the sdist listing, the index answering, the Phase 3 import> | <the label it got, or still CHECK with the reason> |
+| <dependency> | <direct or via> | <the CHECK line, for example CHECK INDEX: an index did not answer, or CHECK FALLBACK: aarch64 gets only the pure-Python wheel> | <the step: the sdist listing, the index answering, the Phase 3 import or loaded check, a user decision> | <the label it got, or still CHECK with the reason> |
 
 ## RECOMMENDED UPGRADE (Non-Blocking)
 | Dependency | Pinned | Recommended version | Reason | Evidence level | Action taken |

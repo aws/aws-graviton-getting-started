@@ -43,18 +43,19 @@ Executed: on a test repository whose `Directory.Build.targets` holds a target wi
 
 ### Determine Deployment Type
 
-- Dockerfile or container config present: **Containerized**
+- Dockerfile or container config present, under any name (`Dockerfile*`, `*.Dockerfile`, `Containerfile`; `docker build -f` and Compose `dockerfile:` accept any name, so read the ones that scripts and CI pass): **Containerized**
 - systemd/init scripts, or a published app started directly (`dotnet <app>.dll` or its apphost): **Host-based**
+- A CDK app (`cdk.json`) or Terraform files define the infrastructure, and its architecture settings, in code (§1.4)
 - Some applications support both
-- AWS Lambda (`aws-lambda-tools-defaults.json`, a SAM or CloudFormation function with a `dotnet` runtime, or a Lambda container image): **Lambda**. The architecture is a function setting (§1.5).
+- AWS Lambda (`aws-lambda-tools-defaults.json`, a SAM, CloudFormation, CDK or Terraform function with a `dotnet` runtime, or a Lambda container image): **Lambda**. The architecture is a function setting (§1.5).
 - IIS (`web.config`, `AspNetCoreHostingModel`, `UseIIS`) or a Windows service (`AddWindowsService`, `UseWindowsService`, `ServiceBase`, installation scripts): **Windows host**. The application must move to Linux first ([Determine Starting Point](#determine-starting-point)).
 
 ```bash
 EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation)
 # Deployment files (read every hit)
-find . \( -name .git -o -name bin -o -name obj -o -name node_modules -o -name graviton-validation \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.dockerfile' \
-  -o -name 'docker-compose*.y*ml' -o -name 'compose*.y*ml' -o -name 'aws-lambda-tools-defaults.json' -o -name 'serverless.template' \
-  -o -name 'template.y*ml' -o -name '[Ww]eb.config' -o -name '*.service' -o -name '*.ps1' -o -name '*.sh' \) -print | sort
+find . \( -name .git -o -name bin -o -name obj -o -name node_modules -o -name cdk.out -o -name graviton-validation \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' \
+  -o -name 'Containerfile*' -o -name 'docker-compose*.y*ml' -o -name 'compose*.y*ml' -o -name 'aws-lambda-tools-defaults.json' -o -name 'serverless.template' \
+  -o -name 'template.y*ml' -o -name 'cdk.json' -o -name '*.tf' -o -name '[Ww]eb.config' -o -name '*.service' -o -name '*.ps1' -o -name '*.sh' \) -print | sort
 # Hosting markers: Kubernetes, Lambda, IIS, Windows services
 grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.template' --include='*.cs' --include='*.vb' --include='*.fs' \
   --include='*.csproj' --include='*.vbproj' --include='*.fsproj' --include='*.config' \
@@ -245,9 +246,10 @@ EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_mo
 # Native loads with file:line (C#, VB, F#)
 grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' \
   '[[<](DllImport|LibraryImport)\(|Declare (Auto |Ansi |Unicode )?(Function|Sub) .* Lib "|NativeLibrary\.(Load|TryLoad|SetDllImportResolver)|LoadUnmanagedDll|GetDelegateForFunctionPointer' . 2>/dev/null || true
-# Binary downloads with an architecture in the URL or file name (scripts, Dockerfiles, CI)
-grep -rnE "${EX[@]}" --include='*.sh' --include='*.ps1' --include='*.cmd' --include='Dockerfile*' --include='*.y*ml' \
-  '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[^#]*(x86_64|amd64|x64|linux64|win64)' . 2>/dev/null || true
+# Every download in scripts, Dockerfiles and CI. A URL that names no architecture still fetches a build
+# for one, so each downloaded file is judged by its content (below)
+grep -rnE "${EX[@]}" --include='*.sh' --include='*.ps1' --include='*.cmd' --include='Dockerfile*' --include='*.[Dd]ockerfile' \
+  --include='Containerfile*' --include='*.y*ml' '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[[:space:]]|^[[:space:]]*ADD[[:space:]]+https?:|releases/download/' . 2>/dev/null || true
 # Packages that run or download executables (a prompt, not an allowlist; the content check decides)
 grep -rnE "${EX[@]}" --include='*.csproj' --include='*.fsproj' --include='*.vbproj' --include='*.props' --include='*.targets' --include='packages.config' \
   'Selenium\.WebDriver|Microsoft\.Playwright|ChromeDriver|GeckoDriver' . 2>/dev/null || true
@@ -262,6 +264,21 @@ Executed:
   - Selenium.WebDriver in the UI test project, with version 4.48.0 in `Directory.Packages.props`;
   - `apt-get install -y --no-install-recommends libfontconfig1` in the Dockerfile.
 - **Windows solution:** `./src/Orders.Service/Platform.cs:20:` `[DllImport("kernel32.dll")]`. Windows system DLLs never exist on Linux: the call failed there with `DllNotFoundException: Unable to load shared library 'kernel32.dll' or one of its dependencies`.
+
+Fetch each download into a scratch folder and scan what it holds, whatever its URL says. Resolve the script's variables in the URL first; an archive is unpacked first:
+
+```bash
+GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list above
+d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX"); mkdir "$d/x"
+if curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
+  python3 -m zipfile -e "$d/download" "$d/x" 2>/dev/null || tar -xf "$d/download" -C "$d/x" 2>/dev/null
+  python3 "$GV_CHECK" scan "$d"
+else echo "CHECK: $URL did not download"; fi
+rm -rf "$d"
+```
+
+Executed: jq 1.6's `jq-linux64`, whose URL names no architecture, gave `FINDING download is x86-64`; jq 1.7.1's `jq-linux-arm64` gave no finding. A download that cannot be fetched from here (credentials, a private network) stays CHECK until it is scanned where it can be.
 
 Check that every OS package exists for arm64 on the target OS, from a container that runs natively on this host. On an x86 host, asking the arm64 image itself runs under emulation; that took 17 seconds for Debian and did not finish in 480 seconds for Amazon Linux 2023.
 
@@ -536,9 +553,19 @@ grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' \
 find . \( -name .git -o -name bin -o -name obj -o -name graviton-validation \) -prune -o -type f \( -name '*.aspx' -o -name '*.ascx' -o -name '*.asmx' -o -name '*.svc' -o -name 'Global.asax' -o -name '*.xaml' \) -print
 find . \( -name .git -o -name bin -o -name obj -o -name graviton-validation \) -prune -o -type f -iname 'web.config' -print | while IFS= read -r f; do
   grep -nE '<authentication mode="Windows"|<system\.serviceModel>|<httpModules>|<httpHandlers>|targetFramework=' "$f" | sed "s#^#$f:#"; done
-# Deployment descriptors, scripts and CI that pin x64, Windows or one architecture
-grep -rnE "${EX[@]}" --include='Dockerfile*' --include='*.y*ml' --include='*.json' --include='*.sh' --include='*.ps1' --include='*.template' -- \
-  '--platform[= ]linux/amd64|(-r|--runtime) (linux|win)-x64|(-a|--arch) (x64|amd64)|nanoserver|servercore|kubernetes\.io/arch: *amd64|runs-on: |x86_64|uname -m|docker build |--locked-mode' . 2>/dev/null || true
+# Deployment descriptors, scripts and CI that pin x64, Windows or one architecture, and the resources
+# whose architecture can be absent (functions, task definitions, node groups)
+grep -rnE "${EX[@]}" --include='Dockerfile*' --include='*.[Dd]ockerfile' --include='Containerfile*' --include='*.y*ml' --include='*.json' \
+  --include='*.tf' --include='*.sh' --include='*.ps1' --include='*.template' -- \
+  '--platform[= ]linux/amd64|(-r|--runtime) (linux|win)-x64|(-a|--arch) (x64|amd64)|nanoserver|servercore|kubernetes\.io/arch: *amd64|runs-on: |x86_64|-amd64([^A-Za-z0-9]|$)|(^|[^A-Za-z0-9])amd64/|uname -m|docker build |--locked-mode|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?[Cc]ompatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"' . 2>/dev/null || true
+# CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
+# (a construct that sets none gets x86_64)
+find . \( -name .git -o -name bin -o -name obj -o -name node_modules -o -name cdk.out \) -prune -o -name cdk.json -print |
+  while IFS= read -r c; do grep -rnE --exclude-dir=node_modules --exclude-dir=cdk.out --exclude-dir=bin --exclude-dir=obj --include='*.py' --include='*.ts' --include='*.js' \
+    --include='*.java' --include='*.cs' --include='*.go' 'Architecture[._](X86_64|ARM_64)|CpuArchitecture[._](X86_64|ARM64)|AmazonLinuxCpuType\.|MachineImage[._]|NodegroupAmiType\.|InstanceType\(|InstanceClass\.|(^|[^A-Za-z0-9_])(New)?(Function|DockerImageFunction|NodejsFunction|PythonFunction|GoFunction|FargateTaskDefinition|Nodegroup)(\(|\.Builder)|add_?[Nn]odegroup_?[Cc]apacity' "$(dirname "$c")"; done
+# x86-only compiler flags and intrinsics in native C and C++ sources the repository builds
+grep -rnE "${EX[@]}" --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' \
+  --include=CMakeLists.txt --include=Makefile --include='*.mk' -- '-m(avx|sse|fma|bmi|popcnt|pclmul|aes|crc32|f16c|lzcnt)|-march=|-mtune=|[a-z0-9]+intrin\.h|cpuid\.h|__builtin_ia32_|__cpuid|__rdtsc|__x86_64__|_M_X64|__SSE|__AVX|__m(128|256|512)|_mm[0-9]*_' . 2>/dev/null || true
 ```
 
 Executed:
@@ -554,12 +581,14 @@ Executed:
   - `OrderService.svc`, `Global.asax` and `Default.aspx`;
   - `<authentication mode="Windows" />` and `<system.serviceModel>` in `Web.config`.
 - **Linux solution:**
-  - the `x86_64` Lambda architecture and `kubernetes.io/arch: amd64`;
+  - the `x86_64` Lambda architecture, with the `AWS::Serverless::Function` line of its function, and `kubernetes.io/arch: amd64`;
   - the `uname -m` gate and the x86_64 AWS CLI URL in `deploy/deploy.sh`;
   - `FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/sdk:8.0 AS build` and `-r linux-x64` in the Dockerfile;
   - in CI: `runs-on: ubuntu-latest`, `dotnet restore --locked-mode`, `-r linux-x64` for the Native AOT agent and a single-architecture `docker build`.
 
 What each Windows or .NET Framework hit means on Linux, with the replacement, is in [windows-to-linux.md](../document_references/windows-to-linux.md). The descriptor fixes are in Phase 2.4.
+
+A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim-amd64`, `public.ecr.aws/lambda/dotnet:8-x86_64`). Native C or C++ sources the repository builds need an Arm path for any x86 intrinsics they use: [c-c++.md](https://github.com/aws/aws-graviton-getting-started/blob/main/c-c%2B%2B.md#porting-codes-with-sseavx-intrinsics-to-neon) describes how to port them, starting with sse2neon, which translates x86 intrinsics to NEON.
 
 ## 1.5 .NET Version Compatibility Check
 

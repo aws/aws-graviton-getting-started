@@ -10,9 +10,18 @@ Analyze the project without making changes. All findings are documented in `grav
 
 ### Determine Deployment Type
 
-- Dockerfile or container config present: **Containerized**
+```bash
+# Deployment files (read every hit)
+find . \( -name .git -o -name node_modules -o -name cdk.out \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' \
+  -o -name 'Containerfile*' -o -name 'docker-compose*.y*ml' -o -name 'compose*.y*ml' -o -name 'template.y*ml' -o -name 'serverless.yml' \
+  -o -name 'cdk.json' -o -name '*.tf' -o -name '*.service' -o -name 'Procfile' \) -print | sort
+```
+
+- Dockerfile or container config present, under any name (`Dockerfile*`, `*.Dockerfile`, `Containerfile`; `docker build -f` and Compose `dockerfile:` accept any name, so read the ones that scripts and CI pass): **Containerized**
 - systemd/init scripts or direct JAR/WAR: **Host-based**
-- Some applications support both
+- A CDK app (`cdk.json`) or Terraform files define the infrastructure, and its architecture settings, in code (§1.4)
+- A SAM, CloudFormation, CDK or Terraform function with a `java` runtime: **Lambda**. The architecture is a function setting (§1.4)
+- Some applications support more than one
 
 ### Detect Multi-Module Structure
 
@@ -149,6 +158,22 @@ grep -rnE "netty-transport-native|netty-tcnative|io\.grpc.*netty|conscrypt|jnr-f
   --include="pom.xml" --include="build.gradle" --include="build.gradle.kts" . 2>/dev/null || true
 ```
 
+Downloads in scripts, Dockerfiles and CI bring native code in outside the build. List every one, then fetch each into a scratch folder and run `file` on what it holds, whatever its URL says (resolve the script's variables in the URL first; a JAR goes through the §1.2.1 scan instead):
+
+```bash
+grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules --include='*.sh' --include='Dockerfile*' --include='*.[Dd]ockerfile' \
+  --include='Containerfile*' --include='Makefile' --include='*.y*ml' '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[[:space:]]|^[[:space:]]*ADD[[:space:]]+https?:|releases/download/' . 2>/dev/null || true
+URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list
+d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX"); mkdir "$d/x"
+if curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
+  unzip -q "$d/download" -d "$d/x" 2>/dev/null || tar -xf "$d/download" -C "$d/x" 2>/dev/null
+  find "$d" -type f -exec file {} + | grep -E ':[[:space:]]+(ELF|Mach-O|PE32)' | sed "s#^$d/##"
+else echo "CHECK: $URL did not download"; fi
+rm -rf "$d"
+```
+
+Executed: `file` reported `x86-64` for jq 1.6's `jq-linux64`, whose URL names no architecture, and `ARM aarch64` for jq 1.7.1's `jq-linux-arm64`. A download that cannot be fetched from here (credentials, a private network) stays CHECK until it is scanned where it can be.
+
 **Common runtime-extracting libraries** (this list is a *prompt*, not an allowlist — any JAR containing a native lib qualifies, including ones not named here such as `jansi`/`hawtjni`, `commons-crypto`, `jansi-native`):
 - **Netty** (`netty-transport-native-epoll`, `netty-tcnative`): Extracts .so based on `os.arch`
 - **Conscrypt**: Native crypto libraries at runtime
@@ -161,7 +186,7 @@ grep -rnE "netty-transport-native|netty-tcnative|io\.grpc.*netty|conscrypt|jnr-f
 
 **Do not rely on the named list alone.** The authoritative signal is the §1.2.1 content scan: any resolved JAR that contains a `.so`/`.dll`/`.dylib`/`.jnilib` extracts or loads native code and must be checked for an `aarch64` binary — whether or not its name appears above. The grep is only a fast-path hint; the content scan is what actually determines the finding.
 
-For each native-bearing JAR found: check whether it includes a `linux/aarch64` binary (verify the JAR per §1.2.1 — never infer from the version number). If missing, flag as MUST UPGRADE. If a pure Java fallback exists (e.g., Netty NIO vs native epoll), document it.
+For each native-bearing JAR found: check whether it includes a `linux/aarch64` binary (verify the JAR per §1.2.1; never infer from the version number). If missing, flag as MUST UPGRADE, unless the library falls back to pure Java without it: the application then runs on ARM64, but without the native code it runs on x86, so mark it CHECK and settle it with the loaded check in Phase 3.3. Executed with netty-transport-native-epoll 4.1.138 and only its `linux-x86_64` classifier JAR: on an arm64 JVM `Epoll.isAvailable()` was `false`, with `java.io.FileNotFoundException: META-INF/native/libnetty_transport_native_epoll_aarch_64.so`, so Netty uses its NIO transport instead; with the `linux-aarch_64` classifier JAR the library loaded.
 
 ### 1.2.3 Tiered Validation Policy
 
@@ -169,7 +194,10 @@ For each native-bearing JAR found: check whether it includes a `linux/aarch64` b
 - .so shows x86-64 only AND no ARM64 version in JAR AND no source code available AND user cannot provide ARM64 version
 
 **WARN but proceed if:**
-- Multi-arch JAR with both x86 and ARM64, OR pure Java fallback exists, OR source available for recompilation
+- Multi-arch JAR with both x86 and ARM64, OR source available for recompilation
+
+**CHECK (settled by the Phase 3.3 loaded check) if:**
+- The library falls back to pure Java without its native code (Netty's epoll transport falls back to NIO): the application runs, but not the code it runs on x86
 
 **PASS if:**
 - .so shows "ARM aarch64" OR the JAR contains both an x86-64 and an `ARM aarch64` build of the library, each confirmed by `file` (a folder name such as `/linux/aarch64/` is not evidence)
@@ -292,9 +320,32 @@ grep -rnE 'System\.getProperty\("os\.(arch|name)"\)|Native\.load|System\.loadLib
 # from the first grep, which is the authoritative signal.
 grep -rlE '"(amd64|x86_64)"' --include="*.java" --include="*.kt" . 2>/dev/null \
   | while IFS= read -r f; do grep -qE '"aarch64"|"arm64"' "$f" || printf '%s\n' "$f"; done   # files comparing amd64/x86_64 but NOT aarch64
+# Dockerfiles under any name, and deployment descriptors
+find . \( -name .git -o -name target -o -name node_modules \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' \) -print |
+  while IFS= read -r f; do grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|x86_64|amd64' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done
+grep -rniE --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules --exclude-dir=cdk.out --include='*.y*ml' --include='*.json' --include='*.tf' \
+  'architectures?"?[[:space:]]*[:=]|kubernetes\.io/arch|nodeselector|cpu_?architecture"?[[:space:]]*[:=]|ami_?type"?[[:space:]]*[:=]|instance_?types?"?[[:space:]]*[:=]|ami-[0-9a-f]{8,17}|^functions:|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?compatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"|x86_64|amd64' . 2>/dev/null || true
+# CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
+# (a construct that sets none gets x86_64)
+find . \( -name .git -o -name target -o -name node_modules -o -name cdk.out \) -prune -o -name cdk.json -print |
+  while IFS= read -r c; do grep -rnE --exclude-dir=node_modules --exclude-dir=cdk.out --exclude-dir=target --include='*.py' --include='*.ts' --include='*.js' \
+    --include='*.java' --include='*.cs' --include='*.go' 'Architecture[._](X86_64|ARM_64)|CpuArchitecture[._](X86_64|ARM64)|AmazonLinuxCpuType\.|MachineImage[._]|NodegroupAmiType\.|InstanceType\(|InstanceClass\.|(^|[^A-Za-z0-9_])(New)?(Function|DockerImageFunction|NodejsFunction|PythonFunction|GoFunction|FargateTaskDefinition|Nodegroup)(\(|\.Builder)|add_?[Nn]odegroup_?[Cc]apacity' "$(dirname "$c")"; done
+# x86-only JVM options (HotSpot defines them only in its x86 port) in start scripts, Dockerfiles,
+# Compose and Kubernetes files, task definitions, systemd units, and Maven and Gradle JVM settings
+grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules --include='*.sh' --include='*.cmd' --include='*.bat' \
+  --include='Dockerfile*' --include='*.[Dd]ockerfile' --include='Containerfile*' --include='*.y*ml' --include='*.json' --include='*.service' \
+  --include='*.conf' --include='*.properties' --include='*.env' --include=jvm.config --include=Procfile -- \
+  '-XX:[+-]?(AVX3Threshold|IntelJccErratumMitigation|RTM[A-Za-z]+|UseAVX|UseAddressNop|UseBMI[12]Instructions|UseCLMUL|UseCount(Leading|Trailing)ZerosInstruction|UseFastStosb|UseIncDec|UseKNLSetting|UseLibmIntrinsic|UseNewLongLShift|UseRTM[A-Za-z]+|UseSSE|UseSSE42Intrinsics|UseStoreImmI16|UseUnalignedLoadStores|UseXMMForObjInit|UseXmm[A-Za-z0-9]+)([^A-Za-z0-9]|$)' . 2>/dev/null || true
+# x86-only compiler flags and intrinsics in JNI sources the project builds (C, C++)
+grep -rnE --exclude-dir=.git --exclude-dir=target --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' \
+  --include='*.hpp' --include=CMakeLists.txt --include=Makefile --include='*.mk' -- '-m(avx|sse|fma|bmi|popcnt|pclmul|aes|crc32|f16c|lzcnt)|-march=|-mtune=|[a-z0-9]+intrin\.h|cpuid\.h|__builtin_ia32_|__cpuid|__rdtsc|__x86_64__|_M_X64|__SSE|__AVX|__m(128|256|512)|_mm[0-9]*_' . 2>/dev/null || true
 ```
 
 Flag code that checks for "amd64" or "x86_64" without "aarch64" handling, loads native libraries without architecture-aware paths, or contains x86-specific assumptions.
+
+An x86-only JVM option is a FINDING when the target JDK refuses it: HotSpot defines these options only in its x86 port, and an ARM64 JVM that does not know one stops before the application starts (`Unrecognized VM option 'UseAVX=2'`, then `Error: Could not create the Java Virtual Machine.`). Executed on arm64 JDK 8, 11, 17 and 21: 17 and 21 refused all 34 options, 11 accepted `UseSSE=<n>`, and 8 accepted `UseSSE=<n>` and `UseSSE42Intrinsics`. With `-XX:+IgnoreUnrecognizedVMOptions` all four started, but that option ignores every unrecognized option, not only these.
+
+A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`public.ecr.aws/lambda/java:21-x86_64`) or its repository (`amd64/eclipse-temurin:21-jre`). C or C++ sources the project builds for JNI need an Arm path for any x86 intrinsics they use: [c-c++.md](https://github.com/aws/aws-graviton-getting-started/blob/main/c-c%2B%2B.md#porting-codes-with-sseavx-intrinsics-to-neon) describes how to port them, starting with sse2neon, which translates x86 intrinsics to NEON.
 
 ## 1.5 Java Version Compatibility Check
 

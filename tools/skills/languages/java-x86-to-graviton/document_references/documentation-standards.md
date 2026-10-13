@@ -208,6 +208,12 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 |------|---------|------|---------|-----------------|
 | src/.../Bridge.java | 23 | JNA Native.load() | libbridge.so | Yes — aarch64 binary present |
 
+## JVM Options and Deployment Settings
+| File | Line(s) | Setting | Action |
+|------|---------|---------|--------|
+| Dockerfile | 9 | `JAVA_TOOL_OPTIONS=-XX:UseAVX=2`: x86-only, an ARM64 JVM does not start | removed for arm64 (Phase 2.4) |
+| template.yaml | 14 | Lambda function with no `Architectures`, so it runs on x86_64 | `Architectures: [arm64]` (Phase 2.4) |
+
 ## Changes Applied
 <Summary of code changes made in Phase 2.3 to add ARM64 handling>
 
@@ -291,6 +297,7 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 ## Startup Validation
 - **Application starts without errors:** ✅ Yes | ❌ No
 - **Existing JVM options accepted on ARM64:** ✅ Yes | ❌ No
+- **Native libraries loaded (loaded check), ARM64 and the x86 baseline:** <both lists, or "the same">
 - **Runtime crashes:** None | <description>
 ```
 

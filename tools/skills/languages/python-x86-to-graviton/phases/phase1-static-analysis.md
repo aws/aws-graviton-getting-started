@@ -13,15 +13,17 @@ Phase 1 runs on any host, including x86, and installs nothing into the project o
 ### Determine Deployment Type
 
 ```bash
-find . \( -path ./.venv -o -path ./.git \) -prune -o \
-  \( -name 'Dockerfile*' -o -name 'docker-compose*.y*ml' -o -name 'template.y*ml' -o -name 'serverless.yml' \
+find . \( -path ./.venv -o -path ./.git -o -name node_modules -o -name cdk.out \) -prune -o \
+  \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' -o -name 'docker-compose*.y*ml' \
+     -o -name 'template.y*ml' -o -name 'serverless.yml' -o -name 'cdk.json' -o -name '*.tf' \
      -o -name 'Procfile' -o -name '*.service' -o -name 'samconfig.toml' \) -print
 grep -lE "AWS::Serverless::Function|AWS::Lambda::Function" template.y*ml 2>/dev/null
 ```
 
-- Dockerfile or container config present: **Containerized**
+- Dockerfile or container config present, under any name (`Dockerfile*`, `*.Dockerfile`, `Containerfile`; `docker build -f` and Compose `dockerfile:` accept any name, so read the ones that scripts and CI pass): **Containerized**
 - SAM / CloudFormation / serverless template with a Lambda function: **Lambda** (also check for layer zips and a `python/` directory, §1.2.2)
 - systemd unit, Procfile, or a plain `python -m app` entry point: **Host-based**
+- A CDK app (`cdk.json`) or Terraform files define the infrastructure, and its architecture settings, in code (§1.4)
 - Some applications support more than one; record all of them
 
 ### Detect Multi-Module Structure
@@ -475,9 +477,11 @@ Executed on the fixture: `setup.py:5: ext = Extension(`, `setup.py:15: ext_modul
 Some packages and scripts download or unpack native binaries at run, build or deploy time instead of shipping them in a wheel, and packages from the OS arrive outside pip. None of them shows up in the dependency tree.
 
 ```bash
-# Binary downloads in scripts and Dockerfiles
-grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include='Dockerfile*' --include='Makefile' --include='*.py' \
-  "(curl|wget).*(amd64|x86_64|x86-64)|releases/download/.*(amd64|x86_64)" .
+# Every download in scripts, Dockerfiles and CI. A URL that names no architecture still fetches a build
+# for one, so each downloaded file is judged by its content (the next block)
+grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include='Dockerfile*' --include='*.[Dd]ockerfile' \
+  --include='Containerfile*' --include='Makefile' --include='*.py' --include='*.y*ml' \
+  '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[[:space:]]|^[[:space:]]*ADD[[:space:]]+https?:|releases/download/' .
 
 # Packages installed from the OS by Dockerfiles and scripts
 grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='Dockerfile*' --include='*.sh' \
@@ -485,6 +489,19 @@ grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='Dockerfile*' --inclu
 ```
 
 Executed on the fixture: `scripts_deploy.sh:5: curl ... tool-linux-amd64`; no OS packages.
+
+Fetch each download into a scratch folder and scan what it holds, whatever its URL says. Resolve the script's variables in the URL first; `native_scan` opens zip archives itself, and a tar archive is unpacked first:
+
+```bash
+. "${TMPDIR:-/tmp}/graviton-python-native_scan.sh" || echo "run the Phase 1.2.1 scan block first: it writes this file"
+TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41; TARGET_PAGE_SIZE=4096   # the §1.1 values, as in §1.2.1
+URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list above
+d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX")
+if curl -fsSL --max-time 300 -o "$d/download" "$URL"; then tar -xf "$d/download" -C "$d" 2>/dev/null; native_scan "$d"; else echo "CHECK: $URL did not download"; fi
+rm -rf "$d"
+```
+
+Executed: jq 1.6's `jq-linux64`, whose URL names no architecture, gave `FINDING ...: not aarch64, e_machine 62 (x86-64)`; jq 1.7.1's `jq-linux-arm64` gave no finding. A download that cannot be fetched from here (credentials, a private network) stays CHECK until it is scanned where it can be.
 
 **Common packages that fetch or carry native binaries outside their wheel tags** (this list is a *prompt*, not an allowlist):
 - **selenium**: its `py3-none-any` wheel carries Selenium Manager executables. Up to 4.48.0 the only Linux build is an x86-64 executable (`selenium/webdriver/common/linux/selenium-manager`); 4.49.0 is the first release that also carries `linux-arm64/selenium-manager`. On Linux aarch64, 4.48.0 stops before it starts any program, with `WebDriverException: Message: Unsupported platform/architecture combination: linux/aarch64` (its `selenium_manager.py` maps Linux to a binary only for `x86_64`); the bundled file itself, run directly on Graviton, fails with `Exec format error`. 4.50.0 runs the arm64 one
@@ -578,7 +595,16 @@ sed -E 's/[[:space:]]*#.*//' graviton-validation/raw/requirements-resolved.txt |
   out=$(probe "$req" aarch64); rc=$?
   if [ $rc -eq 4 ]; then echo "CHECK INDEX     $req  $out"; continue; fi
   if [ $rc -eq 0 ]; then
-    case "$out" in *-none-any.whl) echo "COMPATIBLE      $req  pure Python: $out";; *) echo "COMPATIBLE      $req  aarch64 wheel: $out";; esac
+    case "$out" in
+      *-none-any.whl)   # pure on aarch64: x86_64 may still get compiled code for the same pin
+        x86=$(probe "$req" x86_64); xrc=$?
+        case "$xrc:$x86" in
+          0:*-none-any.whl|[123]:*) echo "COMPATIBLE      $req  pure Python: $out";;
+          4:*) echo "CHECK INDEX     $req  $x86";;
+          *) echo "CHECK FALLBACK  $req  aarch64 gets only the pure-Python wheel $out; x86_64 gets compiled code: $x86";;
+        esac;;
+      *) echo "COMPATIBLE      $req  aarch64 wheel: $out";;
+    esac
   elif [ $rc -eq 3 ]; then
     echo "CHECK MARKER    $req  skipped: its environment marker does not match this host; judge it for Linux aarch64 by hand"
   else
@@ -624,9 +650,11 @@ Apply the decision tree in [../document_references/agent-scope-boundaries.md](..
 
 **RECOMMENDED UPGRADE (Non-blocking):** installs and runs on aarch64, and a newer version has a documented Graviton improvement; record it with its source and evidence level and never apply it. Runtime settings go to `05-runtime-configuration.md` (Phase 2.5).
 
-**COMPATIBLE (No action):** aarch64 wheel present, or `none-any` wheel, or pure-Python sdist. Age, CVEs and "newer is faster" do not move a package out of this class.
+**COMPATIBLE (No action):** aarch64 wheel present, or a `none-any` wheel that x86_64 gets too, or pure-Python sdist. Age, CVEs and "newer is faster" do not move a package out of this class.
 
 **CHECK SDIST/ABI lines need one more step before they get a label:** download the sdist and list compiled sources (wheel-verification.md §5); if there are none it is COMPATIBLE. If the package has aarch64 wheels for a *different* `cp` tag (probe again with `--python-version 3.10 --abi cp310`, and x86_64 with the project's tag), it is an interpreter-ABI blocker, reported in its own table and resolved only through the gate in §1.5.
+
+**CHECK FALLBACK lines run on aarch64, but not the code x86 runs:** aarch64 gets the pure-Python wheel and x86_64 a compiled one for the same pin. Executed for `pydantic==1.10.26`: on x86_64 pip installed a Cython-compiled wheel (`pydantic.compiled` is `True`, 23 native files loaded) and on Graviton2 to Graviton5 the `none-any` wheel (`False`); no pydantic 1.x release has an aarch64 wheel. List the releases with an aarch64 wheel for the project's tag (wheel-verification.md §4) and record the pin under User Decisions Pending. The Recommendation is the lowest such release in the same major version. When there is none, the options are the pure-Python path as it is (the default in unattended runs: nothing changes), a compiled wheel built on aarch64 from the sdist, or the next major version (pydantic 2.x moves its compiled code to `pydantic-core`, which has aarch64 wheels). A plain build from the sdist can be pure again: pydantic 1.x compiles only with its own build option, and on Graviton `pip wheel --no-binary pydantic --config-settings=--build-option=--cythonize --build-constraint build-constraints.txt pydantic==1.10.26`, with `Cython==3.0.12` in the constraints file, built `pydantic-1.10.26-cp311-cp311-linux_aarch64.whl` (`pydantic.compiled` is `True`); without the option it built the `none-any` wheel, and with Cython 3.3.0 the build stopped inside Cython. The Phase 3 loaded check shows which code runs.
 
 **CHECK INDEX lines are not verdicts:** an index that may have the wheel did not answer (credentials, network, a server error), or no configured index has the project. Fix access or the index settings, or probe PyPI as in the skill-config note above, and rerun the loop for those pins; never label a pin from a failed request. An index that answers 403 or 404 for a project page does not have that project, and pip uses the other indexes: the loop keeps their verdict and appends `not on <url> (403)`. Executed with `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`, which answers 403 for projects it does not carry, the loop gave the fixture's pins the same verdicts as with PyPI alone. A private index can also answer 403 or 404 when the probe may not read it; when a note names one that should carry the package, check access to it (wheel-verification.md §9).
 
@@ -680,16 +708,26 @@ grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include=Make
 # x86-only compiler flags, intrinsics headers and macros in build files and extension sources
 grep -rnE --exclude-dir=.venv --exclude-dir=.git \
   --include=setup.py --include=setup.cfg --include=pyproject.toml --include=CMakeLists.txt --include=meson.build \
-  --include='*.c' --include='*.cc' --include='*.cpp' --include='*.h' --include='*.pyx' --include='*.rs' --include=Cargo.toml \
-  -- '-m(avx|sse|fma|bmi|popcnt)|-march=|-mtune=|immintrin\.h|xmmintrin\.h|emmintrin\.h|__x86_64__|__SSE|__AVX|_mm[0-9]*_' .
+  --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' --include='*.pyx' \
+  --include='*.rs' --include=Cargo.toml -- '-m(avx|sse|fma|bmi|popcnt|pclmul|aes|crc32|f16c|lzcnt)|-march=|-mtune=|[a-z0-9]+intrin\.h|cpuid\.h|__builtin_ia32_|__cpuid|__rdtsc|__x86_64__|_M_X64|__SSE|__AVX|__m(128|256|512)|_mm[0-9]*_' .
 
-# Dockerfiles and deployment descriptors
-grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|pip install|uv (sync|pip)|poetry install|conda env' Dockerfile*
-grep -rniE --exclude-dir=.venv --exclude-dir=.git --include='*.y*ml' --include='*.json' --include='*.tf' \
-  'architectures"?[[:space:]]*[:=]|kubernetes\.io/arch|nodeselector|cpu_?architecture"?[[:space:]]*[:=]|ami_?type"?[[:space:]]*[:=]|instance_?types?"?[[:space:]]*[:=]|ami-[0-9a-f]{8,17}|x86_64|amd64' .
+# Dockerfiles under any name, and deployment descriptors
+find . \( -path ./.venv -o -path ./.git -o -name node_modules \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' \) -print |
+  while IFS= read -r f; do grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|x86_64|amd64|pip install|uv (sync|pip)|poetry install|conda env' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done
+grep -rniE --exclude-dir=.venv --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=cdk.out --include='*.y*ml' --include='*.json' --include='*.tf' \
+  'architectures?"?[[:space:]]*[:=]|kubernetes\.io/arch|nodeselector|cpu_?architecture"?[[:space:]]*[:=]|ami_?type"?[[:space:]]*[:=]|instance_?types?"?[[:space:]]*[:=]|ami-[0-9a-f]{8,17}|^functions:|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?compatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"|x86_64|amd64' .
+# CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
+# (a construct that sets none gets x86_64)
+find . \( -path ./.venv -o -path ./.git -o -name node_modules -o -name cdk.out \) -prune -o -name cdk.json -print |
+  while IFS= read -r c; do grep -rnE --exclude-dir=node_modules --exclude-dir=cdk.out --exclude-dir=.venv --include='*.py' --include='*.ts' --include='*.js' \
+    --include='*.java' --include='*.cs' --include='*.go' 'Architecture[._](X86_64|ARM_64)|CpuArchitecture[._](X86_64|ARM64)|AmazonLinuxCpuType\.|MachineImage[._]|NodegroupAmiType\.|InstanceType\(|InstanceClass\.|(^|[^A-Za-z0-9_])(New)?(Function|DockerImageFunction|NodejsFunction|PythonFunction|GoFunction|FargateTaskDefinition|Nodegroup)(\(|\.Builder)|add_?[Nn]odegroup_?[Cc]apacity' "$(dirname "$c")"; done
+# Wheels the project builds itself: cibuildwheel builds only the runner's architecture unless archs adds one
+grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.toml' --include='*.y*ml' 'cibuildwheel|CIBW_ARCHS|^[[:space:]]*archs[[:space:]]*=' .
 ```
 
 The descriptor pattern is case-insensitive and allows an optional quote and `:` or `=`, so it catches CloudFormation JSON (`"Architectures": ["x86_64"]`) and YAML, ECS task definitions (`"cpuArchitecture": "X86_64"`) and Terraform (`architectures = ["x86_64"]`, `cpu_architecture`, `ami_type`, `instance_type`). Executed on a Terraform file, a CloudFormation template, an ECS task definition, an eksctl file and a Kubernetes manifest, it matched all 14 architecture-specific lines; on a SAM template, a JSON template and a Kubernetes manifest it matched the `Architectures` and `nodeSelector` lines. Note the `--` before the pattern in the flags and Dockerfile greps: those patterns start with `-`, and without `--` grep reads them as options (`grep: unrecognized option '--platform=...'`). Keep the `--include` flags **before** the `--`, or grep treats them as file names.
+
+A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`public.ecr.aws/lambda/python:3.12-x86_64`) or its repository (`amd64/python:3.11-slim`). cibuildwheel's default, `archs = "auto"`, builds only `x86_64` wheels on a Linux x86_64 runner, so a project that builds its wheels on x86 runners ships no aarch64 wheel until `archs` (or `CIBW_ARCHS_LINUX`) adds `aarch64` (Phase 2.4 "CI pipelines").
 
 Instance types and AMI IDs need arm64 counterparts. A Graviton instance type is a sizing decision: record it under User Decisions Pending with the default from Phase 2.4 (same family and size, newest Graviton generation in the region). An AMI ID names one architecture: `aws ec2 describe-images --image-ids <id> --query 'Images[].[ImageId,Architecture,Name]'` shows which (executed: `al2023-ami-2023.12.20260930.0-kernel-6.18-x86_64` reports `x86_64` and its `-arm64` sibling `arm64`), and the arm64 AMI of the same release replaces it; the public SSM parameter `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` has an `-arm64` counterpart. ECS `cpuArchitecture` takes `X86_64` or `ARM64` (Fargate defaults to `X86_64`), and EKS `amiType` values come in pairs (`AL2023_x86_64_STANDARD` and `AL2023_ARM_64_STANDARD`). Change these only where the project ships the files ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), IN SCOPE 6).
 

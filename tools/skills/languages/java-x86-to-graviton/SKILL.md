@@ -16,7 +16,7 @@ Validate a Java application's readiness to run on AWS Graviton instances. This t
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
-**In scope:** Native library ARM64 binaries, ARM64-blocking dependency updates, architecture detection code, Graviton JVM flag recommendations (documented, not applied), CI changes that only add or switch an architecture, ARM64 build/test validation.
+**In scope:** Native library ARM64 binaries, ARM64-blocking dependency updates, architecture detection code, x86-only JVM options that stop an ARM64 JVM, Graviton JVM flag recommendations (documented, not applied), CI changes that only add or switch an architecture, ARM64 build/test validation.
 
 **Out of scope:** Java version changes, JDK distribution changes, general dependency modernization, security updates, code refactoring, .gitignore/.dockerignore changes.
 
@@ -92,7 +92,7 @@ Analyze the project without making changes. See [phases/phase1-static-analysis.m
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, dependency tree generation, component risk categorization
 2. **1.2 Native Library Validation** - Scan for .so files (bundled and runtime-extracted), apply tiered FAIL/WARN/PASS policy
 3. **1.3 Dependency ARM64 Compatibility** - Analyze full transitive tree, classify as MUST UPGRADE / RECOMMENDED / COMPATIBLE
-4. **1.4 Architecture-Specific Code Detection** - Find `os.arch` checks, JNI/JNA usage missing ARM64 handling
+4. **1.4 Architecture-Specific Code Detection** - Find `os.arch` checks, JNI/JNA usage missing ARM64 handling, x86-only JVM options, and deployment settings that pick x86, set or absent
 5. **1.5 Java Version Check** - Document version and distribution (do NOT change either)
 
 ### Phase 2: Compatibility Resolution

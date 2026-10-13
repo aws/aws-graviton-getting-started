@@ -223,7 +223,7 @@ For Windows-only APIs, apply the replacements in [../document_references/windows
 
 **Dockerfile updates (containerized deployments only):**
 
-PRESERVE the current base image distribution and version. Do NOT change the .NET version or the image tag.
+PRESERVE the current base image distribution and version. Do NOT change the .NET version or the image tag. One tag change is in scope: a tag or repository that names one architecture (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim-amd64`, `public.ecr.aws/lambda/dotnet:8-x86_64`) becomes the same image's multi-architecture tag (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim`, `public.ecr.aws/lambda/dotnet:8`); the distribution and version stay.
 
 > **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `mcr.microsoft.com/dotnet/aspnet:8.0` → `<registry>/dotnet/aspnet:8.0`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting**: if the configured registry does not resolve or pull from the build host, do NOT rewrite the `FROM`; keep the original registry and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets**, record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md`. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
@@ -281,7 +281,7 @@ Host-based deployments skip Docker steps.
 "function-architecture": "arm64",
 ```
 
-(the second block is the two changed lines of `aws-lambda-tools-defaults.json`). Do not add a template the project does not have. [Lambda instruction set architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html) documents the `arm64` value. The deployment itself is confirmed on AWS Lambda in Phase 3.3. Amazon.Lambda.Tools 7.0.0 publishes with `--runtime linux-arm64` for an `arm64` function, so a `<PlatformTarget>x64</PlatformTarget>` left in a referenced project stops `dotnet lambda package` at `NETSDK1032`.
+(the second block is the two changed lines of `aws-lambda-tools-defaults.json`; `Architecture = Architecture.ARM_64` in a CDK app, `architectures = ["arm64"]` in Terraform; a function that names none runs on x86_64). Do not add a template the project does not have. [Lambda instruction set architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html) documents the `arm64` value. The deployment itself is confirmed on AWS Lambda in Phase 3.3. Amazon.Lambda.Tools 7.0.0 publishes with `--runtime linux-arm64` for an `arm64` function, so a `<PlatformTarget>x64</PlatformTarget>` left in a referenced project stops `dotnet lambda package` at `NETSDK1032`.
 
 **Deployment manifests (only if the project already ships them):**
 

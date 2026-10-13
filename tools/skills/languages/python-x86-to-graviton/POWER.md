@@ -96,7 +96,7 @@ Analyze the project without making changes. See [phases/phase1-static-analysis.m
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, package manager and interpreter detection, target OS/glibc, dependency tree generation, component risk categorization
 2. **1.2 Native Library Validation** - Scan every committed or vendored native file by its content (not its name) for the target's architecture, C library, glibc and libstdc++ versions and page size, layers and in-repo extensions, binaries downloaded at run, build or deploy time, apply tiered FAIL/WARN/PASS policy
 3. **1.3 Dependency ARM64 Compatibility** - Probe every resolved pin (including transitives) for an aarch64 wheel, check hash locks, classify as MUST UPGRADE / RECOMMENDED / COMPATIBLE
-4. **1.4 Architecture-Specific Code Detection** - Find `platform.machine()` checks, ctypes/cffi loads, x86-only build flags and intrinsics, shell architecture gates, amd64 Dockerfile pins
+4. **1.4 Architecture-Specific Code Detection** - Find `platform.machine()` checks, ctypes/cffi loads, x86-only build flags and intrinsics, shell architecture gates, amd64 Dockerfile pins, and deployment settings that pick x86, set or absent
 5. **1.5 Python Version Check** - Document version and live support status (do NOT change it unless `python.interpreter_bump` allows; a change is one decision for the whole dependency set)
 
 ### Phase 2: Compatibility Resolution
