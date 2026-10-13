@@ -283,6 +283,10 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 | testDbConnection | IntegrationTest | INFRA | PostgreSQL not available | No |
 | testNativeAccel | CryptoTest | ARM64 | UnsatisfiedLinkError | Yes |
 
+## Results Compared With x86
+| Output | Inputs | Values compared | Differ | Largest difference (absolute, ULP) | Cause | Within the tolerance | Action |
+|---|---|---|---|---|---|---|---|
+
 ## Final Build (Scoring Basis)
 - **Command:** <the final build command>
 - **Result:** ✅ PASS / ❌ FAIL

@@ -115,7 +115,7 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 1. **3.0 Build Environment Prep** - Python runtime alignment (same minor version, pip >= 20.3; session-scoped only)
 2. **3.1 Build Validation** - Install as the deployment does, build extensions, classify failures as INFRA/ARM64/PRE-EXISTING
-3. **3.2 Functional Testing** - Import smoke test, loaded check against the x86 baseline, execute test suite, classify failures, determine final build
+3. **3.2 Functional Testing** - Import smoke test, loaded check against the x86 baseline, execute test suite, classify failures, compare numeric results with the x86 baseline, determine final build
 4. **3.3 Startup Validation** - Verify application starts on aarch64, aarch64 binaries load, no import or glibc errors
 5. **Write 00-summary.md** - Consolidate exit criteria using template from documentation-standards.md
 

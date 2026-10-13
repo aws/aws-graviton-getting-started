@@ -322,6 +322,10 @@ Interpreter decision, one for the whole dependency set (Phase 1.5), one row per 
 | Test | Type (INFRA / ARM64 / PRE-EXISTING) | Root cause | Blocking |
 |---|---|---|---|
 
+## Results Compared With x86
+| Output | Inputs | Values compared | Differ | Largest difference (absolute, ULP) | Cause | Within the tolerance | Action |
+|---|---|---|---|---|---|---|---|
+
 ## Final Build (Scoring Basis)
 - **Command:** <...>
 - **Result:** PASS / FAIL

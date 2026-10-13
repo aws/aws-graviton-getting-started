@@ -118,7 +118,7 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 1. **3.0 Build Environment Prep** - .NET SDK alignment (target frameworks, solution format, tools; session-scoped only)
 2. **3.1 Build Validation** - Build and test as the repository does, publish every executable project for each target RID and scan each output by content, classify failures as INFRA/ARM64/PRE-EXISTING
-3. **3.2 Functional Testing** - Run the tests on ARM64 (on x86 hosts: built natively, run in an arm64 container), classify failures, determine final build
+3. **3.2 Functional Testing** - Run the tests on ARM64 (on x86 hosts: built natively, run in an arm64 container), classify failures, compare numeric results with the x86 baseline, determine final build
 4. **3.3 Startup Validation** - Verify the application starts with `RuntimeInformation.ProcessArchitecture` reporting `Arm64`, every native library loads, IMDSv2 credentials and Lambda invocations work
 5. **Write 00-summary.md** - Consolidate exit criteria using template from documentation-standards.md
 

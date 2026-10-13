@@ -317,6 +317,10 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 | Test | Type (INFRA / ARM64 / PRE-EXISTING) | Root cause | Blocking |
 |---|---|---|---|
 
+## Results Compared With x86
+| Output | Inputs | Values compared | Differ | Largest difference (absolute, ULP) | Cause | Within the tolerance | Action |
+|---|---|---|---|---|---|---|---|
+
 ## Final Build (Scoring Basis)
 - **Command:** <...>
 - **Result:** PASS / FAIL

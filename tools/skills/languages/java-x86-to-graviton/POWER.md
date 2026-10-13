@@ -111,7 +111,7 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 1. **3.0 Build Environment Prep** - Java runtime alignment for annotation processor compatibility (session-scoped only)
 2. **3.1 Build Validation** - Full build, classify failures as INFRA/ARM64/PRE-EXISTING
-3. **3.2 Functional Testing** - Execute test suite, classify failures, determine final build
+3. **3.2 Functional Testing** - Execute test suite, classify failures, compare numeric results with the x86 baseline, determine final build
 4. **3.3 Startup Validation** - Verify application starts with its existing JVM options, no crashes
 5. **Write 00-summary.md** - Consolidate exit criteria using template from documentation-standards.md
 
