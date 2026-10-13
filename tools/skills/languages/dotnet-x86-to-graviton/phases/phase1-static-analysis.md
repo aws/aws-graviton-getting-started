@@ -30,9 +30,7 @@ grep -rnE --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git --exclude-dir=n
 find . \( -name bin -o -name obj -o -name .git -o -name node_modules \) -prune -o -name '*.rsp' -print
 ```
 
-Executed: on a test repository whose `Directory.Build.targets` holds a target with `BeforeTargets="Restore"` and an `Exec`, it printed both lines and `./Directory.Build.rsp`. On the Linux and Windows solutions it printed nothing; on the .NET Framework solution, the four `<Import>` lines of the web project, which import MSBuild's own props and targets.
-
-"Executed on" lines below refer to three test solutions:
+Examples below refer to three test solutions:
 - the **Linux solution**: nine projects on .NET 8 for Linux x64, with central package versions and lock files;
 - the **Windows solution**: a Windows service, an IIS-hosted API and a Windows Forms tool on .NET 8;
 - the **.NET Framework solution**: a .NET Framework 4.8 web application and a .NET Standard library.
@@ -62,11 +60,6 @@ grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.template
   'kubernetes\.io/arch|AWS::(Serverless|Lambda)::Function|"function-runtime"|AddWindowsService|UseWindowsService|ServiceBase|UseIIS|AspNetCoreHostingModel' . 2>/dev/null || true
 ```
 
-Executed on the three solutions:
-- **Linux solution:** its Dockerfile, `deploy/deploy.sh`, the Lambda files (`aws-lambda-tools-defaults.json` with `"function-runtime": "dotnetcore3.1"`, `template.yaml` with `AWS::Serverless::Function`) and `kubernetes.io/arch: amd64` in `deploy/k8s/deployment.yaml`.
-- **Windows solution:** a Dockerfile, `deploy/install-service.ps1`, `web.config`, `AddWindowsService`, `UseIIS()` and `<AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>`.
-- **.NET Framework solution:** `Web.config`, a `ServiceBase` class and `<UseIISExpress>true</UseIISExpress>`.
-
 ### Detect Multi-Module Structure
 
 - Solutions: `.sln`, `.slnx` (written by `dotnet new sln` in SDK 10) and `.slnf` list projects
@@ -84,10 +77,7 @@ find . \( -name .git -o -name bin -o -name obj -o -name node_modules \) -prune -
 find . -maxdepth 1 -type f \( -name '*.sln' -o -name '*.slnx' \) | while IFS= read -r s; do echo "== $s"; dotnet sln "$s" list < /dev/null; done
 ```
 
-Executed:
-- **Linux solution:** `Fixture.sln` with 9 projects, `Directory.Build.props`, `Directory.Packages.props`, `global.json` and 9 `packages.lock.json` files.
-- **Windows solution:** `Orders.slnx` with 3 projects. SDK 10.0.401 listed them; SDK 8.0.425 failed with ``Invalid solution `Orders.slnx`. Expected file header not found.``
-- **.NET Framework solution:** two project files and a `packages.config`, with no solution file at the root.
+SDK 8.0.425 cannot read a `.slnx` solution (``Invalid solution `Orders.slnx`. Expected file header not found.``); SDK 10.0.401 can.
 
 ### Determine Starting Point
 
@@ -116,17 +106,7 @@ except ValueError:
 | Modern .NET on Linux | `TargetFramework` `netcoreapp*` or `net5.0` and later, Linux RIDs | the arm64 checks in this skill apply directly |
 | .NET Standard library | `TargetFramework` `netstandard*` | portable; the same checks apply |
 
-Executed (lines shortened):
-- **Linux solution:**
-  - `./src/Fixture.Lambda/Fixture.Lambda.csproj: ..., TargetFramework=netcoreapp3.1, ...`
-  - `./src/Fixture.Api/Fixture.Api.csproj: AspNetCoreHostingModel=inprocess, OutputType=Exe, PlatformTarget=x64, ..., RuntimeIdentifier=linux-x64, RuntimeIdentifiers=linux-x64, ...`
-  - `./src/Fixture.Agent/Fixture.Agent.csproj: InvariantGlobalization=true, OutputType=Exe, ..., PublishAot=true, ...`
-- **Windows solution:**
-  - `./src/Orders.AdminTool/Orders.AdminTool.csproj: OutputType=WinExe, ..., TargetFramework=net8.0-windows, ..., UseWindowsForms=true, ...`
-  - `./src/Orders.Service/Orders.Service.csproj: ..., PlatformTarget=x64, ..., RuntimeIdentifier=win-x64, ...`
-- **.NET Framework solution:**
-  - `./Orders.Web/Orders.Web.csproj: OutputType=Library, PlatformTarget=x64, Prefer32Bit=false, TargetFrameworkVersion=v4.8`, with no `UsingMicrosoftNETSdk`, so it is not an SDK-style project;
-  - `./Orders.Contracts/Orders.Contracts.csproj: ..., TargetFramework=netstandard2.0, ..., UsingMicrosoftNETSdk=true`.
+A project without `UsingMicrosoftNETSdk=true` is not an SDK-style project (a .NET Framework project, with `TargetFrameworkVersion=v4.8`, for example).
 
 Never decide the starting point from a successful build or publish. With `EnableWindowsTargeting=true`, `dotnet publish -r linux-arm64` of the Windows Forms tool exited 0 and produced an aarch64 apphost, but its `.runtimeconfig.json` requires `Microsoft.WindowsDesktop.App`, which exists only on Windows. Phase 3's output scan reports that file; the properties above report it first.
 
@@ -155,13 +135,7 @@ Record four values for the rest of the skill:
 - the **lowest libstdc++ version** (`GLIBCXX_3.4.N`) across the glibc targets, when it can be read for each of them (from an image, with the block in §6; a Lambda managed runtime has no image to read it from);
 - the **page size** when a target kernel uses 64KB pages (AlmaLinux 8 and Rocky Linux 8 aarch64).
 
-Executed:
-- **Linux solution:**
-  - `./Dockerfile: FROM mcr.microsoft.com/dotnet/aspnet:8.0` (Debian 12, glibc 2.36, libstdc++ GLIBCXX_3.4.30).
-  - The Lambda function: `Runtime: dotnetcore3.1` with `Architectures: - x86_64`, and the same in `aws-lambda-tools-defaults.json`. Its arm64 target is `dotnet8` or `dotnet10` (§1.5), so the lowest glibc is 2.34. The managed runtime's libstdc++ version cannot be read, so `--glibcxx` is left out.
-  - `deploy/deploy.sh` installs the agent on an EC2 host whose AMI no file names: ask.
-- **Windows solution:** `FROM mcr.microsoft.com/dotnet/aspnet:8.0-nanoserver-ltsc2022`, a Windows image; the Linux image is part of the move to Linux.
-- **.NET Framework solution:** no deployment file names a target: ask.
+For a Lambda function on a managed .NET runtime, the arm64 target is `dotnet8` or `dotnet10` (§1.5), so the lowest glibc is 2.34; the managed runtime's libstdc++ version cannot be read, so `--glibcxx` is left out. When no file names the target OS, as for an EC2 host whose AMI no file names, ask.
 
 ### Generate Dependency Tree
 
@@ -181,10 +155,7 @@ cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findi
 grep -q '^packages: [1-9]' graviton-validation/raw/native-assets.txt || echo "WARNING: no packages resolved; read the restore errors above"
 ```
 
-Executed:
-- **Linux solution:** 3 seconds; `dependency tree: 9 projects written to .../graviton-validation/raw/dependency-tree.json`, then `packages: 40; ...; findings: 4; checks: 1` and exit status 1. Each tree entry names the chain, for example `"SQLitePCLRaw.lib.e_sqlite3 2.1.12": {"type": "package", "via": ["Fixture.Core", "Microsoft.Data.Sqlite 8.0.31", "SQLitePCLRaw.bundle_e_sqlite3 2.1.12"]}` for the tool project.
-- **Windows solution** (with `--source-rid win-x64`): 33 packages, all managed, no findings. Its blockers are in the code (§1.4), not in its packages.
-- **.NET Framework solution:** `CHECK Orders.Web/packages.config: these packages are not restored by PackageReference and are not in this report; run: config Orders.Web/packages.config`. A `packages.config` project gets the per-package check instead: [nuget-native-assets.md §3](../document_references/nuget-native-assets.md#projects-that-still-use-packagesconfig) (5 entries, 1 finding: System.Data.SQLite.Core 1.0.118.0).
+A project that uses `packages.config` is not in this report: the program prints `CHECK <file>: these packages are not restored by PackageReference and are not in this report; run: config <file>`, and that project gets the per-package check instead ([nuget-native-assets.md §3](../document_references/nuget-native-assets.md#projects-that-still-use-packagesconfig)).
 
 ### Categorize Components by Risk
 
@@ -225,17 +196,7 @@ python3 "$GV_CHECK" scan --source-tree . > graviton-validation/raw/repo-native-s
 cat graviton-validation/raw/repo-native-scan.txt; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
 ```
 
-Executed on the Linux solution:
-
-```
-ELF x86-64   glibc GLIBC_2.2.5 align 0x1000           src/Fixture.Core/native/x64/libfastsum.so
-FINDING src/Fixture.Core/native/x64/libfastsum.so is x86-64
-files by kind: ELF x86-64 1
-findings: 1
-exit status 1 (0 no findings, 1 findings, 2 not a folder)
-```
-
-The Windows and .NET Framework solutions commit no native files (`files by kind: none`). The same scan reports committed managed assemblies built for x64 or x86, which fail on arm64 as described in [nuget-native-assets.md §1](../document_references/nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each).
+The same scan reports committed managed assemblies built for x64 or x86, which fail on arm64 as described in [nuget-native-assets.md §1](../document_references/nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each).
 
 ### 1.2.2 Runtime-Extracted Native Library Detection
 
@@ -257,13 +218,7 @@ grep -rnE "${EX[@]}" --include='*.csproj' --include='*.fsproj' --include='*.vbpr
 grep -rnE "${EX[@]}" --include='Dockerfile*' --include='*.sh' '(apt-get|apt|dnf|yum|microdnf|apk|zypper)[[:space:]].*(install|add)[[:space:]]' . 2>/dev/null || true
 ```
 
-Executed:
-- **Linux solution:**
-  - `./src/Fixture.Core/Native.cs:11:` `NativeLibrary.SetDllImportResolver(...)`, `Native.cs:26:` `NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "native", arch, "libfastsum.so"))` and `Native.cs:29:` `[DllImport("fastsum", EntryPoint = "fast_sum")]`;
-  - `./deploy/deploy.sh:10:` the `awscli-exe-linux-x86_64.zip` download;
-  - Selenium.WebDriver in the UI test project, with version 4.48.0 in `Directory.Packages.props`;
-  - `apt-get install -y --no-install-recommends libfontconfig1` in the Dockerfile.
-- **Windows solution:** `./src/Orders.Service/Platform.cs:20:` `[DllImport("kernel32.dll")]`. Windows system DLLs never exist on Linux: the call failed there with `DllNotFoundException: Unable to load shared library 'kernel32.dll' or one of its dependencies`.
+Windows system DLLs never exist on Linux: a `[DllImport("kernel32.dll")]` call fails there with `DllNotFoundException: Unable to load shared library 'kernel32.dll' or one of its dependencies`.
 
 Fetch each download into a scratch folder and scan what it holds, whatever its URL says. Resolve the script's variables in the URL first; an archive is unpacked first:
 
@@ -303,9 +258,8 @@ timeout 600 docker run --rm --init --platform "$NATIVE" --entrypoint timeout "$I
   sh -c "dnf -q --forcearch aarch64 repoquery --arch aarch64,noarch --latest-limit 1 $PKGS"
 ```
 
-Executed:
-- **Debian 12** (the Linux solution's image), 6 seconds: `Inst libfontconfig1:arm64 (2.14.1-4 Debian:12.15/oldstable [arm64])`. Some dependencies resolve to the host's architecture in this simulation (`fontconfig-config ... [amd64]`, which was `[arm64]` in the arm64 image itself), so judge only the requested `:arm64` packages. A package with no arm64 build stops the simulation: the x86-only `cpuid` and `msr-tools` gave `E: Unable to locate package cpuid:arm64` and `E: Unable to locate package msr-tools:arm64`.
-- **Amazon Linux 2023**, 16 seconds: `fontconfig-0:2.13.94-2.amzn2023.0.2.aarch64` and `libicu-0:67.1-7.amzn2023.0.4.aarch64`. A package with no aarch64 build prints no line: the x86-only `grub2-pc` and `microcode_ctl` printed nothing for aarch64, and `grub2-pc-1:2.06-61.amzn2023.0.22.x86_64` and `microcode_ctl-2:2.1-53.amzn2023.0.16.x86_64` without `--forcearch`.
+- **Debian or Ubuntu** (observed on Debian 12): judge only the requested `:arm64` packages, because some dependencies resolve to the host's architecture in this simulation. A package with no arm64 build stops it: `E: Unable to locate package <name>:arm64`.
+- **Amazon Linux 2023:** a package with no aarch64 build prints no line.
 
 **Common sources of native code at run time** (this list is a *prompt*, not an allowlist):
 - **P/Invoke and `NativeLibrary`**: `[DllImport]`, `[LibraryImport]`, VB `Declare ... Lib`, and resolvers that build a path from `RuntimeInformation.ProcessArchitecture`. The Linux solution's resolver knows only `X64`, so on arm64 it throws `PlatformNotSupportedException: fastsum is not built for Arm64` (§1.4).
@@ -352,13 +306,6 @@ grep -E '^(FINDING|CHECK|OK|  via)' graviton-validation/raw/native-assets.txt > 
 cat graviton-validation/raw/dependency-tree-native.txt
 ```
 
-Executed on the Linux solution: 4 `FINDING`, 1 `CHECK` and 2 `OK` lines (quoted in [nuget-native-assets.md §3](../document_references/nuget-native-assets.md#3-the-per-rid-check)), with these chains:
-- `via src/Fixture.Scoring (direct reference)` for Microsoft.ML.OnnxRuntime 1.10.0;
-- `via tests/Fixture.UiTests (direct reference)` for Selenium.WebDriver 4.48.0;
-- `via src/Fixture.Core (direct reference)` for SkiaSharp.NativeAssets.Linux 1.68.3;
-- `via src/Fixture.Core > System.Data.SQLite.Core 1.0.119 > Stub.System.Data.SQLite.Core.NetStandard 1.0.119`;
-- `via tests/Fixture.Tests > Microsoft.NET.Test.Sdk 17.11.1 > Microsoft.CodeCoverage 17.11.1`.
-
 The full graph, including managed packages, is in `graviton-validation/raw/dependency-tree.json`.
 
 ### Classify Each Dependency
@@ -399,7 +346,7 @@ print("projects resolving AWSSDK.Core: %d" % len(seen))
 EOF
 ```
 
-Executed on the Linux solution: `AWSSDK.Core 3.3.103.65 in src/Fixture.Api: no IMDSv2 support (3.3.103.66 or later needed)`, and the same for three more projects (AWSSDK.S3 3.3.107.1 resolves it). This is MUST UPGRADE when any target requires IMDSv2, and the floor is the first AWSSDK.S3 release that requires Core 3.3.103.66 (3.3.107.2). On Graviton4 (Amazon Linux 2023, IMDSv2 required), the fixed tool with AWSSDK.S3 put back to 3.3.107.1 failed its instance-role credentials call with `HttpRequestException: Response status code does not indicate success: 401 (Unauthorized).`, and with 3.3.107.2 it listed the account's buckets. Confirm the credentials call on the target in Phase 3.3.
+An AWSSDK.Core older than 3.3.103.66 has no IMDSv2 support. This is MUST UPGRADE when any target requires IMDSv2, and the floor is the first release of the referenced AWSSDK package that requires Core 3.3.103.66 (AWSSDK.S3 3.3.107.2). Without it, the instance-role credentials call failed on Graviton4 with IMDSv2 required: `HttpRequestException: Response status code does not indicate success: 401 (Unauthorized).` Confirm the credentials call on the target in Phase 3.3.
 
 ### Document Findings
 
@@ -431,8 +378,6 @@ grep -rnE "${EX[@]}" --include='*.csproj' --include='*.fsproj' --include='*.vbpr
   'Grpc\.Tools|PublishAot|Microsoft\.DotNet\.ILCompiler|Microsoft\.NET\.Test\.Sdk|Microsoft\.CodeCoverage|coverlet|ChromeDriver' . 2>/dev/null || true
 find . \( -name .git -o -name node_modules \) -prune -o -name dotnet-tools.json -print | while IFS= read -r f; do echo "== $f"; cat "$f"; done
 ```
-
-Executed on the Linux solution: `Microsoft.NET.Test.Sdk` in both test projects (version 17.11.1 in `Directory.Packages.props`) and `<PublishAot>true</PublishAot>` in `src/Fixture.Agent/Fixture.Agent.csproj`. No solution has a `dotnet-tools.json`.
 
 | Package or feature | On an arm64 build host | Evidence |
 |---|---|---|
@@ -493,16 +438,10 @@ for line in open(sys.argv[1]):
 EOF
 ```
 
-Executed on the Linux solution (selected lines):
-- `./tests/Fixture.Tests/CoreTests.cs:37:` `Assert.Equal("linux-x64", RuntimeInformation.RuntimeIdentifier)`: a test that fails on arm64 by construction. Fix the test, not the code.
-- `x64 without Arm64: ./src/Fixture.Core/Native.cs`: the native-library resolver handles only `Architecture.X64` and throws `PlatformNotSupportedException: fastsum is not built for Arm64` on arm64.
-- `./src/Fixture.Core/Native.cs:44: Avx2.Add without Avx2.IsSupported before it`. On arm64 this throws `System.PlatformNotSupportedException: Operation is not supported on this platform.`, and the compiler gives no warning. The guarded call at line 74 (`if (Avx2.IsSupported)` at line 69) is not reported.
-- `./src/Fixture.Core/Native.cs: x86 intrinsics without an Arm64 or portable path`: the guarded method falls back to a scalar loop on arm64 (RECOMMENDED: a `Vector128` path).
-- The `Vector256<int>` loops in the same file.
-- Project settings:
-  - `./src/Fixture.Api/Fixture.Api.csproj: PlatformTarget=x64, RuntimeIdentifier=linux-x64, RuntimeIdentifiers=linux-x64`;
-  - `./src/Fixture.Legacy/Fixture.Legacy.csproj: PlatformTarget=x64, RuntimeIdentifiers=linux-x64`;
-  - `RuntimeIdentifiers=linux-x64` in every other project (from `Directory.Build.props`).
+In the output:
+- A test that asserts `RuntimeInformation.RuntimeIdentifier` equals `linux-x64` fails on arm64 by construction. Fix the test, not the code.
+- An x86 intrinsic called with no `IsSupported` check before it, such as `Avx2.Add`, throws `System.PlatformNotSupportedException: Operation is not supported on this platform.` on arm64, and the compiler gives no warning. A guarded call is not reported; its fallback runs on arm64 (RECOMMENDED: a `Vector128` path).
+- Project settings are evaluated values, for example `./src/Fixture.Api/Fixture.Api.csproj: PlatformTarget=x64, RuntimeIdentifier=linux-x64, RuntimeIdentifiers=linux-x64`.
 
   These are evaluated values. The API project's file has no `<PlatformTarget>` element: the SDK derives `PlatformTarget=x64` from `RuntimeIdentifier=linux-x64` (without the RID it was empty, and with `-r linux-arm64` it was `arm64`). Find the element that sets each value, in the project file or a `Directory.Build.props`, before changing anything.
 
@@ -526,14 +465,6 @@ grep -oE '[^ ]+\.(cs|vb|fs)\([0-9]+,[0-9]+\): (warning|error) CA1416: [^[]+' "$d
 echo "CA1416 call sites: $(wc -l < graviton-validation/raw/ca1416.txt)"
 rm -rf "$d"
 ```
-
-Executed: the Windows solution reported `CA1416 call sites: 8`:
-- `Registry.GetValue` (`Platform.cs(14,18)`);
-- `ProtectedData.Unprotect` and `DataProtectionScope.LocalMachine` (line 18);
-- `Bitmap` (lines 42 and 43) and `Image.Width` (line 44);
-- `AddEventLog` (`Platform.cs(85,55)` and `Program.cs(10,1)`).
-
-The Linux solution reported 0.
 
 CA1416 does not report three cases:
 - P/Invoke into Windows DLLs, such as the `kernel32.dll` import in §1.2.2;
@@ -571,24 +502,6 @@ grep -rnE "${EX[@]}" --include='*.c' --include='*.cc' --include='*.cpp' --includ
   --include=CMakeLists.txt --include=Makefile --include='*.mk' -- '-m(avx|sse|fma|bmi|popcnt|pclmul|aes|crc32|f16c|lzcnt)|-march=|-mtune=|[a-z0-9]+intrin\.h|cpuid\.h|__builtin_ia32_|__cpuid|__rdtsc|__x86_64__|_M_X64|__SSE|__AVX|__m(128|256|512)|_mm[0-9]*_' . 2>/dev/null || true
 ```
 
-Executed:
-- **Windows solution:**
-  - `@"C:\ProgramData\Orders"` (`Platform.cs:25`);
-  - `"Config\\Settings.json"` (`Platform.cs:35`), where the file on disk is `config/settings.json`;
-  - `"Pacific Standard Time"` (`Platform.cs:38`);
-  - `AddWindowsService` and `AddEventLog` (`Program.cs:9` and `10`);
-  - the two `nanoserver-ltsc2022` images, and the `runs-on: windows-latest` job that publishes with `-r win-x64`.
-- **.NET Framework solution:**
-  - the `ServiceBase` class and `Data Source=C:\ProgramData\Orders\orders.db` in `Web.config`;
-  - `BinaryFormatter`, `System.ServiceModel`, `AppDomain.CreateDomain`, `System.Web.Http` and `System.Web.UI`;
-  - `OrderService.svc`, `Global.asax` and `Default.aspx`;
-  - `<authentication mode="Windows" />` and `<system.serviceModel>` in `Web.config`.
-- **Linux solution:**
-  - the `x86_64` Lambda architecture, with the `AWS::Serverless::Function` line of its function, and `kubernetes.io/arch: amd64`;
-  - the `uname -m` gate and the x86_64 AWS CLI URL in `deploy/deploy.sh`;
-  - `FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/sdk:8.0 AS build` and `-r linux-x64` in the Dockerfile;
-  - in CI: `runs-on: ubuntu-latest`, `dotnet restore --locked-mode`, `-r linux-x64` for the Native AOT agent and a single-architecture `docker build`.
-
 What each Windows or .NET Framework hit means on Linux, with the replacement, is in [windows-to-linux.md](../document_references/windows-to-linux.md). The descriptor fixes are in Phase 2.4.
 
 A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim-amd64`, `public.ecr.aws/lambda/dotnet:8-x86_64`). Native C or C++ sources the repository builds need an Arm path for any x86 intrinsics they use: [c-c++.md](https://github.com/aws/aws-graviton-getting-started/blob/main/c-c%2B%2B.md#porting-codes-with-sseavx-intrinsics-to-neon) describes how to port them, starting with sse2neon, which translates x86 intrinsics to NEON. `long double` and fast-math flags change results between x86 and Graviton without an error: compare those results in Phase 3 (Results That Change Without Failing).
@@ -606,22 +519,6 @@ curl -fsSL https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-
 for r in json.load(sys.stdin)["releases-index"]:
     print("%-5s %-12s end of support %-10s latest runtime %s" % (r["channel-version"], r["support-phase"], r.get("eol-date") or "-", r["latest-runtime"]))'
 ```
-
-Executed (first lines):
-
-```
-11.0  go-live      end of support -          latest runtime 11.0.0-rc.1.26425.128
-10.0  active       end of support 2028-11-14 latest runtime 10.0.12
-9.0   maintenance  end of support 2026-11-10 latest runtime 9.0.20
-8.0   maintenance  end of support 2026-11-10 latest runtime 8.0.31
-7.0   eol          end of support 2024-05-14 latest runtime 7.0.20
-6.0   eol          end of support 2024-11-12 latest runtime 6.0.36
-```
-
-Target frameworks and SDKs found:
-- **Linux solution:** `net8.0` (7 projects), `netcoreapp3.1` (the Lambda function) and `netstandard2.0`; `global.json` pins SDK 8.0.400 with `latestFeature`, so SDK 8.0.425 is selected.
-- **Windows solution:** `net8.0` (2) and `net8.0-windows` (1); no `global.json`, so SDK 10.0.401 is selected.
-- **.NET Framework solution:** `TargetFrameworkVersion=v4.8` and `netstandard2.0`.
 
 1. Document the target framework of every project, the SDK (`global.json`), the runtime image tags, and the Lambda runtimes (§1.1).
 2. **Modern .NET runs on Linux Arm64:**

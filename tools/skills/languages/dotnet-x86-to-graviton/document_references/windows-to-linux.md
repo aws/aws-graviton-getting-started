@@ -50,10 +50,7 @@ Results: the build passed; `assets` reported 81 packages, all managed, and no fi
 
 ## 4. Moving a Windows-Hosted Modern .NET Application
 
-Executed on the Windows test solution (a worker service, an IIS-hosted API and a Windows Forms tool, all on .NET 8):
-- The replacements changed three files of the service (registry, DPAPI, `kernel32.dll`, paths, `System.Drawing`, Event Log, Windows service hosting, the `win-x64` RID), rewrote the Dockerfile for a Linux image and added a systemd unit. The API needed no code change.
-- After the changes, the service and the API built on Linux without `EnableWindowsTargeting`, and CA1416 reported no call sites. Every self-check passed on x64 and arm64, the host ran with `AddSystemd()` in place, and the API answered on Kestrel.
-- Building the whole solution still failed with `NETSDK1100`, because the Windows Forms project stays in it. Build and test the projects that move to Linux one by one (or through a solution filter the team adds); never set `EnableWindowsTargeting` to make the Linux build pass.
+Building a whole solution on Linux fails with `NETSDK1100` while a Windows Forms project stays in it. Build and test the projects that move to Linux one by one (or through a solution filter the team adds); never set `EnableWindowsTargeting` to make the Linux build pass.
 
 ## 5. Images: Globalization and Time Zones
 

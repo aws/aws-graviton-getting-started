@@ -39,7 +39,7 @@ if [ -n "$CONTAINER_CMD" ] && [ "$ARCH" = "x86_64" ]; then
 fi
 ```
 
-Executed in bash and in zsh on the x86 host used to validate this skill: `finch` was on PATH but `finch info` failed, so the block selected `docker`, and the arm64 container printed `aarch64` (3 seconds). After a reboot of that host, before QEMU was registered again, the same container printed `[FATAL tini (6)] exec timeout failed: Exec format error` and the block exited 1: the runtime works but has no ARM64 support. Registering emulation is a privileged change to the host that lasts until the next reboot, so ask the user before doing it; until then, follow the x86 host + no container runtime case below.
+A `command -v` cascade can pick a runtime that cannot run anything: on the x86 host used to validate this skill, `finch` was on PATH but `finch info` failed. After a reboot of that host, before QEMU was registered again, the same container printed `[FATAL tini (6)] exec timeout failed: Exec format error` and the block exited 1: the runtime works but has no ARM64 support. Registering emulation is a privileged change to the host that lasts until the next reboot, so ask the user before doing it; until then, follow the x86 host + no container runtime case below.
 
 **Decision logic:**
 - **ARM64 host (aarch64/arm64) + container runtime:** Publish, test and validate in containers using `$CONTAINER_CMD`. This is the ideal path.
@@ -70,7 +70,7 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CON
   }
   typeset -f run_arm64 > "${TMPDIR:-/tmp}/graviton-dotnet-run_arm64.sh"   # later blocks, perhaps in a new shell, load it from here
   ```
-  Executed with `mcr.microsoft.com/dotnet/runtime:8.0`: `sleep 60` given 5 seconds returned 124, `uname -m` printed `aarch64`, the two runs took 7 seconds together, and no container was left. The `--entrypoint timeout` form also works with images whose entrypoint is the application.
+  The `--entrypoint timeout` form also works with images whose entrypoint is the application.
 - **Do not compile under emulation.** `dotnet test` of a test project inside the arm64 SDK image was killed (`exit 137`) during its restore and build. Build and publish natively for linux-arm64 on the host (the SDK cross-targets managed code), and run only the result in the container.
 - **x86-64 executables do not fail the way they fail on Graviton.** On an x86 host, the kernel runs an x86-64 executable directly even inside an arm64 container: Selenium Manager 4.48.0's x86-64 binary ran there, and an image whose apphost was x86-64 stopped with `exec ./Fixture.Api failed: No such file or directory` (the x86-64 loader is missing), not with an architecture error. On Graviton4 the same Selenium Manager binary did not start: bash reported `cannot execute binary file` (exit 126), and `execve` from a program failed with errno 8, `Exec format error`. Judge executables by content (§3.1) and on Graviton.
 
@@ -105,7 +105,7 @@ echo "selected SDK: $(dotnet --version 2>&1 | head -n 1)"
 dotnet --list-sdks
 ```
 
-Executed on the fixed Linux solution: `8 TargetFramework=net8.0` and `1 TargetFramework=netstandard2.0`; `global.json` asks for SDK 8.0.400 with `"rollForward": "latestFeature"`, and `selected SDK: 8.0.425` with 8.0.425 and 10.0.401 installed. How `rollForward` chooses is in [../document_references/package-management-mapping.md](../document_references/package-management-mapping.md) §2.7.
+How `rollForward` chooses is in [../document_references/package-management-mapping.md](../document_references/package-management-mapping.md) §2.7.
 
 ### Session-Scoped .NET Switching
 
@@ -123,7 +123,7 @@ bash "$script" --version 8.0.425 --install-dir "$SDK_DIR"   # the version global
 )
 ```
 
-Executed: the install took 7 seconds; inside the subshell `dotnet` was the one in the temporary folder and listed only 8.0.425, and after the subshell the default `dotnet` and its SDKs were unchanged. `bash "$script" --version 8.0.425 --install-dir "$SDK_DIR" --dry-run` prints the download URL without installing. The SDK image (`mcr.microsoft.com/dotnet/sdk:<version>`) is the other session-scoped option: run it on the host's own platform, not under emulation (see "Emulation limits"). On fresh Amazon Linux 2023 and AlmaLinux 8 instances, the installed SDK stopped at `Couldn't find a valid ICU package installed on the system. Please install libicu (or icu-libs) using your package manager and try again.`, and `dnf install libicu` fixed it; on Graviton4 the block then ran as written (29 seconds, `Build succeeded.`).
+`bash "$script" --version 8.0.425 --install-dir "$SDK_DIR" --dry-run` prints the download URL without installing. The SDK image (`mcr.microsoft.com/dotnet/sdk:<version>`) is the other session-scoped option: run it on the host's own platform, not under emulation (see "Emulation limits"). On fresh Amazon Linux 2023 and AlmaLinux 8 instances, the installed SDK stopped at `Couldn't find a valid ICU package installed on the system. Please install libicu (or icu-libs) using your package manager and try again.`, and `dnf install libicu` fixed it.
 
 **ALLOWED:** an SDK in a temporary folder used through `PATH` and `DOTNET_ROOT` in a subshell `()`, single-command environment variables, `bash -c`, the SDK container image.
 
@@ -170,11 +170,9 @@ grep -E 'OutputType=Exe' graviton-validation/raw/project-properties.txt | cut -d
   done | tee graviton-validation/raw/output-scan.txt
 ```
 
-Executed on the fixed Linux solution (bash and zsh, 16 seconds, no lock file changed):
-- **Fixture.Api and Fixture.Tool:** `findings: 0`, each with one `NOTE` for `native/x64/libfastsum.so` beside its aarch64 build.
-- **Fixture.Agent (Native AOT):** `publish exit 1`, `error : unrecognized command-line option ‘--target=aarch64-linux-gnu’`, `NOT SCANNED: publish failed`. Publish it on arm64 hardware (Phase 2.4); if none is available, record it as NOT RUN with the reason. On Graviton4 the same block published it (`findings: 0`) once the Native AOT prerequisites were installed, and the aarch64 executable ran (`fixture-agent on Arm64, 4 CPUs`).
+A Native AOT project cross-published from x64 fails with `error : unrecognized command-line option ‘--target=aarch64-linux-gnu’` and is reported `NOT SCANNED: publish failed`: publish it on arm64 hardware (Phase 2.4), or record it as NOT RUN with the reason when none is available.
 
-On the Windows solution after its move to Linux (no lock files), both server projects published with `findings: 0`; the Windows Forms tool (`OutputType=WinExe`) is a blocker and is not published.
+A Windows Forms tool (`OutputType=WinExe`) is a blocker and is not published.
 
 The lock-file guard matters: an earlier validation publish for `linux-musl-arm64` without locked mode added that RID to three tracked `packages.lock.json` files, so they no longer matched the projects' `RuntimeIdentifiers`, a mismatch that locked mode rejects (`NU1004: The project's runtime identifiers have changed from ...`). A target RID enters the lock files in Phase 2.2, deliberately, or not at all.
 
@@ -225,9 +223,7 @@ python3 "$GV_CHECK" scan "${TMPDIR:-/tmp}/graviton-image-app"   # the path the D
 # Must show: Architecture: arm64, RID: linux-arm64, and no FINDING
 ```
 
-Executed on the Linux solution's API image (the image copies the application to `/app`):
-- **Fixed Dockerfile:** `Architecture: arm64` and `RID: linux-arm64`; the scan found no findings, only the `NOTE` for the x64 `libfastsum.so` beside its aarch64 build.
-- **Baseline Dockerfile:** `docker image inspect` also reported `arm64 linux`, but the scan listed an x86-64 apphost, x64 assemblies and x86-64 natives. Never accept image metadata as proof of architecture.
+An image built from a Dockerfile that pins the SDK stage to amd64 was reported by `docker image inspect` as `arm64 linux`, but the scan listed an x86-64 apphost, x64 assemblies and x86-64 natives: never accept image metadata as proof of architecture.
 
 Verify the output shows the SAME .NET runtime major version and base image as the original application.
 
@@ -265,7 +261,7 @@ RUN_ARM64_OPTS="-v $out:/t:ro -w /tmp" run_arm64 480 mcr.microsoft.com/dotnet/sd
 echo "tests on arm64: exit $?"
 ```
 
-`run_arm64` and `host_timeout` come from "Container Runtime Detection" and "Emulation limits" above; the block's first line loads them. Executed on the fixed Linux solution: `Passed!  - Failed:     0, Passed:    10, Skipped:     0, Total:    10` in 47 seconds. Without the OS package the thumbnail test failed with `DllNotFoundException` naming `libfontconfig.so.1` (INFRA: the test environment lacked a package the runtime image has).
+`run_arm64` and `host_timeout` come from "Container Runtime Detection" and "Emulation limits" above; the block's first line loads them. Without the OS package the thumbnail test failed with `DllNotFoundException` naming `libfontconfig.so.1` (INFRA: the test environment lacked a package the runtime image has).
 
 **Code coverage.** Microsoft's [dotnet-coverage](https://learn.microsoft.com/en-us/dotnet/core/additional-tools/dotnet-coverage) page says "Dynamic instrumentation is available on Windows (x86, x64 and Arm64), Linux (x64), and macOS (x64)" and "Static instrumentation is available on all platforms", and the per-RID check reports Microsoft.CodeCoverage's x86-64 instrumentation libraries as a `CHECK` (Phase 1.3). On Graviton4 with Microsoft.CodeCoverage 17.11.1, `dotnet test <project> --collect "Code Coverage"` wrote a `.coverage` file with data, and `--collect "Code Coverage;Format=cobertura"` counted 227 of 3,369 lines covered, against 233 on x64; the only lines that differed were the architecture branches (the resolver's X64 and Arm64 arms, the AVX2 loops on x64, the Vector128 loop on arm64). So the `CHECK` closes when coverage runs this way on arm64 hardware; record the result in `06-build-test-results.md`. Running a built test assembly (`dotnet test <dll>`) does not load the collector on any architecture (`Unable to find a datacollector with friendly name 'Code Coverage'` on x64 too), so it cannot answer this.
 
@@ -298,13 +294,6 @@ Verify:
 4. Where the application ships both architectures of a native file (an output-scan `NOTE`), the aarch64 one is the one loaded
 5. On EC2 targets that require IMDSv2 (Amazon Linux 2023 by default), the AWS SDK obtains instance-role credentials
 6. Lambda functions: deploy the arm64 function with the tool the project already uses (for example `dotnet lambda deploy-function` from Amazon.Lambda.Tools, or `sam deploy`) and invoke it
-
-Executed on the fixed Linux solution in linux/arm64 containers:
-- **Tool self-check:** all 9 checks passed on Debian 12 (`process Arm64, RID linux-arm64`), including the aarch64 `libfastsum.so` (`6.5`), SkiaSharp, ONNX Runtime and SQLite; on Alpine the SkiaSharp and ONNX Runtime checks failed with `DllNotFoundException`, the glibc-only builds of Phase 1.3.
-- **API:** `GET /health` answered `{"status":"ok","arch":"Arm64"}`.
-- **Natively on Graviton4 (Amazon Linux 2023, IMDSv2 required):** the self-check passed with `--aws` added (`PASS buckets (AWS SDK)`); with AWSSDK.S3 put back to 3.3.107.1 (Core 3.3.103.65), the credentials call failed with `HttpRequestException: Response status code does not indicate success: 401 (Unauthorized).`
-- **Lambda:** with the function moved to `net10.0` (Phase 2.2), `dotnet lambda deploy-function` (Amazon.Lambda.Tools 7.0.0) created a `dotnet10` function with `Architectures: arm64`, its log reported `Runtime Version: dotnet:10.mainline.v74`, and `dotnet lambda invoke-function --payload 100` returned `108.25`, as the `net8.0` build did on `dotnet8`.
-- **On AlmaLinux 8 (glibc 2.28, 64KB pages):** the two SQLite checks failed as the glibc check predicted ([nuget-native-assets.md](../document_references/nuget-native-assets.md) §6).
 
 > **macOS-host false FAIL.** On an Apple Silicon Mac, a host-based run (outside containers) uses the `osx-arm64` RID: a package with a verified linux-arm64 native file (Phase 1.3) can still fail to load there because it has no osx-arm64 build. That is a host-development artifact, not a Graviton verdict; check in a `linux/arm64` container instead, and settle the check on a Graviton host ("Match the production hosts").
 

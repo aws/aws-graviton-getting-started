@@ -45,15 +45,15 @@ EOF
 ### 2.1 PackageReference with versions in project files
 
 - **Direct reference:** change `Version=` on the `<PackageReference>`.
-- **Transitive package:** add a direct `<PackageReference>` with the fixed version; the direct reference wins. Executed: Confluent.Kafka 1.5.3 resolved librdkafka.redist 1.5.3, which has no linux-arm64 file. With `<PackageReference Include="librdkafka.redist" Version="1.6.1" />` added, it resolved 1.6.1.
+- **Transitive package:** add a direct `<PackageReference>` with the fixed version; the direct reference wins (`<PackageReference Include="librdkafka.redist" Version="1.6.1" />` under Confluent.Kafka 1.5.3 resolved 1.6.1).
 - **A direct reference cannot go below what a parent requires:** `<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.4" />` next to Microsoft.Data.Sqlite 8.0.31 (which requires 2.1.12 or later) failed with `error NU1605: Warning As Error: Detected package downgrade: SQLitePCLRaw.lib.e_sqlite3 from 2.1.12 to 2.1.4.` In that case change the parent's version instead.
 
 ### 2.2 Central package management
 
-- **Direct reference:** change the `<PackageVersion Include="X" Version="..." />` item in `Directory.Packages.props`. Executed: the Linux test solution's fixes (SkiaSharp, ONNX Runtime, Selenium, AWSSDK.S3) were all one-line changes there.
+- **Direct reference:** change the `<PackageVersion Include="X" Version="..." />` item in `Directory.Packages.props`.
 - **One project only:** `VersionOverride` on its `<PackageReference>` (`<PackageReference Include="SkiaSharp.NativeAssets.Linux" VersionOverride="2.80.0" />` resolved 2.80.0 while the central version stayed 1.68.3). Use it only when one project must differ; one central version is the default.
 - **`Version=` on a `<PackageReference>` is an error here:** `error NU1008: Projects that use central package version management should not define the version on the PackageReference items but on the PackageVersion items`.
-- **Transitive package:** a `<PackageVersion>` for a package no project references directly is ignored unless `<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>` is set. Executed with Confluent.Kafka 1.5.3 and `<PackageVersion Include="librdkafka.redist" Version="1.6.1" />`: 1.5.3 resolved without the property and 1.6.1 with it, and the per-RID check then printed `OK linux-arm64 librdkafka.redist/1.6.1`. Enabling the property is a change to the whole solution's resolution, so prefer a direct reference in the one project that needs it when only one does.
+- **Transitive package:** a `<PackageVersion>` for a package no project references directly is ignored unless `<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>` is set. Enabling the property is a change to the whole solution's resolution, so prefer a direct reference in the one project that needs it when only one does.
 - **Pinning below a parent's requirement fails:** `error NU1109: Detected package downgrade: SQLitePCLRaw.lib.e_sqlite3 from 2.1.12 to centrally defined 2.1.4.`
 
 ### 2.3 Lock files
@@ -66,7 +66,7 @@ EOF
 
 ### 2.5 Paket
 
-Executed with Paket 10.3.1 as a local tool:
+With Paket 10.3.1 as a local tool:
 - **Install:** `dotnet tool install paket` worked under SDK 10.0.401 and failed under SDK 8.0.425 with `Settings file 'DotnetToolSettings.xml' was not found in the package.` Run Paket commands with an SDK that can install it (Phase 3.0, session-scoped).
 - **The per-RID check works:** `dotnet paket install` wrote `paket.lock`, a restore produced `obj/project.assets.json` with `net8.0/linux-arm64` targets, and `assets` printed `FINDING no linux-arm64 native: SkiaSharp.NativeAssets.Linux/1.68.3`.
 - **Change a version:** edit the line in `paket.dependencies` (`nuget SkiaSharp.NativeAssets.Linux 2.80.0`) and run `dotnet paket install`; `assets` then printed `OK linux-arm64 SkiaSharp.NativeAssets.Linux/2.80.0`. `dotnet paket update SkiaSharp.NativeAssets.Linux --version 2.80.0` against the exact pin failed: `Version 2.80.0 doesn't match the version requirement 1.68.3 ... that was specified in paket.dependencies`.
@@ -109,7 +109,7 @@ Do not edit `global.json` to make a build pass: install the SDK it asks for, ses
 
 ### 2.8 Local tools: dotnet-tools.json
 
-Local tools are NuGet packages that run on the build host, so they matter on an arm64 build host or CI runner, not in the application. After `dotnet tool restore`, scan the restored tool's folder by content (`scan "$NUGET_PACKAGES/<tool id in lower case>/<version>"`). Executed: Amazon.Lambda.Tools 7.0.0 held `managed AnyCPU 30, native PE x86 5` (Windows-only native files, ignored on Linux) and no findings.
+Local tools are NuGet packages that run on the build host, so they matter on an arm64 build host or CI runner, not in the application. After `dotnet tool restore`, scan the restored tool's folder by content (`scan "$NUGET_PACKAGES/<tool id in lower case>/<version>"`).
 
 ## 3. Mapped Tier: Assemblies Outside NuGet
 
