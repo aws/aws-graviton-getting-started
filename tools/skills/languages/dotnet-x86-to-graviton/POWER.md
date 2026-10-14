@@ -16,15 +16,15 @@ Validate a .NET application's readiness to run on AWS Graviton instances. This t
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
-**In scope:** linux-arm64 native files (and linux-musl-arm64 for Alpine targets) for every resolved package, direct and transitive; ARM64-blocking package updates and lock file regeneration; native files committed to the repository and the code that loads them; architecture detection code and x86 intrinsics; project settings that pin x64 (`PlatformTarget`, `RuntimeIdentifier`); Dockerfile platform settings, Lambda architectures and deployment scripts; AWS SDK versions without IMDSv2 support where the target requires it; for Windows and .NET Framework starting points, the move to modern .NET on Linux (one decision for the solution, after one approval); Graviton runtime recommendations (documented, never applied); ARM64 build, publish, test and startup validation.
+**In scope:** linux-arm64 native files (and linux-musl-arm64 for Alpine targets) for every resolved package, direct and transitive; ARM64-blocking package updates and lock file regeneration; native files committed to the repository and the code that loads them; architecture detection code and x86 intrinsics; project settings that pin x64 (`PlatformTarget`, `RuntimeIdentifier`); Dockerfile platform settings, Lambda architectures and deployment scripts; AWS SDK versions without IMDSv2 support where the target requires it; for Windows and .NET Framework starting points, the move to modern .NET on Linux (one decision for the solution, after one approval); Graviton runtime recommendations (documented, never applied); CI changes that only add or switch an architecture; ARM64 build, publish, test and startup validation.
 
-**Out of scope:** target framework and SDK changes other than those Graviton requires (gated by `dotnet.framework_bump`), package-management switches (central package management, lock files, Paket), base image changes, general dependency modernization, security updates (including NuGet audit warnings), code refactoring, .gitignore/.dockerignore and CI changes. Windows Forms, WPF and ASP.NET Web Forms have no Linux path: they are BLOCKERs, documented with options ([document_references/windows-to-linux.md](document_references/windows-to-linux.md)).
+**Out of scope:** target framework and SDK changes other than those Graviton requires (gated by `dotnet.framework_bump`), package-management switches (central package management, lock files, Paket), base image changes, general dependency modernization, security updates (including NuGet audit warnings), code refactoring, .gitignore/.dockerignore and other CI changes. Windows Forms, WPF and ASP.NET Web Forms have no Linux path: they are BLOCKERs, documented with options ([document_references/windows-to-linux.md](document_references/windows-to-linux.md)).
 
 > **Verify the native files, never the package name or the exit code.** Whether a package runs on Graviton is a fact about the files its exact version ships for each RID, judged by content: the ELF machine, the C library, the glibc and libstdc++ versions and the other libraries they need, and the page size they were linked for. `dotnet publish -r linux-arm64` exits 0 with native files missing, and a Windows Forms project publishes for linux-arm64 too. Every verdict cites the per-RID check or the output scan; see [document_references/nuget-native-assets.md](document_references/nuget-native-assets.md).
 
 ## Skill Configuration (Optional)
 
-If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (target RIDs, validation SDK source, SDK install hint, test command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the project's target frameworks stay unchanged unless `dotnet.framework_bump` approves a change Graviton requires (a configured SDK source selects only the build/validation SDK per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md). Record any applied overrides in `01-project-assessment.md`.
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (target RIDs, validation SDK source, SDK install hint, test command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the project's target frameworks stay unchanged unless `dotnet.framework_bump` approves a change Graviton requires (a configured SDK source selects only the build/validation SDK per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md) for the fields, and [document_references/skill-config.template.md](document_references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
 
 ## Entry Criteria
 
@@ -35,12 +35,34 @@ If a `skill-config.md` exists at the project root, read it before Phase 1 and ap
 5. ARM64 build/test environment access (Graviton EC2 or ARM64 containers; an x86 host with QEMU emulation can run published output and tests built on the host, not builds, and Microsoft does not support .NET under QEMU)
 6. A .NET SDK that builds the target frameworks, Python 3.6 or later for the check program, and access to the NuGet feeds the project restores from
 7. Existing test suite
+8. Tools the commands call: git, curl, `file`, and a container runtime (Phase 3); the image check (Phase 1.4) uses the docker CLI
 
 ## Transformation Workflow
 
+Copy this checklist into your response and check off each step:
+
+```
+ARM64 migration progress:
+- [ ] Baseline commit; `graviton-validation/raw/` created; `skill-config.md` read if present
+- [ ] 1.1 Deployment type, projects, starting point, target OS and libc, package tree (01, raw/)
+- [ ] 1.2 Native files and assemblies judged by content (02)
+- [ ] 1.3 Each package checked per RID: MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE / CHECK (03)
+- [ ] 1.4 Architecture code, project settings, images, deployment settings (04)
+- [ ] 1.5 Target frameworks and SDK recorded with their support status, not changed (01)
+- [ ] 2.1 Committed native files built for aarch64, loading code updated (02)
+- [ ] 2.2 Only MUST UPGRADE packages updated, then the per-RID check re-run (03)
+- [ ] 2.3 Architecture detection code updated (04)
+- [ ] 2.4 Project settings, Dockerfiles and deployment settings updated (04)
+- [ ] 2.5 Runtime recommendations documented, not applied (05)
+- [ ] 3.0-3.1 ARM64 build, publish and output scan; failures classified INFRA / ARM64 / PRE-EXISTING (06)
+- [ ] 3.2 Tests on ARM64, results that change without failing (06)
+- [ ] 3.3 Startup on ARM64 (06)
+- [ ] 00-summary.md: each exit criterion with where it ran
+```
+
 ### Version Control Setup
 
-Initialize git if not already present. Commit after each meaningful step for traceability and rollback.
+Initialize git if not already present:
 
 ```bash
 # Initialize if no git repo exists (local only, no remote required)
@@ -51,19 +73,7 @@ if [ ! -d ".git" ]; then
 fi
 ```
 
-**Commit at each step that produces output or changes files.** Use `git add -A && git commit -m "<message>"` with descriptive messages. Typical commit points:
-
-1. After documentation setup (graviton-validation/ folder created)
-2. After Phase 1 static analysis complete (all analysis reports written)
-3. After native library resolution (Phase 2.1 - committed native files built for aarch64, loading code updated)
-4. After dependency updates (Phase 2.2 - package versions, RIDs and lock files changed)
-5. After architecture code updates (Phase 2.3 - source and scripts changed)
-6. After project settings, Dockerfile and deployment descriptor updates (Phase 2.4)
-7. After runtime recommendations (Phase 2.5)
-8. After build validation (Phase 3.1 - builds, publishes and output scans documented)
-9. After final validation and summary (Phase 3.3 + 00-summary.md written)
-
-Not every project will have all steps (e.g., no Dockerfile changes for host-based deployments, no native library resolution if none found). Commit whenever files change, skip commits for steps that produced no changes. Publish outputs and SDKs created for validation live outside the project tree (`${TMPDIR:-/tmp}`), but `dotnet restore` and `dotnet build` write `obj/` and `bin/` inside each project folder: if the repository does not ignore them, stage the changed files by name instead of `git add -A` (adding a `.gitignore` is out of scope).
+**Commit after each checklist step that changes files** with `git add -A && git commit -m "<message>"`, the message naming the step; skip the commit when a step changed nothing. Publish outputs and SDKs created for validation live outside the project tree (`${TMPDIR:-/tmp}`), but `dotnet restore` and `dotnet build` write `obj/` and `bin/` inside each project folder: if the repository does not ignore them, stage the changed files by name instead of `git add -A` (adding a `.gitignore` is out of scope).
 
 ### Documentation Setup
 
@@ -98,8 +108,8 @@ Analyze the project without making changes. See [phases/phase1-static-analysis.m
 
 1. **1.1 Project Structure Analysis** - Deployment type, solution and project structure (including projects no solution lists), starting point (modern .NET on Linux or Windows, .NET Framework), target OS and libc, dependency tree with the per-RID native check, component risk categorization
 2. **1.2 Native Library Validation** - Scan every committed native file and assembly by content (never by name or folder), P/Invoke and `NativeLibrary` loads, executables run and binaries downloaded at run, build or deploy time, OS packages in images, apply tiered FAIL/WARN/PASS policy
-3. **1.3 Dependency ARM64 Compatibility** - Classify every resolved package (including transitives) by its per-RID native files as MUST UPGRADE / RECOMMENDED / COMPATIBLE, check AWS SDK IMDSv2 support, find build-tool packages with OS/arch RIDs
-4. **1.4 Architecture-Specific Code Detection** - Find architecture checks, x86 intrinsics without `IsSupported` checks, fixed vector widths, `PlatformTarget`/`RuntimeIdentifier` pins, Windows-only APIs (CA1416), amd64 Dockerfile pins and shell architecture gates
+3. **1.3 Dependency ARM64 Compatibility** - Classify every resolved package (including transitives) by its per-RID native files as MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE (CHECK until the evidence decides), check AWS SDK IMDSv2 support, find build-tool packages with OS/arch RIDs
+4. **1.4 Architecture-Specific Code Detection** - Find architecture checks, x86 intrinsics without `IsSupported` checks, fixed vector widths, `PlatformTarget`/`RuntimeIdentifier` pins, Windows-only APIs (CA1416), amd64 Dockerfile pins and shell architecture gates, and deployment settings that pick x86, set or absent
 5. **1.5 .NET Version Compatibility Check** - Document target frameworks, SDK and live support status (do NOT change them unless `dotnet.framework_bump` allows; a change is one decision for the whole solution)
 
 ### Phase 2: Compatibility Resolution
@@ -118,11 +128,13 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 1. **3.0 Build Environment Prep** - .NET SDK alignment (target frameworks, solution format, tools; session-scoped only)
 2. **3.1 Build Validation** - Build and test as the repository does, publish every executable project for each target RID and scan each output by content, classify failures as INFRA/ARM64/PRE-EXISTING
-3. **3.2 Functional Testing** - Run the tests on ARM64 (on x86 hosts: built natively, run in an arm64 container), classify failures, determine final build
+3. **3.2 Functional Testing** - Run the tests on ARM64 (on x86 hosts: built natively, run in an arm64 container), classify failures, check results that can differ by architecture, determine final build
 4. **3.3 Startup Validation** - Verify the application starts with `RuntimeInformation.ProcessArchitecture` reporting `Arm64`, every native library loads, IMDSv2 credentials and Lambda invocations work
 5. **Write 00-summary.md** - Consolidate exit criteria using template from documentation-standards.md
 
 ## Exit Criteria
+
+A criterion that runs on ARM64 passes only on a Graviton host or the target, such as the arm64 Lambda function; one that ran only under emulation or on another arm64 machine is NOT RUN (Phase 3, "Match the production hosts").
 
 ### Must Pass
 1. Every resolved package gives each target RID an aarch64 native file for the target's libc, glibc, libstdc++ and page size, or is managed only, or is a documented user decision
@@ -145,9 +157,7 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 ## Test Failure Handling
 
-Infrastructure failures (missing database, services, credentials, network or feed access, OS packages missing from the test environment) are non-blocking. Classify and document them, then run the final build without tests (the Phase 3.1 build, publish and scan, without the test step):
-- `dotnet restore <solution>` (add `--locked-mode` when the repository has `packages.lock.json` files), then `dotnet build <solution> -c Release --no-restore`
-- the Phase 3.1 publish and output scan for each target RID
+Infrastructure failures (missing database, services, credentials, network or feed access, OS packages missing from the test environment, or one that fails the same way on the x86 baseline) are non-blocking: filter out only those tests (`dotnet test --filter "FullyQualifiedName!~<name>"`), list them under CHECK Items, and take that run, with the Phase 3.1 publish and output scan for each target RID, as the final build (Phase 3.1, Build Strategy step 4). A build that skips every test is never the final build.
 
 ARM64 failures are blocking. Do not skip tests or projects; the failing build is the final build.
 
@@ -155,7 +165,7 @@ ARM64 failures are blocking. Do not skip tests or projects; the failing build is
 
 - Performance benchmarking and load testing
 - Integration testing with external services
-- CI/CD pipeline configuration for ARM64 builds (if `skill-config.md` defines `ci.system`, phrase this recommendation in that system's vocabulary; the skill makes no CI changes itself)
+- CI/CD changes beyond architecture (credentials, deployment steps, triggers, tool versions), recommended in the vocabulary of `ci.system` when `skill-config.md` defines it; changes that only add or switch an architecture are applied in Phase 2.4 unless `ci.changes` is `recommend`
 
 ## Notes
 
@@ -163,4 +173,4 @@ ARM64 failures are blocking. Do not skip tests or projects; the failing build is
 - Solutions with many projects require analysis of every project, including projects no solution lists, and its full resolved package set
 - The per-RID check is one Python program embedded in [document_references/nuget-native-assets.md](document_references/nuget-native-assets.md) §11; its block writes it to `${TMPDIR:-/tmp}` once per session, and the other blocks call it from there
 - The bash blocks were executed in bash 5.2 and zsh 5.9 on Linux. On Windows, run the skill in a WSL 2 distribution, which runs a Linux kernel ([Microsoft](https://learn.microsoft.com/en-us/windows/wsl/compare-versions)), with the project in the Linux file system
-- Every Graviton vCPU maps to a physical core (no SMT), so performance scales more linearly with CPU load than on x86; load test to the maximum sustainable load before comparing instance types ([transition guide](https://github.com/aws/aws-graviton-getting-started/blob/main/transition-guide.md))
+- Every Graviton vCPU maps to a physical core (no SMT, [AWS Graviton performance testing](https://docs.aws.amazon.com/whitepapers/latest/aws-graviton-performance-testing/other-considerations.html)), so performance scales more linearly with CPU load than on x86; load test to the maximum sustainable load before comparing instance types

@@ -30,12 +30,18 @@ grep -rnE --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git --exclude-dir=n
 find . \( -name bin -o -name obj -o -name .git -o -name node_modules \) -prune -o -name '*.rsp' -print
 ```
 
-Executed: on a test repository whose `Directory.Build.targets` holds a target with `BeforeTargets="Restore"` and an `Exec`, it printed both lines and `./Directory.Build.rsp`. On the Linux and Windows solutions it printed nothing; on the .NET Framework solution, the four `<Import>` lines of the web project, which import MSBuild's own props and targets.
-
-"Executed on" lines below refer to three test solutions:
+Examples below refer to three test solutions:
 - the **Linux solution**: nine projects on .NET 8 for Linux x64, with central package versions and lock files;
 - the **Windows solution**: a Windows service, an IIS-hosted API and a Windows Forms tool on .NET 8;
 - the **.NET Framework solution**: a .NET Framework 4.8 web application and a .NET Standard library.
+
+## Contents
+
+- 1.1 Project Structure Analysis: Determine Deployment Type; Detect Multi-Module Structure; Determine Starting Point; Determine Target OS and libc; Generate Dependency Tree; Categorize Components by Risk
+- 1.2 Native Library Validation: 1.2.1 Statically Bundled .so Scanning; 1.2.2 Runtime-Extracted Native Library Detection; 1.2.3 Tiered Validation Policy
+- 1.3 Dependency ARM64 Compatibility Analysis: Generate Filtered Tree; Classify Each Dependency; Document Findings; Build-Tool Artifacts with OS/Arch RIDs
+- 1.4 Architecture-Specific Code Detection
+- 1.5 .NET Version Compatibility Check
 
 ## 1.1 Project Structure Analysis
 
@@ -43,28 +49,40 @@ Executed: on a test repository whose `Directory.Build.targets` holds a target wi
 
 ### Determine Deployment Type
 
-- Dockerfile or container config present: **Containerized**
+- Dockerfile or container config present, under any name (`Dockerfile*`, `*.Dockerfile`, `Containerfile`; `docker build -f` and Compose `dockerfile:` accept any name; the block lists them all in `raw/dockerfiles.txt`): **Containerized**
 - systemd/init scripts, or a published app started directly (`dotnet <app>.dll` or its apphost): **Host-based**
+- A CDK app (`cdk.json`) or Terraform files define the infrastructure, and its architecture settings, in code (§1.4)
 - Some applications support both
-- AWS Lambda (`aws-lambda-tools-defaults.json`, a SAM or CloudFormation function with a `dotnet` runtime, or a Lambda container image): **Lambda**. The architecture is a function setting (§1.5).
+- AWS Lambda (`aws-lambda-tools-defaults.json`, a SAM, CloudFormation, CDK or Terraform function with a `dotnet` runtime, or a Lambda container image): **Lambda**. The architecture is a function setting (§1.5).
 - IIS (`web.config`, `AspNetCoreHostingModel`, `UseIIS`) or a Windows service (`AddWindowsService`, `UseWindowsService`, `ServiceBase`, installation scripts): **Windows host**. The application must move to Linux first ([Determine Starting Point](#determine-starting-point)).
 
 ```bash
-EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation)
+EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
 # Deployment files (read every hit)
-find . \( -name .git -o -name bin -o -name obj -o -name node_modules -o -name graviton-validation \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.dockerfile' \
-  -o -name 'docker-compose*.y*ml' -o -name 'compose*.y*ml' -o -name 'aws-lambda-tools-defaults.json' -o -name 'serverless.template' \
-  -o -name 'template.y*ml' -o -name '[Ww]eb.config' -o -name '*.service' -o -name '*.ps1' -o -name '*.sh' \) -print | sort
+find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules -o -name cdk.out -o -name graviton-validation \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' \
+  -o -name 'Containerfile*' -o -name 'docker-compose*.y*ml' -o -name 'compose*.y*ml' -o -name 'aws-lambda-tools-defaults.json' -o -name 'serverless.template' \
+  -o -name 'template.y*ml' -o -name 'cdk.json' -o -name '*.tf' -o -name '[Ww]eb.config' -o -name '*.service' -o -name '*.ps1' -o -name '*.sh' \) -print | sort
 # Hosting markers: Kubernetes, Lambda, IIS, Windows services
 grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.template' --include='*.cs' --include='*.vb' --include='*.fs' \
   --include='*.csproj' --include='*.vbproj' --include='*.fsproj' --include='*.config' \
   'kubernetes\.io/arch|AWS::(Serverless|Lambda)::Function|"function-runtime"|AddWindowsService|UseWindowsService|ServiceBase|UseIIS|AspNetCoreHostingModel' . 2>/dev/null || true
+# Dockerfiles under any name: by name, plus the files a build's -f or --file, Compose dockerfile: and
+# docker/build-push-action file: name. A file is kept when it has a FROM line; a name that is no file
+# here is printed: find that file by hand and add it to the list.
+mkdir -p graviton-validation/raw
+{ find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules -o -name cdk.out -o -name graviton-validation \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' \) -print
+  grep -rnoE "${EX[@]}" --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' --include='Jenkinsfile*' -- \
+    "(build|bud)[[:space:]][^;|&#]*(-f[[:space:]]+|--file[[:space:]=]+)[\"']?[^[:space:];|&\"')]+|(dockerfile|file):[[:space:]]*[\"']?[^[:space:]#\"']+" . |
+    while IFS= read -r hit; do
+      src=${hit%%:*}; ref=$(printf '%s\n' "${hit#*:*:}" | sed -E "s/^.*(-f[[:space:]]+|--file[[:space:]=]+|file:[[:space:]]*)[\"']?//")
+      if [ -f "$ref" ]; then printf './%s\n' "${ref#./}"
+      elif [ -f "${src%/*}/$ref" ]; then printf '%s/%s\n' "${src%/*}" "${ref#./}"
+      else printf 'not found: %s names %s\n' "$src" "$ref" >&2; fi
+    done
+} | while IFS= read -r f; do grep -qiE '^[[:space:]]*FROM[[:space:]]' "$f" && printf '%s\n' "$f"; done |
+  sort -u > graviton-validation/raw/dockerfiles.txt
+cat graviton-validation/raw/dockerfiles.txt
 ```
-
-Executed on the three solutions:
-- **Linux solution:** its Dockerfile, `deploy/deploy.sh`, the Lambda files (`aws-lambda-tools-defaults.json` with `"function-runtime": "dotnetcore3.1"`, `template.yaml` with `AWS::Serverless::Function`) and `kubernetes.io/arch: amd64` in `deploy/k8s/deployment.yaml`.
-- **Windows solution:** a Dockerfile, `deploy/install-service.ps1`, `web.config`, `AddWindowsService`, `UseIIS()` and `<AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>`.
-- **.NET Framework solution:** `Web.config`, a `ServiceBase` class and `<UseIISExpress>true</UseIISExpress>`.
 
 ### Detect Multi-Module Structure
 
@@ -75,7 +93,7 @@ Executed on the three solutions:
 
 ```bash
 # Solutions, projects and the files that shape every project's build
-find . \( -name .git -o -name bin -o -name obj -o -name node_modules \) -prune -o -type f \( -name '*.sln' -o -name '*.slnx' -o -name '*.slnf' \
+find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules \) -prune -o -type f \( -name '*.sln' -o -name '*.slnx' -o -name '*.slnf' \
   -o -name '*.csproj' -o -name '*.fsproj' -o -name '*.vbproj' -o -name 'Directory.Build.props' -o -name 'Directory.Build.targets' \
   -o -name 'Directory.Packages.props' -o -name 'global.json' -o -iname 'nuget.config' -o -name 'packages.config' -o -name 'packages.lock.json' \
   -o -name 'dotnet-tools.json' \) -print | sort
@@ -83,10 +101,7 @@ find . \( -name .git -o -name bin -o -name obj -o -name node_modules \) -prune -
 find . -maxdepth 1 -type f \( -name '*.sln' -o -name '*.slnx' \) | while IFS= read -r s; do echo "== $s"; dotnet sln "$s" list < /dev/null; done
 ```
 
-Executed:
-- **Linux solution:** `Fixture.sln` with 9 projects, `Directory.Build.props`, `Directory.Packages.props`, `global.json` and 9 `packages.lock.json` files.
-- **Windows solution:** `Orders.slnx` with 3 projects. SDK 10.0.401 listed them; SDK 8.0.425 failed with ``Invalid solution `Orders.slnx`. Expected file header not found.``
-- **.NET Framework solution:** two project files and a `packages.config`, with no solution file at the root.
+SDK 8.0.425 cannot read a `.slnx` solution (``Invalid solution `Orders.slnx`. Expected file header not found.``); SDK 10.0.401 can.
 
 ### Determine Starting Point
 
@@ -96,7 +111,7 @@ Graviton instances and arm64 Lambda functions run Linux, so the first question i
 mkdir -p graviton-validation/raw
 # Evaluated properties of every project file, one line each
 P=TargetFramework,TargetFrameworks,TargetFrameworkVersion,OutputType,RuntimeIdentifier,RuntimeIdentifiers,PlatformTarget,Prefer32Bit,UseWindowsForms,UseWPF,SelfContained,PublishAot,PublishReadyToRun,PublishSingleFile,InvariantGlobalization,AspNetCoreHostingModel,UsingMicrosoftNETSdk
-find . \( -name .git -o -name bin -o -name obj -o -name node_modules \) -prune -o -type f \( -name '*.csproj' -o -name '*.fsproj' -o -name '*.vbproj' \) -print | sort |
+find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules \) -prune -o -type f \( -name '*.csproj' -o -name '*.fsproj' -o -name '*.vbproj' \) -print | sort |
   while IFS= read -r p; do
     printf '%s: ' "$p"
     dotnet msbuild "$p" -getProperty:"$P" < /dev/null 2>&1 | python3 -c 'import json, sys
@@ -115,17 +130,7 @@ except ValueError:
 | Modern .NET on Linux | `TargetFramework` `netcoreapp*` or `net5.0` and later, Linux RIDs | the arm64 checks in this skill apply directly |
 | .NET Standard library | `TargetFramework` `netstandard*` | portable; the same checks apply |
 
-Executed (lines shortened):
-- **Linux solution:**
-  - `./src/Fixture.Lambda/Fixture.Lambda.csproj: ..., TargetFramework=netcoreapp3.1, ...`
-  - `./src/Fixture.Api/Fixture.Api.csproj: AspNetCoreHostingModel=inprocess, OutputType=Exe, PlatformTarget=x64, ..., RuntimeIdentifier=linux-x64, RuntimeIdentifiers=linux-x64, ...`
-  - `./src/Fixture.Agent/Fixture.Agent.csproj: InvariantGlobalization=true, OutputType=Exe, ..., PublishAot=true, ...`
-- **Windows solution:**
-  - `./src/Orders.AdminTool/Orders.AdminTool.csproj: OutputType=WinExe, ..., TargetFramework=net8.0-windows, ..., UseWindowsForms=true, ...`
-  - `./src/Orders.Service/Orders.Service.csproj: ..., PlatformTarget=x64, ..., RuntimeIdentifier=win-x64, ...`
-- **.NET Framework solution:**
-  - `./Orders.Web/Orders.Web.csproj: OutputType=Library, PlatformTarget=x64, Prefer32Bit=false, TargetFrameworkVersion=v4.8`, with no `UsingMicrosoftNETSdk`, so it is not an SDK-style project;
-  - `./Orders.Contracts/Orders.Contracts.csproj: ..., TargetFramework=netstandard2.0, ..., UsingMicrosoftNETSdk=true`.
+A project without `UsingMicrosoftNETSdk=true` is not an SDK-style project (a .NET Framework project, with `TargetFrameworkVersion=v4.8`, for example).
 
 Never decide the starting point from a successful build or publish. With `EnableWindowsTargeting=true`, `dotnet publish -r linux-arm64` of the Windows Forms tool exited 0 and produced an aarch64 apphost, but its `.runtimeconfig.json` requires `Microsoft.WindowsDesktop.App`, which exists only on Windows. Phase 3's output scan reports that file; the properties above report it first.
 
@@ -134,9 +139,9 @@ Never decide the starting point from a successful build or publish. With `Enable
 Native files depend on the OS the workload runs on as well as the CPU: glibc or musl, the glibc version, and the kernel's page size ([nuget-native-assets.md §6](../document_references/nuget-native-assets.md#6-target-os-libc-glibc-version-page-size)). Find every target:
 
 ```bash
-EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation)
+EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
 # The image each Dockerfile's last stage runs on
-find . \( -name .git -o -name bin -o -name obj -o -name node_modules \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.dockerfile' \) -print |
+find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.dockerfile' \) -print |
   while IFS= read -r f; do echo "$f: $(grep -iE '^[[:space:]]*FROM[[:space:]]' "$f" | tail -n 1)"; done
 # Lambda runtimes and architectures
 grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.template' \
@@ -154,13 +159,7 @@ Record four values for the rest of the skill:
 - the **lowest libstdc++ version** (`GLIBCXX_3.4.N`) across the glibc targets, when it can be read for each of them (from an image, with the block in §6; a Lambda managed runtime has no image to read it from);
 - the **page size** when a target kernel uses 64KB pages (AlmaLinux 8 and Rocky Linux 8 aarch64).
 
-Executed:
-- **Linux solution:**
-  - `./Dockerfile: FROM mcr.microsoft.com/dotnet/aspnet:8.0` (Debian 12, glibc 2.36, libstdc++ GLIBCXX_3.4.30).
-  - The Lambda function: `Runtime: dotnetcore3.1` with `Architectures: - x86_64`, and the same in `aws-lambda-tools-defaults.json`. Its arm64 target is `dotnet8` or `dotnet10` (§1.5), so the lowest glibc is 2.34. The managed runtime's libstdc++ version cannot be read, so `--glibcxx` is left out.
-  - `deploy/deploy.sh` installs the agent on an EC2 host whose AMI no file names: ask.
-- **Windows solution:** `FROM mcr.microsoft.com/dotnet/aspnet:8.0-nanoserver-ltsc2022`, a Windows image; the Linux image is part of the move to Linux.
-- **.NET Framework solution:** no deployment file names a target: ask.
+For a Lambda function on a managed .NET runtime, the arm64 target is `dotnet8` or `dotnet10` (§1.5), so the lowest glibc is 2.34; the managed runtime's libstdc++ version cannot be read, so `--glibcxx` is left out. When no file names the target OS, as for an EC2 host whose AMI no file names, ask.
 
 ### Generate Dependency Tree
 
@@ -180,10 +179,7 @@ cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findi
 grep -q '^packages: [1-9]' graviton-validation/raw/native-assets.txt || echo "WARNING: no packages resolved; read the restore errors above"
 ```
 
-Executed:
-- **Linux solution:** 3 seconds; `dependency tree: 9 projects written to .../graviton-validation/raw/dependency-tree.json`, then `packages: 40; ...; findings: 4; checks: 1` and exit status 1. Each tree entry names the chain, for example `"SQLitePCLRaw.lib.e_sqlite3 2.1.12": {"type": "package", "via": ["Fixture.Core", "Microsoft.Data.Sqlite 8.0.31", "SQLitePCLRaw.bundle_e_sqlite3 2.1.12"]}` for the tool project.
-- **Windows solution** (with `--source-rid win-x64`): 33 packages, all managed, no findings. Its blockers are in the code (§1.4), not in its packages.
-- **.NET Framework solution:** `CHECK Orders.Web/packages.config: these packages are not restored by PackageReference and are not in this report; run: config Orders.Web/packages.config`. A `packages.config` project gets the per-package check instead: [nuget-native-assets.md §3](../document_references/nuget-native-assets.md#projects-that-still-use-packagesconfig) (5 entries, 1 finding: System.Data.SQLite.Core 1.0.118.0).
+A project that uses `packages.config` is not in this report: the program prints `CHECK <file>: these packages are not restored by PackageReference and are not in this report; run: config <file>`, and that project gets the per-package check instead ([nuget-native-assets.md §3](../document_references/nuget-native-assets.md#projects-that-still-use-packagesconfig)).
 
 ### Categorize Components by Risk
 
@@ -224,30 +220,21 @@ python3 "$GV_CHECK" scan --source-tree . > graviton-validation/raw/repo-native-s
 cat graviton-validation/raw/repo-native-scan.txt; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
 ```
 
-Executed on the Linux solution:
-
-```
-ELF x86-64   glibc GLIBC_2.2.5 align 0x1000           src/Fixture.Core/native/x64/libfastsum.so
-FINDING src/Fixture.Core/native/x64/libfastsum.so is x86-64
-files by kind: ELF x86-64 1
-findings: 1
-exit status 1 (0 no findings, 1 findings, 2 not a folder)
-```
-
-The Windows and .NET Framework solutions commit no native files (`files by kind: none`). The same scan reports committed managed assemblies built for x64 or x86, which fail on arm64 as described in [nuget-native-assets.md §1](../document_references/nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each).
+The same scan reports committed managed assemblies built for x64 or x86, which fail on arm64 as described in [nuget-native-assets.md §1](../document_references/nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each).
 
 ### 1.2.2 Runtime-Extracted Native Library Detection
 
 Some code loads or downloads native code at run time instead of shipping it in a package, and some images install it from the OS:
 
 ```bash
-EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation)
+EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
 # Native loads with file:line (C#, VB, F#)
 grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' \
   '[[<](DllImport|LibraryImport)\(|Declare (Auto |Ansi |Unicode )?(Function|Sub) .* Lib "|NativeLibrary\.(Load|TryLoad|SetDllImportResolver)|LoadUnmanagedDll|GetDelegateForFunctionPointer' . 2>/dev/null || true
-# Binary downloads with an architecture in the URL or file name (scripts, Dockerfiles, CI)
-grep -rnE "${EX[@]}" --include='*.sh' --include='*.ps1' --include='*.cmd' --include='Dockerfile*' --include='*.y*ml' \
-  '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[^#]*(x86_64|amd64|x64|linux64|win64)' . 2>/dev/null || true
+# Every download in scripts, Dockerfiles and CI. A URL that names no architecture still fetches a build
+# for one, so each downloaded file is judged by its content (below)
+grep -rnE "${EX[@]}" --include='*.sh' --include='*.ps1' --include='*.cmd' --include='Dockerfile*' --include='*.[Dd]ockerfile' \
+  --include='Containerfile*' --include='*.y*ml' --include='Jenkinsfile*' '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[[:space:]]|^[[:space:]]*ADD([[:space:]]+--[^[:space:]]+)*[[:space:]]+https?:|releases/(latest/)?download/' . 2>/dev/null || true
 # Packages that run or download executables (a prompt, not an allowlist; the content check decides)
 grep -rnE "${EX[@]}" --include='*.csproj' --include='*.fsproj' --include='*.vbproj' --include='*.props' --include='*.targets' --include='packages.config' \
   'Selenium\.WebDriver|Microsoft\.Playwright|ChromeDriver|GeckoDriver' . 2>/dev/null || true
@@ -255,13 +242,32 @@ grep -rnE "${EX[@]}" --include='*.csproj' --include='*.fsproj' --include='*.vbpr
 grep -rnE "${EX[@]}" --include='Dockerfile*' --include='*.sh' '(apt-get|apt|dnf|yum|microdnf|apk|zypper)[[:space:]].*(install|add)[[:space:]]' . 2>/dev/null || true
 ```
 
-Executed:
-- **Linux solution:**
-  - `./src/Fixture.Core/Native.cs:11:` `NativeLibrary.SetDllImportResolver(...)`, `Native.cs:26:` `NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "native", arch, "libfastsum.so"))` and `Native.cs:29:` `[DllImport("fastsum", EntryPoint = "fast_sum")]`;
-  - `./deploy/deploy.sh:10:` the `awscli-exe-linux-x86_64.zip` download;
-  - Selenium.WebDriver in the UI test project, with version 4.48.0 in `Directory.Packages.props`;
-  - `apt-get install -y --no-install-recommends libfontconfig1` in the Dockerfile.
-- **Windows solution:** `./src/Orders.Service/Platform.cs:20:` `[DllImport("kernel32.dll")]`. Windows system DLLs never exist on Linux: the call failed there with `DllNotFoundException: Unable to load shared library 'kernel32.dll' or one of its dependencies`.
+Windows system DLLs never exist on Linux: a `[DllImport("kernel32.dll")]` call fails there with `DllNotFoundException: Unable to load shared library 'kernel32.dll' or one of its dependencies`.
+
+Fetch each download into a scratch folder and scan what it holds, whatever its URL says. Resolve the script's variables in the URL first; an archive is unpacked first:
+
+```bash
+GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list above
+d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX"); mkdir "$d/x"
+if curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
+  # Unpack by the first bytes, not the name: a .deb (an ar archive), an .rpm, a zip or a tar archive
+  case "$(od -An -tx1 -N4 "$d/download" | tr -d ' \t\n')" in
+    213c6172) if head -c 64 "$d/download" | grep -q debian-binary; then   # another ar archive is a static library, which the scan reads
+                (cd "$d/x" && ar x ../download && for t in data.tar.*; do tar -xf "$t"; done) && rm "$d/download" \
+                  || echo "CHECK: $URL is a .deb this host cannot unpack (needs ar, and tar with xz or zstd)"
+              fi ;;
+    edabeedb) { if command -v rpm2cpio > /dev/null 2>&1; then (cd "$d/x" && rpm2cpio ../download | cpio -idm --quiet)
+                else bsdtar -xf "$d/download" -C "$d/x"; fi; } && rm "$d/download" \
+                || echo "CHECK: $URL is an .rpm this host cannot unpack (needs rpm2cpio and cpio, or bsdtar)" ;;
+    *) python3 -m zipfile -e "$d/download" "$d/x" 2>/dev/null || tar -xf "$d/download" -C "$d/x" 2>/dev/null ;;
+  esac
+  python3 "$GV_CHECK" scan "$d"
+else echo "CHECK: $URL did not download"; fi
+rm -rf "$d"
+```
+
+Executed: jq 1.6's `jq-linux64`, whose URL names no architecture, gave `FINDING download is x86-64`; jq 1.7.1's `jq-linux-arm64` gave no finding. A download that cannot be fetched from here (credentials, a private network) stays CHECK until it is scanned where it can be.
 
 Check that every OS package exists for arm64 on the target OS, from a container that runs natively on this host. On an x86 host, asking the arm64 image itself runs under emulation; that took 17 seconds for Debian and did not finish in 480 seconds for Amazon Linux 2023.
 
@@ -272,8 +278,20 @@ PKGS="libfontconfig1"                     # the packages its Dockerfile installs
 command -v timeout > /dev/null 2>&1 || timeout() { shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit
 NATIVE="linux/$(docker version -f '{{.Server.Arch}}')"
 ARM_PKGS=$(echo "$PKGS" | sed 's/[^ ][^ ]*/&:arm64/g')
+# On an amd64 Ubuntu image the x86 mirrors carry no arm64 files (apt-get update: "binary-arm64/Packages 404 Not
+# Found"): keep the image's sources for amd64 and read arm64 from ports.ubuntu.com
+PORTS='. /etc/os-release
+if [ "$ID" = ubuntu ] && [ "$(dpkg --print-architecture)" = amd64 ]; then
+  for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do [ -f "$f" ] && sed -i -E "s/^deb (https?:)/deb [arch=amd64] \1/" "$f"; done
+  for f in /etc/apt/sources.list.d/*.sources; do [ -f "$f" ] && sed -i "/^Types:/a Architectures: amd64" "$f"; done
+  for s in "" -updates -security; do
+    echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://ports.ubuntu.com/ubuntu-ports $VERSION_CODENAME$s main restricted universe multiverse"
+  done > /etc/apt/sources.list.d/arm64-ports.list
+fi
+'
+# 480 seconds inside the container stops apt-get; 600 outside stops the container if it does not exit
 timeout 600 docker run --rm --init --platform "$NATIVE" --entrypoint timeout "$IMG" 480 \
-  sh -c "dpkg --add-architecture arm64 && apt-get update -qq && apt-get install -s --no-install-recommends $ARM_PKGS 2>&1 | grep -E '^(Inst|E:)'"
+  sh -c "$PORTS dpkg --add-architecture arm64 && apt-get update -qq && apt-get install -s --no-install-recommends $ARM_PKGS 2>&1 | grep -E '^(Inst|E:)'"
 ```
 
 ```bash
@@ -282,13 +300,13 @@ IMG=public.ecr.aws/amazonlinux/amazonlinux:2023
 PKGS="fontconfig libicu"
 command -v timeout > /dev/null 2>&1 || timeout() { shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit
 NATIVE="linux/$(docker version -f '{{.Server.Arch}}')"
+# 480 seconds inside the container stops dnf; 600 outside stops the container if it does not exit
 timeout 600 docker run --rm --init --platform "$NATIVE" --entrypoint timeout "$IMG" 480 \
   sh -c "dnf -q --forcearch aarch64 repoquery --arch aarch64,noarch --latest-limit 1 $PKGS"
 ```
 
-Executed:
-- **Debian 12** (the Linux solution's image), 6 seconds: `Inst libfontconfig1:arm64 (2.14.1-4 Debian:12.15/oldstable [arm64])`. Some dependencies resolve to the host's architecture in this simulation (`fontconfig-config ... [amd64]`, which was `[arm64]` in the arm64 image itself), so judge only the requested `:arm64` packages. A package with no arm64 build stops the simulation: the x86-only `cpuid` and `msr-tools` gave `E: Unable to locate package cpuid:arm64` and `E: Unable to locate package msr-tools:arm64`.
-- **Amazon Linux 2023**, 16 seconds: `fontconfig-0:2.13.94-2.amzn2023.0.2.aarch64` and `libicu-0:67.1-7.amzn2023.0.4.aarch64`. A package with no aarch64 build prints no line: the x86-only `grub2-pc` and `microcode_ctl` printed nothing for aarch64, and `grub2-pc-1:2.06-61.amzn2023.0.22.x86_64` and `microcode_ctl-2:2.1-53.amzn2023.0.16.x86_64` without `--forcearch`.
+- **Debian or Ubuntu** (observed on Debian 12, Ubuntu 22.04 and Ubuntu 24.04): judge only the requested `:arm64` packages, because some dependencies resolve to the host's architecture in this simulation. A package with no arm64 build stops it: `E: Unable to locate package <name>:arm64`.
+- **Amazon Linux 2023:** a package with no aarch64 build prints no line.
 
 **Common sources of native code at run time** (this list is a *prompt*, not an allowlist):
 - **P/Invoke and `NativeLibrary`**: `[DllImport]`, `[LibraryImport]`, VB `Declare ... Lib`, and resolvers that build a path from `RuntimeInformation.ProcessArchitecture`. The Linux solution's resolver knows only `X64`, so on arm64 it throws `PlatformNotSupportedException: fastsum is not built for Arm64` (§1.4).
@@ -335,13 +353,6 @@ grep -E '^(FINDING|CHECK|OK|  via)' graviton-validation/raw/native-assets.txt > 
 cat graviton-validation/raw/dependency-tree-native.txt
 ```
 
-Executed on the Linux solution: 4 `FINDING`, 1 `CHECK` and 2 `OK` lines (quoted in [nuget-native-assets.md §3](../document_references/nuget-native-assets.md#3-the-per-rid-check)), with these chains:
-- `via src/Fixture.Scoring (direct reference)` for Microsoft.ML.OnnxRuntime 1.10.0;
-- `via tests/Fixture.UiTests (direct reference)` for Selenium.WebDriver 4.48.0;
-- `via src/Fixture.Core (direct reference)` for SkiaSharp.NativeAssets.Linux 1.68.3;
-- `via src/Fixture.Core > System.Data.SQLite.Core 1.0.119 > Stub.System.Data.SQLite.Core.NetStandard 1.0.119`;
-- `via tests/Fixture.Tests > Microsoft.NET.Test.Sdk 17.11.1 > Microsoft.CodeCoverage 17.11.1`.
-
 The full graph, including managed packages, is in `graviton-validation/raw/dependency-tree.json`.
 
 ### Classify Each Dependency
@@ -382,7 +393,7 @@ print("projects resolving AWSSDK.Core: %d" % len(seen))
 EOF
 ```
 
-Executed on the Linux solution: `AWSSDK.Core 3.3.103.65 in src/Fixture.Api: no IMDSv2 support (3.3.103.66 or later needed)`, and the same for three more projects (AWSSDK.S3 3.3.107.1 resolves it). This is MUST UPGRADE when any target requires IMDSv2, and the floor is the first AWSSDK.S3 release that requires Core 3.3.103.66 (3.3.107.2). On Graviton4 (Amazon Linux 2023, IMDSv2 required), the fixed tool with AWSSDK.S3 put back to 3.3.107.1 failed its instance-role credentials call with `HttpRequestException: Response status code does not indicate success: 401 (Unauthorized).`, and with 3.3.107.2 it listed the account's buckets. Confirm the credentials call on the target in Phase 3.3.
+An AWSSDK.Core older than 3.3.103.66 has no IMDSv2 support. This is MUST UPGRADE when any target requires IMDSv2, and the floor is the first release of the referenced AWSSDK package that requires Core 3.3.103.66 (AWSSDK.S3 3.3.107.2). Without it, the instance-role credentials call failed on Graviton4 with IMDSv2 required: `HttpRequestException: Response status code does not indicate success: 401 (Unauthorized).` Confirm the credentials call on the target in Phase 3.3.
 
 ### Document Findings
 
@@ -408,14 +419,12 @@ Resolution: replace with Microsoft.Data.Sqlite (already in the solution, linux-a
 Some packages carry executables that run on the build host or in test steps rather than in the application. They matter where the build or the tests run, for example on an arm64 CI runner or in a `docker build` on Graviton, even when the application never loads them. The per-RID report lists them as `CHECK` or `OK` lines (files outside `runtimes/`). Find what uses them:
 
 ```bash
-EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation)
+EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
 # Build-time packages and tools that run executables on the build host
 grep -rnE "${EX[@]}" --include='*.csproj' --include='*.fsproj' --include='*.vbproj' --include='*.props' --include='*.targets' \
   'Grpc\.Tools|PublishAot|Microsoft\.DotNet\.ILCompiler|Microsoft\.NET\.Test\.Sdk|Microsoft\.CodeCoverage|coverlet|ChromeDriver' . 2>/dev/null || true
 find . \( -name .git -o -name node_modules \) -prune -o -name dotnet-tools.json -print | while IFS= read -r f; do echo "== $f"; cat "$f"; done
 ```
-
-Executed on the Linux solution: `Microsoft.NET.Test.Sdk` in both test projects (version 17.11.1 in `Directory.Packages.props`) and `<PublishAot>true</PublishAot>` in `src/Fixture.Agent/Fixture.Agent.csproj`. No solution has a `dotnet-tools.json`.
 
 | Package or feature | On an arm64 build host | Evidence |
 |---|---|---|
@@ -433,7 +442,7 @@ Match the RID to the *target*, not the developer machine. **Graviton is Linux, s
 Scan the source tree for architecture-sensitive patterns. Scan from the root (`.`), not from one project folder, and include C#, VB and F# sources:
 
 ```bash
-EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation)
+EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
 # Architecture checks with file:line
 grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' \
   'RuntimeInformation\.(ProcessArchitecture|OSArchitecture|RuntimeIdentifier)|Architecture\.(X64|X86|Arm64|Arm)\b|Is64Bit(Process|OperatingSystem)|IntPtr\.Size|"(linux|win|osx)-(x64|x86)"|"(x64|x86_64|amd64)"' . 2>/dev/null || true
@@ -476,16 +485,10 @@ for line in open(sys.argv[1]):
 EOF
 ```
 
-Executed on the Linux solution (selected lines):
-- `./tests/Fixture.Tests/CoreTests.cs:37:` `Assert.Equal("linux-x64", RuntimeInformation.RuntimeIdentifier)`: a test that fails on arm64 by construction. Fix the test, not the code.
-- `x64 without Arm64: ./src/Fixture.Core/Native.cs`: the native-library resolver handles only `Architecture.X64` and throws `PlatformNotSupportedException: fastsum is not built for Arm64` on arm64.
-- `./src/Fixture.Core/Native.cs:44: Avx2.Add without Avx2.IsSupported before it`. On arm64 this throws `System.PlatformNotSupportedException: Operation is not supported on this platform.`, and the compiler gives no warning. The guarded call at line 74 (`if (Avx2.IsSupported)` at line 69) is not reported.
-- `./src/Fixture.Core/Native.cs: x86 intrinsics without an Arm64 or portable path`: the guarded method falls back to a scalar loop on arm64 (RECOMMENDED: a `Vector128` path).
-- The `Vector256<int>` loops in the same file.
-- Project settings:
-  - `./src/Fixture.Api/Fixture.Api.csproj: PlatformTarget=x64, RuntimeIdentifier=linux-x64, RuntimeIdentifiers=linux-x64`;
-  - `./src/Fixture.Legacy/Fixture.Legacy.csproj: PlatformTarget=x64, RuntimeIdentifiers=linux-x64`;
-  - `RuntimeIdentifiers=linux-x64` in every other project (from `Directory.Build.props`).
+In the output:
+- A test that asserts `RuntimeInformation.RuntimeIdentifier` equals `linux-x64` fails on arm64 by construction. Fix the test, not the code.
+- An x86 intrinsic called with no `IsSupported` check before it, such as `Avx2.Add`, throws `System.PlatformNotSupportedException: Operation is not supported on this platform.` on arm64, and the compiler gives no warning. A guarded call is not reported; its fallback runs on arm64 (RECOMMENDED: a `Vector128` path).
+- Project settings are evaluated values, for example `./src/Fixture.Api/Fixture.Api.csproj: PlatformTarget=x64, RuntimeIdentifier=linux-x64, RuntimeIdentifiers=linux-x64`.
 
   These are evaluated values. The API project's file has no `<PlatformTarget>` element: the SDK derives `PlatformTarget=x64` from `RuntimeIdentifier=linux-x64` (without the RID it was empty, and with `-r linux-arm64` it was `arm64`). Find the element that sets each value, in the project file or a `Directory.Build.props`, before changing anything.
 
@@ -510,14 +513,6 @@ echo "CA1416 call sites: $(wc -l < graviton-validation/raw/ca1416.txt)"
 rm -rf "$d"
 ```
 
-Executed: the Windows solution reported `CA1416 call sites: 8`:
-- `Registry.GetValue` (`Platform.cs(14,18)`);
-- `ProtectedData.Unprotect` and `DataProtectionScope.LocalMachine` (line 18);
-- `Bitmap` (lines 42 and 43) and `Image.Width` (line 44);
-- `AddEventLog` (`Platform.cs(85,55)` and `Program.cs(10,1)`).
-
-The Linux solution reported 0.
-
 CA1416 does not report three cases:
 - P/Invoke into Windows DLLs, such as the `kernel32.dll` import in §1.2.2;
 - projects whose target framework ends in `-windows`, which declare Windows support;
@@ -526,40 +521,73 @@ CA1416 does not report three cases:
 So also search the text:
 
 ```bash
-EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation)
+EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
 # Windows paths and separators, Windows time zone IDs, Windows-only APIs (also in code the analyzer does not check)
 grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' --include='*.json' --include='*.config' \
   '[A-Za-z]:\\|"[^"]*\\\\[^"]*"|Standard Time"|Microsoft\.Win32|Registry\.|EventLog|ProtectedData|WindowsIdentity|ServiceBase|AddWindowsService|System\.Drawing|System\.Management|System\.DirectoryServices' . 2>/dev/null || true
 # .NET Framework technologies without a Linux path, or with a different one on modern .NET
 grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' \
   'System\.Web\.(UI|Http|Mvc)|System\.ServiceModel|System\.EnterpriseServices|System\.Runtime\.Remoting|AppDomain\.CreateDomain|BinaryFormatter|System\.Workflow|System\.Activities' . 2>/dev/null || true
-find . \( -name .git -o -name bin -o -name obj -o -name graviton-validation \) -prune -o -type f \( -name '*.aspx' -o -name '*.ascx' -o -name '*.asmx' -o -name '*.svc' -o -name 'Global.asax' -o -name '*.xaml' \) -print
-find . \( -name .git -o -name bin -o -name obj -o -name graviton-validation \) -prune -o -type f -iname 'web.config' -print | while IFS= read -r f; do
+find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name graviton-validation \) -prune -o -type f \( -name '*.aspx' -o -name '*.ascx' -o -name '*.asmx' -o -name '*.svc' -o -name 'Global.asax' -o -name '*.xaml' \) -print
+find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name graviton-validation \) -prune -o -type f -iname 'web.config' -print | while IFS= read -r f; do
   grep -nE '<authentication mode="Windows"|<system\.serviceModel>|<httpModules>|<httpHandlers>|targetFramework=' "$f" | sed "s#^#$f:#"; done
-# Deployment descriptors, scripts and CI that pin x64, Windows or one architecture
-grep -rnE "${EX[@]}" --include='Dockerfile*' --include='*.y*ml' --include='*.json' --include='*.sh' --include='*.ps1' --include='*.template' -- \
-  '--platform[= ]linux/amd64|(-r|--runtime) (linux|win)-x64|(-a|--arch) (x64|amd64)|nanoserver|servercore|kubernetes\.io/arch: *amd64|runs-on: |x86_64|uname -m|docker build |--locked-mode' . 2>/dev/null || true
+# Deployment descriptors, scripts and CI that pin x64, Windows or one architecture, and the resources
+# whose architecture can be absent (functions, task definitions, node groups)
+DP='--platform[= ]linux/amd64|(-r|--runtime) (linux|win)-x64|(-a|--arch) (x64|amd64)|nanoserver|servercore|kubernetes\.io/arch: *amd64|runs-on: |x86_64|-amd64([^A-Za-z0-9]|$)|(^|[^A-Za-z0-9])amd64/|uname -m|docker build |--locked-mode|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?[Cc]ompatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"'
+grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.tf' --include='*.sh' --include='*.ps1' --include='*.template' -- "$DP" . 2>/dev/null || true
+if [ -f graviton-validation/raw/dockerfiles.txt ]; then   # the Dockerfiles of §1.1, under any name
+  while IFS= read -r f; do grep -nE -- "$DP" "$f" | sed "s#^#$f:#"; done < graviton-validation/raw/dockerfiles.txt
+else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt"; fi
+# CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
+# (a construct that sets none gets x86_64)
+find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules -o -name cdk.out \) -prune -o -name cdk.json -print |
+  while IFS= read -r c; do grep -rnE --exclude-dir=node_modules --exclude-dir=cdk.out --exclude-dir=bin --exclude-dir=obj --exclude-dir=.venv --include='*.py' --include='*.ts' --include='*.js' \
+    --include='*.java' --include='*.cs' --include='*.go' 'Architecture[._](X86_64|ARM_64)|CpuArchitecture[._](X86_64|ARM64)|AmazonLinuxCpuType[._]|MachineImage[._]|NodegroupAmiType[._]|InstanceType(\(|[._][Oo]f\()|InstanceClass[._]|(^|[^A-Za-z0-9_])(New)?(Function|DockerImageFunction|NodejsFunction|PythonFunction|GoFunction|FargateTaskDefinition|Nodegroup|Cluster)(\(|\.Builder)|[Aa]dd_?[Nn]odegroup_?[Cc]apacity' "$(dirname "$c")"; done | sort -u
+# System calls made by number: the numbers differ (x86-64's 186 is gettid, aarch64's is 178, and 186 there
+# is msgget), and open, fork, pipe, dup2 and poll have no aarch64 number at all (openat, clone, pipe2, dup3
+# and ppoll do). Use the libc function or the target's SYS_ constant instead of the number.
+grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' -- \
+  'syscall\([[:space:]]*(0x[0-9a-fA-F]+|[0-9]+)' . 2>/dev/null || true
+# Types and build flags whose results differ by architecture (checked in Phase 3)
+grep -rnE "${EX[@]}" --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' \
+  --include=CMakeLists.txt --include=Makefile --include='*.mk' -- 'long double|__float128|longdouble|float128|float96|complex256|-ffast-math|-Ofast|-funsafe-math' . 2>/dev/null || true
+# x86-only compiler flags and intrinsics in native C and C++ sources the repository builds
+grep -rnE "${EX[@]}" --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' \
+  --include=CMakeLists.txt --include=Makefile --include='*.mk' -- '-m(avx|sse|fma|bmi|popcnt|pclmul|aes|crc32|f16c|lzcnt)|-march=|-mtune=|[a-z0-9]+intrin\.h|cpuid\.h|__builtin_ia32_|__cpuid|__rdtsc|__x86_64__|_M_X64|__SSE|__AVX|__m(128|256|512)|_mm[0-9]*_' . 2>/dev/null || true
 ```
 
-Executed:
-- **Windows solution:**
-  - `@"C:\ProgramData\Orders"` (`Platform.cs:25`);
-  - `"Config\\Settings.json"` (`Platform.cs:35`), where the file on disk is `config/settings.json`;
-  - `"Pacific Standard Time"` (`Platform.cs:38`);
-  - `AddWindowsService` and `AddEventLog` (`Program.cs:9` and `10`);
-  - the two `nanoserver-ltsc2022` images, and the `runs-on: windows-latest` job that publishes with `-r win-x64`.
-- **.NET Framework solution:**
-  - the `ServiceBase` class and `Data Source=C:\ProgramData\Orders\orders.db` in `Web.config`;
-  - `BinaryFormatter`, `System.ServiceModel`, `AppDomain.CreateDomain`, `System.Web.Http` and `System.Web.UI`;
-  - `OrderService.svc`, `Global.asax` and `Default.aspx`;
-  - `<authentication mode="Windows" />` and `<system.serviceModel>` in `Web.config`.
-- **Linux solution:**
-  - the `x86_64` Lambda architecture and `kubernetes.io/arch: amd64`;
-  - the `uname -m` gate and the x86_64 AWS CLI URL in `deploy/deploy.sh`;
-  - `FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/sdk:8.0 AS build` and `-r linux-x64` in the Dockerfile;
-  - in CI: `runs-on: ubuntu-latest`, `dotnet restore --locked-mode`, `-r linux-x64` for the Native AOT agent and a single-architecture `docker build`.
-
 What each Windows or .NET Framework hit means on Linux, with the replacement, is in [windows-to-linux.md](../document_references/windows-to-linux.md). The descriptor fixes are in Phase 2.4.
+
+A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`, and the CDK's `aws-eks` `Cluster` without `defaultCapacityInstance` adds `m5.large` (x86) nodes, two unless `defaultCapacity` sets another count; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim-amd64`, `public.ecr.aws/lambda/dotnet:8-x86_64`). Native C or C++ sources the repository builds need an Arm path for any x86 intrinsics they use: `sse2neon.h` ([sse2neon](https://github.com/DLTcollab/sse2neon)) implements the SSE to SSE4.2 and AES intrinsics with NEON, but no AVX (`_mm256_*`); port what it does not cover, and the hot paths found by profiling on Graviton, to NEON intrinsics. `long double` and fast-math flags change results between x86 and Graviton without an error: check them in Phase 3 (Results That Change Without Failing).
+
+Every image the project builds from, tests with or deploys has to list `linux/arm64`, including images a library starts at run time: a test that calls `WithImage("mysql:5.7")` starts `mysql:5.7`, which has no arm64 build. List the images and read each one's platforms from its registry, without pulling it:
+
+```bash
+EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
+mkdir -p graviton-validation/raw
+# Image references: FROM lines of the Dockerfiles in raw/dockerfiles.txt (§1.1; not stage names), image: keys in
+# YAML and JSON, image names in test code. A reference built from a variable is left out: resolve it by hand.
+{ if [ -f graviton-validation/raw/dockerfiles.txt ]; then
+    while IFS= read -r f; do
+      awk 'toupper($1) == "FROM" { i = ($2 ~ /^--platform=/) ? 3 : 2; if (!($i in s)) print $i
+             for (k = i + 1; k < NF; k++) if (toupper($k) == "AS") s[$(k + 1)] = 1 }' "$f"
+    done < graviton-validation/raw/dockerfiles.txt
+  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt" >&2; fi
+  grep -rhoiE "${EX[@]}" --include='*.y*ml' --include='*.json' \
+    '"?image(uri)?"?[[:space:]]*:[[:space:]]*"?[a-z0-9][^"[:space:],}]*' . |
+    sed -E 's/^"?[Ii][Mm][Aa][Gg][Ee]([Uu][Rr][Ii])?"?[[:space:]]*:[[:space:]]*"?//'
+  grep -rhoE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' 'WithImage\("[^"]+"' . |
+    sed -E 's/.*\("//; s/"$//'
+} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/raw/images.txt
+# Platforms per image, from its registry (docker CLI). Without docker, or a login a private registry needs, the line is CHECK.
+while IFS= read -r img; do
+  if ! out=$(docker manifest inspect -v "$img" 2>&1); then printf 'CHECK   %s: %s\n' "$img" "$(printf '%s\n' "$out" | grep -v '^errors:$' | head -n 1)"
+  elif printf '%s' "$out" | grep -q '"architecture": "arm64"'; then printf 'OK      %s\n' "$img"
+  else printf 'FINDING %s: no linux/arm64 build\n' "$img"; fi
+done < graviton-validation/raw/images.txt
+```
+
+`docker manifest inspect -v` prints every platform of a multi-architecture image and the one platform of a single-architecture image. A FINDING is fixed in Phase 2.4. On an ARM64 host a list without arm64 stops the pull (`no matching manifest for linux/arm64/v8 in the manifest list entries`), while a single amd64 manifest is pulled and its container stops with `exec format error` (`--platform linux/arm64` stops that pull: `was found but does not match the specified platform: wanted linux/arm64, actual: linux/amd64`).
 
 ## 1.5 .NET Version Compatibility Check
 
@@ -572,31 +600,15 @@ find . \( -name .git -o -name node_modules \) -prune -o -name global.json -print
 # Support phase and end of support of every .NET release (Microsoft release metadata)
 curl -fsSL https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json | python3 -c 'import json, sys
 for r in json.load(sys.stdin)["releases-index"]:
-    print("%-5s %-12s end of support %-10s latest runtime %s" % (r["channel-version"], r["support-phase"], r.get("eol-date") or "-", r["latest-runtime"]))'
+    print("%-5s %-3s %-12s end of support %-10s latest runtime %s" % (r["channel-version"], r.get("release-type", "-"), r["support-phase"], r.get("eol-date") or "-", r["latest-runtime"]))'
 ```
-
-Executed (first lines):
-
-```
-11.0  go-live      end of support -          latest runtime 11.0.0-rc.1.26425.128
-10.0  active       end of support 2028-11-14 latest runtime 10.0.12
-9.0   maintenance  end of support 2026-11-10 latest runtime 9.0.20
-8.0   maintenance  end of support 2026-11-10 latest runtime 8.0.31
-7.0   eol          end of support 2024-05-14 latest runtime 7.0.20
-6.0   eol          end of support 2024-11-12 latest runtime 6.0.36
-```
-
-Target frameworks and SDKs found:
-- **Linux solution:** `net8.0` (7 projects), `netcoreapp3.1` (the Lambda function) and `netstandard2.0`; `global.json` pins SDK 8.0.400 with `latestFeature`, so SDK 8.0.425 is selected.
-- **Windows solution:** `net8.0` (2) and `net8.0-windows` (1); no `global.json`, so SDK 10.0.401 is selected.
-- **.NET Framework solution:** `TargetFrameworkVersion=v4.8` and `netstandard2.0`.
 
 1. Document the target framework of every project, the SDK (`global.json`), the runtime image tags, and the Lambda runtimes (§1.1).
 2. **Modern .NET runs on Linux Arm64:**
    - Microsoft's supported-OS lists for .NET 8 and 10 include Arm64 for Linux distributions such as Alpine, Azure Linux, CentOS Stream and Debian ([8.0](https://github.com/dotnet/core/blob/main/release-notes/8.0/supported-os.md), [10.0](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md)).
    - .NET 10 needs glibc 2.27, which Amazon Linux 2 (glibc 2.26) does not have; .NET 8 needs glibc 2.23. On Graviton4, in an `amazonlinux:2` container, .NET 8.0.31 ran a console app and .NET 10.0.12 stopped at ``Failed to load .../libcoreclr.so, error: /lib64/libm.so.6: version `GLIBC_2.27' not found``; .NET 10.0.12 ran on AlmaLinux 8 (glibc 2.28).
-   - The .NET Framework does not support Linux, and Windows is not supported on Graviton ([dotnet.md](https://github.com/aws/aws-graviton-getting-started/blob/main/dotnet.md#net-versions)).
-3. **Support:** .NET 10 (LTS) is supported until 2028-11-14; .NET 8 (LTS) and .NET 9 until 2026-11-10; earlier releases are out of support. The repository's guidance recommends .NET 10 for new Graviton workloads, or .NET 8 or 9 when an earlier supported release is needed ([dotnet.md](https://github.com/aws/aws-graviton-getting-started/blob/main/dotnet.md#recommended-versions)).
+   - The .NET Framework does not support Linux, and Windows is not supported on Graviton.
+3. **Support:** the block above prints each release's type (`lts` or `sts`), support phase and end of support from Microsoft's release index. Use the newest `lts` release in `active` support for new Graviton workloads, or an earlier release in `active` or `maintenance` support when the project needs it; a release in `eol` is out of support.
 4. **Lambda:** changing a function's architecture means uploading new code built for it ([Lambda architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html)). After a runtime's block-update date, "Lambda begins blocking the update of code and configuration for existing functions", but "You can still upgrade the function configuration to a supported runtime" ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)):
 
    | Runtime | OS | Deprecation | Block create | Block update |

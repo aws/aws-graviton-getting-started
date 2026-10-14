@@ -60,9 +60,10 @@ Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`) th
 |-------|---------|--------|------------------------------|
 | `container.base_image_registry` | Container (shared) | Where base images are pulled from | current base image, registry preserved (same distro/version); phase2 §2.4 "Dockerfile updates" |
 | `container.runtime` | Container (shared) | Container CLI | auto-detected `CONTAINER_CMD`; phase3 "Container Runtime Detection" |
-| `deploy.arch_selector` / `deploy.nodepool_label` | Deployment (shared) | ARM64 node selection in manifests | generic `kubernetes.io/arch: arm64`, no nodepool label; phase2 §2.4 "Deployment manifests" |
+| `deploy.arch_selector` / `deploy.nodepool_label` | Deployment (shared) | ARM64 node selection in manifests | generic `kubernetes.io/arch` (`arm64` only with arm64 capacity), no nodepool label; phase2 §2.4 "Deployment manifests" |
 | `deploy.registry` / `deploy.ingress_convention` | Deployment (shared) | Manifest registry & ingress | existing registry/ingress left unchanged; phase2 §2.4 "Deployment manifests" |
 | `ci.system` | CI (shared) | CI vocabulary in the post-transformation note | generic CI/CD wording; SKILL.md "User Responsibility (Post-Transformation)" |
+| `ci.changes` | CI (shared) | Whether CI changes that only add or switch an architecture are applied or recommended | `apply`; phase2 §2.4 "CI pipelines" |
 | `dotnet.target_rids` | .NET | Target RIDs for every per-RID check, probe and scan | `linux-arm64`, plus `linux-musl-arm64` when a target image is Alpine; phase1 §1.1 "Determine Target OS and libc" |
 | `dotnet.framework_bump` | .NET | How a Graviton-required target framework change is approved | `ask`; phase1 §1.5, phase2 §2.2 "Target framework changes" |
 | `dotnet.sdk_select` | .NET | Tool that provides the session-scoped validation SDK | first that works: an installed SDK that matches `global.json`, the official install script into a temporary folder, the SDK container image; phase3 "Session-Scoped .NET Switching" |

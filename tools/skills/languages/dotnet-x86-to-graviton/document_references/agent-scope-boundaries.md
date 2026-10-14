@@ -1,5 +1,20 @@
 # ARM64 Transformation - Agent Scope Boundaries
 
+## Contents
+
+- Primary Objective
+- Quick Reference: ARM64 Dependency Update Decision Tree
+- IN SCOPE: What to Fix: 1. Native Library Issues; 2. Build Tool Artifacts; 3. Architecture Detection; 4. Documented ARM64 Bugs; 5. Project Settings and Lock Files; 6. Deployment Configuration; 7. The Move to Linux; 8. Images and Binaries the Project Pulls
+- OUT OF SCOPE: What NOT to Fix: 1. General Dependency Modernization; 2. Security Updates; 3. Feature Upgrades; 4. .NET Version Changes; 5. Code Refactoring; 6. Tooling and Platform Changes
+- Decision Tree: Should I Update This Dependency?
+- Recommendations: Validation Ladder
+- Common Managed .NET Libraries
+- Red Flags: When Agent is Going Off-Scope
+- How to Document Scope Compliance: For Updates Made; For Updates NOT Made
+- Learning from Past Mistakes: Case Study: Newtonsoft.Json 12.0.3; Case Study: SkiaSharp.NativeAssets.Linux 1.68.3; Case Study: Microsoft.ML.OnnxRuntime 1.10.0; Case Study: SQLitePCLRaw.lib.e_sqlite3 2.0.0; Case Study: The False PASS
+- Success Criteria
+- When in Doubt
+
 ## 🎯 Primary Objective
 Validate .NET application compatibility with AWS Graviton (ARM64) architecture.  
 **Focus ONLY on ARM64-specific compatibility issues.**
@@ -17,7 +32,9 @@ Is this dependency update required for ARM64 compatibility?
 │  ├─ YES → Does the target RID get an aarch64 build for the target's libc and glibc?
 │  │  ├─ NO → ✅ MUST UPGRADE (ARM64 native file missing or wrong)
 │  │  └─ YES → ✅ COMPATIBLE (has ARM64 support)
-│  └─ NO (managed only) → ✅ COMPATIBLE (managed code runs on all architectures)
+│  └─ NO (managed only) → Does it start an image or download a binary with no arm64 build?
+│     ├─ YES → ✅ MUST UPGRADE (IN SCOPE 8)
+│     └─ NO → ✅ COMPATIBLE (managed code runs on all architectures)
 │
 ├─ Does current version FAIL to build or publish for linux-arm64?
 │  ├─ YES → Check why:
@@ -39,6 +56,7 @@ Is this dependency update required for ARM64 compatibility?
 
 RESULT:
 - If no ARM64-specific issue found → Mark COMPATIBLE, do NOT upgrade
+- If the evidence does not decide either way → Mark CHECK, do NOT upgrade; settle it in Phase 3
 - If ARM64-specific issue found → Document evidence and upgrade
 ```
 
@@ -86,14 +104,19 @@ A successful `dotnet publish -r linux-arm64` answers none of these questions: it
 ### 6. Deployment Configuration
 - ✅ Dockerfiles that pin `--platform=linux/amd64` or publish with `-r linux-x64`, and Windows container images (Phase 2.4)
 - ✅ Lambda functions where the project ships the template or `aws-lambda-tools-defaults.json` (architecture `arm64`, and a supported runtime when the current one blocks updates)
-- ✅ Kubernetes node selection only when the project already ships manifests, and only the node-selection, registry and ingress lines
+- ✅ Kubernetes node selection only when the project already ships manifests, and only the node-selection, registry and ingress lines (an arm64 selector only together with arm64 capacity, phase2 §2.4)
 - ✅ Deployment and install scripts that gate on `uname -m` or download x86_64 assets
+- ✅ ECS `cpuArchitecture`, EKS node groups and instance types in files the project ships, only together with arm64 capacity; an instance type gets the Graviton type phase2 §2.4 picks, recorded as a user decision
+- ✅ CI changes that only add or switch an architecture, in pipelines the project ships (phase2 §2.4), unless `ci.changes` is `recommend`
 - ✅ AWS SDK for .NET versions without IMDSv2 support, when a target requires IMDSv2 (AWSSDK.Core before 3.3.103.66; Amazon Linux 2023 AMIs require IMDSv2 by default)
 
 ### 7. The Move to Linux (Windows and .NET Framework Starting Points)
 - ✅ Porting a .NET Framework project to modern .NET, and a Windows-targeting modern .NET project to Linux: one MUST UPGRADE decision for the whole solution, applied after one approval
 - ✅ Replacing Windows-only APIs with what modern .NET supports on Linux ([windows-to-linux.md](windows-to-linux.md)); each replacement that changes behavior or data (secrets, imaging, authentication, serialized data) is a user decision
 - ✅ Windows Forms, WPF and ASP.NET Web Forms have no Linux path: **BLOCKER**, documented with options, never ported to another Windows-only target
+
+### 8. Images and Binaries the Project Pulls
+- ✅ An image the project builds from, tests with, deploys or has a library start, with no `linux/arm64` build (Phase 1.4), and a binary a library or script downloads with no arm64 build, even when the library itself is managed only.
 
 ## ❌ OUT OF SCOPE: What NOT to Fix
 
@@ -127,7 +150,7 @@ A successful `dotnet publish -r linux-arm64` answers none of these questions: it
 - ❌ Moving to or from central package management, lock files or Paket ([package-management-mapping.md](package-management-mapping.md))
 - ❌ Base image distribution or version changes (Debian to Alpine, `aspnet:8.0` to `aspnet:10.0`): they change the C library and its version at once. The exception is a target whose glibc is too old for a required native, which the skill documents as a user decision
 - ❌ Web server, hosting model or logging framework changes beyond what Linux requires (keeping `UseIIS()` is harmless on Linux; removing it is out of scope)
-- ❌ `.gitignore`, `.dockerignore` or CI pipeline edits: phrased as a recommendation only (SKILL.md "User Responsibility")
+- ❌ `.gitignore` or `.dockerignore` edits, and CI changes beyond architecture: phrased as a recommendation only (SKILL.md "User Responsibility")
 
 ## 🔍 Decision Tree: Should I Update This Dependency?
 
@@ -135,7 +158,7 @@ A successful `dotnet publish -r linux-arm64` answers none of these questions: it
 For each dependency, ask in order:
 
 1. Does it have native files for the source or target RID?
-   NO → Mark COMPATIBLE, do NOT update
+   NO → Does it start an image or download a binary with no arm64 build? YES → MUST UPGRADE (IN SCOPE 8); NO → Mark COMPATIBLE, do NOT update
    YES → Continue to #2
 
 2. Does the target RID get an aarch64 build for the target's libc and glibc?
@@ -153,7 +176,7 @@ For each dependency, ask in order:
 
 A missing native file almost always fails at run time, not at build time, so step 4 is where most findings land.
 
-**Simple Rule:** If it builds and runs on ARM64 today → **DO NOT UPDATE**
+**Simple Rule:** Update only what ARM64 requires. A dependency, image or tool is in scope when, on the ARM64 target, it fails to build, publish or run, runs other code than on x86 because a native file did not load, or pulls an image or binary that has no arm64 build. A confirmed fallback is MUST UPGRADE to the lowest version that ships the linux-arm64 file, or a user decision when none does. Everything else stays as it is, even when it is old.
 
 ## 📈 Recommendations: Validation Ladder
 
@@ -161,15 +184,15 @@ A recommendation (a RECOMMENDED UPGRADE or a runtime setting) may be recorded on
 
 | Level | Evidence | Handling |
 |---|---|---|
-| **A** | Documented in this repository with a mechanism (file and section cited) | Record in `05-runtime-configuration.md` as a recommendation with the citation |
+| **A** | Stated in this skill with the condition it applies under (Phase 2.5) | Record in `05-runtime-configuration.md` as a recommendation, with that condition |
 | **B** | Upstream release note, changelog or published benchmark that names Arm64 or Graviton | Record with the link, labelled "upstream-claimed, measure before adopting" |
 | **C** | No written source | Omit. If the user asks, say it is unverified |
 
-A-level sources available in this repository: the .NET version guidance (.NET 10 LTS for new Graviton workloads, .NET 8 or 9 when an earlier supported release is needed) in [dotnet.md](https://github.com/aws/aws-graviton-getting-started/blob/main/dotnet.md#recommended-versions) and the README's [software updates table](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#recent-software-updates-relevant-to-graviton).
+Only the settings that Phase 2.5 states are level A.
 
-## 📋 Common Managed .NET Libraries (Always ARM64-Compatible)
+## 📋 Common Managed .NET Libraries (ARM64-Compatible)
 
-These packages had **no native files** in their latest stable release at the time of writing (checked by content with `probe`). Managed code runs on any architecture, but a resolved tree still goes through the per-RID check, because any version can add a native dependency:
+These packages had **no native files** in the releases checked by content with `probe`. Managed code runs on any architecture, but a resolved tree still goes through the per-RID check, because any version can add a native dependency:
 
 **Testing Frameworks:**
 - xunit 2.9.3
@@ -354,7 +377,7 @@ Do not extend the list from memory. A package is managed only when the per-RID c
 - "Is there concrete evidence this current version breaks on ARM64?"
 - "Am I updating this because it's old, or because ARM64 requires it?"
 
-**If unsure:** Mark as COMPATIBLE and document reasoning. It's better to under-fix than to introduce unnecessary scope creep.
+**If unsure:** Mark it CHECK, not COMPATIBLE, and change nothing. Name the evidence that would settle it and collect it in Phase 3 on ARM64; until then it stays CHECK. It's better to under-fix than to introduce unnecessary scope creep.
 
 ---
 

@@ -1,8 +1,16 @@
 # Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses.
+Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes, or whose options all lie outside the skill (such as the OS or the base image), stays unchanged and listed.
 
 For a .NET Framework or Windows starting point (Phase 1.1), the approved move to modern .NET on Linux comes first, following [../document_references/windows-to-linux.md](../document_references/windows-to-linux.md); the steps below then apply to the moved projects.
+
+## Contents
+
+- 2.1 Native Library Resolution
+- 2.2 Dependency Compatibility Updates
+- 2.3 Architecture Detection Code Updates
+- 2.4 Build Configuration Updates
+- 2.5 Graviton-Specific Runtime Recommendations
 
 ## 2.1 Native Library Resolution
 
@@ -16,6 +24,7 @@ Build the aarch64 file with the project's own native build, on aarch64 hardware 
 
 ```bash
 mkdir -p src/Fixture.Core/native/arm64   # the folder for the aarch64 build, next to the x64 one
+# timeout 600 bounds the cross-compiler install and the build; raise it for a larger build
 $CONTAINER_CMD run --rm --init --platform linux/amd64 -v "$PWD":/w -w /w -e HOST_IDS="$(id -u):$(id -g)" ubuntu:24.04 timeout 600 sh -c \
   'apt-get update && apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross && aarch64-linux-gnu-gcc -shared -fPIC -O2 -o src/Fixture.Core/native/arm64/libfastsum.so native/fastsum.c && chown "$HOST_IDS" src/Fixture.Core/native/arm64/libfastsum.so'
 echo "cross-compile: exit $?"   # must be 0 before the scan below means anything
@@ -23,7 +32,7 @@ GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
 python3 "$GV_CHECK" scan src/Fixture.Core/native/arm64   # the file's line must start with "ELF aarch64", and no FINDING may follow
 ```
 
-Executed on the Linux solution (`$CONTAINER_CMD` from Phase 3, here `docker`): the scan's line for `libfastsum.so` began with `ELF aarch64  align 0x10000`, the scan printed `findings: 0`, and the file belonged to the host user. The block is for x86 hosts: on Graviton4 the x86-64 image could not start (`[FATAL tini (8)] exec timeout failed: Exec format error`), and the scan of the then empty folder printed `files by kind: none` with `findings: 0`, so check the `cross-compile` exit status before reading the scan. On an arm64 host, compile natively instead: `clang -shared -fPIC -O2 -o src/Fixture.Core/native/arm64/libfastsum.so native/fastsum.c` gave `ELF aarch64  glibc GLIBC_2.17 align 0x10000`. `HOST_IDS` hands the file the container writes back to your user: on a Linux host, files written through a bind mount otherwise belong to root. A library that links other native libraries needs their aarch64 builds too; build it on aarch64 hardware.
+The block is for x86 hosts: on Graviton4 the x86-64 image could not start (`[FATAL tini (8)] exec timeout failed: Exec format error`), and the scan of the then empty folder printed `files by kind: none` with `findings: 0`, so check the `cross-compile` exit status before reading the scan. On an arm64 host, compile natively instead, for example `clang -shared -fPIC -O2 -o src/Fixture.Core/native/arm64/libfastsum.so native/fastsum.c`. `HOST_IDS` hands the file the container writes back to your user: on a Linux host, files written through a bind mount otherwise belong to root. A library that links other native libraries needs their aarch64 builds too; build it on aarch64 hardware.
 
 Ship the aarch64 file the way the project ships the x64 one. The Linux solution copies its native files to the output from project items, so the change is one more item next to the existing one:
 
@@ -55,8 +64,6 @@ string arch = RuntimeInformation.ProcessArchitecture switch
 return NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "native", arch, "libfastsum.so"));
 ```
 
-Executed: with both changes, the linux-arm64 publish held `native/arm64/libfastsum.so` (aarch64) beside `native/x64/libfastsum.so`; the output scan reported the x64 file as a `NOTE` (an aarch64 build of the same file is present), and the self-check in a linux/arm64 container loaded the aarch64 library (`PASS fast sum (vendored libfastsum): 6.5`). `RuntimeInformation.ProcessArchitecture` returned `Arm64` in every linux/arm64 container used to validate this skill.
-
 ## 2.2 Dependency Compatibility Updates
 
 > **Output: update `graviton-validation/03-dependency-compatibility-report.md`**
@@ -70,7 +77,7 @@ python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0 --target-rid linux
 
 > **Skill config:** If `skill-config.md` defines `dotnet.target_rids`, the candidate must probe clean for each of those RIDs. Probes use the repository's `NuGet.config`; if the repository's feeds lack the candidate, record an INFRA item ("the feed needs SkiaSharp.NativeAssets.Linux 2.80.0") rather than choosing a different version. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
-**Read the NuGet audit lines of each probe.** `probe` prints the NU1901 to NU1904 warnings of the probed package and of its dependencies as `NOTE NuGet audit:` lines, each naming its package (its scratch project sets `NuGetAuditMode` to `all`; `assets` keeps the repository's own setting). If the candidate has a warning that the current version does not have, present the floor and the lowest version without the warning as one user decision. Executed: SkiaSharp 1.68.3 had no audit warning; 2.80.0, the arm64 floor, reported `warning NU1903: Package 'SkiaSharp' 2.80.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-j7hp-h8jx-5ppr`; 2.88.6 was the lowest release without it and probed clean for linux-arm64 (GLIBC_2.17). An advisory that the current version already has stays out of scope.
+**Read the NuGet audit lines of each probe.** `probe` prints the NU1901 to NU1904 warnings of the probed package and of its dependencies as `NOTE NuGet audit:` lines, each naming its package (its scratch project sets `NuGetAuditMode` to `all`; `assets` keeps the repository's own setting). If the candidate has a warning that the current version does not have, present the floor and the lowest version without the warning as one user decision. For example, SkiaSharp 2.80.0, the arm64 floor, reported `warning NU1903: Package 'SkiaSharp' 2.80.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-j7hp-h8jx-5ppr`, which 1.68.3 did not; 2.88.6 was the lowest release without it. An advisory that the current version already has stays out of scope.
 
 **Where to write the version** depends on how the solution manages packages ([../document_references/package-management-mapping.md](../document_references/package-management-mapping.md)):
 
@@ -91,9 +98,9 @@ python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0 --target-rid linux
 <PackageVersion Include="AWSSDK.S3" Version="3.3.107.2" />                   <!-- was 3.3.107.1: AWSSDK.Core without IMDSv2 support -->
 ```
 
-**Transitive dependencies:** when a parent pulls in a native package without an arm64 build, raise the parent if a version of it brings a working one (Confluent.Kafka 1.5.3 to 1.6.1 brings librdkafka.redist 1.6.1); otherwise reference the transitive package directly. Executed: a direct `<PackageReference Include="librdkafka.redist" Version="1.6.1" />` next to Confluent.Kafka 1.5.3 resolved 1.6.1, and so did a central `<PackageVersion>` with `CentralPackageTransitivePinningEnabled`. A version below the parent's requirement fails restore (`NU1605`, or `NU1109` with central management).
+**Transitive dependencies:** when a parent pulls in a native package without an arm64 build, raise the parent if a version of it brings a working one (Confluent.Kafka 1.5.3 to 1.6.1 brings librdkafka.redist 1.6.1); otherwise reference the transitive package directly. A version below the parent's requirement fails restore (`NU1605`, or `NU1109` with central management).
 
-**Packages with no linux-arm64 build in any release:** these need a substitute, and substitutions change behavior, so present the evidence and wait for the user. Example from the Linux solution: System.Data.SQLite.Core (through Stub.System.Data.SQLite.Core.NetStandard, no linux-arm64 file up to 1.0.119) replaced by Microsoft.Data.Sqlite, which the solution already used:
+**Packages with no linux-arm64 build in any release:** these need a substitute, and substitutions change behavior, so present the evidence and wait for the user (an unattended run applies the recommended substitute, as stated at the top of this phase). Example from the Linux solution: System.Data.SQLite.Core (through Stub.System.Data.SQLite.Core.NetStandard, no linux-arm64 file up to 1.0.119) replaced by Microsoft.Data.Sqlite, which the solution already used:
 
 ```csharp
 // Before (System.Data.SQLite)
@@ -108,7 +115,7 @@ connection.Open();
 return connection.ExecuteScalar<string>("select sqlite_version()")!;
 ```
 
-Remove the `<PackageReference>` and the `<PackageVersion>` of the replaced package. Executed: the self-check in a linux/arm64 container returned the SQLite version (`3.53.3`) through Microsoft.Data.Sqlite. Its SQLitePCLRaw native needs GLIBC_2.34, so check the target's glibc (Phase 1.1) before choosing it for an Amazon Linux 2 target.
+Remove the `<PackageReference>` and the `<PackageVersion>` of the replaced package. Its SQLitePCLRaw native needs GLIBC_2.34, so check the target's glibc (Phase 1.1) before choosing it for an Amazon Linux 2 target.
 
 **Lock files and RIDs:** add the target RID wherever the source RID is listed, regenerate the lock files, and confirm that a locked restore passes:
 
@@ -122,9 +129,9 @@ dotnet restore Fixture.sln --force-evaluate   # the solution from Phase 1.1
 dotnet restore Fixture.sln --locked-mode; echo "locked restore: exit $?"
 ```
 
-Executed on a clone of the Linux solution: `--force-evaluate` rewrote all 9 lock files, and the locked restore then exited 0 ([../document_references/nuget-native-assets.md](../document_references/nuget-native-assets.md) §8). Commit the lock files with the change.
+Commit the lock files with the change.
 
-**Target framework changes:** follow `dotnet.framework_bump` (Phase 1.5): `ask` presents the options and waits; `approved=<tfm>` applies the change to every project that needs it and records it in `01-project-assessment.md`; `never` documents the blocker and changes nothing. The Linux solution's Lambda function needed one: `dotnetcore3.1` blocks updates, so its move to arm64 includes a move to `net10.0` and the `dotnet10` runtime (§2.4); `net8.0` and `dotnet8` reach end of support on November 10, 2026 (Phase 1.5). The solution pins SDK 8.0.400 in `global.json`, so the same approval covers the pin: with it, the build stopped at `NETSDK1045: The current .NET SDK does not support targeting .NET 10.0`, and with `10.0.100` (`latestFeature`) it passed. Executed on a copy of the solution with both changes: `restore --force-evaluate` rewrote the Lambda project's lock file, the Lambda project and the whole solution built with SDK 10.0.401, `publish -r linux-arm64` produced a `net10.0` runtimeconfig, and the function's packages (Amazon.Lambda.Core 2.3.0, Amazon.Lambda.Serialization.SystemTextJson 2.4.4) did not change. When a package does not support the approved framework, choose its lowest version that does and probe it.
+**Target framework changes:** follow `dotnet.framework_bump` (Phase 1.5): `ask` presents the options and waits (an unattended run applies the Recommendation, the newest `lts` release in `active` support that the target offers: `net10.0`, with `dotnet10` on Lambda); `approved=<tfm>` applies the change to every project that needs it and records it in `01-project-assessment.md`; `never` documents the blocker and changes nothing. A Lambda function on a runtime that blocks updates, such as `dotnetcore3.1`, moves to arm64 together with a supported framework and runtime, `net10.0` and `dotnet10` (§2.4); `net8.0` and `dotnet8` reach end of support on November 10, 2026 (Phase 1.5). A `global.json` SDK pin falls under the same approval: with SDK 8.0.400 pinned, the build stopped at `NETSDK1045: The current .NET SDK does not support targeting .NET 10.0`, and with `10.0.100` (`latestFeature`) it passed. When a package does not support the approved framework, choose its lowest version that does and probe it.
 
 After the changes, keep the Phase 1 evidence that `03-dependency-compatibility-report.md` cites, then re-run the Phase 1.1 check:
 
@@ -136,8 +143,6 @@ python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 --gli
   --tree graviton-validation/raw/dependency-tree.json > graviton-validation/raw/native-assets.txt; rc=$?
 cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 ```
-
-Executed on the fixed Linux solution: `packages: 38; with native files for these RIDs: 4; natives for other platforms only: 1; managed only: 33; findings: 0; checks: 1` (the remaining `CHECK` is Microsoft.CodeCoverage, confirmed in Phase 3.2). Newtonsoft.Json 12.0.3 and Dapper 2.0.123 were not touched.
 
 ## 2.3 Architecture Detection Code Updates
 
@@ -187,7 +192,7 @@ for (; i < data.Length; i++)
 }
 ```
 
-Executed: the unchanged method threw `System.PlatformNotSupportedException: Operation is not supported on this platform.` in a linux/arm64 container; the changed one returned `5050` for 1 to 100 there and on x64. A method that is already guarded and only lacks an Arm64 path is not a blocker: it runs its fallback, and a faster path is a recommendation (§2.5).
+Unguarded, the method threw `System.PlatformNotSupportedException: Operation is not supported on this platform.` on arm64. A method that is already guarded and only lacks an Arm64 path is not a blocker: it runs its fallback, and a faster path is a recommendation (§2.5).
 
 **Tests that assert an x64 environment** are test defects: fix the test, not the code.
 
@@ -215,15 +220,17 @@ For Windows-only APIs, apply the replacements in [../document_references/windows
 
 ## 2.4 Build Configuration Updates
 
+> **Output: update `graviton-validation/04-code-scan-findings.md`** (Changes Applied)
+
 **Project settings:**
-- Remove `<PlatformTarget>x64</PlatformTarget>` (and `x86`) where a file sets it: the default AnyCPU runs on both architectures. An evaluated `x64` with no such element comes from `RuntimeIdentifier` (next item). Executed: with it, `publish -r linux-arm64` stopped at `NETSDK1032: The RuntimeIdentifier platform 'linux-arm64' and the PlatformTarget 'x64' must be compatible.`, and a build without a RID ran until arm64 failed to load the assembly.
-- Remove a `<RuntimeIdentifier>linux-x64</RuntimeIdentifier>` (or a Windows RID) that only exists to pick the build fleet's architecture; pass the RID at publish time (`-r linux-arm64`, or `-a` in a Dockerfile). Executed: with it in the API project, a publish without `-r` produced an x86-64 apphost and x86-64 natives.
+- Remove `<PlatformTarget>x64</PlatformTarget>` (and `x86`) where a file sets it: the default AnyCPU runs on both architectures. An evaluated `x64` with no such element comes from `RuntimeIdentifier` (next item). With it, `publish -r linux-arm64` stops at `NETSDK1032: The RuntimeIdentifier platform 'linux-arm64' and the PlatformTarget 'x64' must be compatible.`, and a build without a RID runs until arm64 fails to load the assembly.
+- Remove a `<RuntimeIdentifier>linux-x64</RuntimeIdentifier>` (or a Windows RID) that only exists to pick the build fleet's architecture; pass the RID at publish time (`-r linux-arm64`, or `-a` in a Dockerfile). With it, a publish without `-r` produces an x86-64 apphost and x86-64 natives.
 - Add the target RID to `<RuntimeIdentifiers>` and regenerate lock files (§2.2).
-- **Native AOT** (`<PublishAot>true</PublishAot>`): the compiler and linker run on the build host. Publishing linux-arm64 from x64 without a cross toolchain failed with `gcc : error : unrecognized command-line option ‘--target=aarch64-linux-gnu’`; Microsoft documents cross-compiling "As long as the necessary native toolchain is installed" ([Native AOT cross-compilation](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/cross-compile)). Publish Native AOT binaries for arm64 on arm64 hardware; nothing in the project file changes. On Graviton4 (Amazon Linux 2023), the publish first failed with `error : Platform linker ('clang' or 'gcc') not found in PATH. Ensure you have all the required prerequisites documented at https://aka.ms/nativeaot-prerequisites.`; Microsoft lists `clang zlib-devel zlib-ng-devel zlib-ng-compat-devel` for RHEL ([Native AOT prerequisites](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/#prerequisites)), Amazon Linux 2023 has the first two, and after `dnf install clang zlib-devel` the publish succeeded and the aarch64 executable ran. For Lambda, AWS documents compiling Native AOT functions on Amazon Linux 2023 with the function's architecture ([Lambda Native AOT](https://docs.aws.amazon.com/lambda/latest/dg/dotnet-native-aot.html)).
+- **Native AOT** (`<PublishAot>true</PublishAot>`): the compiler and linker run on the build host. Publishing linux-arm64 from x64 without a cross toolchain failed with `gcc : error : unrecognized command-line option ‘--target=aarch64-linux-gnu’`; Microsoft documents cross-compiling "As long as the necessary native toolchain is installed" ([Native AOT cross-compilation](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/cross-compile)). Publish Native AOT binaries for arm64 on arm64 hardware; nothing in the project file changes. Without the prerequisites the publish fails with `error : Platform linker ('clang' or 'gcc') not found in PATH. Ensure you have all the required prerequisites documented at https://aka.ms/nativeaot-prerequisites.`; Microsoft lists `clang zlib-devel zlib-ng-devel zlib-ng-compat-devel` for RHEL ([Native AOT prerequisites](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/#prerequisites)), and on Amazon Linux 2023 (Graviton4), which has the first two, `dnf install clang zlib-devel` was enough. For Lambda, AWS documents compiling Native AOT functions on Amazon Linux 2023 with the function's architecture ([Lambda Native AOT](https://docs.aws.amazon.com/lambda/latest/dg/dotnet-native-aot.html)).
 
 **Dockerfile updates (containerized deployments only):**
 
-PRESERVE the current base image distribution and version. Do NOT change the .NET version or the image tag.
+PRESERVE the current base image distribution and version. Do NOT change the .NET version or the image tag. One tag change is in scope: a tag or repository that names one architecture (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim-amd64`, `public.ecr.aws/lambda/dotnet:8-x86_64`) becomes the same image's multi-architecture tag (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim`, `public.ecr.aws/lambda/dotnet:8`); the distribution and version stay. An image with no arm64 build at its tag (Phase 1.4) moves to the lowest tag of the same image that lists `linux/arm64` (`mysql:5.7` lists only amd64, `mysql:8.0` lists arm64 too): a user decision, which an unattended run applies and records with how to reverse it. A library that starts such an image moves to its lowest version whose image has an arm64 build (MUST UPGRADE).
 
 > **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `mcr.microsoft.com/dotnet/aspnet:8.0` → `<registry>/dotnet/aspnet:8.0`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting**: if the configured registry does not resolve or pull from the build host, do NOT rewrite the `FROM`; keep the original registry and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets**, record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md`. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
@@ -255,9 +262,9 @@ EXPOSE 8080
 ENTRYPOINT ["./Fixture.Api"]
 ```
 
-This is Microsoft's pattern: "Use $BUILDPLATFORM and $TARGETARCH environment variables in your Dockerfile to get the SDK to run natively and cross-compile/publish" ([.NET Blog](https://devblogs.microsoft.com/dotnet/improving-multiplatform-container-support/)). `dotnet publish -a amd64` was accepted, so the same Dockerfile builds both architectures. Executed with `docker build --platform linux/arm64` on the x86 host:
-- **Before** (`FROM --platform=linux/amd64 ... AS build` and `-r linux-x64`): the build exited 0 in 27 seconds (the runtime stage's `apt-get` ran under emulation) and `docker image inspect` reported `arm64 linux`, but a scan of the image's `/app` found an x86-64 apphost, x64 assemblies and x86-64 natives, and the container stopped at once: `[FATAL tini (7)] exec ./Fixture.Api failed: No such file or directory` (exit 127). The x86-64 apphost looks for the x86-64 dynamic loader, which an arm64 image does not have. On an arm64 build host without emulation (Graviton4, Docker 25.0.16 with BuildKit), the same Dockerfile did not build: the amd64 SDK stage stopped at `exec /bin/sh: exec format error`.
-- **After:** the build took 10 seconds (it reused the runtime layer), the scan found only aarch64 natives and AnyCPU or arm64 assemblies (plus the x64 `libfastsum.so` reported as a `NOTE` beside its aarch64 build), and `GET /health` answered `{"status":"ok","arch":"Arm64"}`.
+This is Microsoft's pattern: "Use $BUILDPLATFORM and $TARGETARCH environment variables in your Dockerfile to get the SDK to run natively and cross-compile/publish" ([.NET Blog](https://devblogs.microsoft.com/dotnet/improving-multiplatform-container-support/)). `dotnet publish -a amd64` was accepted, so the same Dockerfile builds both architectures. With `docker build --platform linux/arm64` on an x86 host:
+- **Before** (`FROM --platform=linux/amd64 ... AS build` and `-r linux-x64`): the build exited 0 and `docker image inspect` reported `arm64 linux`, but the image held an x86-64 apphost, x64 assemblies and x86-64 natives, and the container stopped at once: `[FATAL tini (7)] exec ./Fixture.Api failed: No such file or directory` (exit 127). The x86-64 apphost looks for the x86-64 dynamic loader, which an arm64 image does not have. On a Graviton4 build host without emulation, the same Dockerfile did not build: the amd64 SDK stage stopped at `exec /bin/sh: exec format error`.
+- **After:** the image's natives were aarch64, apart from `native/x64/libfastsum.so`, which the project also copies and loads only on x64; its assemblies were AnyCPU or arm64, and the application answered on arm64.
 
 Key rules:
 - **An SDK stage on `$BUILDPLATFORM` is valid only while it compiles managed code and copies package files.** Anything that compiles native code (Native AOT, `RUN gcc`, a native build script) or runs the published application must run on the target platform.
@@ -281,17 +288,26 @@ Host-based deployments skip Docker steps.
 "function-architecture": "arm64",
 ```
 
-(the second block is the two changed lines of `aws-lambda-tools-defaults.json`). Do not add a template the project does not have. [Lambda instruction set architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html) documents the `arm64` value. The deployment itself is confirmed on AWS Lambda in Phase 3.3. Amazon.Lambda.Tools 7.0.0 publishes with `--runtime linux-arm64` for an `arm64` function, so a `<PlatformTarget>x64</PlatformTarget>` left in a referenced project stops `dotnet lambda package` at `NETSDK1032`.
+(the second block is the two changed lines of `aws-lambda-tools-defaults.json`; `Architecture = Architecture.ARM_64` in a CDK app, `architectures = ["arm64"]` in Terraform; a function that names none runs on x86_64). Do not add a template the project does not have. [Lambda instruction set architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html) documents the `arm64` value. The deployment itself is confirmed on AWS Lambda in Phase 3.3. Amazon.Lambda.Tools 7.0.0 publishes with `--runtime linux-arm64` for an `arm64` function, so a `<PlatformTarget>x64</PlatformTarget>` left in a referenced project stops `dotnet lambda package` at `NETSDK1032`.
 
 **Deployment manifests (only if the project already ships them):**
 
 If the project contains Kubernetes/Helm manifests (or similar deployment descriptors), ensure they can schedule onto ARM64 nodes. Only touch node selection, image registry, and ingress vocabulary; do NOT restructure manifests or add resources the project does not already have. If no manifests are present, skip this step.
 
-> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use a generic `kubernetes.io/arch: arm64` node selector and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use the generic `kubernetes.io/arch` label as the capacity rule below says, and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
-The Linux solution's `deploy/k8s/deployment.yaml` changed one line, `kubernetes.io/arch: amd64` to `kubernetes.io/arch: arm64`; the image it names must be built for linux/arm64 (or as a multi-architecture image) before the deployment can run.
+The image a manifest names must be built for linux/arm64 (or as a multi-architecture image) before the deployment can run.
 
-**CI pipelines:** a CI system that publishes for `linux-x64` only, runs on Windows, or builds one image architecture is recorded with the change it needs (for example a `linux-arm64` publish, an arm64 runner for Native AOT, `docker buildx build --platform linux/amd64,linux/arm64`) as a recommendation in `00-summary.md`; the skill makes no CI changes itself (SKILL.md "User Responsibility").
+Change a node selector, a node affinity or the `cpuArchitecture` of an ECS task on EC2 capacity to arm64 only together with arm64 capacity in the files the project ships (a node group, NodePool, capacity provider or instance type): a pod whose selector no node matches stays `Pending`. Without that capacity, allow both architectures (a node affinity on `kubernetes.io/arch` with `operator: In` and the values `amd64` and `arm64`) and ship a multi-architecture image, so the workload keeps its x86 nodes until arm64 nodes exist. An instance type in those files gets the same series (`m`, `c`, `r`, ...) and size in the newest Graviton generation the region offers, with `g` for the processor letter (`m6i` and `m5a` become `m*g`) and its other letters kept (`m5d`, with instance store volumes, becomes `m*gd`); when no Graviton type keeps them, change nothing and list it. It goes under User Decisions Pending because sizing is the team's call (an unattended run applies it). With AWS credentials, list the candidates for `m5.xlarge`:
+
+```bash
+aws ec2 describe-instance-type-offerings --region us-west-2 --location-type region \
+  --filters 'Name=instance-type,Values=m*g.xlarge' --query 'InstanceTypeOfferings[].InstanceType' --output text
+```
+
+Executed in us-west-2, it listed `m6g.xlarge`, `m7g.xlarge`, `m8g.xlarge` and `m9g.xlarge`, so the default is `m9g.xlarge`.
+
+**CI pipelines (only if the project already ships them):** apply the changes that only add or switch an architecture, and leave the rest of the pipeline as it is: add `linux/arm64` to the platforms an image build publishes (`docker buildx build --platform linux/amd64,linux/arm64`, or the `platforms` input of `docker/build-push-action`) with the two steps it needs on an x86 runner: QEMU (`docker/setup-qemu-action`; elsewhere `docker run --privileged --rm tonistiigi/binfmt --install all`; where no privileged container may run, use the arm64 job below), or an arm64 `RUN` step stops with `exec /bin/sh: exec format error`, and a builder for several platforms (`docker/setup-buildx-action`; elsewhere `docker buildx create --driver docker-container --use`), or an engine without the containerd image store, which Docker Engine 29.0 and later use by default only on a fresh installation, stops with `Multi-platform build is not supported for the docker driver`; add a `linux-arm64` publish beside a `linux-x64` one (Native AOT on an arm64 runner), or add an arm64 job beside the x86 one (a GitHub-hosted `ubuntu-24.04-arm` runner, a CodeBuild `ARM_CONTAINER` environment). Record each change in `04-code-scan-findings.md`. Anything else the pipeline needs (credentials, deployment steps, triggers, tool versions) is a recommendation in `00-summary.md`; with `ci.changes: recommend` in `skill-config.md`, the architecture changes are recommendations too.
 
 ## 2.5 Graviton-Specific Runtime Recommendations
 
@@ -301,7 +317,7 @@ Do NOT apply runtime settings automatically. Document recommendations in the rep
 
 | Recommendation | Applies when | Level | Source |
 |---|---|---|---|
-| .NET 10 (LTS) for new Graviton workloads, or .NET 8 or 9 when an earlier supported release is needed; .NET 5, 6 and 7 are out of support | always (record the project's target frameworks; any change goes through `dotnet.framework_bump`) | A | [dotnet.md](https://github.com/aws/aws-graviton-getting-started/blob/main/dotnet.md#recommended-versions) and the README's [software updates table](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#recent-software-updates-relevant-to-graviton) |
+| The newest `lts` release in `active` support for new Graviton workloads, or an earlier release in `active` or `maintenance` support when the project needs it; a release in `eol` is out of support | always (record the project's target frameworks; any change goes through `dotnet.framework_bump`) | A | Microsoft's release index (Phase 1.5) |
 | A `Vector128` (or `Vector<T>`) path for code that has only an x86 intrinsics path and a scalar fallback: Microsoft calls `Vector128<T>` "the common denominator across every platform that supports vectorization" | code found by Phase 1.4 that runs its scalar fallback on Arm64 (on arm64, `Vector128` was accelerated and `Vector256` was not) | B, measure before adopting | [Microsoft Learn: SIMD](https://learn.microsoft.com/en-us/dotnet/standard/simd) |
 
 Nothing else is recommended without a written source. In particular, do not recommend garbage collector modes, thread pool settings, tiered compilation or ReadyToRun changes for Graviton unless the project's own documentation or a cited source covers them.
