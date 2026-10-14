@@ -56,9 +56,10 @@ Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`) th
 |-------|---------|--------|------------------------------|
 | `container.base_image_registry` | Container (shared) | Where base images are pulled from | current base image, registry preserved (same distro/version); phase2 §2.4 "Dockerfile updates" |
 | `container.runtime` | Container (shared) | Container CLI | auto-detected `CONTAINER_CMD`; phase3 "Container Runtime Detection", run before the first container command (Phase 1.1) |
-| `deploy.arch_selector` / `deploy.nodepool_label` | Deployment (shared) | ARM64 node selection in manifests | generic `kubernetes.io/arch: arm64`, no nodepool label; phase2 §2.4 "Deployment manifests" |
+| `deploy.arch_selector` / `deploy.nodepool_label` | Deployment (shared) | ARM64 node selection in manifests | generic `kubernetes.io/arch` (`arm64` only with arm64 capacity), no nodepool label; phase2 §2.4 "Deployment manifests" |
 | `deploy.registry` / `deploy.ingress_convention` | Deployment (shared) | Manifest registry & ingress | existing registry/ingress left unchanged; phase2 §2.4 "Deployment manifests" |
 | `ci.system` | CI (shared) | CI vocabulary in the post-transformation note | generic CI/CD wording; SKILL.md "User Responsibility (Post-Transformation)" |
+| `ci.changes` | CI (shared) | Whether CI changes that only add or switch an architecture are applied or recommended | `apply`; phase2 §2.4 "CI pipelines" |
 | `python.package_manager` | Python | Which manager's commands drive export, override and lock regeneration | auto-detected from marker files; phase1 §1.1 "Detect Package Manager and Interpreter" |
 | `python.index_url` / `python.extra_index_url` | Python | Index used by every probe and install | the index the project's pip configuration already uses (PyPI by default); phase1 §1.3, phase2 §2.2, phase3 §3.1 |
 | `python.interpreter_bump` | Python | Whether the declared interpreter may change when it is the only path to an aarch64 wheel | `never`; phase1 §1.5, phase2 §2.2 "Interpreter-ABI blockers" |

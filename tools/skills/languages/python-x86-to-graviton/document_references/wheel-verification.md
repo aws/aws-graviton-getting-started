@@ -6,16 +6,30 @@ This is the evidence standard for every dependency verdict in this skill:
 
 Every version floor quoted in this skill was verified against PyPI on the date stated. Re-run the probe at migration time rather than trusting a table: maintainers add wheels (and occasionally drop them) between skill releases.
 
+## Contents
+
+- 1. Why Wheels Are the Central Graviton Problem
+- 2. Tag Vocabulary
+- 3. The Probe: `pip download` Against the aarch64 Platform
+- 4. The Files List: PyPI JSON API
+- 5. Sdist-Only Packages: Inspect Before Labelling
+- 6. Interpreter ABI Mismatches Are Not Architecture Findings
+- 7. glibc: The Wheel Exists but Will Not Install on the Target OS
+- 8. Hash-Locked Requirements Only Cover the Wheels They Were Generated From
+- 9. Private Indexes and Mirrors
+- 10. False-Verdict Traps
+- 11. Recording the Evidence
+
 ## 1. Why Wheels Are the Central Graviton Problem
 
 `pip install` prefers a binary wheel whose tags match the target interpreter and platform. When no wheel matches, pip silently falls back to the source distribution (sdist) and compiles it. On Graviton that fallback is where migrations break:
 
 - The sdist build needs compilers and headers that the image does not have, and fails.
-- The build succeeds but takes minutes (the repo's [python.md](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md) section 1 notes up to 20 minutes for large packages), which breaks container build budgets and autoscaling.
+- The build succeeds but takes minutes, which breaks container build budgets and autoscaling.
 - The build succeeds but yields a slower, untested binary than the maintainer's wheel.
 - A hash-locked requirements file (`--require-hashes`) rejects the sdist or the aarch64 wheel outright because the lock only carries x86_64 hashes.
 
-**Pure Python and native code.** Pure-Python code (a `py3-none-any` wheel, or an sdist with no compiled sources) is the same on every operating system and CPU, so it is COMPATIBLE unless it reaches native code itself: a `ctypes` or `cffi` load, a binary it runs or downloads, or a branch on `platform.machine()` (Phase 1.2 and 1.4 find those). Native code (compiled extension modules in wheels, sdists that compile, vendored `.so` files, executables shipped inside wheels, packages from the OS) depends on the target in six ways, and wheel tags record three of them:
+**Pure Python and native code.** Pure-Python code (a `py3-none-any` wheel, or an sdist with no compiled sources) is the same on every operating system and CPU, so it is COMPATIBLE unless it reaches native code itself: a `ctypes` or `cffi` load, a binary it runs or downloads, or a branch on `platform.machine()` (Phase 1.2 and 1.4 find those), or x86_64 gets a compiled wheel of the same pin (CHECK FALLBACK in section 3). Native code (compiled extension modules in wheels, sdists that compile, vendored `.so` files, executables shipped inside wheels, packages from the OS) depends on the target in six ways, and wheel tags record three of them:
 
 | Native code depends on | Recorded in the wheel tags | Where the skill checks it |
 |---|---|---|
@@ -26,7 +40,7 @@ Every version floor quoted in this skill was verified against PyPI on the date s
 | CPU generation and features | no | Phase 2.5 (build flags) and Phase 3 (the oldest Graviton generation deployed) |
 | Packages from the OS | no | Phase 1.2.2 (the target's arm64 repository) and the Phase 3 image build |
 
-The last three fail on Graviton even when every wheel is tagged for aarch64. Executed on Graviton: polars 0.15.1 aborted at import with `<jemalloc>: Unsupported system page size` on AlmaLinux 8 (64KB pages) and imported on AlmaLinux 9 (4KB pages); a test library built with SVE instructions ran on Graviton3 and Graviton4 and stopped with `Illegal instruction` on Graviton2; Debian 13's arm64 repository has `libgeos-dev` but no `libmkl-dev`.
+The last three fail on Graviton even when every wheel is tagged for aarch64. For example, polars 0.15.1 aborted at import with `<jemalloc>: Unsupported system page size` on AlmaLinux 8 (64KB pages), and a library built with SVE instructions stopped with `Illegal instruction` on Graviton2.
 
 The skill therefore classifies every pinned dependency by **which files exist on the index for that exact pin**, using the probes below, before any ARM64 hardware is involved.
 
@@ -42,7 +56,7 @@ A wheel filename is `{name}-{version}-{python tag}-{abi tag}-{platform tag}.whl`
 
 Legacy manylinux aliases, from [PEP 600](https://peps.python.org/pep-0600/): `manylinux1` = `manylinux_2_5`, `manylinux2010` = `manylinux_2_12`, `manylinux2014` = `manylinux_2_17`. Only `manylinux2014` and later have aarch64 variants; `manylinux1`/`manylinux2010` are x86 only.
 
-pip version floors (from [pip's changelog](https://pip.pypa.io/en/stable/news/)): `manylinux2014` tags were added in **pip 19.3** (2019-10-14), which is why the repo's [python.md](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md) and [README](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#python-installation-on-some-linux-distros) require pip > 19.3 on Graviton; perennial `manylinux_2_N` tags (PEP 600) were added in **pip 20.3** (2020-11-30). An older pip on the target cannot see aarch64 wheels at all and will build everything from source. Check `python3 -m pip --version` on the target before interpreting any install failure, and upgrade with `python3 -m pip install --upgrade pip` (the repo's documented workaround). Current aarch64 wheels mostly carry `manylinux_2_N` tags only (numpy 2.5.3, pillow 12.3.0 and torch 2.14.1 publish no `manylinux2014` aarch64 wheel), so pip 20.3 is the floor that matters. Executed on an x86_64 host with Python 3.8 (pip applies the same tag rules on aarch64): pip 19.3.1 and 20.2.4 found no `confluent-kafka==2.5.0`, whose cp38 x86_64 wheel is tagged `manylinux_2_28` only, and pip 20.3 downloaded it.
+pip version floors (from [pip's changelog](https://pip.pypa.io/en/stable/news/)): `manylinux2014` tags were added in **pip 19.3** (2019-10-14), so Graviton needs pip 19.3 or later; perennial `manylinux_2_N` tags (PEP 600) were added in **pip 20.3** (2020-11-30). An older pip on the target cannot see aarch64 wheels at all and will build everything from source. Check `python3 -m pip --version` on the target before interpreting any install failure, and upgrade with `python3 -m pip install --upgrade pip`. Current aarch64 wheels mostly carry `manylinux_2_N` tags only (numpy 2.5.3, pillow 12.3.0 and torch 2.14.1 publish no `manylinux2014` aarch64 wheel), so pip 20.3 is the floor that matters.
 
 ## 3. The Probe: `pip download` Against the aarch64 Platform
 
@@ -61,6 +75,7 @@ platforms() { # $1=arch ; sets PLAT
     PLAT+=(--platform "manylinux2014_$1")
   fi
 }
+typeset -f platforms > "${TMPDIR:-/tmp}/graviton-python-platforms.sh"   # later blocks, perhaps in a new shell, load it from here
 # Usage: probe <requirement> <arch>; prints the wheel filename on success.
 # --only-binary=:all: is mandatory: without it pip accepts the sdist and the
 # probe "passes" for a package that has no aarch64 wheel at all (false PASS).
@@ -109,11 +124,13 @@ Executed results (pip 26.2.1, `PYVER=3.11`, glibc 2.34):
 | `probe blosc2==0.6.3 aarch64` with `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu` | `(from versions: 0.6.4, 0.6.5, ...)`, then `not on https://download.pytorch.org/whl/cpu/blosc2/ (403)` (return code 1) | The verdict PyPI alone gives: that index answers 403 for a project it does not carry, and pip used PyPI's files. `docopt==0.6.2` gave `from versions: none` the same way, and an extra index that answers 404 gave the same results (section 9). |
 | `probe graviton-skill-review-no-such-project==1.0 aarch64`, a project on no index | `CHECK INDEX: no index has the project: https://pypi.org/simple/graviton-skill-review-no-such-project/ (404)` (return code 4) | Not a verdict: check the name and which index carries the project. |
 
-The three distinct meanings of a FAIL are why the probe is always run twice (aarch64, then x86_64 with the same ABI):
+The three distinct meanings of a FAIL, and a pure-Python PASS that x86_64 does not share, are why the probe is run twice (aarch64, then x86_64 with the same ABI):
 
 | aarch64 | x86_64 | Verdict |
 |---|---|---|
-| PASS | any | COMPATIBLE |
+| PASS, a wheel with compiled code | any | COMPATIBLE |
+| PASS, a `none-any` wheel | PASS, a `none-any` wheel, or FAIL | COMPATIBLE |
+| PASS, a `none-any` wheel | PASS, a wheel with compiled code | CHECK FALLBACK: aarch64 runs the pure-Python code and x86_64 the compiled code (Phase 1.3) |
 | FAIL with `from versions: <list>` | PASS | MUST UPGRADE to the **lowest** listed version (then confirm it with another PASS) |
 | FAIL `from versions: none` | PASS | Either x86-only by nature (section 4) or aarch64 dropped in later releases (pygeos case): decide from the full files list |
 | FAIL | FAIL | Not an architecture finding: sdist-only package (section 5) or interpreter ABI mismatch (section 6) |
@@ -122,14 +139,17 @@ The three distinct meanings of a FAIL are why the probe is always run twice (aar
 Transitive dependencies get the same treatment, but you do not need to enumerate them by hand. `pip install --dry-run --report` resolves the whole tree for the target platform:
 
 ```bash
-platforms aarch64   # the function above: one --platform per tag the target's libc accepts
-python3 -m pip install --dry-run --ignore-installed --only-binary=:all: \
-  --report graviton-validation/raw/wheel-availability.json -q "${PLAT[@]}" \
-  --python-version 3.11 --implementation cp --abi cp311 \
-  --target /tmp/graviton-probe-target -r graviton-validation/raw/requirements-resolved.txt
+if . "${TMPDIR:-/tmp}/graviton-python-platforms.sh"; then
+  TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
+  platforms aarch64   # one --platform per tag the target's libc accepts
+  python3 -m pip install --dry-run --ignore-installed --only-binary=:all: \
+    --report graviton-validation/raw/wheel-availability.json -q "${PLAT[@]}" \
+    --python-version 3.11 --implementation cp --abi cp311 \
+    --target /tmp/graviton-probe-target -r graviton-validation/raw/requirements-resolved.txt
+else echo "CHECK: run the section 3 block first: it writes ${TMPDIR:-/tmp}/graviton-python-platforms.sh"; fi
 ```
 
-Executed on three direct pins (numpy, requests, pandas) this produced a `version: 1` report with 11 entries; each `install[].download_info.url` ends in the wheel filename that would be used on aarch64, and `install[].requested` is `true` for direct dependencies and `false` for transitives (`charset_normalizer-3.5.2-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl` was pulled in by requests, for example). If the resolution fails, pip names the first package without an aarch64 wheel; fix or exclude it and re-run until the report completes, recording each failure as you go.
+The report lists every package pip would install: each `install[].download_info.url` ends in the wheel filename for aarch64, and `install[].requested` is `true` for direct dependencies and `false` for transitives. If the resolution fails, pip names the first package without an aarch64 wheel; fix or exclude it and re-run until the report completes, recording each failure as you go.
 
 ## 4. The Files List: PyPI JSON API
 
@@ -153,30 +173,30 @@ for v, files in d["releases"].items():
 
 Rules for reading the output:
 
-- **Make a missing version fail loudly.** `curl` without `--fail` saves the 404 body, and the Python step then prints nothing, which is indistinguishable from "no aarch64 wheel". Executed check: `curl -sS --fail https://pypi.org/pypi/pygeos/0.99/json` exits 22 with HTTP 404. Keep `--fail` and check the exit status before reading an empty list as evidence.
+- **Make a missing version fail loudly.** `curl` without `--fail` saves the 404 body, and the Python step then prints nothing, which is indistinguishable from "no aarch64 wheel". With `--fail`, `curl` exits 22 on the 404. Keep `--fail` and check the exit status before reading an empty list as evidence.
 - **The floor is the lowest version with a wheel for the project's ABI, not the lowest with any aarch64 wheel.** numpy's first aarch64 wheel is 1.19.0 (cp36, cp37, cp38), but the lowest numpy with a cp311 aarch64 wheel is 1.23.2. Quoting 1.19.0 to a Python 3.11 project is wrong.
 - **Availability is not monotonic.** blosc2 shipped aarch64 wheels for 0.2.0 and 0.3.0, none from 0.3.1 through 0.6.3, and resumed at 0.6.4. pygeos shipped them through 0.13 and dropped them at 0.14. Always check the exact pinned version.
 - **"x86-only by nature" needs the whole release history.** mkl, intel-openmp, tensorflow-intel and tfx-bsl have no Linux aarch64 file in any release (tfx-bsl 1.21.0 ships macOS arm64 wheels, which do not help Graviton). That is the evidence for a substitution verdict; `from versions: none` alone is not.
 
-Verified floors for packages this repo documents (source: `https://pypi.org/pypi/<project>/json`; column 3 is the first release with any Linux aarch64 wheel; re-verify before relying on them):
+Verified floors for common packages (source: `https://pypi.org/pypi/<project>/json`; column 3 is the first release with any Linux aarch64 wheel; re-verify before relying on them):
 
-| Package | Repo reference | First aarch64 wheel | Evidence file |
-|---|---|---|---|
-| numpy | [python.md](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md) section 2: "NumPy>=1.19.0 vend binary wheel packages for Aarch64"; correctness floor 1.21.1 | 1.19.0 (cp36-cp38); cp311 from 1.23.2 | `numpy-1.19.0-cp36-cp36m-manylinux2014_aarch64.whl` |
-| scipy | python.md section 2: "SciPy>=1.5.3"; correctness floor 1.7.2 | 1.5.3 (cp36-cp38) | `scipy-1.5.3-cp36-cp36m-manylinux2014_aarch64.whl` |
-| sentencepiece | python.md section 3.4 | 0.1.94 | `sentencepiece-0.1.94-cp35-cp35m-manylinux2014_aarch64.whl` |
-| torch | [pytorch.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/pytorch.md) | 1.8.0 | `torch-1.8.0-cp36-cp36m-manylinux2014_aarch64.whl` |
-| torchaudio | pytorch.md | 0.10.0 | `torchaudio-0.10.0-cp36-cp36m-manylinux2014_aarch64.whl` |
-| tensorflow | [tensorflow.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/tensorflow.md) | 2.10.0 | `tensorflow-2.10.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl` |
-| onnxruntime | [onnx.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/onnx.md) | 1.3.0 | `onnxruntime-1.3.0-cp35-cp35m-manylinux2014_aarch64.whl` |
-| confluent-kafka | python.md section 4 | 2.1.0, but `manylinux_2_28_aarch64` only (glibc >= 2.28; see section 7) | `confluent_kafka-2.1.0-cp310-cp310-manylinux_2_28_aarch64.whl` |
-| open3d | python.md section 4: glibc >= 2.27 | 0.14.1 | `open3d-0.14.1-cp36-cp36m-manylinux2014_aarch64.whl` |
-| vllm | [vllm.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/vllm.md) points to the AWS vLLM Deep Learning Container image for Graviton (`vllm-arm64` on the Amazon ECR Public Gallery) and describes a source build | PyPI has aarch64 wheels from 0.10.2 (`cp38-abi3`), but they are CUDA builds (0.10.2's `_C.abi3.so` links `libcudart.so.12` and `libcuda.so.1`; 0.30.0's `_C_stable_libtorch.abi3.so` links `libcudart.so.13` and `libcuda.so.1`); the CPU build is the `+cpu` wheel attached to the vLLM release | `vllm-0.29.0+cpu-cp38-abi3-manylinux_2_34_aarch64.whl` (ran on Graviton); 0.30.0's is `manylinux_2_39` |
-| llama-cpp-python | [llama.cpp.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/llama.cpp.md) source build | none (sdist only); source build remains the path | sdist |
-| pandas | wheel tester | 1.1.3; cp311 from 1.5.0 | `pandas-1.1.3-cp36-cp36m-manylinux2014_aarch64.whl` |
-| pillow | wheel tester | 7.2.0; cp311 from 9.2.0 | `Pillow-7.2.0-cp35-cp35m-manylinux2014_aarch64.whl` |
+| Package | First aarch64 wheel | Evidence file |
+|---|---|---|
+| numpy | 1.19.0 (cp36-cp38); cp311 from 1.23.2; correctness floor 1.21.1 | `numpy-1.19.0-cp36-cp36m-manylinux2014_aarch64.whl` |
+| scipy | 1.5.3 (cp36-cp38); correctness floor 1.7.2 | `scipy-1.5.3-cp36-cp36m-manylinux2014_aarch64.whl` |
+| sentencepiece | 0.1.94 | `sentencepiece-0.1.94-cp35-cp35m-manylinux2014_aarch64.whl` |
+| torch | 1.8.0 | `torch-1.8.0-cp36-cp36m-manylinux2014_aarch64.whl` |
+| torchaudio | 0.10.0 | `torchaudio-0.10.0-cp36-cp36m-manylinux2014_aarch64.whl` |
+| tensorflow | 2.10.0 | `tensorflow-2.10.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl` |
+| onnxruntime | 1.3.0 | `onnxruntime-1.3.0-cp35-cp35m-manylinux2014_aarch64.whl` |
+| confluent-kafka | 2.1.0, but `manylinux_2_28_aarch64` only (glibc >= 2.28; see section 7) | `confluent_kafka-2.1.0-cp310-cp310-manylinux_2_28_aarch64.whl` |
+| open3d | 0.14.1; needs glibc 2.27 or later | `open3d-0.14.1-cp36-cp36m-manylinux2014_aarch64.whl` |
+| vllm | PyPI has aarch64 wheels from 0.10.2 (`cp38-abi3`), but they are CUDA builds (0.10.2's `_C.abi3.so` links `libcudart.so.12` and `libcuda.so.1`; 0.30.0's `_C_stable_libtorch.abi3.so` links `libcudart.so.13` and `libcuda.so.1`); the CPU build is the `+cpu` wheel attached to the vLLM release; AWS also publishes a vLLM Deep Learning Container image for Graviton (`vllm-arm64` on the Amazon ECR Public Gallery) | `vllm-0.29.0+cpu-cp38-abi3-manylinux_2_34_aarch64.whl` (ran on Graviton); 0.30.0's is `manylinux_2_39` |
+| llama-cpp-python | none (sdist only); source build remains the path | sdist |
+| pandas | 1.1.3; cp311 from 1.5.0 | `pandas-1.1.3-cp36-cp36m-manylinux2014_aarch64.whl` |
+| pillow | 7.2.0; cp311 from 9.2.0 | `Pillow-7.2.0-cp35-cp35m-manylinux2014_aarch64.whl` |
 
-The repo's [arm64 Python wheel tester](https://geoffreyblake.github.io/arm64-python-wheel-tester/) (linked from python.md) installs and imports about 230 popular packages daily on AL2, AL2023, Ubuntu 20.04/22.04/24.04 and conda, on real Graviton hardware. Use it as a cross-check for *runtime* breakage that a files list cannot show (a wheel that exists but fails to import), not as a substitute for the per-pin probe: it tests the latest version, not your pin.
+The [arm64 Python wheel tester](https://geoffreyblake.github.io/arm64-python-wheel-tester/) installs and imports about 230 popular packages daily on AL2, AL2023, Ubuntu 20.04/22.04/24.04 and conda, on real Graviton hardware. Use it as a cross-check for *runtime* breakage that a files list cannot show (a wheel that exists but fails to import), not as a substitute for the per-pin probe: it tests the latest version, not your pin.
 
 ## 5. Sdist-Only Packages: Inspect Before Labelling
 
@@ -196,13 +216,13 @@ names = (zipfile.ZipFile(io.BytesIO(data)).namelist() if sd[0]["filename"].endsw
          else tarfile.open(fileobj=io.BytesIO(data)).getnames())
 native = [n for n in names if n.rsplit(".", 1)[-1] in ("c", "cc", "cpp", "cxx", "h", "hpp", "pyx", "pxd", "rs", "f", "f90")]
 print("%s: %d files" % (sd[0]["filename"], len(names)))
-print("native sources: %s; needs the build prerequisites from python.md section 1.1 on aarch64" % ", ".join(native[:10])
+print("native sources: %s; needs a C compiler and the Python headers on aarch64" % ", ".join(native[:10])
       if native else "pure Python sdist: COMPATIBLE, installs anywhere")'
 ```
 
-Executed with Python 3.12 and no setuptools installed: docopt 0.6.2 (32 files) has no C, C++, Cython, Rust or Fortran sources, so its verdict is COMPATIBLE; pygeos 0.14 (68 files) lists `pygeos-0.14/pygeos/_geometry.pyx`, `.pxd` files and `pygeos-0.14/src/c_api.c`. Do not write "no wheel available" as a finding for a pure-Python sdist; the wheel tester marks these as "build required" and passing. For a package published only on a private index, download its sdist from that index with the index's credentials and list it with `tar tzf` (or `unzip -l`); do not `pip download` it.
+docopt 0.6.2's sdist has no C, C++, Cython, Rust or Fortran sources, so its verdict is COMPATIBLE; pygeos 0.14's lists `.pyx` and `.pxd` files and `src/c_api.c`. Do not write "no wheel available" as a finding for a pure-Python sdist; the wheel tester marks these as "build required" and passing. For a package published only on a private index, download its sdist from that index with the index's credentials and list it with `tar tzf` (or `unzip -l`); do not `pip download` it.
 
-When the sdist does contain native code, the finding is COMPATIBLE-with-build-prerequisites if it compiles on aarch64 (document the toolchain from [python.md section 1.1](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#11-prerequisites-for-installing-python-packages-from-source): `"@Development tools" python3-devel` on AL/RHEL, `build-essential python3-dev` on Debian/Ubuntu, plus whatever headers the package needs) and MUST UPGRADE if the sources themselves are x86-only (intrinsics, inline assembly; see phase 1.4).
+When the sdist does contain native code, the finding is COMPATIBLE-with-build-prerequisites if it compiles on aarch64 (document the toolchain: `"@Development tools" python3-devel` on AL/RHEL, `build-essential python3-dev` on Debian/Ubuntu, plus whatever headers the package needs) and MUST UPGRADE if the sources themselves are x86-only (intrinsics, inline assembly; see phase 1.4).
 
 ## 6. Interpreter ABI Mismatches Are Not Architecture Findings
 
@@ -236,17 +256,17 @@ Distribution and runtime glibc versions, measured inside `linux/arm64` container
 | Lambda `python3.12` and later (Amazon Linux 2023; `public.ecr.aws/lambda/python:3.12`, `:3.13`) | 2.34 | `manylinux_2_34` |
 | `python:3.11-alpine` | none (musl 1.2) | `musllinux_1_2`; no `manylinux` wheel installs |
 
-The repo documents the symptom for the opposite order of events (a wheel that installs but fails at import with `ImportError: /lib64/libm.so.6: version 'GLIBC_2.27' not found`) in [python.md "Python wheel glibc requirements"](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#python-wheel-glibc-requirements) and for open3d in section 4. Both are the same finding: the wheel's glibc requirement exceeds the target OS. Options, in the repo's order: a version of the package whose wheel tag the OS accepts, the distro's own package (`yum install python3-<name>`), or a newer OS (AL2023, Ubuntu 22.04 or later). Record it as MUST UPGRADE with "user decision" because changing the OS is outside the skill's scope.
+The opposite order of events has the same cause: a wheel whose tag claims less than it needs installs, then fails at import with `ImportError: /lib64/libm.so.6: version 'GLIBC_2.27' not found`. Both are the same finding: the wheel's glibc requirement exceeds the target OS. Options, in this order: a version of the package whose wheel tag the OS accepts, the distro's own package (`yum install python3-<name>`), or a newer OS (AL2023, Ubuntu 22.04 or later). Record it as MUST UPGRADE with "user decision" because changing the OS is outside the skill's scope; the Recommendation is the lowest version whose wheel tag the OS accepts, and when no version has one, change nothing and list it.
 
 To probe for a specific target OS, set `TARGET_LIBC_VER` to its glibc (2.26 for AL2): section 3's `platforms` then offers `manylinux_2_26` down to `manylinux_2_17` and `manylinux2014`, and nothing higher. Read the target's libc in Phase 1.1 and confirm with `pip debug --verbose` on the target in Phase 3. A Lambda function's runtime sets its OS (Phase 1.1): executed on `arm64` functions, a confluent-kafka 2.15.1 layer built from its `manylinux_2_28_aarch64` wheel imported on `python3.12` and failed on `python3.11` with `ImportError: /lib64/libpthread.so.0: version 'GLIBC_2.28' not found`; with `TARGET_LIBC_VER=2.26` the Phase 1.3 loop finds no cp311 wheel for that pin on either architecture, and labels `confluent-kafka==2.0.2` (a `manylinux2014` x86_64 wheel) `MUST UPGRADE` with `from versions: none`.
 
-**musl (Alpine).** A musl-based image accepts only `musllinux` wheels: set `TARGET_LIBC=musl` and `TARGET_LIBC_VER=1.2` (from the Phase 1.1 probe). Executed for the fixture's pins, inside `python:3.11-alpine` natively on Graviton and with the probe: numpy 1.26.4, pandas 2.2.2, pillow 10.4.0, msgpack 1.2.3, MarkupSafe 2.1.5 and charset-normalizer 3.4.0 have `musllinux` aarch64 wheels; blosc2 0.6.4, shapely 2.0.0 and confluent-kafka 2.15.1, which all have `manylinux` aarch64 wheels, have no `musllinux` wheel for either architecture, so on Alpine they build from source on x86 as well (an sdist build to validate on aarch64 hardware, not an architecture gap).
+**musl (Alpine).** A musl-based image accepts only `musllinux` wheels: set `TARGET_LIBC=musl` and `TARGET_LIBC_VER=1.2` (from the Phase 1.1 probe). A package can have `manylinux` aarch64 wheels and no `musllinux` wheel for either architecture (blosc2 0.6.4, shapely 2.0.0 and confluent-kafka 2.15.1): on Alpine it builds from source on x86 as well, an sdist build to validate on aarch64 hardware, not an architecture gap.
 
 ## 8. Hash-Locked Requirements Only Cover the Wheels They Were Generated From
 
 `pip-compile --generate-hashes`, `pip hash`, and lock exporters record hashes of specific files. A lock generated on an x86 CI runner from `pip download` output carries x86_64 wheel hashes only; on Graviton pip downloads the aarch64 wheel, whose hash differs, and `--require-hashes` aborts.
 
-Executed (pip 26.2.1): a requirements file pinning `numpy==1.26.4` with only the x86_64 wheel hash (`sha256:666dbfb6...`), installed with `--require-hashes` against the aarch64 platform, fails with:
+A requirements file that pins `numpy==1.26.4` with only the x86_64 wheel hash, installed with `--require-hashes` for aarch64, fails with:
 
 ```
 ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE. ...
@@ -258,19 +278,22 @@ Adding the aarch64 wheel's hash as a second `--hash=` on the same line makes the
 
 ```bash
 # Any hashed requirement that resolves to a different file on aarch64 fails this dry run:
-platforms aarch64   # section 3: one --platform per tag the target's libc accepts
-python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
-  --python-version 3.11 --implementation cp --abi cp311 --target /tmp/graviton-probe-target \
-  -r requirements-locked.txt
+if . "${TMPDIR:-/tmp}/graviton-python-platforms.sh"; then
+  TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
+  platforms aarch64   # one --platform per tag the target's libc accepts
+  python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
+    --python-version 3.11 --implementation cp --abi cp311 --target /tmp/graviton-probe-target \
+    -r requirements-locked.txt
+else echo "CHECK: run the section 3 block first: it writes ${TMPDIR:-/tmp}/graviton-python-platforms.sh"; fi
 ```
 
 Fix per manager (details in [package-manager-mapping.md](package-manager-mapping.md)): `pip-compile --generate-hashes` records hashes for **all** published files of each version, so a lock produced that way already contains the aarch64 hashes; a hand-made lock needs `pip hash` of the aarch64 wheel appended; `poetry.lock` and `uv.lock` are cross-platform and already carry every wheel's hash (verified on the fixture: both locks list `*_aarch64.whl` entries), so they only need regenerating if they predate the aarch64 wheel. A hash lock is also tied to the interpreter version: under Python 3.12, the fixture's lock (x86_64 and aarch64 hashes for the cp311 wheels) failed with `Expected sha256 6ec585f6... or b91c0375... Got ac07bad8...`, because pip downloaded the cp312 wheel.
 
 ## 9. Private Indexes and Mirrors
 
-The 2024 Python Developers Survey reports about one in ten developers installing from a private index or an internal PyPI mirror. A mirror that was populated from x86 builds will fail the probe for packages PyPI serves fine. Run the probe twice when `skill-config.md` sets `python.index_url` (or `PIP_INDEX_URL`/`pip.conf` points somewhere other than PyPI): once with `PIP_INDEX_URL=<mirror>` and once with `PIP_INDEX_URL=https://pypi.org/simple` (pip reads the variable, and an explicit PyPI URL overrides a `pip.conf` that points at the mirror). Executed with a local index that carried only the x86_64 numpy 1.26.4 wheel: the Phase 1.3 loop reported `MUST UPGRADE numpy==1.26.4 ... x86_64 wheel exists for cp311, no aarch64 wheel` against it and `COMPATIBLE` against PyPI. If the mirror fails and PyPI passes, the dependency is COMPATIBLE and the finding is **INFRA**: "mirror lacks the aarch64 wheel for X; populate the mirror or allow PyPI fallback". Never upgrade a package to work around a mirror gap.
+The 2024 Python Developers Survey reports about one in ten developers installing from a private index or an internal PyPI mirror. A mirror that was populated from x86 builds will fail the probe for packages PyPI serves fine. Run the probe twice when `skill-config.md` sets `python.index_url` (or `PIP_INDEX_URL`/`pip.conf` points somewhere other than PyPI): once with `PIP_INDEX_URL=<mirror>` and once with `PIP_INDEX_URL=https://pypi.org/simple` (pip reads the variable, and an explicit PyPI URL overrides a `pip.conf` that points at the mirror). If the mirror fails and PyPI passes, the dependency is COMPATIBLE and the finding is **INFRA**: "mirror lacks the aarch64 wheel for X; populate the mirror or allow PyPI fallback". Never upgrade a package to work around a mirror gap.
 
-An extra index (`PIP_EXTRA_INDEX_URL`, `extra-index-url` in `pip.conf`, or `python.extra_index_url` in `skill-config.md`) is asked for every pin, and most extra indexes carry only a few projects. pip skips an index that answers 403 or 404 for a project page and uses the others, so the probe keeps that verdict and adds `not on <url> (403)`. Executed with `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`, which answers 403 for projects it does not carry, the Phase 1.3 loop gave the fixture's pins the same verdicts as with PyPI alone. A 403 or 404 can also come from an index the probe may not read: 403 means the server refuses the request, and [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.4) lets a server answer 404 instead to hide a resource. When the note names a private index that should carry the package (an internal package, or an aarch64 wheel built in-house), check that the probe can read that index: probe a pin it carries with `PIP_INDEX_URL` set to that index alone.
+An extra index (`PIP_EXTRA_INDEX_URL`, `extra-index-url` in `pip.conf`, or `python.extra_index_url` in `skill-config.md`) is asked for every pin, and most extra indexes carry only a few projects. pip skips an index that answers 403 or 404 for a project page and uses the others, so the probe keeps that verdict and adds `not on <url> (403)`. The PyTorch index (`https://download.pytorch.org/whl/cpu`), for example, answers 403 for projects it does not carry. A 403 or 404 can also come from an index the probe may not read: 403 means the server refuses the request, and [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.4) lets a server answer 404 instead to hide a resource. When the note names a private index that should carry the package (an internal package, or an aarch64 wheel built in-house), check that the probe can read that index: probe a pin it carries with `PIP_INDEX_URL` set to that index alone.
 
 ## 10. False-Verdict Traps (Checklist)
 
@@ -279,7 +302,7 @@ An extra index (`PIP_EXTRA_INDEX_URL`, `extra-index-url` in `pip.conf`, or `pyth
 | `--only-binary=:all:` omitted | probe PASSES by downloading the sdist | Always include it; the probe is about wheels |
 | Wrong `--abi`/`--python-version` | FAIL for a package that has aarch64 wheels | Use the project's interpreter (phase 1.1), then cross-check x86_64 with the same ABI |
 | Target OS glibc below the wheel tag | `from versions: none` on the target, PASS in the probe | Probe with the target's glibc tag set (section 7); confirm with `pip debug --verbose` on the target |
-| Old pip on the target (< 19.3, or < 20.3 for `manylinux_2_N`) | every native package builds from source on Graviton | Upgrade pip first ([python.md section 1](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#1-installing-python-packages)) |
+| Old pip on the target (< 19.3, or < 20.3 for `manylinux_2_N`) | every native package builds from source on Graviton | Upgrade pip first (`python3 -m pip install --upgrade pip`) |
 | `curl` without `--fail` | empty files list for a typo or unpublished version | Check the exit status; a 404 is not evidence |
 | Reading the first aarch64 release as the floor | quoting numpy 1.19.0 to a Python 3.11 project | The floor is per interpreter ABI (numpy 1.23.2 for cp311) |
 | Assuming availability is monotonic | upgrading blosc2 0.6.3 to 0.6.1, or pygeos 0.14 to "latest" | Check the exact candidate version; blosc2 0.3.1-0.6.3 and pygeos >= 0.14 have no aarch64 wheels |

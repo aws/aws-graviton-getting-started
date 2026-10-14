@@ -6,6 +6,14 @@ Analyze the project without making changes. All findings are documented in `grav
 
 Phase 1 runs on any host, including x86, and installs nothing into the project or its environment. Most checks read files or ask the package index; three kinds of step run code. The §1.1 dry run (`pip install --dry-run` without `--only-binary`) runs the build backend (`setup.py` or the `pyproject.toml` backend) of every sdist it resolves, and of the project itself when the step installs `.`. The §1.1 target probe runs the base image's own `python3` in a container, and §1.2.2 runs the distribution's package tools in containers. The §1.3 probes pass `--only-binary=:all:`, so they never build or run a package. For a repository or an index you do not trust, run Phase 1 in a disposable container or VM. The project's own code and tests run only in Phase 3.
 
+## Contents
+
+- 1.1 Project Structure Analysis: Determine Deployment Type; Detect Multi-Module Structure; Detect Package Manager and Interpreter; Determine Target OS and glibc; Generate Dependency Tree; Categorize Components by Risk
+- 1.2 Native Library Validation: 1.2.1 Statically Bundled .so Scanning; 1.2.2 Runtime-Extracted Native Library Detection; 1.2.3 Tiered Validation Policy
+- 1.3 Dependency ARM64 Compatibility Analysis: Generate Filtered Tree; Classify Each Dependency; Document Findings; Build-Time Binaries Outside the Dependency Tree
+- 1.4 Architecture-Specific Code Detection
+- 1.5 Python Version Compatibility Check
+
 ## 1.1 Project Structure Analysis
 
 > **Output: `graviton-validation/01-project-assessment.md`**, **`graviton-validation/raw/dependency-tree-full.json`** and **`graviton-validation/raw/requirements-resolved.txt`**
@@ -13,15 +21,33 @@ Phase 1 runs on any host, including x86, and installs nothing into the project o
 ### Determine Deployment Type
 
 ```bash
-find . \( -path ./.venv -o -path ./.git \) -prune -o \
-  \( -name 'Dockerfile*' -o -name 'docker-compose*.y*ml' -o -name 'template.y*ml' -o -name 'serverless.yml' \
+find . \( -path ./.venv -o -path ./.git -o -name node_modules -o -name cdk.out \) -prune -o \
+  \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' -o -name 'docker-compose*.y*ml' \
+     -o -name 'template.y*ml' -o -name 'serverless.yml' -o -name 'cdk.json' -o -name '*.tf' \
      -o -name 'Procfile' -o -name '*.service' -o -name 'samconfig.toml' \) -print
-grep -lE "AWS::Serverless::Function|AWS::Lambda::Function" template.y*ml 2>/dev/null
+grep -lE "AWS::Serverless::Function|AWS::Lambda::Function" template.yaml template.yml 2>/dev/null
+# Dockerfiles under any name: by name, plus the files a build's -f or --file, Compose dockerfile: and
+# docker/build-push-action file: name. A file is kept when it has a FROM line; a name that is no file
+# here is printed: find that file by hand and add it to the list.
+mkdir -p graviton-validation/raw
+{ find . \( -path ./.venv -o -path ./.git -o -name node_modules -o -name cdk.out \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' \) -print
+  grep -rnoE --exclude-dir=.venv --exclude-dir=.git --exclude-dir=node_modules --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' --include='Jenkinsfile*' -- \
+    "(build|bud)[[:space:]][^;|&#]*(-f[[:space:]]+|--file[[:space:]=]+)[\"']?[^[:space:];|&\"')]+|(dockerfile|file):[[:space:]]*[\"']?[^[:space:]#\"']+" . |
+    while IFS= read -r hit; do
+      src=${hit%%:*}; ref=$(printf '%s\n' "${hit#*:*:}" | sed -E "s/^.*(-f[[:space:]]+|--file[[:space:]=]+|file:[[:space:]]*)[\"']?//")
+      if [ -f "$ref" ]; then printf './%s\n' "${ref#./}"
+      elif [ -f "${src%/*}/$ref" ]; then printf '%s/%s\n' "${src%/*}" "${ref#./}"
+      else printf 'not found: %s names %s\n' "$src" "$ref" >&2; fi
+    done
+} | while IFS= read -r f; do grep -qiE '^[[:space:]]*FROM[[:space:]]' "$f" && printf '%s\n' "$f"; done |
+  sort -u > graviton-validation/raw/dockerfiles.txt
+cat graviton-validation/raw/dockerfiles.txt
 ```
 
-- Dockerfile or container config present: **Containerized**
+- Dockerfile or container config present, under any name (`Dockerfile*`, `*.Dockerfile`, `Containerfile`; `docker build -f` and Compose `dockerfile:` accept any name; the block lists them all in `raw/dockerfiles.txt`): **Containerized**
 - SAM / CloudFormation / serverless template with a Lambda function: **Lambda** (also check for layer zips and a `python/` directory, §1.2.2)
 - systemd unit, Procfile, or a plain `python -m app` entry point: **Host-based**
+- A CDK app (`cdk.json`) or Terraform files define the infrastructure, and its architecture settings, in code (§1.4)
 - Some applications support more than one; record all of them
 
 ### Detect Multi-Module Structure
@@ -54,8 +80,6 @@ grep -nE "pip (install|sync)|uv (sync|pip install|export)|poetry (install|sync|e
   Dockerfile Makefile *.sh .github/workflows/*.y*ml .gitlab-ci.yml buildspec.yml 2>/dev/null
 ```
 
-Executed on the fixture: markers `requirements.txt`, `requirements-locked.txt`, `requirements-dev.txt`, `setup.py`; the Dockerfile and Makefile both run `pip install --require-hashes -r requirements-locked.txt` followed by `pip install -r requirements.txt`, so those two files are authoritative and `requirements-dev.txt` is test-only.
-
 Interpreter, in order of authority (the first hit decides; record its source):
 
 ```bash
@@ -71,7 +95,7 @@ Also record where that interpreter comes from (official image, distribution pack
 
 The wheel a pin resolves to must also be accepted by the target's libc and pip, and native code also depends on the kernel page size of the hosts it runs on (see [../document_references/wheel-verification.md](../document_references/wheel-verification.md) §1, §2 and §7). Read the libc and the interpreter from the runtime image:
 
-`$CONTAINER_CMD` below is the working container runtime: run the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection) first, in the same shell (it also applies `container.runtime` from `skill-config.md`). With no working runtime, follow the "No container runtime" item after the block.
+`$CONTAINER_CMD` below is the working container runtime: run the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection) first (in a new shell, set `CONTAINER_CMD` again; the block also applies `container.runtime` from `skill-config.md`). With no working runtime, follow the "No container runtime" item after the block.
 
 ```bash
 IMG=$(awk '/^FROM/{img=$NF; for(i=2;i<=NF;i++) if($i !~ /^--platform/ && $i!="AS" && $i!="as") {img=$i; break}} END{print img}' Dockerfile)
@@ -112,7 +136,7 @@ $CONTAINER_CMD run --rm --init --platform linux/arm64 --entrypoint python3 "$IMG
     'echo "arch=$(uname -m) libc=$(getconf GNU_LIBC_VERSION 2>/dev/null || ls /lib/ld-musl-* 2>/dev/null) python3=$(command -v python3 || echo none)"'
 ```
 
-The probe asks the image's own `python3`, because `sh -c` with `ldd --version` and `pip debug` misreads common targets: executed natively on Graviton4 against 16 base images, that form printed empty fields with exit code 0 for Alpine (its `ldd --version` prints no glibc version) and for images without `python3` or pip, and did not run in the Lambda base images or distroless, whose `ENTRYPOINT` receives the command as arguments. The block above reported all 16: 11 through `python3` and the 5 without it (`ubuntu:22.04`, `ubuntu:24.04`, `debian:12`, `amazonlinux:2`, `almalinux:8`) through the fallback, in a second or less each once pulled, and in 5 to 23 seconds each under emulation on x86, including the pull. The limits are inside the container (`signal.alarm` in the probe, `timeout` in the fallback) because under emulation a host-side `timeout` does not reliably stop the container (Phase 3, "Emulation limits"). Executed on the fixture (`python:3.11-slim`): `arch=aarch64 libc=glibc 2.41 max_tag=manylinux_2_41_aarch64 python=3.11.17 (/usr/local/bin/python3) pip=24.0 venv=yes externally_managed=False`; wheel-verification.md §7 lists the other images. Record the libc as `TARGET_LIBC` and `TARGET_LIBC_VER` for §1.3 (`TARGET_LIBC=glibc TARGET_LIBC_VER=2.41` for the fixture).
+The probe asks the image's own `python3`, because `sh -c` with `ldd --version` and `pip debug` misreads common targets: it printed empty fields with exit code 0 for Alpine (its `ldd --version` prints no glibc version) and for images without `python3` or pip, and did not run in the Lambda base images or distroless, whose `ENTRYPOINT` receives the command as arguments. The limits are inside the container (`signal.alarm` in the probe, `timeout` in the fallback) because under emulation a host-side `timeout` does not reliably stop the container (Phase 3, "Emulation limits"). Record the libc as `TARGET_LIBC` and `TARGET_LIBC_VER` for §1.3: for `python:3.11-slim` the probe printed `libc=glibc 2.41`, so `TARGET_LIBC=glibc TARGET_LIBC_VER=2.41` (wheel-verification.md §7 lists other images).
 
 - **No `python3` in the base image** (the fallback line): the deployment installs Python in a later step (`apt-get install python3`, `dnf install python3.11`), so the interpreter and pip come from that package. The libc still comes from the base image; read the rest from the built image or the distribution's package before §1.3.
 - **Lambda functions deployed as .zip archives** have no image: the runtime identifier sets the OS. `python3.12` and later run on Amazon Linux 2023 (glibc 2.34), `python3.10` and `python3.11` on Amazon Linux 2 (glibc 2.26) ([Lambda Python runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html)); wheel-verification.md §7 shows a `manylinux_2_28` layer that imports on `python3.12` and fails on `python3.11`. For container-image functions, run the block against the image.
@@ -120,7 +144,7 @@ The probe asks the image's own `python3`, because `sh -c` with `ldd --version` a
 - **No container runtime:** use the table in wheel-verification.md §7 and say so. For host-based deployments read the AMI's distribution.
 - **Kernel page size of the deployment hosts.** A container uses its host's kernel, so the page size comes from the EC2 hosts or Kubernetes nodes, not from the image: a Debian 13 container on an AlmaLinux 8 Graviton2 host reported 65536. Run `getconf PAGESIZE` on a deployment host (executed on Graviton: AlmaLinux 8.10 65536; AlmaLinux 9.8 and Amazon Linux 2023 4096); if no host can be reached, ask the team that runs them and record the page size as unknown until then. Set `TARGET_PAGE_SIZE` to the value in bytes: the scan in §1.2.1 judges page alignment only when it is set. A 64KB-page target needs Phase 3 on a 64KB-page host: on AlmaLinux 8, polars 0.20.20 aborted with `<jemalloc>: Unsupported system page size`, as did every earlier release tested back to 0.15.1, while 0.20.21 and the later releases tested imported. On the 4KB AlmaLinux 9 host polars 0.15.1 imported, so a 4KB validation host hides the failure.
 
-Record `pip` on the target: below 19.3 it cannot install aarch64 wheels at all (python.md section 1), and below 20.3 it cannot see `manylinux_2_N` tags; plan the `python3 -m pip install --upgrade pip` step for Phase 3. `pip=none` (the `python3` of Amazon Linux 2023 and AlmaLinux 9, and distroless) means pip has to come from a virtual environment or a distribution package; `venv=no` (distroless) means `python3 -m venv` does not work either.
+Record `pip` on the target: below 19.3 it cannot install aarch64 wheels at all, and below 20.3 it cannot see `manylinux_2_N` tags; plan the `python3 -m pip install --upgrade pip` step for Phase 3. `pip=none` (the `python3` of Amazon Linux 2023 and AlmaLinux 9, and distroless) means pip has to come from a virtual environment or a distribution package; `venv=no` (distroless) means `python3 -m venv` does not work either.
 
 ### Generate Dependency Tree
 
@@ -161,7 +185,7 @@ EOF
 grep -c '==' graviton-validation/raw/requirements-resolved.txt
 ```
 
-Executed on the fixture: 25 pins (11 direct, 14 transitive). `charset-normalizer` appears twice: 3.4.0 from the hash-locked file and 3.5.2 as a transitive of `requests`, and a dry run of the project's second `pip install --prefix` step showed it would install 3.5.2 into the prefix that already held 3.4.0, and the image built natively on Graviton held both `charset_normalizer-3.4.0.dist-info` and `charset_normalizer-3.5.2.dist-info`: `import charset_normalizer` gave 3.5.2 while `importlib.metadata` reported 3.4.0. Both versions are probed (that is the project's behaviour on any architecture, not a Graviton finding). The list includes six transitives of `mkl` (`intel-openmp`, `intel-cmplr-lib-ur`, `tbb`, `tcmlib`, `umf`, `onemkl-license`) that never appear in `requirements.txt`. `pip install --dry-run` and `--report` require pip 22.2 or newer on the analysis host; on x86 the report lists x86 wheels, which is fine: §1.3 re-resolves for aarch64.
+When two install steps pin different versions of one package, keep and probe both: pip installs both into the same prefix, on any architecture (a hash-locked `charset-normalizer` 3.4.0 ended up next to the 3.5.2 that `requests` pulled in). The list also holds transitives that no requirements file names, such as the six that `mkl` pulls in. `pip install --dry-run` and `--report` require pip 22.2 or newer on the analysis host; on x86 the report lists x86 wheels, which is fine: §1.3 re-resolves for aarch64.
 
 > **If `--dry-run` fails** on a hashed file with `Hashes are required in --require-hashes mode`, you passed a hashed and an unhashed file in one call: split them as above. If it fails on `pip install . --dry-run` with `Multiple top-level packages discovered in a flat-layout`, extract `[project].dependencies` with `tomllib` instead (package-manager-mapping.md §2.3).
 
@@ -399,6 +423,7 @@ print("findings: %d" % len(findings))
 sys.exit(2 if missing else 1 if findings else 0)
 EOF
 }
+typeset -f native_scan > "${TMPDIR:-/tmp}/graviton-python-native_scan.sh"   # later blocks, perhaps in a new shell, load it from here
 native_scan . | tee graviton-validation/raw/site-packages-so-scan.txt
 ```
 
@@ -423,7 +448,7 @@ Every `FINDING` line is a finding, and the scan exits with status 1 when it prin
 - `needs GLIBCXX_3.4.N`: newer than the target image's libstdc++ (judged only when `TARGET_GLIBCXX` is set, below).
 - `LOAD align` or `LOAD vaddr-offset align`: not linked for the target's page size (below).
 
-Wheels from the index get the C library and glibc checks through their tags in §1.3. The scan's checks matter most for files committed to the repository, which no tag describes. The `needs` list names the libraries the loader must find on the target: each must come from the target image or travel with the file, and a load that cannot find one fails (executed on arm64 with NumPy 1.26.4's `numpy.libs` folder removed: `OSError: libopenblas64_p-r0-17488984.3.23.dev.so: cannot open shared object file: No such file or directory` from `ctypes.CDLL`). Executed on a test tree holding an x86-64 executable with no extension, an x86-64 library named `libfoo-aarch64.so`, a 32-bit x86 library, and x86-64 members of a Lambda layer zip and of a vendored `py3-none-any` wheel: the scan printed a `FINDING` line for each of the eight non-aarch64 files and none for the one real aarch64 build. On a project that vendors `selenium-4.48.0-py3-none-any.whl` it reported `...!selenium/webdriver/common/linux/selenium-manager: e_machine 62 (x86-64)` with its `FINDING` line, and listed the wheel's macOS and Windows builds of the same tool as `Mach-O` and `PE`. On 224 ELF files on disk (aarch64 and x86_64 installs of the fixture's native packages, test builds and third-party binaries), every property it printed matched `readelf`; files inside a zip got the same lines as on disk, and Python 3.6.15, 3.8.20 and 3.12.14 printed the same output. A CPython extension's filename states the target it was built for (`*.cpython-311-x86_64-linux-gnu.so` for x86_64 Python 3.11, `*.cpython-311-aarch64-linux-gnu.so` for Graviton; see the side-by-side listing in [configuring_your_sut.md](https://github.com/aws/aws-graviton-getting-started/blob/main/perfrunbook/configuring_your_sut.md)); the scan confirms that the content matches.
+Wheels from the index get the C library and glibc checks through their tags in §1.3. The scan's checks matter most for files committed to the repository, which no tag describes. The `needs` list names the libraries the loader must find on the target: each must come from the target image or travel with the file, and a load that cannot find one fails (executed on arm64 with NumPy 1.26.4's `numpy.libs` folder removed: `OSError: libopenblas64_p-r0-17488984.3.23.dev.so: cannot open shared object file: No such file or directory` from `ctypes.CDLL`). A CPython extension's filename states the target it was built for (`*.cpython-311-x86_64-linux-gnu.so` for x86_64 Python 3.11, `*.cpython-311-aarch64-linux-gnu.so` for Graviton); the scan confirms that the content matches.
 
 Lambda layers and vendored `site-packages` also carry package metadata. The scan above already checked their binaries; find them so their pins also get the wheel check of §1.3:
 
@@ -433,10 +458,9 @@ find . \( -path ./.venv -o -path ./.git \) -prune -o \
   \( -type d -name 'python' -o -name '*.dist-info' -o -name '*.egg-info' -o -name 'layer*.zip' \) -print
 ```
 
-For a Lambda layer or vendored directory, list `*.dist-info` to get `name==version` pins and feed them to §1.3; the repo's [aws-lambda/README.md](https://github.com/aws/aws-graviton-getting-started/blob/main/aws-lambda/README.md) asks for exactly this check of "binaries in dependencies, Lambda layers, and Lambda extensions".
-Executed on the fixture: no layers or vendored `site-packages`.
+For a Lambda layer or vendored directory, list `*.dist-info` to get `name==version` pins and feed them to §1.3; Lambda extensions need the same check.
 
-For a target with 64KB pages (§1.1), an aarch64 file must also be linked for that page size, and which value the loader checks depends on the target's C library: glibc 2.34 and earlier refuse a `PT_LOAD` segment whose `p_align` is not a multiple of the page size (`ELF load command alignment not page-aligned`). glibc 2.35 and later instead refuse one whose `p_vaddr - p_offset` is not a multiple of it (`ELF load command address/offset not page-aligned`). musl's loader rounds both values down to the page size and maps the segment without checking either. The scan prints each aarch64 file's smallest `LOAD align`, and its `vaddr-offset align` (the largest power of two dividing every segment's `p_vaddr - p_offset`) when that is below `0x10000`. With `TARGET_PAGE_SIZE` set, it applies the rule of the target's C library and version, and both rules when the version is not set. Executed on Graviton2 with AlmaLinux 8: a library linked with `-z max-page-size=4096` (`0x1000`) failed to load with `ELF load command alignment not page-aligned`; linked with GNU ld's aarch64 default (`0x10000`, binutils 2.41), it loaded. The scan reports the two test builds as `LOAD align 0x1000, vaddr-offset align 0x1000` and `LOAD align 0x10000`, and with `TARGET_LIBC_VER=2.28 TARGET_PAGE_SIZE=65536` prints a `FINDING` for the first only.
+For a target with 64KB pages (§1.1), an aarch64 file must also be linked for that page size, and which value the loader checks depends on the target's C library: glibc 2.34 and earlier refuse a `PT_LOAD` segment whose `p_align` is not a multiple of the page size (`ELF load command alignment not page-aligned`). glibc 2.35 and later instead refuse one whose `p_vaddr - p_offset` is not a multiple of it (`ELF load command address/offset not page-aligned`). musl's loader rounds both values down to the page size and maps the segment without checking either. The scan prints each aarch64 file's smallest `LOAD align`, and its `vaddr-offset align` (the largest power of two dividing every segment's `p_vaddr - p_offset`) when that is below `0x10000`. With `TARGET_PAGE_SIZE` set, it applies the rule of the target's C library and version, and both rules when the version is not set.
 
 When the scan prints `GLIBCXX_` for a file committed to the repository, set `TARGET_GLIBCXX` to the highest version the target image's libstdc++ provides, so the scan judges it:
 
@@ -467,26 +491,53 @@ find . \( -path ./.venv -o -path ./.git \) -prune -o \
   \( -name '*.pyx' -o -name '*.pxd' -o -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.rs' -o -name 'Cargo.toml' \) -type f -print
 ```
 
-Executed on the fixture: `setup.py:5: ext = Extension(`, `setup.py:15: ext_modules=[ext]`, sources `native/fastsum.c`, `native/fixture_ext.c`. An extension built from source is not a blocker by itself (it will be compiled on aarch64 in Phase 3); its **flags and headers** are checked in §1.4.
+An extension built from source is not a blocker by itself (it will be compiled on aarch64 in Phase 3); its **flags and headers** are checked in §1.4.
 
 ### 1.2.2 Runtime-Extracted Native Library Detection
 
 Some packages and scripts download or unpack native binaries at run, build or deploy time instead of shipping them in a wheel, and packages from the OS arrive outside pip. None of them shows up in the dependency tree.
 
 ```bash
-# Binary downloads in scripts and Dockerfiles
-grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include='Dockerfile*' --include='Makefile' --include='*.py' \
-  "(curl|wget).*(amd64|x86_64|x86-64)|releases/download/.*(amd64|x86_64)" .
+# Every download in scripts, Dockerfiles and CI. A URL that names no architecture still fetches a build
+# for one, so each downloaded file is judged by its content (the next block)
+grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include='Dockerfile*' --include='*.[Dd]ockerfile' \
+  --include='Containerfile*' --include='Makefile' --include='*.py' --include='*.y*ml' --include='Jenkinsfile*' \
+  '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[[:space:]]|^[[:space:]]*ADD([[:space:]]+--[^[:space:]]+)*[[:space:]]+https?:|releases/(latest/)?download/' .
 
 # Packages installed from the OS by Dockerfiles and scripts
 grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='Dockerfile*' --include='*.sh' \
   '(apt-get|apt|dnf|yum|microdnf) install|apk add' .
 ```
 
-Executed on the fixture: `scripts_deploy.sh:5: curl ... tool-linux-amd64`; no OS packages.
+Fetch each download into a scratch folder and scan what it holds, whatever its URL says. Resolve the script's variables in the URL first; `native_scan` opens zip archives itself, and a tar archive is unpacked first:
+
+```bash
+if . "${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; then
+  TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41; TARGET_PAGE_SIZE=4096   # the §1.1 values, as in §1.2.1
+  URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list above
+  d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX"); mkdir "$d/x"
+  if curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
+    # Unpack by the first bytes, not the name: a .deb (an ar archive), an .rpm, a zip or a tar archive; native_scan opens a zip itself
+    case "$(od -An -tx1 -N4 "$d/download" | tr -d ' \t\n')" in
+      213c6172) if head -c 64 "$d/download" | grep -q debian-binary; then   # another ar archive is a static library, which the scan reads
+                  (cd "$d/x" && ar x ../download && for t in data.tar.*; do tar -xf "$t"; done) && rm "$d/download" \
+                    || echo "CHECK: $URL is a .deb this host cannot unpack (needs ar, and tar with xz or zstd)"
+                fi ;;
+      edabeedb) { if command -v rpm2cpio > /dev/null 2>&1; then (cd "$d/x" && rpm2cpio ../download | cpio -idm --quiet)
+                  else bsdtar -xf "$d/download" -C "$d/x"; fi; } && rm "$d/download" \
+                  || echo "CHECK: $URL is an .rpm this host cannot unpack (needs rpm2cpio and cpio, or bsdtar)" ;;
+      *) tar -xf "$d/download" -C "$d/x" 2>/dev/null ;;
+    esac
+    native_scan "$d"
+  else echo "CHECK: $URL did not download"; fi
+  rm -rf "$d"
+else echo "CHECK: run the Phase 1.2.1 scan block first: it writes ${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; fi
+```
+
+Executed: jq 1.6's `jq-linux64`, whose URL names no architecture, gave `FINDING ...: not aarch64, e_machine 62 (x86-64)`; jq 1.7.1's `jq-linux-arm64` gave no finding. A download that cannot be fetched from here (credentials, a private network) stays CHECK until it is scanned where it can be.
 
 **Common packages that fetch or carry native binaries outside their wheel tags** (this list is a *prompt*, not an allowlist):
-- **selenium**: its `py3-none-any` wheel carries Selenium Manager executables. Up to 4.48.0 the only Linux build is an x86-64 executable (`selenium/webdriver/common/linux/selenium-manager`); 4.49.0 is the first release that also carries `linux-arm64/selenium-manager`. On Linux aarch64, 4.48.0 stops before it starts any program, with `WebDriverException: Message: Unsupported platform/architecture combination: linux/aarch64` (its `selenium_manager.py` maps Linux to a binary only for `x86_64`); the bundled file itself, run directly on Graviton, fails with `Exec format error`. 4.50.0 runs the arm64 one
+- **selenium**: its `py3-none-any` wheel carries Selenium Manager executables. Up to 4.48.0 the only Linux build is an x86-64 executable (`selenium/webdriver/common/linux/selenium-manager`); 4.49.0 is the first release that also carries `linux-arm64/selenium-manager`. On Linux aarch64, 4.48.0 stops before it starts any program, with `WebDriverException: Message: Unsupported platform/architecture combination: linux/aarch64` (its `selenium_manager.py` maps Linux to a binary only for `x86_64`); the bundled file itself, run directly on Graviton, fails with `Exec format error`. 4.49.0 and 4.50.0 run the arm64 one
 - **pyppeteer**: downloads Chromium on first use from the `Linux_x64` snapshot path on every Linux host (2.0.0), so on Graviton it fetches an x86 browser (executed: `pyppeteer-install` downloaded an x86-64 `chrome` that fails with `Exec format error`)
 - **Browser and driver downloaders** (Selenium Manager, webdriver-manager): fetch Chrome for Testing builds at run time. The current Stable release lists `linux-arm64` for Chrome and ChromeDriver (154.0.8037.92), and on Graviton webdriver-manager 4.1.2 downloaded the `linux-arm64` ChromeDriver for that release; check the platform list for the version the project uses
 - **duckdb**: downloads extensions for its platform at first use; `linux_arm64` builds are published (on Graviton, duckdb 1.5.6 installed and loaded the `linux_arm64` `httpfs` extension)
@@ -497,18 +548,33 @@ Executed on the fixture: `scripts_deploy.sh:5: curl ... tool-linux-amd64`; no OS
 For each OS package, check that the target's arm64 repository has it. From an x86 host this needs no emulation:
 
 ```bash
-# Debian or Ubuntu target: read the arm64 package index from an amd64 container (no emulation).
-# Enable the repositories the Dockerfile enables (non-free for MKL here).
-$CONTAINER_CMD run --rm --init --platform linux/amd64 debian:13 timeout 300 sh -c \
-  'sed -i "s/^Components: main$/Components: main non-free/" /etc/apt/sources.list.d/debian.sources &&
+# Debian or Ubuntu target: read the arm64 package index from the target image, run for this host's own
+# platform (no emulation). Enable the repositories the Dockerfile enables (non-free for MKL here).
+IMG=python:3.11-slim   # the runtime image (§1.1)
+case "$(uname -m)" in x86_64|amd64) NATIVE=linux/amd64 ;; *) NATIVE=linux/arm64 ;; esac
+# On an amd64 Ubuntu image the x86 mirrors carry no arm64 files (apt-get update: "binary-arm64/Packages 404 Not
+# Found"): keep the image's sources for amd64 and read arm64 from ports.ubuntu.com
+PORTS='. /etc/os-release
+if [ "$ID" = ubuntu ] && [ "$(dpkg --print-architecture)" = amd64 ]; then
+  for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do [ -f "$f" ] && sed -i -E "s/^deb (https?:)/deb [arch=amd64] \1/" "$f"; done
+  for f in /etc/apt/sources.list.d/*.sources; do [ -f "$f" ] && sed -i "/^Types:/a Architectures: amd64" "$f"; done
+  for s in "" -updates -security; do
+    echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://ports.ubuntu.com/ubuntu-ports $VERSION_CODENAME$s main restricted universe multiverse"
+  done > /etc/apt/sources.list.d/arm64-ports.list
+fi
+'
+# timeout 300 bounds each index download; raise it on a slow network
+$CONTAINER_CMD run --rm --init --platform "$NATIVE" --entrypoint timeout "$IMG" 300 sh -c "$PORTS"'
+   [ -f /etc/apt/sources.list.d/debian.sources ] && sed -i "s/^Components: main$/Components: main non-free/" /etc/apt/sources.list.d/debian.sources
    dpkg --add-architecture arm64 && apt-get update -qq >/dev/null &&
    for p in libgeos-dev libmkl-dev; do echo "$p arm64: $(apt-cache policy "$p:arm64" | sed -n "s/^ *Candidate: //p")"; done'
-# Amazon Linux 2023 (and other dnf distributions): query the aarch64 repository from an amd64 container.
-$CONTAINER_CMD run --rm --init --platform linux/amd64 amazonlinux:2023 timeout 300 sh -c \
+# Amazon Linux 2023 (and other dnf distributions): query the aarch64 repository, for this host's own platform
+# (timeout 300, as above).
+$CONTAINER_CMD run --rm --init --platform "$NATIVE" amazonlinux:2023 timeout 300 sh -c \
   'dnf -q --forcearch=aarch64 repoquery --available --latest-limit 1 --qf "%{name}-%{version}-%{release}.%{arch}" geos-devel python3.11 2>/dev/null'
 ```
 
-Executed (22 seconds): `libgeos-dev arm64: 3.13.1-1`, `libmkl-dev arm64:` with no candidate, `geos-devel-3.13.0-2.amzn2023.0.1.aarch64` and `python3.11-3.11.16-1.amzn2023.0.1.aarch64`; natively on Graviton, `apt-cache policy` in a Debian 13 `linux/arm64` container gave the same answers. A package with no arm64 candidate is a MUST UPGRADE finding, and its substitute is a user decision (as for `mkl` in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)).
+A package with no arm64 candidate is a MUST UPGRADE finding, and its substitute is a user decision (as for `mkl` in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)).
 
 ### 1.2.3 Tiered Validation Policy
 
@@ -523,7 +589,10 @@ Executed (22 seconds): `libgeos-dev arm64: 3.13.1-1`, `libmkl-dev arm64:` with n
 
 For x86-only binaries: locate the source, document the rebuild, or ask the user for an aarch64 build. Validate with:
 ```bash
-native_scan libname.so   # in the shell where §1.2.1 set the TARGET_* values: no FINDING line
+if . "${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; then
+  TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41; TARGET_PAGE_SIZE=4096   # the §1.1 values, as in §1.2.1
+  native_scan libname.so   # no FINDING line
+else echo "CHECK: run the Phase 1.2.1 scan block first: it writes ${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; fi
 ```
 
 ## 1.3 Dependency ARM64 Compatibility Analysis
@@ -548,6 +617,7 @@ platforms() { # $1=arch ; sets PLAT to one --platform flag per wheel tag the tar
     PLAT+=(--platform "manylinux2014_$1")
   fi
 }
+typeset -f platforms > "${TMPDIR:-/tmp}/graviton-python-platforms.sh"   # later blocks, perhaps in a new shell, load it from here
 probe() { # $1=requirement $2=arch ; prints the wheel filename (rc 0), the from-versions list (rc 1),
           # nothing (rc 3) when an environment marker excluded the pin on this host, or why the indexes
           # give no verdict (rc 4). --no-input and </dev/null: pip never reads the loop's list of pins;
@@ -574,7 +644,16 @@ sed -E 's/[[:space:]]*#.*//' graviton-validation/raw/requirements-resolved.txt |
   out=$(probe "$req" aarch64); rc=$?
   if [ $rc -eq 4 ]; then echo "CHECK INDEX     $req  $out"; continue; fi
   if [ $rc -eq 0 ]; then
-    case "$out" in *-none-any.whl) echo "COMPATIBLE      $req  pure Python: $out";; *) echo "COMPATIBLE      $req  aarch64 wheel: $out";; esac
+    case "$out" in
+      *-none-any.whl)   # pure on aarch64: x86_64 may still get compiled code for the same pin
+        x86=$(probe "$req" x86_64); xrc=$?
+        case "$xrc:$x86" in
+          0:*-none-any.whl|[123]:*) echo "COMPATIBLE      $req  pure Python: $out";;
+          4:*) echo "CHECK INDEX     $req  $x86";;
+          *) echo "CHECK FALLBACK  $req  aarch64 gets only the pure-Python wheel $out; x86_64 gets compiled code: $x86";;
+        esac;;
+      *) echo "COMPATIBLE      $req  aarch64 wheel: $out";;
+    esac
   elif [ $rc -eq 3 ]; then
     echo "CHECK MARKER    $req  skipped: its environment marker does not match this host; judge it for Linux aarch64 by hand"
   else
@@ -595,34 +674,37 @@ Set `TARGET_LIBC` and `TARGET_LIBC_VER` from §1.1. `platforms` then offers pip 
 
 Run the loop in the same shell as §1.1, so `python3` is the project-version environment. pip evaluates environment markers (`; python_version < "3.12"`, `; platform_machine == "x86_64"`, `; sys_platform == "win32"`) against the interpreter and machine that run it, not against `--python-version` or `--platform`: executed with a Python 3.12 host and `--python-version 3.11`, a pin marked `python_version < "3.12"` was skipped and one marked `python_version >= "3.12"` was downloaded. With the project's interpreter the `python_version` markers resolve correctly; markers on the machine or platform still follow the analysis host, so a `CHECK MARKER` line, or a `MUST UPGRADE` line whose marker names `platform_machine`, needs a manual call for Linux aarch64. Exports from Poetry and uv carry such markers; requirement files from pip usually do not.
 
-Executed on the fixture (25 pins): `MUST UPGRADE` for `blosc2==0.6.3` (with `from versions: 0.6.4, 0.6.5, ...`), `pygeos==0.14`, `mkl==2026.1.0` and its six transitives (`from versions: none`); `CHECK SDIST/ABI` for `docopt==0.6.2`; `COMPATIBLE` for the other 15, including `six==1.11.0` (`py2.py3-none-any`), `numpy==1.26.4` and `charset-normalizer==3.4.0`.
-
 > **Skill config:** when `python.index_url` is set, run the loop twice, with `PIP_INDEX_URL` set to the configured index and then to `https://pypi.org/simple` (the loop has no index option; pip reads the variable). A pin that fails only on the configured index is COMPATIBLE with an **INFRA** note ("mirror lacks the aarch64 wheel"), not a dependency change (wheel-verification.md §9).
 
 Then the hash-lock check for every hashed requirements file the deployment installs:
 
 ```bash
-platforms aarch64   # the same tag list as the loop above
-python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
-  --python-version "$PYVER" --implementation cp --abi "$ABI" --target /tmp/graviton-probe-target \
-  -r requirements-locked.txt
+if . "${TMPDIR:-/tmp}/graviton-python-platforms.sh"; then
+  PYVER=3.11; ABI="cp${PYVER/./}"; TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41   # the values of the probe block
+  platforms aarch64   # the same tag list as the loop above
+  python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
+    --python-version "$PYVER" --implementation cp --abi "$ABI" --target /tmp/graviton-probe-target \
+    -r requirements-locked.txt
+else echo "CHECK: run the probe block above first: it writes ${TMPDIR:-/tmp}/graviton-python-platforms.sh"; fi
 ```
 
-Executed on the fixture: `ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE ... Expected sha256 b91c0375... Got 6ec585f6...` for MarkupSafe 2.1.5. The pins themselves are COMPATIBLE (both have aarch64 wheels); the **lock file** is the MUST UPGRADE finding. `poetry.lock`, `uv.lock`, `pdm.lock`, `Pipfile.lock` and pip-tools output with `--generate-hashes` carry hashes for every published file and pass this check without changes (package-manager-mapping.md §1).
+With hashes for the x86 wheels only, the dry run stops at `ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE`. The error is about the lock's hashes only, and the probe loop judges each pin: here both pins have aarch64 wheels, so the **lock file** is the MUST UPGRADE finding, and a pin without one (such as `pygeos==0.14`) stays a finding of its own. `poetry.lock`, `uv.lock`, `pdm.lock`, `Pipfile.lock` and pip-tools output with `--generate-hashes` carry hashes for every published file and pass this check without changes (package-manager-mapping.md §1).
 
 ### Classify Each Dependency
 
 Apply the decision tree in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md) to every line of `raw/wheel-availability.txt`:
 
-**MUST UPGRADE (Blocking):** no aarch64 wheel for the pinned version and interpreter where a later version has one (upgrade to the **lowest** such version); no aarch64 wheel in any release and the package is x86-only by nature (substitute, user confirms); hash lock excludes the aarch64 wheel (regenerate); wheel tag exceeds the target glibc (user decision); documented aarch64 correctness bug at this version (NumPy < 1.21.1, SciPy < 1.7.2 per [python.md section 2](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#2-scientific-and-numerical-application-numpy-scipy-blas-etc)).
+**MUST UPGRADE (Blocking):** no aarch64 wheel for the pinned version and interpreter where a later version has one (upgrade to the **lowest** such version); no aarch64 wheel in any release and the package is x86-only by nature (substitute, user confirms); hash lock excludes the aarch64 wheel (regenerate); wheel tag exceeds the target glibc (user decision); documented aarch64 correctness bug at this version (NumPy < 1.21.1, SciPy < 1.7.2, whose OpenBLAS lacks aarch64 correctness fixes).
 
 **RECOMMENDED UPGRADE (Non-blocking):** installs and runs on aarch64, and a newer version has a documented Graviton improvement; record it with its source and evidence level and never apply it. Runtime settings go to `05-runtime-configuration.md` (Phase 2.5).
 
-**COMPATIBLE (No action):** aarch64 wheel present, or `none-any` wheel, or pure-Python sdist. Age, CVEs and "newer is faster" do not move a package out of this class.
+**COMPATIBLE (No action):** aarch64 wheel present, or a `none-any` wheel that x86_64 gets too, or pure-Python sdist. Age, CVEs and "newer is faster" do not move a package out of this class.
 
 **CHECK SDIST/ABI lines need one more step before they get a label:** download the sdist and list compiled sources (wheel-verification.md §5); if there are none it is COMPATIBLE. If the package has aarch64 wheels for a *different* `cp` tag (probe again with `--python-version 3.10 --abi cp310`, and x86_64 with the project's tag), it is an interpreter-ABI blocker, reported in its own table and resolved only through the gate in §1.5.
 
-**CHECK INDEX lines are not verdicts:** an index that may have the wheel did not answer (credentials, network, a server error), or no configured index has the project. Fix access or the index settings, or probe PyPI as in the skill-config note above, and rerun the loop for those pins; never label a pin from a failed request. An index that answers 403 or 404 for a project page does not have that project, and pip uses the other indexes: the loop keeps their verdict and appends `not on <url> (403)`. Executed with `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`, which answers 403 for projects it does not carry, the loop gave the fixture's pins the same verdicts as with PyPI alone. A private index can also answer 403 or 404 when the probe may not read it; when a note names one that should carry the package, check access to it (wheel-verification.md §9).
+**CHECK FALLBACK lines run on aarch64, but not the code x86 runs:** aarch64 gets the pure-Python wheel and x86_64 a compiled one for the same pin. Executed for `pydantic==1.10.26`: on x86_64 pip installed a Cython-compiled wheel (`pydantic.compiled` is `True`, 23 native files loaded) and on Graviton2 to Graviton5 the `none-any` wheel (`False`); no pydantic 1.x release has an aarch64 wheel. List the releases with an aarch64 wheel for the project's tag (wheel-verification.md §4) and record the pin under User Decisions Pending. The Recommendation is the lowest such release in the same major version. When there is none, the options are the pure-Python path as it is (the default in unattended runs: nothing changes), a compiled wheel built on aarch64 from the sdist, or the next major version (pydantic 2.x moves its compiled code to `pydantic-core`, which has aarch64 wheels). A plain build from the sdist can be pure again: pydantic 1.x compiles only with its own build option, and on Graviton `pip wheel --no-binary pydantic --config-settings=--build-option=--cythonize --build-constraint build-constraints.txt pydantic==1.10.26`, with `Cython==3.0.12` in the constraints file (`--build-constraint` needs pip 25.3 or later, `python3 -m pip install 'pip>=25.3'`, and the build needs a C compiler), built `pydantic-1.10.26-cp311-cp311-linux_aarch64.whl` (`pydantic.compiled` is `True`); without the option it built the `none-any` wheel, and with Cython 3.3.0 the build stopped inside Cython. The Phase 3 loaded check shows which code runs.
+
+**CHECK INDEX lines are not verdicts:** an index that may have the wheel did not answer (credentials, network, a server error), or no configured index has the project. Fix access or the index settings, or probe PyPI as in the skill-config note above, and rerun the loop for those pins; never label a pin from a failed request. An index that answers 403 or 404 for a project page does not have that project, and pip uses the other indexes: the loop keeps their verdict and appends `not on <url> (403)`. A private index can also answer 403 or 404 when the probe may not read it; when a note names one that should carry the package, check access to it (wheel-verification.md §9).
 
 **A pin the decision tree sends to a user decision stays CHECK until the user chooses** (pygeos in [agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md): a source build is COMPATIBLE, a move to `shapely>=2.0` is MUST UPGRADE). The loop's line for it records only the probe result; the report lists it under User Decisions Pending.
 
@@ -646,8 +728,6 @@ Resolution: pin blosc2==0.6.4 in requirements.txt (lowest version restoring the 
 
 Some binaries the build or deployment needs are fetched by scripts rather than resolved as packages, so none of the steps above sees them: a `curl` of a `tool-linux-amd64` release asset in a deploy script, a Dockerfile `ADD` of an x86 tarball, `npm`/`node` installed by a build hook, or a Dockerfile that installs a compiler and compiles a dependency with `--no-binary`. These were collected by the §1.2.2 download grep; for each one, check that the vendor publishes an `arm64`/`aarch64` asset (open the release page or run `curl --fail -I` on the aarch64 URL) and record it in `04-code-scan-findings.md`. If no aarch64 asset exists, it is a MUST UPGRADE finding and a user decision, like an x86-only package.
 
-Executed on the fixture: `scripts_deploy.sh:5` downloads `tool-linux-amd64` from a placeholder host; no aarch64 asset can exist, so it is recorded as a blocker for the user to resolve.
-
 ## 1.4 Architecture-Specific Code Detection
 
 > **Output: `graviton-validation/04-code-scan-findings.md`**
@@ -665,7 +745,7 @@ grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.py' \
 
 # The risky shape: files that COMPARE against x86 but never mention aarch64/arm64 (heuristic; read the hits above)
 grep -rlE --exclude-dir=.venv --exclude-dir=.git --include='*.py' "[\"'](x86_64|amd64|AMD64)[\"']" . \
-  | xargs grep -LE "[\"'](aarch64|arm64)[\"']" 2>/dev/null
+  | while IFS= read -r f; do grep -qE "[\"'](aarch64|arm64)[\"']" "$f" || printf '%s\n' "$f"; done
 
 # Shell scripts, Makefiles, CI
 grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' \
@@ -674,28 +754,70 @@ grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.sh' --include=Make
 # x86-only compiler flags, intrinsics headers and macros in build files and extension sources
 grep -rnE --exclude-dir=.venv --exclude-dir=.git \
   --include=setup.py --include=setup.cfg --include=pyproject.toml --include=CMakeLists.txt --include=meson.build \
-  --include='*.c' --include='*.cc' --include='*.cpp' --include='*.h' --include='*.pyx' --include='*.rs' --include=Cargo.toml \
-  -- '-m(avx|sse|fma|bmi|popcnt)|-march=|-mtune=|immintrin\.h|xmmintrin\.h|emmintrin\.h|__x86_64__|__SSE|__AVX|_mm[0-9]*_' .
+  --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' --include='*.pyx' \
+  --include='*.rs' --include=Cargo.toml -- '-m(avx|sse|fma|bmi|popcnt|pclmul|aes|crc32|f16c|lzcnt)|-march=|-mtune=|[a-z0-9]+intrin\.h|cpuid\.h|__builtin_ia32_|__cpuid|__rdtsc|__x86_64__|_M_X64|__SSE|__AVX|__m(128|256|512)|_mm[0-9]*_' .
 
-# Dockerfiles and deployment descriptors
-grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|pip install|uv (sync|pip)|poetry install|conda env' Dockerfile*
-grep -rniE --exclude-dir=.venv --exclude-dir=.git --include='*.y*ml' --include='*.json' --include='*.tf' \
-  'architectures"?[[:space:]]*[:=]|kubernetes\.io/arch|nodeselector|cpu_?architecture"?[[:space:]]*[:=]|ami_?type"?[[:space:]]*[:=]|instance_?types?"?[[:space:]]*[:=]|ami-[0-9a-f]{8,17}|x86_64|amd64' .
+# System calls made by number: the numbers differ (x86-64's 186 is gettid, aarch64's is 178, and 186 there
+# is msgget), and open, fork, pipe, dup2 and poll have no aarch64 number at all (openat, clone, pipe2, dup3
+# and ppoll do). Use the libc function or the target's SYS_ constant instead of the number.
+grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.py' --include='*.pyx' --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' -- \
+  'syscall\([[:space:]]*(0x[0-9a-fA-F]+|[0-9]+)' . 2>/dev/null || true
+# Dockerfiles under any name, and deployment descriptors
+if [ -f graviton-validation/raw/dockerfiles.txt ]; then
+  while IFS= read -r f; do grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|x86_64|amd64|pip install|uv (sync|pip)|poetry install|conda env' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done < graviton-validation/raw/dockerfiles.txt
+else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt"; fi
+grep -rniE --exclude-dir=.venv --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=cdk.out --include='*.y*ml' --include='*.json' --include='*.tf' \
+  'architectures?"?[[:space:]]*[:=]|kubernetes\.io/arch|nodeselector|cpu_?architecture"?[[:space:]]*[:=]|ami_?type"?[[:space:]]*[:=]|instance_?types?"?[[:space:]]*[:=]|ami-[0-9a-f]{8,17}|^functions:|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?compatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"|x86_64|amd64' .
+# CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
+# (a construct that sets none gets x86_64)
+find . \( -path ./.venv -o -path ./.git -o -name node_modules -o -name cdk.out \) -prune -o -name cdk.json -print |
+  while IFS= read -r c; do grep -rnE --exclude-dir=node_modules --exclude-dir=cdk.out --exclude-dir=.venv --include='*.py' --include='*.ts' --include='*.js' \
+    --include='*.java' --include='*.cs' --include='*.go' 'Architecture[._](X86_64|ARM_64)|CpuArchitecture[._](X86_64|ARM64)|AmazonLinuxCpuType[._]|MachineImage[._]|NodegroupAmiType[._]|InstanceType(\(|[._][Oo]f\()|InstanceClass[._]|(^|[^A-Za-z0-9_])(New)?(Function|DockerImageFunction|NodejsFunction|PythonFunction|GoFunction|FargateTaskDefinition|Nodegroup|Cluster)(\(|\.Builder)|[Aa]dd_?[Nn]odegroup_?[Cc]apacity' "$(dirname "$c")"; done | sort -u
+# Wheels the project builds itself: cibuildwheel builds only the runner's architecture unless archs adds one
+grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.toml' --include='*.y*ml' 'cibuildwheel|CIBW_ARCHS|^[[:space:]]*archs[[:space:]]*=' .
+# Types and build flags whose results differ by architecture (checked in Phase 3)
+grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.py' --include='*.pyx' --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' \
+  --include=CMakeLists.txt --include=Makefile --include='*.mk' \
+  --include=setup.cfg --include=pyproject.toml --include=meson.build -- 'long double|__float128|longdouble|float128|float96|complex256|-ffast-math|-Ofast|-funsafe-math' .
 ```
 
-The descriptor pattern is case-insensitive and allows an optional quote and `:` or `=`, so it catches CloudFormation JSON (`"Architectures": ["x86_64"]`) and YAML, ECS task definitions (`"cpuArchitecture": "X86_64"`) and Terraform (`architectures = ["x86_64"]`, `cpu_architecture`, `ami_type`, `instance_type`). Executed on a Terraform file, a CloudFormation template, an ECS task definition, an eksctl file and a Kubernetes manifest, it matched all 14 architecture-specific lines; on a SAM template, a JSON template and a Kubernetes manifest it matched the `Architectures` and `nodeSelector` lines. Note the `--` before the pattern in the flags and Dockerfile greps: those patterns start with `-`, and without `--` grep reads them as options (`grep: unrecognized option '--platform=...'`). Keep the `--include` flags **before** the `--`, or grep treats them as file names.
+The descriptor pattern is case-insensitive and allows an optional quote and `:` or `=`, so it catches CloudFormation JSON (`"Architectures": ["x86_64"]`) and YAML, ECS task definitions (`"cpuArchitecture": "X86_64"`) and Terraform (`architectures = ["x86_64"]`, `cpu_architecture`, `ami_type`, `instance_type`). Note the `--` before the pattern in the flags and Dockerfile greps: those patterns start with `-`, and without `--` grep reads them as options (`grep: unrecognized option '--platform=...'`). Keep the `--include` flags **before** the `--`, or grep treats them as file names.
 
-Instance types and AMI IDs need arm64 counterparts. A Graviton instance type is a sizing decision: record it for the user. An AMI ID names one architecture: `aws ec2 describe-images --image-ids <id> --query 'Images[].[ImageId,Architecture,Name]'` shows which (executed: `al2023-ami-2023.12.20260930.0-kernel-6.18-x86_64` reports `x86_64` and its `-arm64` sibling `arm64`), and the arm64 AMI of the same release replaces it; the public SSM parameter `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` has an `-arm64` counterpart. ECS `cpuArchitecture` takes `X86_64` or `ARM64` (Fargate defaults to `X86_64`), and EKS `amiType` values come in pairs (`AL2023_x86_64_STANDARD` and `AL2023_ARM_64_STANDARD`). Change these only where the project ships the files ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), IN SCOPE 6).
+A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`, and the CDK's `aws-eks` `Cluster` without `defaultCapacityInstance` adds `m5.large` (x86) nodes, two unless `defaultCapacity` sets another count; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`public.ecr.aws/lambda/python:3.12-x86_64`) or its repository (`amd64/python:3.11-slim`). cibuildwheel's default, `archs = "auto"`, builds only `x86_64` wheels on a Linux x86_64 runner, so a project that builds its wheels on x86 runners ships no aarch64 wheel until `archs` (or `CIBW_ARCHS_LINUX`) adds `aarch64` (Phase 2.4 "CI pipelines"). `long double`, numpy's long double types and fast-math flags change results between x86 and Graviton without an error: check them in Phase 3 (Results That Change Without Failing).
 
-Executed on the fixture:
-- `app/service.py:29: return ctypes.CDLL(path)` (the path is chosen by the architecture check below) and `app/service.py:46: ctypes.util.find_library("c")` (harmless: libc resolves everywhere). For each `CDLL`/`dlopen`, read the code that builds the path: a hard-coded x86 filename or a lookup table without an `aarch64` key is a FAIL.
-- `app/service.py:19: if arch == "x86_64":` and `:21: if arch == "AMD64":` with no aarch64 branch; `app/service.py` is the only file comparing x86 but never aarch64
-- `tests/test_service.py:13: if platform.machine() == "x86_64":` guards the test's only assertion, so on aarch64 the test passes without checking anything. The file mentions `aarch64` on another line, so the heuristic does not list it; only the first grep shows it
-- `scripts_deploy.sh:4: if [ "$(uname -m)" != "x86_64" ]; then ... exit 1` and `:5` the `tool-linux-amd64` download
-- `setup.py:8: extra_compile_args=["-O3", "-mavx2", "-march=haswell"]`; `native/fixture_ext.c:7-8` includes `<immintrin.h>` under `#ifdef __x86_64__` (guarded, so the header is fine; the flags are not)
-- `Dockerfile:6: FROM --platform=$BUILDPLATFORM python:3.11-slim AS builder` whose `RUN pip install` output is copied into `Dockerfile:12: FROM --platform=linux/amd64 python:3.11-slim`
+Instance types and AMI IDs need arm64 counterparts. A Graviton instance type is a sizing decision: record it under User Decisions Pending with the default from Phase 2.4. An AMI ID names one architecture: `aws ec2 describe-images --image-ids <id> --query 'Images[].[ImageId,Architecture,Name]'` shows which (executed: `al2023-ami-2023.12.20260930.0-kernel-6.18-x86_64` reports `x86_64` and its `-arm64` sibling `arm64`), and the arm64 AMI of the same release replaces it; the public SSM parameter `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` has an `-arm64` counterpart. ECS `cpuArchitecture` takes `X86_64` or `ARM64` (Fargate defaults to `X86_64`), and EKS `amiType` values come in pairs (`AL2023_x86_64_STANDARD` and `AL2023_ARM_64_STANDARD`). Change these only where the project ships the files ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), IN SCOPE 6).
+
+For each `CDLL` or `dlopen`, read the code that builds the path: a hard-coded x86 filename or a lookup table without an `aarch64` key is a FAIL. The heuristic misses a file that mentions `aarch64` anywhere, such as a test whose only assertion runs under `if platform.machine() == "x86_64":`; only the first grep shows it. An x86 header under `#ifdef __x86_64__` is fine; x86-only compiler flags are not.
 
 Flag code that checks for `x86_64`/`amd64` without `aarch64`/`arm64` handling, builds library paths or download URLs from the architecture without an aarch64 case, compiles with x86-only flags, or pins container images to amd64. A test whose assertions run only on x86 does not block the migration: record it in `04-code-scan-findings.md` as COMPATIBLE with that note, leave it unchanged, and check the path it would have covered directly in Phase 3.3. One Dockerfile rule needs particular care: **`pip install` must run on the target platform.** Wheels are architecture-specific, so a stage that installs packages and is copied into the runtime image must run on `$TARGETPLATFORM` (Phase 2.4).
+
+Every image the project builds from, tests with or deploys has to list `linux/arm64`, including images a library starts at run time: a test that creates `MySqlContainer("mysql:5.7")` starts `mysql:5.7`, which has no arm64 build. List the images and read each one's platforms from its registry, without pulling it:
+
+```bash
+mkdir -p graviton-validation/raw
+# Image references: FROM lines of the Dockerfiles in raw/dockerfiles.txt (§1.1; not stage names), image: keys in
+# YAML and JSON, image names in test code. A reference built from a variable is left out: resolve it by hand.
+{ if [ -f graviton-validation/raw/dockerfiles.txt ]; then
+    while IFS= read -r f; do
+      awk 'toupper($1) == "FROM" { i = ($2 ~ /^--platform=/) ? 3 : 2; if (!($i in s)) print $i
+             for (k = i + 1; k < NF; k++) if (toupper($k) == "AS") s[$(k + 1)] = 1 }' "$f"
+    done < graviton-validation/raw/dockerfiles.txt
+  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt" >&2; fi
+  grep -rhoiE --exclude-dir=.venv --exclude-dir=.git --exclude-dir=node_modules --include='*.y*ml' --include='*.json' \
+    '"?image(uri)?"?[[:space:]]*:[[:space:]]*"?[a-z0-9][^"[:space:],}]*' . |
+    sed -E 's/^"?[Ii][Mm][Aa][Gg][Ee]([Uu][Rr][Ii])?"?[[:space:]]*:[[:space:]]*"?//'
+  grep -rhoE --exclude-dir=.venv --exclude-dir=.git --include='*.py' "Container\((image=)?[\"'][^\"']+" . |
+    sed -E "s/^[^\"']*[\"']//"
+} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/raw/images.txt
+# Platforms per image, from its registry (docker CLI). Without docker, or a login a private registry needs, the line is CHECK.
+while IFS= read -r img; do
+  if ! out=$(docker manifest inspect -v "$img" 2>&1); then printf 'CHECK   %s: %s\n' "$img" "$(printf '%s\n' "$out" | grep -v '^errors:$' | head -n 1)"
+  elif printf '%s' "$out" | grep -q '"architecture": "arm64"'; then printf 'OK      %s\n' "$img"
+  else printf 'FINDING %s: no linux/arm64 build\n' "$img"; fi
+done < graviton-validation/raw/images.txt
+```
+
+`docker manifest inspect -v` prints every platform of a multi-architecture image and the one platform of a single-architecture image. A FINDING is fixed in Phase 2.4. On an ARM64 host a list without arm64 stops the pull (`no matching manifest for linux/arm64/v8 in the manifest list entries`), while a single amd64 manifest is pulled and its container stops with `exec format error` (`--platform linux/arm64` stops that pull: `was found but does not match the specified platform: wanted linux/arm64, actual: linux/amd64`).
 
 ## 1.5 Python Version Compatibility Check
 
@@ -711,13 +833,13 @@ Flag code that checks for `x86_64`/`amd64` without `aarch64`/`arm64` handling, b
        c = [html.unescape(re.sub(r'<[^>]+>', '', x)).strip() for x in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', r, flags=re.S)]
        if c and c[0] == want: print(f'Python {c[0]}: status={c[2]}, first release {c[3]}, end of life {c[4]}')"
    ```
-   (The `-A` user agent matters: devguide.python.org returns 403 to urllib's default agent.) Executed for the fixture: `Python 3.11: status=security, first release 2022-10-24, end of life 2027-10`.
-3. CPython itself is not the blocker: the official `python:` images are multi-architecture (the fixture's `python:3.11-slim` ran as `aarch64` in §1.1), and the repo's guidance ([python.md section 1.2](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#12-recommended-versions)) is to target at least 3.11 because older releases are end of life and package maintainers drop their wheels first (section 1.3 describes the AL2 and RHEL 8 cases). An end-of-life interpreter is recorded as a RECOMMENDED UPGRADE with the live date, not as a blocker, unless §1.3 produced interpreter-ABI blockers.
+   (The `-A` user agent matters: devguide.python.org returns 403 to urllib's default agent.)
+3. CPython itself is not the blocker: the official `python:` images are multi-architecture, and the guidance is to target a release the devguide lists as supported, because package maintainers drop wheels for end-of-life releases first. An end-of-life interpreter is recorded as a RECOMMENDED UPGRADE with the live date, not as a blocker, unless §1.3 produced interpreter-ABI blockers.
 4. **DO NOT change the interpreter version by default.** The gate is `python.interpreter_bump` in `skill-config.md`:
    - `never` (default): report ABI blockers with evidence and options; make no change
    - `ask`: present the blockers and the lowest interpreter that resolves them, and wait for approval
    - `approved=<3.X>`: the team pre-approved that version; apply it as a consequence of the required fix and record it in `01-project-assessment.md` and `00-summary.md`
    A bump is only in scope when it is the sole path to an aarch64 wheel for a required package; "3.10 is end of life" alone never justifies it.
 
-   **One interpreter for the whole dependency set.** The interpreter is one decision covering every pin, never made for one package at a time, because a bump made for one package changes the wheel every other pin needs. Before proposing or applying a bump, rerun the §1.3 loop for each candidate interpreter over the whole resolved list (`PYVER=3.Y`, run in a 3.Y environment from Phase 3.0), and record for each candidate which pins are not COMPATIBLE and the lowest versions that fix them (03 report, Interpreter-ABI Blockers). Keep the current interpreter when every MUST UPGRADE finding is fixable there; otherwise choose the lowest candidate at which every pin is, and apply the bump and all of its pin changes together. When no single interpreter works for every pin, report the table as a user decision and change nothing. Executed on the fixed fixture: at cp312 the two pins fixed for cp311, `blosc2==0.6.4` and `shapely==2.0.0`, have no wheel on either architecture (the lowest cp312 aarch64 releases are 2.2.8 and 2.0.2), so a move to 3.12 would be three changes decided together, not one.
-5. Record `pip` on the target (§1.1): pip 19.3 is the first release that installs `manylinux2014` aarch64 wheels ([README, Python installation on some Linux distros](https://github.com/aws/aws-graviton-getting-started/blob/main/README.md#python-installation-on-some-linux-distros)), and pip 20.3 the first that sees the `manylinux_2_N` tags most current aarch64 wheels carry ([../document_references/wheel-verification.md](../document_references/wheel-verification.md) §2); plan the upgrade in Phase 3 if it is older than 20.3.
+   **One interpreter for the whole dependency set.** The interpreter is one decision covering every pin, never made for one package at a time, because a bump made for one package changes the wheel every other pin needs. Before proposing or applying a bump, rerun the §1.3 loop for each candidate interpreter over the whole resolved list (`PYVER=3.Y`, run in a 3.Y environment from Phase 3.0), and record for each candidate which pins are not COMPATIBLE and the lowest versions that fix them (03 report, Interpreter-ABI Blockers). Keep the current interpreter when every MUST UPGRADE finding is fixable there; otherwise choose the lowest candidate at which every pin is, and apply the bump and all of its pin changes together. When no single interpreter works for every pin, report the table as a user decision and change nothing.
+5. Record `pip` on the target (§1.1): pip 19.3 is the first release that installs `manylinux2014` aarch64 wheels ([pip's changelog](https://pip.pypa.io/en/stable/news/)), and pip 20.3 the first that sees the `manylinux_2_N` tags most current aarch64 wheels carry ([../document_references/wheel-verification.md](../document_references/wheel-verification.md) §2); plan the upgrade in Phase 3 if it is older than 20.3.
