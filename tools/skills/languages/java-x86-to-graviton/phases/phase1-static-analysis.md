@@ -4,15 +4,48 @@ Analyze the project without making changes. All findings are documented in `grav
 
 > **Skill config:** Wherever a step below runs `mvn` or `./gradlew`, substitute `build.maven_invocation` / `build.gradle_invocation` from `skill-config.md` if defined (e.g. `./mvnw`). If it specifies a Maven wrapper (`./mvnw`) that is not present, fall back to bare `mvn`. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
+## Contents
+
+- 1.1 Project Structure Analysis: Determine Deployment Type; Detect Multi-Module Structure; Generate Dependency Tree; Categorize Components by Risk
+- 1.2 Native Library Validation: 1.2.1 Statically Bundled .so Scanning; 1.2.2 Runtime-Extracted Native Library Detection; 1.2.3 Tiered Validation Policy
+- 1.3 Dependency ARM64 Compatibility Analysis: Generate Filtered Tree; Classify Each Dependency; Document Findings; Build-Tool Artifacts with OS/Arch Classifiers
+- 1.4 Architecture-Specific Code Detection
+- 1.5 Java Version Compatibility Check
+
 ## 1.1 Project Structure Analysis
 
 > **Output: `graviton-validation/01-project-assessment.md`** and **`graviton-validation/raw/dependency-tree-full.txt`**
 
 ### Determine Deployment Type
 
-- Dockerfile or container config present: **Containerized**
+```bash
+# Deployment files (read every hit)
+find . \( -name .git -o -name .venv -o -name node_modules -o -name cdk.out \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' \
+  -o -name 'Containerfile*' -o -name 'docker-compose*.y*ml' -o -name 'compose*.y*ml' -o -name 'template.y*ml' -o -name 'serverless.yml' \
+  -o -name 'cdk.json' -o -name '*.tf' -o -name '*.service' -o -name 'Procfile' \) -print | sort
+# Dockerfiles under any name: by name, plus the files a build's -f or --file, Compose dockerfile: and
+# docker/build-push-action file: name. A file is kept when it has a FROM line; a name that is no file
+# here is printed: find that file by hand and add it to the list.
+mkdir -p graviton-validation/raw
+{ find . \( -name .git -o -name .venv -o -name target -o -name node_modules -o -name cdk.out \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' \) -print
+  grep -rnoE --exclude-dir=.git --exclude-dir=.venv --exclude-dir=target --exclude-dir=node_modules --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' --include='Jenkinsfile*' -- \
+    "(build|bud)[[:space:]][^;|&#]*(-f[[:space:]]+|--file[[:space:]=]+)[\"']?[^[:space:];|&\"')]+|(dockerfile|file):[[:space:]]*[\"']?[^[:space:]#\"']+" . |
+    while IFS= read -r hit; do
+      src=${hit%%:*}; ref=$(printf '%s\n' "${hit#*:*:}" | sed -E "s/^.*(-f[[:space:]]+|--file[[:space:]=]+|file:[[:space:]]*)[\"']?//")
+      if [ -f "$ref" ]; then printf './%s\n' "${ref#./}"
+      elif [ -f "${src%/*}/$ref" ]; then printf '%s/%s\n' "${src%/*}" "${ref#./}"
+      else printf 'not found: %s names %s\n' "$src" "$ref" >&2; fi
+    done
+} | while IFS= read -r f; do grep -qiE '^[[:space:]]*FROM[[:space:]]' "$f" && printf '%s\n' "$f"; done |
+  sort -u > graviton-validation/raw/dockerfiles.txt
+cat graviton-validation/raw/dockerfiles.txt
+```
+
+- Dockerfile or container config present, under any name (`Dockerfile*`, `*.Dockerfile`, `Containerfile`; `docker build -f` and Compose `dockerfile:` accept any name; the block lists them all in `raw/dockerfiles.txt`): **Containerized**
 - systemd/init scripts or direct JAR/WAR: **Host-based**
-- Some applications support both
+- A CDK app (`cdk.json`) or Terraform files define the infrastructure, and its architecture settings, in code (§1.4)
+- A SAM, CloudFormation, CDK or Terraform function with a `java` runtime: **Lambda**. The architecture is a function setting (§1.4)
+- Some applications support more than one
 
 ### Detect Multi-Module Structure
 
@@ -60,7 +93,7 @@ Native libraries incompatible with ARM64 exist in two forms: **statically bundle
 
 Native libraries live inside the **resolved dependency JARs**, not the project source tree. Those JARs are in the local repository cache (`~/.m2/repository` for Maven, `~/.gradle/caches` for Gradle), and in any built fat/uber JAR under `target/`/`build/`. **Do not restrict the scan to the project tree, and do NOT exclude `target/`/`build/`** — that is exactly where the shippable artifacts are.
 
-**Preflight — the scan needs `unzip` and `file`.** Without them it silently emits nothing, which is indistinguishable from "no native libraries found" — a false all-clear. The Maven/Gradle base images this skill steers toward (`maven:3.9-eclipse-temurin-17`, `gradle:8-jdk17`, etc.) ship **neither**. Check first, and install them (`yum`/`apt`/`microdnf install unzip file`) if missing:
+**Preflight: the scan needs `unzip` and `file`.** Without them it prints nothing, which reads as "no native libraries found", a false all-clear. Build images often lack them: `maven:3-amazoncorretto-21`, `maven:3-eclipse-temurin-21` and `gradle:jdk21` ship no `file`, and only `gradle:jdk21` ships `unzip`. Check first, and install them (`yum`/`apt`/`microdnf install unzip file`) if missing:
 
 ```bash
 command -v unzip >/dev/null && command -v file >/dev/null \
@@ -110,6 +143,7 @@ scan_archive() {  # $1 = path to a .jar/.war/.ear on disk; $2 = label for nested
     while IFS= read -r -d '' nested; do scan_archive "$nested" "$label"'!'"${nested#"$d"/}"; done
   rm -rf "$d"
 }
+typeset -f scan_archive > "${TMPDIR:-/tmp}/graviton-java-scan_archive.sh"   # later blocks, perhaps in a new shell, load it from here
 
 # Scan the materialized deps plus built artifacts in the project tree. Match .jar/.war/.ear —
 # a shippable target/*.war or *.ear is itself an archive that bundles native libs and must be
@@ -119,8 +153,11 @@ scan_archive() {  # $1 = path to a .jar/.war/.ear on disk; $2 = label for nested
 # scanning all of ~/.m2 / ~/.gradle would add thousands of unrelated jars and drown the finding.
 # `. ` already covers target/deps and build/deps (they live under it), so don't list them again
 # — doing so double-lists every JAR (differing path prefixes defeat `sort -u`).
-find . \( -name "*.jar" -o -name "*.war" -o -name "*.ear" \) -print0 2>/dev/null |
+find . \( -name "*.jar" -o -name "*.war" -o -name "*.ear" -o -name "*.nar" \) -print0 2>/dev/null |
   while IFS= read -r -d '' ar; do scan_archive "$ar"; done | sort -u
+# Native files outside archives (committed libraries, downloaded tools, JVM agents), by content
+find . \( -name .git -o -name node_modules \) -prune -o -type f ! -name "*.class" ! -name "*.[jwen]ar" \
+  -exec file {} + 2>/dev/null | grep -E ':[[:space:]]+(ELF|Mach-O|PE32)' | sed 's/, BuildID.*//; s/^/  [file] /' | sort -u
 ```
 
 If a dependency could not be materialized (offline/blocked `copy-dependencies`), fall back to scanning its JAR directly in the cache: `find "$HOME/.m2/repository" "$HOME/.gradle/caches" -name '<artifact>-*.jar' -print0 | while IFS= read -r -d '' jar; do scan_archive "$jar"; done` for the specific coordinates from the dependency tree — rather than sweeping the entire cache.
@@ -149,6 +186,32 @@ grep -rnE "netty-transport-native|netty-tcnative|io\.grpc.*netty|conscrypt|jnr-f
   --include="pom.xml" --include="build.gradle" --include="build.gradle.kts" . 2>/dev/null || true
 ```
 
+Downloads in scripts, Dockerfiles and CI bring native code in outside the build. List every one, then fetch each into a scratch folder and run `file` on what it holds, whatever its URL says (resolve the script's variables in the URL first; a JAR goes through the §1.2.1 scan instead):
+
+```bash
+grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --exclude-dir=node_modules --include='*.sh' --include='Dockerfile*' --include='*.[Dd]ockerfile' \
+  --include='Containerfile*' --include='Makefile' --include='*.y*ml' --include='Jenkinsfile*' '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[[:space:]]|^[[:space:]]*ADD([[:space:]]+--[^[:space:]]+)*[[:space:]]+https?:|releases/(latest/)?download/' . 2>/dev/null || true
+URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list
+d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX"); mkdir "$d/x"
+if curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
+  # Unpack by the first bytes, not the name: a .deb (an ar archive), an .rpm, a zip or a tar archive
+  case "$(od -An -tx1 -N4 "$d/download" | tr -d ' \t\n')" in
+    213c6172) if head -c 64 "$d/download" | grep -q debian-binary; then   # another ar archive is a static library, which the scan reads
+                (cd "$d/x" && ar x ../download && for t in data.tar.*; do tar -xf "$t"; done) && rm "$d/download" \
+                  || echo "CHECK: $URL is a .deb this host cannot unpack (needs ar, and tar with xz or zstd)"
+              fi ;;
+    edabeedb) { if command -v rpm2cpio > /dev/null 2>&1; then (cd "$d/x" && rpm2cpio ../download | cpio -idm --quiet)
+                else bsdtar -xf "$d/download" -C "$d/x"; fi; } && rm "$d/download" \
+                || echo "CHECK: $URL is an .rpm this host cannot unpack (needs rpm2cpio and cpio, or bsdtar)" ;;
+    *) unzip -q "$d/download" -d "$d/x" 2>/dev/null || tar -xf "$d/download" -C "$d/x" 2>/dev/null ;;
+  esac
+  find "$d" -type f -exec file {} + | grep -E ':[[:space:]]+(ELF|Mach-O|PE32)' | sed "s#^$d/##"
+else echo "CHECK: $URL did not download"; fi
+rm -rf "$d"
+```
+
+A download that cannot be fetched from here (credentials, a private network) stays CHECK until it is scanned where it can be.
+
 **Common runtime-extracting libraries** (this list is a *prompt*, not an allowlist — any JAR containing a native lib qualifies, including ones not named here such as `jansi`/`hawtjni`, `commons-crypto`, `jansi-native`):
 - **Netty** (`netty-transport-native-epoll`, `netty-tcnative`): Extracts .so based on `os.arch`
 - **Conscrypt**: Native crypto libraries at runtime
@@ -161,7 +224,7 @@ grep -rnE "netty-transport-native|netty-tcnative|io\.grpc.*netty|conscrypt|jnr-f
 
 **Do not rely on the named list alone.** The authoritative signal is the §1.2.1 content scan: any resolved JAR that contains a `.so`/`.dll`/`.dylib`/`.jnilib` extracts or loads native code and must be checked for an `aarch64` binary — whether or not its name appears above. The grep is only a fast-path hint; the content scan is what actually determines the finding.
 
-For each native-bearing JAR found: check whether it includes a `linux/aarch64` binary (verify the JAR per §1.2.1 — never infer from the version number). If missing, flag as MUST UPGRADE. If a pure Java fallback exists (e.g., Netty NIO vs native epoll), document it.
+For each native-bearing JAR found: check whether it includes a `linux/aarch64` binary (verify the JAR per §1.2.1; never infer from the version number). If missing, flag as MUST UPGRADE, unless the library falls back to pure Java without it: the application then runs on ARM64, but without the native code it runs on x86, so mark it CHECK and settle it with the loaded check in Phase 3.3. For Netty epoll, `Epoll.unavailabilityCause()` is then `java.io.FileNotFoundException: META-INF/native/libnetty_transport_native_epoll_aarch_64.so`.
 
 ### 1.2.3 Tiered Validation Policy
 
@@ -169,7 +232,10 @@ For each native-bearing JAR found: check whether it includes a `linux/aarch64` b
 - .so shows x86-64 only AND no ARM64 version in JAR AND no source code available AND user cannot provide ARM64 version
 
 **WARN but proceed if:**
-- Multi-arch JAR with both x86 and ARM64, OR pure Java fallback exists, OR source available for recompilation
+- Multi-arch JAR with both x86 and ARM64, OR source available for recompilation
+
+**CHECK (settled by the Phase 3.3 loaded check) if:**
+- The library falls back to pure Java without its native code (Netty's epoll transport falls back to NIO): the application runs, but not the code it runs on x86
 
 **PASS if:**
 - .so shows "ARM aarch64" OR the JAR contains both an x86-64 and an `ARM aarch64` build of the library, each confirmed by `file` (a folder name such as `/linux/aarch64/` is not evidence)
@@ -291,10 +357,78 @@ grep -rnE 'System\.getProperty\("os\.(arch|name)"\)|Native\.load|System\.loadLib
 # otherwise be wrongly cleared. This remains a heuristic: always eyeball the os.arch hits
 # from the first grep, which is the authoritative signal.
 grep -rlE '"(amd64|x86_64)"' --include="*.java" --include="*.kt" . 2>/dev/null \
-  | xargs grep -LE '"aarch64"|"arm64"' 2>/dev/null   # files comparing amd64/x86_64 but NOT aarch64
+  | while IFS= read -r f; do grep -qE '"aarch64"|"arm64"' "$f" || printf '%s\n' "$f"; done   # files comparing amd64/x86_64 but NOT aarch64
+# Dockerfiles under any name, and deployment descriptors
+if [ -f graviton-validation/raw/dockerfiles.txt ]; then
+  while IFS= read -r f; do grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|x86_64|amd64' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done < graviton-validation/raw/dockerfiles.txt
+else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt"; fi
+grep -rniE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --exclude-dir=node_modules --exclude-dir=cdk.out --include='*.y*ml' --include='*.json' --include='*.tf' \
+  'architectures?"?[[:space:]]*[:=]|kubernetes\.io/arch|nodeselector|cpu_?architecture"?[[:space:]]*[:=]|ami_?type"?[[:space:]]*[:=]|instance_?types?"?[[:space:]]*[:=]|ami-[0-9a-f]{8,17}|^functions:|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?compatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"|x86_64|amd64' . 2>/dev/null || true
+# CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
+# (a construct that sets none gets x86_64)
+find . \( -name .git -o -name .venv -o -name target -o -name node_modules -o -name cdk.out \) -prune -o -name cdk.json -print |
+  while IFS= read -r c; do grep -rnE --exclude-dir=node_modules --exclude-dir=cdk.out --exclude-dir=target --exclude-dir=.venv --include='*.py' --include='*.ts' --include='*.js' \
+    --include='*.java' --include='*.cs' --include='*.go' 'Architecture[._](X86_64|ARM_64)|CpuArchitecture[._](X86_64|ARM64)|AmazonLinuxCpuType[._]|MachineImage[._]|NodegroupAmiType[._]|InstanceType(\(|[._][Oo]f\()|InstanceClass[._]|(^|[^A-Za-z0-9_])(New)?(Function|DockerImageFunction|NodejsFunction|PythonFunction|GoFunction|FargateTaskDefinition|Nodegroup|Cluster)(\(|\.Builder)|[Aa]dd_?[Nn]odegroup_?[Cc]apacity' "$(dirname "$c")"; done | sort -u
+# x86-only JVM options (HotSpot defines them only in its x86 port) in start scripts, Dockerfiles,
+# Compose and Kubernetes files, task definitions, Terraform, systemd units, Maven and Gradle builds and JVM settings
+grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --exclude-dir=node_modules --include='*.sh' --include='*.cmd' --include='*.bat' \
+  --include='Dockerfile*' --include='*.[Dd]ockerfile' --include='Containerfile*' --include='*.y*ml' --include='*.json' --include='*.service' \
+  --include='*.conf' --include='*.properties' --include='*.env' --include=jvm.config --include=Procfile --include='*.gradle' --include='*.gradle.kts' --include='*.tf' --include=pom.xml -- \
+  '-XX:[+-]?(AVX3Threshold|IntelJccErratumMitigation|RTM[A-Za-z]+|UseAVX|UseAddressNop|UseBMI[12]Instructions|UseCLMUL|UseCount(Leading|Trailing)ZerosInstruction|UseFastStosb|UseIncDec|UseKNLSetting|UseLibmIntrinsic|UseNewLongLShift|UseRTM[A-Za-z]+|UseSSE|UseSSE42Intrinsics|UseStoreImmI16|UseUnalignedLoadStores|UseXMMForObjInit|UseXmm[A-Za-z0-9]+)([^A-Za-z0-9]|$)' . 2>/dev/null || true
+# JVM agents: -agentpath loads a native library before main, and an x86-64 one stops an ARM64 JVM ("Could not
+# find agent library ... (Possible cause: can't load AMD 64 .so on a AARCH64 platform)"): judge each agent file
+# by content (§1.2.1). -javaagent names a JAR: run scan_archive on it when the project tree does not hold it
+# (in a new shell, load it first, and stop if that fails:
+# if . "${TMPDIR:-/tmp}/graviton-java-scan_archive.sh"; then scan_archive <jar>; fi).
+grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --include='*.sh' --include='Dockerfile*' --include='*.[Dd]ockerfile' \
+  --include='Containerfile*' --include='*.y*ml' --include='*.json' --include='*.service' --include='*.conf' \
+  --include='*.properties' --include='*.env' --include=jvm.config --include=Procfile --include='*.gradle' --include='*.gradle.kts' --include='*.tf' --include=pom.xml -- '-agentpath:|-agentlib:|-javaagent:' . 2>/dev/null || true
+# System calls made by number: the numbers differ (x86-64's 186 is gettid, aarch64's is 178, and 186 there
+# is msgget), and open, fork, pipe, dup2 and poll have no aarch64 number at all (openat, clone, pipe2, dup3
+# and ppoll do). Use the libc function or the target's SYS_ constant instead of the number.
+grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --include='*.java' --include='*.kt' --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' -- \
+  'syscall\([[:space:]]*(0x[0-9a-fA-F]+|[0-9]+)' . 2>/dev/null || true
+# Types and build flags whose results differ by architecture (checked in Phase 3)
+grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' \
+  --include=CMakeLists.txt --include=Makefile --include='*.mk' -- 'long double|__float128|longdouble|float128|float96|complex256|-ffast-math|-Ofast|-funsafe-math' . 2>/dev/null || true
+# x86-only compiler flags and intrinsics in JNI sources the project builds (C, C++)
+grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' \
+  --include='*.hpp' --include=CMakeLists.txt --include=Makefile --include='*.mk' -- '-m(avx|sse|fma|bmi|popcnt|pclmul|aes|crc32|f16c|lzcnt)|-march=|-mtune=|[a-z0-9]+intrin\.h|cpuid\.h|__builtin_ia32_|__cpuid|__rdtsc|__x86_64__|_M_X64|__SSE|__AVX|__m(128|256|512)|_mm[0-9]*_' . 2>/dev/null || true
 ```
 
 Flag code that checks for "amd64" or "x86_64" without "aarch64" handling, loads native libraries without architecture-aware paths, or contains x86-specific assumptions.
+
+An x86-only JVM option is a FINDING when the target JDK refuses it: HotSpot defines these options only in its x86 port, and an ARM64 JVM that does not know one stops before the application starts (`Unrecognized VM option 'UseAVX=2'`, then `Error: Could not create the Java Virtual Machine.`). JDK 17 and 21 refuse all of them, 11 accepts `UseSSE=<n>`, and 8 also `UseSSE42Intrinsics`. `-XX:+IgnoreUnrecognizedVMOptions` lets the JVM start, but it ignores every unrecognized option, not only these.
+
+A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`, and the CDK's `aws-eks` `Cluster` without `defaultCapacityInstance` adds `m5.large` (x86) nodes, two unless `defaultCapacity` sets another count; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`public.ecr.aws/lambda/java:21-x86_64`) or its repository (`amd64/eclipse-temurin:21-jre`). C or C++ sources the project builds for JNI need an Arm path for any x86 intrinsics they use: `sse2neon.h` ([sse2neon](https://github.com/DLTcollab/sse2neon)) implements the SSE to SSE4.2 and AES intrinsics with NEON, but no AVX (`_mm256_*`); port what it does not cover, and the hot paths found by profiling on Graviton, to NEON intrinsics. `long double` and fast-math flags change results between x86 and Graviton without an error: check them in Phase 3 (Results That Change Without Failing).
+
+Every image the project builds from, tests with or deploys has to list `linux/arm64`, including images a library starts at run time: Testcontainers for Java 1.6.0 to 1.15.1 start a Ryuk image with no arm64 build (add it to the list), and 1.15.2 starts `testcontainers/ryuk:0.3.1`, which has one. List the images and read each one's platforms from its registry, without pulling it:
+
+```bash
+mkdir -p graviton-validation/raw
+# Image references: FROM lines of the Dockerfiles in raw/dockerfiles.txt (§1.1; not stage names), image: keys in
+# YAML and JSON, image names in test code. A reference built from a variable is left out: resolve it by hand.
+{ if [ -f graviton-validation/raw/dockerfiles.txt ]; then
+    while IFS= read -r f; do
+      awk 'toupper($1) == "FROM" { i = ($2 ~ /^--platform=/) ? 3 : 2; if (!($i in s)) print $i
+             for (k = i + 1; k < NF; k++) if (toupper($k) == "AS") s[$(k + 1)] = 1 }' "$f"
+    done < graviton-validation/raw/dockerfiles.txt
+  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt" >&2; fi
+  grep -rhoiE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --exclude-dir=node_modules --include='*.y*ml' --include='*.json' \
+    '"?image(uri)?"?[[:space:]]*:[[:space:]]*"?[a-z0-9][^"[:space:],}]*' . |
+    sed -E 's/^"?[Ii][Mm][Aa][Gg][Ee]([Uu][Rr][Ii])?"?[[:space:]]*:[[:space:]]*"?//'
+  grep -rhoE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --include='*.java' --include='*.kt' \
+    '(DockerImageName\.parse|Container(<[^>]*>)?)\("[^"]+"' . | sed -E 's/.*\("//; s/"$//'
+} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/raw/images.txt
+# Platforms per image, from its registry (docker CLI). Without docker, or a login a private registry needs, the line is CHECK.
+while IFS= read -r img; do
+  if ! out=$(docker manifest inspect -v "$img" 2>&1); then printf 'CHECK   %s: %s\n' "$img" "$(printf '%s\n' "$out" | grep -v '^errors:$' | head -n 1)"
+  elif printf '%s' "$out" | grep -q '"architecture": "arm64"'; then printf 'OK      %s\n' "$img"
+  else printf 'FINDING %s: no linux/arm64 build\n' "$img"; fi
+done < graviton-validation/raw/images.txt
+```
+
+`docker manifest inspect -v` prints every platform of a multi-architecture image and the one platform of a single-architecture image. A FINDING is fixed in Phase 2.4. On an ARM64 host a list without arm64 stops the pull (`no matching manifest for linux/arm64/v8 in the manifest list entries`), while a single amd64 manifest is pulled and its container stops with `exec format error` (`--platform linux/arm64` stops that pull: `was found but does not match the specified platform: wanted linux/arm64, actual: linux/amd64`).
 
 ## 1.5 Java Version Compatibility Check
 

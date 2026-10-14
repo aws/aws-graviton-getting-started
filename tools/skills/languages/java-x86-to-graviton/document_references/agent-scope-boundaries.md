@@ -1,5 +1,19 @@
 # ARM64 Transformation - Agent Scope Boundaries
 
+## Contents
+
+- Primary Objective
+- Quick Reference: ARM64 Dependency Update Decision Tree
+- IN SCOPE: What to Fix: 1. Native Library Issues; 2. Build Tool Artifacts; 3. Architecture Detection; 4. Documented ARM64 Bugs; 5. Images and Binaries the Project Pulls
+- OUT OF SCOPE: What NOT to Fix: 1. General Dependency Modernization; 2. Security Updates; 3. Feature Upgrades; 4. Java Version Changes; 5. Code Refactoring
+- Decision Tree: Should I Update This Dependency?
+- Common Pure Java Libraries
+- Red Flags: When Agent is Going Off-Scope
+- How to Document Scope Compliance: For Updates Made; For Updates NOT Made
+- Learning from Past Mistakes: Case Study: JUnit 3.8.1; Case Study: Protoc 3.3.0; Case Study: JNA 5.6.0
+- Success Criteria
+- When in Doubt
+
 ## 🎯 Primary Objective
 Validate Java application compatibility with AWS Graviton (ARM64) architecture.  
 **Focus ONLY on ARM64-specific compatibility issues.**
@@ -13,9 +27,12 @@ Is this dependency update required for ARM64 compatibility?
 │
 ├─ Does the dependency contain native code (.so, .dll, .dylib)?
 │  ├─ YES → Does current version have ARM64 binaries?
-│  │  ├─ NO → ✅ MUST UPGRADE (ARM64 native libraries missing)
+│  │  ├─ NO → ✅ MUST UPGRADE (ARM64 native libraries missing; a library with a pure-Java fallback is CHECK
+│  │  │        until the Phase 3 loaded check confirms the fallback)
 │  │  └─ YES → ✅ COMPATIBLE (has ARM64 support)
-│  └─ NO (Pure Java) → ✅ COMPATIBLE (pure Java works on all architectures)
+│  └─ NO (Pure Java) → Does it start an image or download a binary with no arm64 build?
+│     ├─ YES → ✅ MUST UPGRADE (IN SCOPE 5)
+│     └─ NO → ✅ COMPATIBLE (pure Java works on all architectures)
 │
 ├─ Does current version FAIL to build on ARM64?
 │  ├─ YES → Check why:
@@ -36,6 +53,7 @@ Is this dependency update required for ARM64 compatibility?
 
 RESULT:
 - If no ARM64-specific issue found → Mark COMPATIBLE, do NOT upgrade
+- If the evidence does not decide either way → Mark CHECK, do NOT upgrade; settle it in Phase 3
 - If ARM64-specific issue found → Document evidence and upgrade
 ```
 
@@ -53,9 +71,9 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 - ✅ Missing ARM64 native library artifacts
 - ✅ Example: snappy-java 1.1.1.7 → 1.1.2.2 (1.1.1.7 ships no `Linux/aarch64/libsnappyjava.so`; 1.1.2.2 is the lowest that does)
 
-> ⚠️ **Verify the JAR, never the version number.** Whether a version has an ARM64 binary is a fact about the artifact's contents, not something you can infer from how old the version is. Many libraries added Linux aarch64 support years earlier than people assume: JNA has shipped `linux-aarch64/libjnidispatch.so` since 4.2.0, and snappy-java's `Linux/aarch64/libsnappyjava.so` first appears in **1.1.2.2** (2016-03-29), roughly fifteen releases before the 1.1.4 that is commonly cited. The boundary is exact and narrow, and verified on a Graviton3 instance (c7g, Amazon Linux 2023, `aarch64`): 1.1.2.1 throws `[FAILED_TO_LOAD_NATIVE_LIBRARY] no native library is found for os.name=Linux and os.arch=aarch64`, while 1.1.2.2 loads and completes a compress/uncompress round-trip. Before writing MUST UPGRADE, confirm the *resolved* JAR actually lacks the aarch64 binary: run `scan_archive` from phase1-static-analysis.md §1.2.1 on it and look for an `ARM aarch64` line. A version being "old" is never sufficient evidence.
+> ⚠️ **Verify the JAR, never the version number.** Many libraries added Linux aarch64 support years earlier than people assume: JNA has shipped `linux-aarch64/libjnidispatch.so` since 4.2.0, and snappy-java's `Linux/aarch64/libsnappyjava.so` first appears in **1.1.2.2**, about fifteen releases before the 1.1.4 that is commonly cited. On Graviton, 1.1.2.1 stops with `[FAILED_TO_LOAD_NATIVE_LIBRARY] no native library is found for os.name=Linux and os.arch=aarch64`, and 1.1.2.2 loads. Before writing MUST UPGRADE, confirm the *resolved* JAR actually lacks the aarch64 binary: run `scan_archive` from phase1-static-analysis.md §1.2.1 on it and look for an `ARM aarch64` line.
 >
-> **When checking a floor, make a missing artifact fail loudly.** `curl` without `--fail` writes the 404 HTML body to the output path, producing a small file that is not a valid archive — and `unzip -l ... | grep aarch64` on it returns empty, which is indistinguishable from a real "no aarch64 binary" result. That is a false MUST UPGRADE. Use `curl -sSL --fail` and check the exit status, or verify the archive first with `unzip -t`, before reading any grep result as evidence. Confirm a version exists at all in `maven-metadata.xml` rather than assuming a gap in a version sequence was published (e.g. snappy-java has `1.1.3-M1`/`1.1.3-M2` milestones but **no released `1.1.3`**).
+> **When checking a floor, make a missing artifact fail loudly** (Phase 1.2.3): a saved 404 page reads like a JAR with no aarch64 binary, a false MUST UPGRADE. Confirm the version exists in `maven-metadata.xml` (snappy-java has `1.1.3-M1` and `1.1.3-M2` but no released `1.1.3`).
 
 ### 2. Build Tool Artifacts
 - ✅ Protoc compiler missing ARM64 executables
@@ -64,6 +82,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 
 ### 3. Architecture Detection
 - ✅ Code checking for "amd64" without "aarch64" handling
+- ✅ x86-only JVM options (`-XX:UseAVX=2`) in start scripts, Dockerfiles and deployment files, which an ARM64 JVM refuses at startup
 - ✅ Build plugins not detecting ARM64 architecture
 - ✅ Example: os-maven-plugin 1.4.1 → 1.7.0 (aarch64 detection)
 
@@ -71,6 +90,10 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 - ✅ Current version has known ARM64-specific runtime failures
 - ✅ Must have issue tracker evidence or release notes
 - ✅ Example: "Version X causes crash only on ARM64"
+
+### 5. Images and Binaries the Project Pulls
+- ✅ An image the project builds from, tests with, deploys or has a library start, with no `linux/arm64` build (Phase 1.4), and a binary a library or script downloads with no arm64 build, even when the library itself is pure Java.
+- ✅ Example: Testcontainers for Java 1.15.1 → 1.15.2, the first release whose Ryuk image has an arm64 build
 
 ## ❌ OUT OF SCOPE: What NOT to Fix
 
@@ -97,7 +120,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 ### 5. Code Refactoring
 - ❌ Code quality improvements
 - ❌ Design pattern changes
-- ❌ Performance optimizations (except Graviton-specific JVM flags)
+- ❌ Performance optimizations (Graviton-specific JVM flags are documented as recommendations, not applied)
 
 ## 🔍 Decision Tree: Should I Update This Dependency?
 
@@ -105,7 +128,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 For each dependency, ask in order:
 
 1. Does it contain native code?
-   NO → Mark COMPATIBLE, do NOT update
+   NO → Does it start an image or download a binary with no arm64 build? YES → MUST UPGRADE (IN SCOPE 5); NO → Mark COMPATIBLE, do NOT update
    YES → Continue to #2
 
 2. Does current version have ARM64 binaries?
@@ -121,9 +144,9 @@ For each dependency, ask in order:
    YES → MUST UPGRADE (document evidence)
 ```
 
-**Simple Rule:** If it builds and runs on ARM64 today → **DO NOT UPDATE**
+**Simple Rule:** Update only what ARM64 requires. A dependency, image or tool is in scope when, on the ARM64 target, it fails to build or run, runs other code than on x86 because its native build did not load (a pure-Java fallback, such as Netty's NIO transport in place of epoll), or pulls an image or binary that has no arm64 build. A confirmed fallback is MUST UPGRADE to the artifact that ships the aarch64 file (for Netty, the `linux-aarch_64` classifier), or a user decision when none does. Everything else stays as it is, even when it is old.
 
-## 📋 Common Pure Java Libraries (Always ARM64-Compatible)
+## 📋 Common Pure Java Libraries (ARM64-Compatible)
 
 These are **almost always** ARM64-compatible without updates:
 
@@ -222,7 +245,7 @@ These are **almost always** ARM64-compatible without updates:
 
 **What Was Wrong — the target version:**
 - `linux-aarch_64` first appears in **protoc 3.5.0**, not 3.17 or 3.21. Every release from 3.5.0 through 3.16.x already ships it.
-- Recommending 3.21.0+ violates the minimality rule (*prefer the lowest version that includes the ARM64 binary*) and drags ~18 minor versions of unrelated change into an ARM64 migration.
+- Recommending 3.21.0+ violates the minimality rule (*prefer the lowest version whose ARM64 binary works on the target*) and drags ~18 minor versions of unrelated change into an ARM64 migration.
 - Worse, `protoc` is usually pinned via a shared `${protobuf.version}` property, so an oversized bump also moves `protobuf-java` — a runtime library — turning a compatibility fix into unrequested modernization.
 - Citing `osx-aarch_64` alongside `linux-aarch_64` conflates the **macOS** floor (`osx-aarch_64` lands in 3.17.3) with the Linux one, which is what inflates the recommended version. Graviton is Linux: `linux-aarch_64` alone decides the verdict.
 
@@ -243,7 +266,7 @@ These are **almost always** ARM64-compatible without updates:
 - "Old + has native code" is not evidence of a missing Graviton binary.
 
 **Correct Analysis:**
-> "JNA 5.6.0: JAR contains `linux-aarch64/libjnidispatch.so` (verified via `unzip -l` + `file`). Loads on Graviton unmodified. Status: COMPATIBLE. No update required for ARM64. (If the local BUILD host is an Apple-Silicon Mac, 5.6.0 also lacks `darwin-aarch64` — but that affects local dev only, not the Graviton target.)"
+> "JNA 5.6.0: JAR contains `linux-aarch64/libjnidispatch.so` (verified with `scan_archive`). Loads on Graviton unmodified. Status: COMPATIBLE. No update required for ARM64."
 
 **Lesson:** Always inspect the resolved JAR for the `linux/aarch64` binary before deciding. A version number cannot tell you whether the Graviton binary is present.
 
@@ -270,7 +293,7 @@ These are **almost always** ARM64-compatible without updates:
 - "Is there concrete evidence this current version breaks on ARM64?"
 - "Am I updating this because it's old, or because ARM64 requires it?"
 
-**If unsure:** Mark as COMPATIBLE and document reasoning. It's better to under-fix than to introduce unnecessary scope creep.
+**If unsure:** Mark it CHECK, not COMPATIBLE, and change nothing. Name the evidence that would settle it and collect it in Phase 3 on ARM64; until then it stays CHECK. It's better to under-fix than to introduce unnecessary scope creep.
 
 ---
 

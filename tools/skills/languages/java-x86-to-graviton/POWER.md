@@ -1,7 +1,7 @@
 ---
 name: java-x86-to-graviton
 displayName: "Java x86 to Graviton Migration"
-description: "Validates Java application compatibility with AWS Graviton (ARM64) architecture by analyzing native libraries, dependencies (including transitive), and architecture-specific code. Performs static analysis, applies ARM64-required dependency updates, configures Graviton JVM flags, and validates builds on ARM64."
+description: "Validates Java application compatibility with AWS Graviton (ARM64) architecture by analyzing native libraries, dependencies (including transitive), and architecture-specific code. Performs static analysis, applies ARM64-required dependency updates, documents Graviton JVM flag recommendations, and validates builds on ARM64."
 keywords: ["java", "graviton", "arm64", "aarch64", "migration", "jvm", "native libraries", "dependencies"]
 author: "AWS"
 ---
@@ -16,13 +16,13 @@ Validate a Java application's readiness to run on AWS Graviton instances. This t
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
-**In scope:** Native library ARM64 binaries, ARM64-blocking dependency updates, architecture detection code, Graviton JVM flags, ARM64 build/test validation.
+**In scope:** Native library ARM64 binaries, ARM64-blocking dependency updates, architecture detection code, x86-only JVM options that stop an ARM64 JVM, Graviton JVM flag recommendations (documented, not applied), CI changes that only add or switch an architecture, ARM64 build/test validation.
 
 **Out of scope:** Java version changes, JDK distribution changes, general dependency modernization, security updates, code refactoring, .gitignore/.dockerignore changes.
 
 ## Skill Configuration (Optional)
 
-If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (build/validation JDK, build command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope — `agent-scope-boundaries.md` still binds, and the application's shipped JDK distribution stays unchanged (a configured JDK preference selects only the build/validation environment per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md). Record any applied overrides in `01-project-assessment.md`.
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (build/validation JDK, build command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the application's shipped JDK distribution stays unchanged (a configured JDK preference selects only the build/validation environment per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md) for the fields, and [document_references/skill-config.template.md](document_references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
 
 ## Entry Criteria
 
@@ -33,12 +33,34 @@ If a `skill-config.md` exists at the project root, read it before Phase 1 and ap
 5. ARM64 build/test environment access (Graviton EC2 or ARM64 containers)
 6. Complete dependency list with current versions
 7. Existing test suite
+8. Tools the commands call: git, curl, `unzip`, `file` and `readelf`, the project's Maven or Gradle build, and a container runtime (Phase 3); the image check (Phase 1.4) uses the docker CLI
 
 ## Transformation Workflow
 
+Copy this checklist into your response and check off each step:
+
+```
+ARM64 migration progress:
+- [ ] Baseline commit; `graviton-validation/raw/` created; `skill-config.md` read if present
+- [ ] 1.1 Deployment type, modules, dependency tree, risk categories (01, raw/)
+- [ ] 1.2 Native files inside and outside archives, judged by content (02)
+- [ ] 1.3 Each dependency: MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE / CHECK (03)
+- [ ] 1.4 Architecture code, JVM options, images, deployment settings (04)
+- [ ] 1.5 Java version and distribution recorded, not changed (01)
+- [ ] 2.1 Native libraries resolved (02)
+- [ ] 2.2 Only MUST UPGRADE dependencies updated, then the 1.2.1 scan re-run (03)
+- [ ] 2.3 Architecture detection code updated (04)
+- [ ] 2.4 Dockerfiles, build and deployment settings updated (04)
+- [ ] 2.5 JVM flags documented, not applied (05)
+- [ ] 3.0-3.1 ARM64 build; failures classified INFRA / ARM64 / PRE-EXISTING (06)
+- [ ] 3.2 Tests on ARM64, results that change without failing (06)
+- [ ] 3.3 Startup with the project's existing JVM options, and the loaded check (06)
+- [ ] 00-summary.md: each exit criterion with where it ran
+```
+
 ### Version Control Setup
 
-Initialize git if not already present. Commit after each meaningful step for traceability and rollback.
+Initialize git if not already present:
 
 ```bash
 # Initialize if no git repo exists (local only, no remote required)
@@ -49,19 +71,7 @@ if [ ! -d ".git" ]; then
 fi
 ```
 
-**Commit at each step that produces output or changes files.** Use `git add -A && git commit -m "<message>"` with descriptive messages. Typical commit points:
-
-1. After documentation setup (graviton-validation/ folder created)
-2. After Phase 1 static analysis complete (all analysis reports written)
-3. After native library resolution (Phase 2.1 - .so files updated)
-4. After dependency updates (Phase 2.2 - pom.xml/build.gradle changed)
-5. After architecture code updates (Phase 2.3 - Java source changed)
-6. After Dockerfile/build config updates (Phase 2.4)
-7. After JVM optimization config (Phase 2.5)
-8. After build validation (Phase 3.1 - build results documented)
-9. After final validation and summary (Phase 3.3 + 00-summary.md written)
-
-Not every project will have all steps (e.g., no Dockerfile changes for host-based deployments, no native library resolution if none found). Commit whenever files change, skip commits for steps that produced no changes.
+**Commit after each checklist step that changes files** with `git add -A && git commit -m "<message>"`, the message naming the step; skip the commit when a step changed nothing.
 
 ### Documentation Setup
 
@@ -79,7 +89,7 @@ Output files produced:
 | `02-native-library-report.md` | 1.2, 2.1 | Native library findings and resolutions |
 | `03-dependency-compatibility-report.md` | 1.3, 2.2 | Per-dependency ARM64 verdicts |
 | `04-code-scan-findings.md` | 1.4, 2.3 | Architecture-specific code patterns |
-| `05-jvm-configuration.md` | 2.5 | Graviton JVM flags |
+| `05-jvm-configuration.md` | 2.5 | Graviton JVM flag recommendations (documented, not applied) |
 | `06-build-test-results.md` | 3.0-3.3 | Build, test results, startup checks |
 | `raw/dependency-tree-full.txt` | 1.1 | Raw dependency tree |
 | `raw/dependency-tree-native.txt` | 1.3 | Filtered native-artifact tree |
@@ -90,9 +100,9 @@ Output files produced:
 Analyze the project without making changes. See [phases/phase1-static-analysis.md](phases/phase1-static-analysis.md) for detailed steps.
 
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, dependency tree generation, component risk categorization
-2. **1.2 Native Library Validation** - Scan for .so files (bundled and runtime-extracted), apply tiered FAIL/WARN/PASS policy
-3. **1.3 Dependency ARM64 Compatibility** - Analyze full transitive tree, classify as MUST UPGRADE / RECOMMENDED / COMPATIBLE
-4. **1.4 Architecture-Specific Code Detection** - Find `os.arch` checks, JNI/JNA usage missing ARM64 handling
+2. **1.2 Native Library Validation** - Scan for .so files (bundled and runtime-extracted), apply tiered FAIL/WARN/CHECK/PASS policy
+3. **1.3 Dependency ARM64 Compatibility** - Analyze full transitive tree, classify as MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE (CHECK until the evidence decides)
+4. **1.4 Architecture-Specific Code Detection** - Find `os.arch` checks, JNI/JNA usage missing ARM64 handling, x86-only JVM options, and deployment settings that pick x86, set or absent
 5. **1.5 Java Version Check** - Document version and distribution (do NOT change either)
 
 ### Phase 2: Compatibility Resolution
@@ -102,8 +112,8 @@ Apply fixes for ARM64-blocking issues only. See [phases/phase2-resolution.md](ph
 1. **2.1 Native Library Resolution** - Cross-compile or obtain ARM64 .so files, update loading logic
 2. **2.2 Dependency Updates** - Update ONLY MUST UPGRADE dependencies (including transitive via dependencyManagement)
 3. **2.3 Architecture Code Updates** - Add `aarch64` handling to architecture detection code
-4. **2.4 Build Config Updates** - Add ARM64 Maven profile, Dockerfile `--platform` annotations (preserve current base images)
-5. **2.5 JVM Optimizations** - Apply version-gated Graviton JVM flags, validate with `java <flags> -version`
+4. **2.4 Build Config Updates** - Dockerfile `--platform` annotations (preserve current base images); no Maven profile activated by the host's architecture
+5. **2.5 JVM Recommendations** - Document version-gated Graviton JVM flags for the team to evaluate; do not apply them
 
 ### Phase 3: ARM64 Validation & Testing
 
@@ -111,11 +121,13 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 1. **3.0 Build Environment Prep** - Java runtime alignment for annotation processor compatibility (session-scoped only)
 2. **3.1 Build Validation** - Full build, classify failures as INFRA/ARM64/PRE-EXISTING
-3. **3.2 Functional Testing** - Execute test suite, classify failures, determine final build
-4. **3.3 Startup Validation** - Verify application starts, JVM flags accepted, no crashes
+3. **3.2 Functional Testing** - Execute test suite, classify failures, check results that can differ by architecture, determine final build
+4. **3.3 Startup Validation** - Verify application starts with its existing JVM options, no crashes
 5. **Write 00-summary.md** - Consolidate exit criteria using template from documentation-standards.md
 
 ## Exit Criteria
+
+A criterion that runs on ARM64 passes only on a Graviton host or the target, such as the arm64 Lambda function; one that ran only under emulation or on another arm64 machine is NOT RUN (Phase 3, "Match the production hosts").
 
 ### Must Pass
 1. Application compiles on ARM64 without errors
@@ -131,16 +143,14 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 ### Startup Criteria
 9. Application starts on ARM64 without crashes
-10. JVM flags accepted without errors
+10. The project's existing JVM options accepted on ARM64 without errors
 
 ### Documentation Criteria
 11. All files in `graviton-validation/` using canonical names from documentation-standards.md
 
 ## Test Failure Handling
 
-Infrastructure failures (missing DB, Docker, env vars) are non-blocking. Classify and document them, then run the final build without tests:
-- Gradle: `./gradlew clean build -x test`
-- Maven: `mvn clean install -DskipTests`
+Infrastructure failures (a missing database, Docker daemon, environment variable or credential, or one that fails the same way on the x86 baseline) are non-blocking: exclude only those tests with the build tool's own filter, list them under CHECK Items, and take that run as the final build (Phase 3.1, Build Strategy step 3). A build that skips every test is never the final build.
 
 ARM64 failures are blocking. Do not skip tests; the failing build is the final build.
 
@@ -148,7 +158,7 @@ ARM64 failures are blocking. Do not skip tests; the failing build is the final b
 
 - Performance benchmarking and load testing
 - Integration testing with external services
-- CI/CD pipeline configuration for ARM64 builds (if `skill-config.md` defines `ci.system`, phrase this recommendation in that system's vocabulary; the skill makes no CI changes itself)
+- CI/CD changes beyond architecture (credentials, deployment steps, triggers, tool versions), recommended in the vocabulary of `ci.system` when `skill-config.md` defines it; changes that only add or switch an architecture are applied in Phase 2.4 unless `ci.changes` is `recommend`
 
 ## Notes
 

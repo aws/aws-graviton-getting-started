@@ -55,9 +55,10 @@ in a language section the project does not use is simply ignored.
 |-------|---------|--------|------------------------------|
 | `container.base_image_registry` | Container (shared) | Where base images are pulled from | current base image, registry preserved (same distro/version) — phase2 §2.4 "Dockerfile updates" |
 | `container.runtime` | Container (shared) | Container CLI | auto-detected `CONTAINER_CMD` — phase3 "Container Runtime Detection" |
-| `deploy.arch_selector` / `deploy.nodepool_label` | Deployment (shared) | ARM64 node selection in manifests | generic `kubernetes.io/arch: arm64`, no nodepool label — phase2 §2.4 "Deployment manifests" |
+| `deploy.arch_selector` / `deploy.nodepool_label` | Deployment (shared) | ARM64 node selection in manifests | generic `kubernetes.io/arch` (`arm64` only with arm64 capacity), no nodepool label — phase2 §2.4 "Deployment manifests" |
 | `deploy.registry` / `deploy.ingress_convention` | Deployment (shared) | Manifest registry & ingress | existing registry/ingress left unchanged — phase2 §2.4 "Deployment manifests" |
 | `ci.system` | CI (shared) | CI vocabulary in the post-transformation note | generic CI/CD wording — SKILL.md "User Responsibility (Post-Transformation)" |
+| `ci.changes` | CI (shared) | Whether CI changes that only add or switch an architecture are applied or recommended | `apply`; phase2 §2.4 "CI pipelines" |
 | `jdk.preferred_distribution` / `jdk.discovery_glob` | Java | Build/validation JDK discovery | Corretto-named find glob — phase3 "Session-Scoped Java Switching" |
 | `jdk.version_select` | Java | How a JDK major is resolved | `/usr/libexec/java_home -v` (macOS) / find glob (Linux) |
 | `jdk.install_hint` | Java | Install command surfaced if no JDK is found | Corretto install block — phase3 "If no compatible version found" |
