@@ -2,6 +2,20 @@
 
 > The central check of this skill. For every NuGet package the application resolves, it asks one question: does the target runtime identifier (RID) get a native file that runs on Graviton? Read this before Phase 1.2 and Phase 1.3. The commands call the check program in [§11](#11-the-check-program): write it to a temporary file once per session with the block there. It needs Python 3.6 or later; `assets`, `probe` and `config` also need the .NET SDK.
 
+## Contents
+
+- 1. Managed Code, Native Code, and What Decides Each
+- 2. How the SDK Selects Native Files
+- 3. The Per-RID Check: Projects That Still Use packages.config
+- 4. Package Shapes That Defeat Name-Based Checks
+- 5. Finding the Lowest Version That Works
+- 6. Target OS: libc, glibc Version, Page Size
+- 7. Scanning Build and Publish Outputs
+- 8. Lock Files
+- 9. Private Feeds and Mirrors
+- 10. Traps
+- 11. The Check Program
+
 ## 1. Managed Code, Native Code, and What Decides Each
 
 - **Managed assemblies** (IL) built as `AnyCPU` run on Graviton unchanged; the runtime compiles them for arm64 when they load.
@@ -24,9 +38,9 @@
 
   Two consequences: a file in a generic `runtimes/linux/native/` folder is selected for every Linux RID, whatever its architecture; and a package without `linux-musl-arm64` files gives Alpine its glibc `linux-arm64` build.
 - "Starting with .NET 8, the default behavior of the .NET SDK and runtime is to only consider non-version-specific and non-distro-specific RIDs" ([RID catalog](https://learn.microsoft.com/en-us/dotnet/core/rid-catalog)), so assets under RIDs such as `debian-arm64` or `ubuntu.16.04-arm64` are ignored.
-- The SDK's warning for such assets, NETSDK1206, appeared only in builds without a RID. Executed on the fixture: 1 warning without a RID, none with `-r linux-x64` or `-r linux-arm64`.
+- The SDK's warning for such assets, NETSDK1206, appeared only in builds without a RID.
 - Folder names that are not RIDs are never selected, and NETSDK1206 does not mention them. Microsoft.ML.OnnxRuntime 1.10.0 keeps its aarch64 build in `runtimes/linux-aarch64/native/`; the warning named only its `osx.10.14-arm64` and `osx.10.14-x64` folders.
-- **A missing native file is not a build error.** Executed on the fixture: `dotnet publish -r linux-arm64` exited 0 although SkiaSharp, ONNX Runtime and System.Data.SQLite had no arm64 file and the output still held an x86-64 library; the application failed only at run time, with `DllNotFoundException`. Never accept a publish exit code as evidence.
+- **A missing native file is not a build error.** `dotnet publish -r linux-arm64` exits 0 when a package has no arm64 file, and the output can still hold an x86-64 library; the application fails only at run time, with `DllNotFoundException`. Never accept a publish exit code as evidence.
 
 ## 3. The Per-RID Check
 
@@ -64,7 +78,7 @@ What `assets` does:
   - `--page-size 65536` reports natives linked for a smaller page size than the target's, by the rule of the target's loader (§6);
   - `--tree FILE` also writes every resolved package, per project and target framework, with its reference chain (JSON).
 
-Executed on the fixture (`linux-x64` to `linux-arm64`, 3 seconds with a warm package cache; long lines shortened):
+Output on the Linux test solution (`linux-x64` to `linux-arm64`; long lines shortened):
 
 ```
 restore Fixture.sln for linux-x64;linux-arm64 (scratch copy)
@@ -84,7 +98,7 @@ OK ELF files outside runtimes/ in runtime.linux-arm64.Microsoft.DotNet.ILCompile
 packages: 40; with native files for these RIDs: 5; natives for other platforms only: 1; managed only: 34; findings: 4; checks: 1
 ```
 
-The `via` line gives one chain. In a restored repository, `dotnet nuget why <project> <package>` prints every path, and works on SDK 8.0.425 and 10.0.401. For the fixture it printed `Fixture.Core` → `Microsoft.Data.Sqlite (v8.0.31)` → `SQLitePCLRaw.bundle_e_sqlite3 (v2.1.12)` → `SQLitePCLRaw.lib.e_sqlite3 (v2.1.12)`. `dotnet list <project> package --include-transitive --format json` lists every resolved package; the fixture's tool resolved 17 transitive packages.
+The `via` line gives one chain. In a restored repository, `dotnet nuget why <project> <package>` prints every path, and works on SDK 8.0.425 and 10.0.401. `dotnet list <project> package --include-transitive --format json` lists every resolved package.
 
 ### Projects That Still Use packages.config
 
@@ -97,7 +111,7 @@ python3 "$GV_CHECK" config path/to/packages.config > graviton-validation/raw/nat
 cat graviton-validation/raw/native-assets-packages-config.txt; echo "exit status $rc"
 ```
 
-Executed on the .NET Framework fixture: `assets` printed `CHECK Orders.Web/packages.config: these packages are not restored by PackageReference and are not in this report; run: config Orders.Web/packages.config`, and `config` found 5 entries and 1 finding (`no linux-arm64 native: Stub.System.Data.SQLite.Core.NetStandard/1.0.118`, `via probe > System.Data.SQLite.Core 1.0.118 > Stub.System.Data.SQLite.Core.NetStandard 1.0.118`). The full check runs again with `assets` after the project moves to modern .NET.
+The full check runs again with `assets` after the project moves to modern .NET.
 
 ## 4. Package Shapes That Defeat Name-Based Checks
 
@@ -125,11 +139,11 @@ curl -fsSL https://api.nuget.org/v3-flatcontainer/skiasharp.nativeassets.linux/i
   | python3 -c 'import json,sys; print(" ".join(v for v in json.load(sys.stdin)["versions"] if "-" not in v))'
 ```
 
-Probe the candidates upward from the version in use and stop at the first that reports no findings. The minimal fix is that version, not the latest one. Executed:
+Probe the candidates upward from the version in use and stop at the first that reports no findings. The minimal fix is that version, not the latest one. For example:
 - Confluent.Kafka 1.5.3 resolves librdkafka.redist 1.5.3, which has no linux-arm64 file. The next stable release, 1.6.1, resolves librdkafka.redist 1.6.1: OK, and it needs GLIBC_2.25.
 - LibGit2Sharp 0.26.2 resolves LibGit2Sharp.NativeBinaries 2.0.306 (finding); 0.27.0 resolves 2.0.319 (OK).
 
-Floors found by reading every stable release on nuget.org at the time of writing:
+Floors found by reading every stable release on nuget.org:
 
 | Package | First linux-arm64 | First linux-musl-arm64 | Notes |
 |---|---|---|---|
@@ -154,11 +168,11 @@ Floors are not always monotonic. The arm64 glibc build of SQLitePCLRaw.lib.e_sql
 
 Microsoft.Data.Sqlite 8.0.31 brings in 2.1.12, which needs a newer glibc than Amazon Linux 2 has (§6).
 
-No linux-arm64 build in any stable release, so a substitute is a user decision:
-- System.Data.SQLite.Core and Stub.System.Data.SQLite.Core.NetStandard (up to 1.0.119);
+No linux-arm64 build in any stable release, so a substitute is a user decision; the Recommendation is the first substitute named here, and for a package with none named, change nothing and list it:
+- System.Data.SQLite.Core and Stub.System.Data.SQLite.Core.NetStandard (up to 1.0.119; use Microsoft.Data.Sqlite);
 - Microsoft.ML.Mkl.Redist (up to 5.0.0);
-- Magick.NET-Q16-x64 (up to 14.17.2; use Magick.NET-Q16-AnyCPU or Magick.NET-Q16-arm64);
-- NetVips.Native.linux-x64 (use NetVips.Native or NetVips.Native.linux-arm64);
+- Magick.NET-Q16-x64 (up to 14.17.2; use Magick.NET-Q16-AnyCPU, or Magick.NET-Q16-arm64 for arm64 only);
+- NetVips.Native.linux-x64 (use NetVips.Native, or NetVips.Native.linux-arm64 for arm64 only);
 - Selenium.WebDriver.ChromeDriver (up to 154.0.8037.9200).
 
 ## 6. Target OS: libc, glibc Version, Page Size
@@ -169,6 +183,7 @@ No linux-arm64 build in any stable release, so a substitute is a user decision:
   ```bash
   IMG=mcr.microsoft.com/dotnet/aspnet:8.0
   command -v timeout > /dev/null 2>&1 || timeout() { shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit
+  # timeout 150 per try covers the image pull and one emulated start of its C library
   for e in /lib/aarch64-linux-gnu/libc.so.6 /usr/lib/aarch64-linux-gnu/libc.so.6 /lib64/libc.so.6 /usr/lib64/libc.so.6 /lib/ld-musl-aarch64.so.1; do
     out=$(timeout 150 docker run --rm --platform linux/arm64 --entrypoint "$e" "$IMG" 2>&1 | grep -m1 -E 'release version|^Version')
     [ -n "$out" ] && { echo "$IMG: $e: $out"; break; }
@@ -176,28 +191,18 @@ No linux-arm64 build in any stable release, so a substitute is a user decision:
   [ -n "$out" ] || echo "$IMG: no libc version printed (on an x86 host, check that arm64 images run: Phase 3, Container Runtime Detection)"
   ```
 
-  Executed on arm64 images (tags as published at the time of writing):
-
-  | Image | OS | libc |
-  |---|---|---|
-  | `mcr.microsoft.com/dotnet/aspnet:8.0` | Debian 12 | glibc 2.36 |
-  | `mcr.microsoft.com/dotnet/aspnet:10.0` | Ubuntu 24.04 | glibc 2.39 |
-  | `mcr.microsoft.com/dotnet/aspnet:8.0-alpine`, `:10.0-alpine` | Alpine 3.24 | musl 1.2.6 |
-  | `mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled` | Ubuntu 24.04, no shell | glibc 2.39 |
-  | `mcr.microsoft.com/dotnet/aspnet:8.0-azurelinux3.0` | Azure Linux 3.0 | glibc 2.38 |
-  | `public.ecr.aws/lambda/dotnet:8`, `:10` | Amazon Linux 2023 | glibc 2.34 |
-  | `public.ecr.aws/amazonlinux/amazonlinux:2023` | Amazon Linux 2023 | glibc 2.34 |
-  | `public.ecr.aws/amazonlinux/amazonlinux:2` | Amazon Linux 2 | glibc 2.26 |
+  The block prints the C library and version of each image it is given; a tag can move to a newer OS release, so read the image the project deploys.
 
   For EC2 hosts, run `ldd --version | head -n 1` (glibc) or check for `/lib/ld-musl-aarch64.so.1` on the instance.
 - **Android builds.** A file built for Android's C library (bionic) needs a bare `libc.so`, as a musl build does, and carries an ELF note owned by `Android`. The check reports it for every Linux RID instead of reading it as musl. Packages keep such files under `runtimes/android-*` (SQLitePCLRaw.lib.e_sqlite3 3.53.3 has `runtimes/android-arm64/native/libe_sqlite3.so`), which `assets` and `scan` skip for Linux RIDs; the rule matters when such a file is committed to the repository or copied into an image by hand.
-- **Natives can need more than .NET does.** SQLitePCLRaw.lib.e_sqlite3 2.1.12 needs GLIBC_2.34, Magick.NET-Q16-arm64 14.17.2 needs GLIBC_2.29, and SkiaSharp.NativeAssets.Linux 3.119.0 needs GLIBC_2.27. Pass the target's version with `--glibc`. Executed on the fixed fixture with `--glibc 2.26`: `needs GLIBC_2.34 (target glibc 2.26)` for libe_sqlite3.so. On AlmaLinux 8 (glibc 2.28, Graviton2), `assets` and `scan` with `--glibc 2.28` (run with the system Python 3.6.8) reported the same file, and the fixed tool then failed both SQLite checks with `TypeInitializationException: The type initializer for 'Microsoft.Data.Sqlite.SqliteConnection' threw an exception.`; the innermost exception was `DllNotFoundException: Unable to load shared library 'e_sqlite3'`, and `ldd` named the cause: ``/lib64/libc.so.6: version `GLIBC_2.33' not found``.
+- **Natives can need more than .NET does.** SQLitePCLRaw.lib.e_sqlite3 2.1.12 needs GLIBC_2.34, Magick.NET-Q16-arm64 14.17.2 needs GLIBC_2.29, and SkiaSharp.NativeAssets.Linux 3.119.0 needs GLIBC_2.27. Pass the target's version with `--glibc`: on AlmaLinux 8 (glibc 2.28, Graviton2) the check reported libe_sqlite3.so (`needs GLIBC_2.34 (target glibc 2.28)`), and the application failed with `TypeInitializationException: The type initializer for 'Microsoft.Data.Sqlite.SqliteConnection' threw an exception.`, whose innermost exception was `DllNotFoundException: Unable to load shared library 'e_sqlite3'`; `ldd` named the cause: ``/lib64/libc.so.6: version `GLIBC_2.33' not found``.
 - **The target's libstdc++.** A native that needs `libstdc++.so.6` needs its `GLIBCXX_` versions too (the `OK` lines show the highest). Pass the highest version the target image's libstdc++ defines with `--glibcxx`. This block reads it without emulation, from a container that is created but never started, so it also works on images without a shell:
 
   ```bash
   IMG=mcr.microsoft.com/dotnet/aspnet:8.0
   command -v timeout > /dev/null 2>&1 || timeout() { shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit
   # The container is created, never started: no emulation is needed, and images without a shell work too
+  # (timeout 300 bounds the image pull that docker create does)
   cid=$(timeout 300 docker create --platform linux/arm64 "$IMG" none) || cid=
   d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-libstdcxx.XXXXXX")
   for f in /usr/lib/aarch64-linux-gnu/libstdc++.so.6 /lib/aarch64-linux-gnu/libstdc++.so.6 /usr/lib64/libstdc++.so.6 /usr/lib/libstdc++.so.6; do
@@ -213,7 +218,7 @@ No linux-arm64 build in any stable release, so a substitute is a user decision:
   rm -rf "$d"
   ```
 
-  Executed on arm64 images, in bash and zsh (each value equals the highest version definition that `readelf -V` reads from the same file):
+Values read from arm64 images:
 
   | Image | libstdc++ |
   |---|---|
@@ -224,8 +229,8 @@ No linux-arm64 build in any stable release, so a substitute is a user decision:
   | `public.ecr.aws/amazonlinux/amazonlinux:2` | GLIBCXX_3.4.24 |
   | `mcr.microsoft.com/dotnet/aspnet:8.0-alpine`, `:10.0-alpine` | defines no `GLIBCXX_` versions |
 
-  musl's loader does not check the versions a file needs, so `--glibcxx` applies to glibc RIDs only. The linux-arm64 natives in the packages this skill was tested with need at most GLIBCXX_3.4.22 (`libhostpolicy.so` of the .NET 10.0.12 runtime pack), below every image above. Executed with an aarch64 library that needs GLIBCXX_3.4.31: `scan --glibc 2.41 --glibcxx 3.4.24` reported `needs GLIBCXX_3.4.31 (target libstdc++ provides up to GLIBCXX_3.4.24)`, and `--glibcxx 3.4.33` gave `findings: 0`.
-- **Page size.** On kernels with 64KB pages, glibc 2.34 and earlier refuse a library whose LOAD segments are aligned to less than the page size (`ELF load command alignment not page-aligned`); glibc 2.35 and later refuse one whose segment addresses and file offsets differ by other than a multiple of the page size (`ELF load command address/offset not page-aligned`), which a library linked for 4KB pages usually does. The default aarch64 kernels of AlmaLinux 8 and Rocky Linux 8 use 64KB pages (AlmaLinux 8.10 on Graviton2 reported 65536); their 9 and 10 releases default to 4KB. Pass `--page-size 65536` for such targets, and the check applies the target loader's rule. With `--glibc` 2.34 or earlier it compares each LOAD alignment with the page size; with 2.35 or later it checks that each segment's `p_vaddr - p_offset` is a multiple of the page size, and the file's line shows that value's alignment (`vaddr-offset align`) when it is below `0x10000`; without `--glibc` it applies both rules. musl's loader checks neither value: it maps each segment from its file offset rounded down to the page size at its address rounded down to the page size ([`ldso/dynlink.c`](https://git.musl-libc.org/cgit/musl/tree/ldso/dynlink.c)), which places the segment correctly only when the two differ by a multiple of the page size, so for musl RIDs the check applies the second rule. Both 4KB-linked libraries tested break both rules. Every arm64 native resolved by the fixed fixture is aligned to `0x10000`. Executed on AlmaLinux 8.10 (Graviton2, 65536-byte pages, glibc 2.28): an aarch64 build of the fixture's library linked with `-Wl,-z,max-page-size=4096` failed with `DllNotFoundException` and `ELF load command alignment not page-aligned`, while the same file loaded on Graviton4 (4096-byte pages). For that file, `scan --glibc 2.28 --page-size 65536` reports `LOAD alignment 0x1000 is below the target page size 0x10000`, and `scan --target-rid linux-musl-arm64 --page-size 65536` reports `LOAD vaddr-offset alignment 0x1000 is below the target page size 0x10000`.
+  musl's loader does not check the versions a file needs, so `--glibcxx` applies to glibc RIDs only. A file that needs more than the target provides is reported as `needs GLIBCXX_3.4.31 (target libstdc++ provides up to GLIBCXX_3.4.24)`.
+- **Page size.** On kernels with 64KB pages, glibc 2.34 and earlier refuse a library whose LOAD segments are aligned to less than the page size (`ELF load command alignment not page-aligned`); glibc 2.35 and later refuse one whose segment addresses and file offsets differ by other than a multiple of the page size (`ELF load command address/offset not page-aligned`), which a library linked for 4KB pages usually does. The default aarch64 kernels of AlmaLinux 8 and Rocky Linux 8 use 64KB pages (AlmaLinux 8.10 on Graviton2 reported 65536); their 9 and 10 releases default to 4KB. Pass `--page-size 65536` for such targets, and the check applies the target loader's rule. With `--glibc` 2.34 or earlier it compares each LOAD alignment with the page size; with 2.35 or later it checks that each segment's `p_vaddr - p_offset` is a multiple of the page size, and the file's line shows that value's alignment (`vaddr-offset align`) when it is below `0x10000`; without `--glibc` it applies both rules. musl's loader checks neither value: it maps each segment from its file offset rounded down to the page size at its address rounded down to the page size ([`ldso/dynlink.c`](https://git.musl-libc.org/cgit/musl/tree/ldso/dynlink.c)), which places the segment correctly only when the two differ by a multiple of the page size, so for musl RIDs the check applies the second rule. On AlmaLinux 8.10 (Graviton2, glibc 2.28), a library linked with `-Wl,-z,max-page-size=4096` failed to load with `DllNotFoundException` and `ELF load command alignment not page-aligned`; for that file, `scan --glibc 2.28 --page-size 65536` reports `LOAD alignment 0x1000 is below the target page size 0x10000`, and `scan --target-rid linux-musl-arm64 --page-size 65536` reports `LOAD vaddr-offset alignment 0x1000 is below the target page size 0x10000`.
 
 ## 7. Scanning Build and Publish Outputs
 
@@ -251,14 +256,9 @@ What `scan` reports:
 
 With more than one `--target-rid`, every check runs once per RID under a `== target <rid>` line, and `findings:` counts the findings of all of them: a glibc aarch64 library scanned with `--target-rid linux-arm64 --target-rid linux-musl-arm64`, in either order, gives one finding (`is a glibc build (target uses musl)`) and exit 1.
 
-A scan cannot see files that are missing. The fixture published with `-r linux-arm64` produced one finding, the vendored `native/x64/libfastsum.so`; the same output had no SkiaSharp, ONNX Runtime or SQLite.Interop library at all, and only the per-RID check (§3) reports those.
+A scan cannot see files that are missing. A package with no native file for linux-arm64 adds none to a linux-arm64 publish: the scan has nothing to report, and only the per-RID check (§3) finds it.
 
-Executed on other outputs of the fixture:
-- **Built without a RID: 6 findings.** They were:
-  - the apphost `Fixture.Tool`, built for the build machine (x86-64); start such output with `dotnet <app>.dll` or publish with `-r linux-arm64`;
-  - `Fixture.Legacy.dll is managed x64`;
-  - three `.deps.json` entries (ONNX Runtime 1.10.0, SkiaSharp 1.68.3, System.Data.SQLite);
-  - `libfastsum.so`.
+A build without a RID gives an apphost for the build machine (x86-64 on an x86 host): start such output with `dotnet <app>.dll`, or publish with `-r linux-arm64`.
 
   The 75 files under `runtimes/` for other RIDs were ignored.
 - **Published for linux-x64: 11 findings,** one for each x86-64 native and each x64 assembly.
@@ -266,7 +266,7 @@ Executed on other outputs of the fixture:
 
 ## 8. Lock Files
 
-A `packages.lock.json` records the RIDs it was resolved for, as `dependencies` keys such as `net8.0/linux-x64`. Executed on a scratch clone of the fixture, which tracks 9 lock files:
+A `packages.lock.json` records the RIDs it was resolved for, as `dependencies` keys such as `net8.0/linux-x64`. On a clone of the Linux test solution, which tracks 9 lock files:
 
 1. `dotnet restore --locked-mode` as committed: exit 0.
 2. With `linux-arm64` added to `<RuntimeIdentifiers>` in `Directory.Build.props`, `dotnet restore --locked-mode` failed: `error NU1004: The project's runtime identifiers have changed from. Project's runtime identifiers: linux-arm64;linux-x64, lock file's runtime identifiers linux-x64.`
