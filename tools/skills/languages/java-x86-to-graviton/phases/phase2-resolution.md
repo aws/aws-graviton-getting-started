@@ -1,6 +1,14 @@
 # Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility.
+Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility. Findings that need a user decision are listed with their options and a recommendation under User Decisions Pending (`03-dependency-compatibility-report.md`) and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes, or whose options all lie outside the skill (such as the OS or the base image), stays unchanged and listed.
+
+## Contents
+
+- 2.1 Native Library Resolution
+- 2.2 Dependency Compatibility Updates
+- 2.3 Architecture Detection Code Updates
+- 2.4 Build Configuration Updates
+- 2.5 Graviton-Specific JVM Recommendations
 
 ## 2.1 Native Library Resolution
 
@@ -46,7 +54,7 @@ try {
 
 > **Output: update `graviton-validation/03-dependency-compatibility-report.md`**
 
-Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was confirmed to lack the `linux/aarch64` binary — see the verification note in Phase 1.3). Do NOT upgrade compatible dependencies. Prefer the *lowest* version that includes the ARM64 binary, not the latest, to stay minimal — and **confirm that candidate's JAR actually contains the aarch64 binary** (`unzip -l | grep aarch64`) rather than trusting a remembered version number; the exact floor varies by library and some intermediate versions are unpublished.
+Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was confirmed to lack the `linux/aarch64` binary; see the verification note in Phase 1.3). Do NOT upgrade compatible dependencies. Prefer the *lowest* version whose ARM64 binary works on the target, not the latest, to stay minimal: **confirm that candidate's JAR actually contains the aarch64 binary** (`scan_archive` from Phase 1.2.1 shows an `ARM aarch64` line) rather than trusting a remembered version number, and that the libraries the binary needs (`readelf -d` lists them) are in the target image (`netty-tcnative`'s `linux-aarch_64-fedora` builds need libraries the Amazon Linux 2023 images do not include (`libssl.so.1.1` up to at least 2.0.66, `libapr-1.so.0` in 2.0.84), while `netty-tcnative-boringssl-static` needs only glibc's libraries); the exact floor varies by library and some intermediate versions are unpublished.
 
 **Direct dependencies (Maven):** e.g. snappy-java confirmed lacking `Linux/aarch64/libsnappyjava.so`:
 ```xml
@@ -98,6 +106,8 @@ configurations.all {
 }
 ```
 
+After the updates, copy the dependencies again and re-run the Phase 1.2.1 scan; a MUST UPGRADE item still without an `ARM aarch64` build that suits the target comes back to this step, or goes under User Decisions Pending when no version has one.
+
 ## 2.3 Architecture Detection Code Updates
 
 > **Output: update `graviton-validation/04-code-scan-findings.md`** (Changes Applied)
@@ -122,26 +132,15 @@ if ("aarch64".equals(arch)) {
 
 ## 2.4 Build Configuration Updates
 
-**Maven ARM64 profile:**
-```xml
-<profiles>
-    <profile>
-        <id>arm64</id>
-        <activation>
-            <os><arch>aarch64</arch></os>
-        </activation>
-        <properties>
-            <native.arch>aarch64</native.arch>
-        </properties>
-    </profile>
-</profiles>
-```
+> **Output: update `graviton-validation/04-code-scan-findings.md`** (Changes Applied)
+
+**No Maven profile for ARM64.** A profile activated by `<os><arch>` matches the JVM that runs Maven, not the target, so an x86 build host never activates it for an arm64 image. Pass a setting the target needs explicitly (`-P<id>` or `-D<property>`); otherwise add none.
 
 **Dockerfile updates (containerized deployments only):**
 
-PRESERVE the current base image distribution and version. Do NOT change JDK distribution or version.
+PRESERVE the current base image distribution and version. Do NOT change JDK distribution or version. One tag change is in scope: a tag or repository that names one architecture (`public.ecr.aws/lambda/java:21-x86_64`, `amd64/eclipse-temurin:21-jre`) becomes the same image's multi-architecture tag (`public.ecr.aws/lambda/java:21`, `eclipse-temurin:21-jre`); the distribution and version stay. An image with no arm64 build at its tag (Phase 1.4) moves to the lowest tag of the same image that lists `linux/arm64` (`mysql:5.7` lists only amd64, `mysql:8.0` lists arm64 too): a user decision, which an unattended run applies and records with how to reverse it. A library that starts such an image moves to its lowest version whose image has an arm64 build (MUST UPGRADE; Testcontainers for Java 1.15.2).
 
-> **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `eclipse-temurin:17-jdk` → `<registry>/eclipse-temurin:17-jdk`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting** — like the `./mvnw` wrapper fallback, this is verify-then-apply: if the configured registry does not resolve/pull (e.g. an internal mirror unreachable from the build host, `no such host`), do NOT rewrite the `FROM` — an unconditional redirect turns a compatibility migration into a hard build failure. Keep the original registry (same distro/version) and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets** (host-based or library project), `container.base_image_registry` / `container.runtime` have nothing to apply to — record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md` rather than silently ignoring it. If Phase 3 later synthesizes an image purely for ARM64 validation, honor the configured registry there. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `eclipse-temurin:17-jdk` → `<registry>/eclipse-temurin:17-jdk`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting**: if the configured registry does not resolve or pull from the build host, do NOT rewrite the `FROM`; keep the original registry and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets**, record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md`. An image Phase 3 builds for ARM64 validation uses the configured registry. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
 Single-stage (the whole image is the deployable artifact — it must be built for the target arch):
 ```dockerfile
@@ -150,9 +149,11 @@ Single-stage (the whole image is the deployable artifact — it must be built fo
 FROM <current-base-image>:<current-version>
 ```
 
+A stage that runs GraalVM `native-image` builds an executable for the platform it runs on (`--target` defaults to the host's OS and architecture), so pin that stage to `$TARGETPLATFORM` and run it on an arm64 build host.
+
 Multi-stage — **Maven** (builder produces `target/*.jar`):
 ```dockerfile
-# Builder: $BUILDPLATFORM = run the build natively on the builder's arch (faster; Java bytecode is arch-neutral)
+# Builder: $BUILDPLATFORM = run the build natively on the builder's arch (faster; a JAR's bytecode is arch-neutral)
 FROM --platform=$BUILDPLATFORM <current-builder-image>:<current-version> AS builder
 WORKDIR /app
 COPY . .
@@ -184,11 +185,24 @@ Key rules:
 
 Host-based deployments skip Docker steps.
 
+**x86-only JVM options (§1.4):** remove each one where an ARM64 JVM reads it, or set it only on x86 (a start script can test `uname -m`). This is an ARM64-required change, not a tuning recommendation: a JVM that refuses the option does not start.
+
+**Lambda functions (only if the project already ships the template):** set `Architectures: [arm64]` on each function in the SAM or CloudFormation template (`Architecture.ARM_64` in a CDK app, `architectures = ["arm64"]` in Terraform; a function that names none runs on x86_64). Do not add a template the project does not have, and do not change the runtime. The JAR the function deploys must pass §1.2 for Linux aarch64 like any other build. [Lambda instruction set architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html) documents the `arm64` value.
+
 **Deployment manifests (only if the project already ships them):**
 
 If the project contains Kubernetes/Helm manifests (or similar deployment descriptors), ensure they can schedule onto ARM64 nodes. Only touch node selection, image registry, and ingress vocabulary — do NOT restructure manifests or add resources the project does not already have. If no manifests are present, skip this step.
 
-> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use a generic `kubernetes.io/arch: arm64` node selector and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use the generic `kubernetes.io/arch` label as the capacity rule below says, and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+
+Change a node selector, a node affinity or the `cpuArchitecture` of an ECS task on EC2 capacity to arm64 only together with arm64 capacity in the files the project ships (a node group, NodePool, capacity provider or instance type): a pod whose selector no node matches stays `Pending`. Without that capacity, allow both architectures (a node affinity on `kubernetes.io/arch` with `operator: In` and the values `amd64` and `arm64`) and ship a multi-architecture image, so the workload keeps its x86 nodes until arm64 nodes exist. An instance type in those files gets the same series (`m`, `c`, `r`, ...) and size in the newest Graviton generation the region offers, with `g` for the processor letter (`m6i` and `m5a` become `m*g`) and its other letters kept (`m5d`, with instance store volumes, becomes `m*gd`); when no Graviton type keeps them, change nothing and list it. It goes under User Decisions Pending because sizing is the team's call (an unattended run applies it). With AWS credentials, list the candidates for `m5.xlarge`:
+
+```bash
+aws ec2 describe-instance-type-offerings --region us-west-2 --location-type region \
+  --filters 'Name=instance-type,Values=m*g.xlarge' --query 'InstanceTypeOfferings[].InstanceType' --output text
+```
+
+**CI pipelines (only if the project already ships them):** apply the changes that only add or switch an architecture, and leave the rest of the pipeline as it is: add `linux/arm64` to the platforms an image build publishes (`docker buildx build --platform linux/amd64,linux/arm64`, or the `platforms` input of `docker/build-push-action`) with the two steps it needs on an x86 runner: QEMU (`docker/setup-qemu-action`; elsewhere `docker run --privileged --rm tonistiigi/binfmt --install all`; where no privileged container may run, use the arm64 job below), or an arm64 `RUN` step stops with `exec /bin/sh: exec format error`, and a builder for several platforms (`docker/setup-buildx-action`; elsewhere `docker buildx create --driver docker-container --use`), or an engine without the containerd image store, which Docker Engine 29.0 and later use by default only on a fresh installation, stops with `Multi-platform build is not supported for the docker driver`, or add an arm64 job beside the x86 one (a GitHub-hosted `ubuntu-24.04-arm` runner, a CodeBuild `ARM_CONTAINER` environment). Record each change in `04-code-scan-findings.md`. Anything else the pipeline needs (credentials, deployment steps, triggers, tool versions) is a recommendation in `00-summary.md`; with `ci.changes: recommend` in `skill-config.md`, the architecture changes are recommendations too.
 
 ## 2.5 Graviton-Specific JVM Recommendations
 
@@ -196,13 +210,14 @@ If the project contains Kubernetes/Helm manifests (or similar deployment descrip
 
 Do NOT apply JVM flags automatically. Graviton runs well with default JVM settings. Document recommendations in the report for the team to evaluate during performance testing.
 
-**JDK 21+:** Most Graviton optimizations are already enabled by default (AES-CTR intrinsics, improved tiered compilation). No flags to recommend unless performance testing shows a specific issue.
+**JDK 21+:** No flags to recommend unless performance testing shows a specific issue. AES and AES-CTR intrinsics need no flag on JDK 11 and later: on Graviton2 to Graviton5, `-XX:+UnlockDiagnosticVMOptions -XX:+PrintFlagsFinal` showed `UseAESIntrinsics` and `UseAESCTRIntrinsics` true by default on Corretto 11, 17 and 21; check an older JDK build the same way.
+
+**JDK 8:** has no AES-CTR option: `-XX:+UnlockDiagnosticVMOptions -XX:+UseAESCTRIntrinsics` stops it with `Unrecognized VM option 'UseAESCTRIntrinsics'`, and `UseAESIntrinsics` is on by default. Recommend a flag for JDK 8 only after `java <flag> -version` on the target JDK accepts it.
 
 **JDK 11-17:** Document the following as recommendations to try if performance testing shows a regression:
 
 | Flag | Workload type | Notes |
 |------|---------------|-------|
-| `-XX:+UnlockDiagnosticVMOptions -XX:+UseAESCTRIntrinsics` | Crypto-heavy (TLS termination, encryption) | Enabled by default in 21+ |
 | `-XX:-TieredCompilation` | Long-running services (not latency-sensitive startup) | Trades startup time for steady-state throughput |
 | `-XX:ReservedCodeCacheSize=64M` | Large apps with many classes | Only if code cache pressure observed |
 

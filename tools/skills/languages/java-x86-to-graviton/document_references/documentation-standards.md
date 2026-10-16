@@ -1,7 +1,14 @@
 # ARM64 Transformation — Documentation Standards
 
+## Contents
+
+- Purpose
+- Output Folder Structure
+- Agent Instructions
+- File Specifications: `00-summary.md`; `01-project-assessment.md`; `02-native-library-report.md`; `03-dependency-compatibility-report.md`; `04-code-scan-findings.md`; `05-jvm-configuration.md`; `06-build-test-results.md`; `raw/dependency-tree-full.txt`; `raw/dependency-tree-native.txt`
+
 ## Purpose
-This document defines the standard output folder structure, canonical filenames, and content requirements for all documentation produced during an ARM64 Graviton compatibility transformation. Adherence to this standard ensures consistency across transformation runs regardless of which agent executes the work.
+This document defines the standard output folder structure, canonical filenames, and content requirements for all documentation produced during an ARM64 Graviton compatibility transformation.
 
 ## Output Folder Structure
 
@@ -15,7 +22,7 @@ All transformation output documents MUST be written to a single folder named `gr
     ├── 02-native-library-report.md          # All .so / native library findings and resolutions
     ├── 03-dependency-compatibility-report.md # Per-dependency ARM64 compatibility verdicts
     ├── 04-code-scan-findings.md             # Architecture-specific code patterns detected
-    ├── 05-jvm-configuration.md              # Graviton-optimized JVM flags and profiles
+    ├── 05-jvm-configuration.md              # Graviton JVM flag recommendations (not applied)
     ├── 06-build-test-results.md             # Build validation, test results, failure classification
     └── raw/                                 # Machine-generated artifacts (not hand-authored)
         ├── dependency-tree-full.txt         # Full dependency tree output
@@ -31,6 +38,7 @@ All transformation output documents MUST be written to a single folder named `gr
 5. **`00-summary.md` is written last**, after all other files are complete. It references (not duplicates) the detail in files 01–06.
 6. **If a section has no findings**, include the section header with an explicit "No findings" statement. Do not omit empty sections — their absence is ambiguous.
 7. **Do not create documentation files outside `graviton-validation/`.** All transformation documentation lives in this single folder.
+8. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce, is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the recommended option, the smallest change the evidence supports (an unattended run applies it and says how to reverse it), and the rest under CHECK Items with the step that settles each.
 
 ---
 
@@ -65,14 +73,16 @@ All transformation output documents MUST be written to a single folder named `gr
 | 6 | Test suite executes on ARM64 | ✅ PASS / ❌ FAIL | |
 | 7 | No ARM64-related test failures | ✅ PASS / ❌ FAIL | |
 | 8 | Application starts on ARM64 | ✅ PASS / ❌ FAIL | |
-| 9 | JVM flags accepted without errors | ✅ PASS / ❌ FAIL | |
+| 9 | The project's existing JVM options accepted on ARM64 | ✅ PASS / ❌ FAIL | |
+
+A criterion that runs on ARM64 passes only on a Graviton host or the target (Phase 3, "Match the production hosts"); otherwise its status is NOT RUN, with where it did run in Notes.
 
 ## Changes Made
 <Brief summary of dependency updates, native library resolutions, code changes.
 Reference detail files: 02-native-library-report.md, 03-dependency-compatibility-report.md, 04-code-scan-findings.md>
 
 ## Remaining Concerns
-<Any unresolved issues, user-responsibility items, or known limitations>
+<Any unresolved issues, user decisions pending, CHECK items not settled, user-responsibility items, or known limitations>
 ```
 
 ---
@@ -157,6 +167,16 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 |------------|----------------|----------------------|-----------------|-------------|----------|
 | org.xerial.snappy:snappy-java | 1.1.1.7 | 1.1.2.2 | 1.1.2.2 | JAR has no Linux/aarch64/libsnappyjava.so | `unzip -l ... \| grep aarch64` empty; UnsatisfiedLinkError on aarch64 |
 
+## User Decisions Pending
+| Item | Current | Options | Recommendation | Applied |
+|---|---|---|---|---|
+| <dependency or file> | <version> | (a) <option, and the label it leads to>; (b) <option> | <the smallest change the evidence supports> | <no (the user chooses), or yes (unattended run) and how to reverse it> |
+
+## CHECK Items
+| Item | Via | Why it is not settled | Settled by | Result |
+|---|---|---|---|---|
+| <dependency or file> | <direct or the dependency that pulls it in> | <for example: a native library extracted or downloaded at run time> | <the Phase 3 step on ARM64> | <the label it got, or still CHECK with the reason> |
+
 ## RECOMMENDED UPGRADE (Non-Blocking)
 | Dependency | Current Version | Recommended Version | Reason | Action Taken |
 |------------|----------------|--------------------|---------|----|
@@ -178,7 +198,7 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 
 ### `04-code-scan-findings.md` — Architecture-Specific Code Detection
 
-**Created:** Phase 1.4, updated in Phase 2.3 (resolution)
+**Created:** Phase 1.4, updated in Phase 2.3 and 2.4 (resolution)
 **Purpose:** Records all source code locations with architecture-sensitive patterns and changes applied.
 
 **Required sections:**
@@ -195,6 +215,12 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 |------|---------|------|---------|-----------------|
 | src/.../Bridge.java | 23 | JNA Native.load() | libbridge.so | Yes — aarch64 binary present |
 
+## JVM Options and Deployment Settings
+| File | Line(s) | Setting | Action |
+|------|---------|---------|--------|
+| Dockerfile | 9 | `JAVA_TOOL_OPTIONS=-XX:UseAVX=2`: x86-only, an ARM64 JVM does not start | removed for arm64 (Phase 2.4) |
+| template.yaml | 14 | Lambda function with no `Architectures`, so it runs on x86_64 | `Architectures: [arm64]` (Phase 2.4) |
+
 ## Changes Applied
 <Summary of code changes made in Phase 2.3 to add ARM64 handling>
 
@@ -208,7 +234,7 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 ### `05-jvm-configuration.md` — Graviton JVM Optimization
 
 **Created:** Phase 2.5
-**Purpose:** Records the JVM flags applied, version-gated rationale, and validation results.
+**Purpose:** Records the JVM flag recommendations, their version-gated rationale, and the check that the target JVM accepts them. Nothing in this file is applied by the skill.
 
 **Required sections:**
 ```markdown
@@ -217,22 +243,21 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 ## Target Java Version
 <JDK version used for flag selection, e.g., JDK 17>
 
-## Applied JVM Flags
+## Recommended JVM Flags (Not Applied)
 | Flag | Applicable JDK Versions | Workload Type | Expected Impact |
 |------|------------------------|---------------|-----------------|
-| -XX:-TieredCompilation | 11, 17, 21+ | Moderate lock contention | Reduced compilation overhead |
+| -XX:-TieredCompilation | 11, 17 | Long-running services (not latency-sensitive startup) | Trades startup time for steady-state throughput |
 
-## Flags NOT Applied (Version-Gated)
-| Flag | Reason Not Applied |
-|------|--------------------|
-| -XX:CompilationMode=high-only | Removed in JDK 21+; project uses JDK 21 |
+## Flags Not Recommended (Version-Gated)
+| Flag | Reason Not Recommended |
+|------|------------------------|
+| -XX:+UnlockDiagnosticVMOptions -XX:+UseAESCTRIntrinsics | On by default on JDK 11 and later (`-XX:+UnlockDiagnosticVMOptions -XX:+PrintFlagsFinal` shows `UseAESCTRIntrinsics = true {diagnostic} {default}`); JDK 8 has no such option and stops with `Unrecognized VM option` |
 
 ## Flag Validation
-<Output of: java <flags> -version>
-<Confirm all flags accepted without errors>
+<Output of: java <recommended flags> -version on ARM64, to confirm the target JVM accepts them; nothing is written to the project>
 
 ## Configuration Profiles
-<If multiple profiles were created for different workload types, list them here>
+<If the recommendations differ by workload type, list each set here>
 ```
 
 ---
@@ -248,6 +273,7 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 
 ## Build Environment
 - **Architecture:** <output of `uname -m`, should be aarch64>
+- **Where:** Graviton host (<instance type>) | the target | linux/arm64 container on <host arch> (emulated: yes/no) | another arm64 machine (<which>); only a Graviton host or the target passes a check
 - **Java Runtime:** <output of `java -version`>
 - **Build Tool:** <Maven/Gradle version>
 - **Build Environment Notes:** <any Java runtime alignment applied per Phase 3.0>
@@ -277,7 +303,8 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 
 ## Startup Validation
 - **Application starts without errors:** ✅ Yes | ❌ No
-- **JVM flags accepted:** ✅ Yes | ❌ No
+- **Existing JVM options accepted on ARM64:** ✅ Yes | ❌ No
+- **Native libraries loaded (loaded check), ARM64 and the x86 baseline:** <both lists, or "the same">
 - **Runtime crashes:** None | <description>
 ```
 
@@ -294,31 +321,3 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 
 **Created:** Phase 1.3 step 1
 **Purpose:** Filtered dependency tree showing only known native-code artifacts. Kept for traceability; not hand-edited.
-
----
-
-## Mapping: Transformation Steps → Output Files
-
-| # | Transformation Step | What Is Produced | Output File |
-|---|---|---|---|
-| 1 | 1.1 step 1 — Deployment type | Containerized vs host-based | `01-project-assessment.md` |
-| 2 | 1.1 step 2 — Dependency tree generation | Raw tree output | `raw/dependency-tree-full.txt` |
-| 3 | 1.1 step 4 — Component risk categorization | CRITICAL/HIGH/MEDIUM/LOW table | `01-project-assessment.md` |
-| 4 | 1.2.1 — Statically bundled .so scan | Architecture per .so file | `02-native-library-report.md` |
-| 5 | 1.2.2 — Runtime-extracted native detection | Libraries extracting native code | `02-native-library-report.md` |
-| 6 | 1.2.3 — Tiered validation verdicts | FAIL/WARN/PASS per library | `02-native-library-report.md` |
-| 7 | 1.2.3 step 3 — Recompilation requirements | Resolution notes | `02-native-library-report.md` |
-| 8 | 1.3 step 1 — Filtered transitive tree | Native-artifact-only tree | `raw/dependency-tree-native.txt` |
-| 9 | 1.3 step 3 — Compatibility report | MUST UPGRADE / RECOMMENDED / COMPATIBLE | `03-dependency-compatibility-report.md` |
-| 10 | 1.3 step 4 — Per-dependency findings | Detailed blocks per dependency | `03-dependency-compatibility-report.md` |
-| 11 | 1.4 — Code scan | Architecture patterns, JNI/JNA usage | `04-code-scan-findings.md` |
-| 12 | 1.5 — Java version & distribution | Version and distro record | `01-project-assessment.md` |
-| 13 | 2.1 — Native library resolution | Resolution per .so, fallback decisions | `02-native-library-report.md` |
-| 14 | 2.5 step 2 — JVM flag documentation | Flags, rationale, impact | `05-jvm-configuration.md` |
-| 15 | 2.5 step 3 — Config profiles | Workload-specific flag sets | `05-jvm-configuration.md` |
-| 16 | 3.0 — Annotation processor notes | Processor/version requiring alignment | `06-build-test-results.md` |
-| 17 | 3.0 — Blocker: no compatible JDK | Requirement documentation | `06-build-test-results.md` |
-| 18 | 3.1 — Build test classification | INFRA/ARM64/PRE-EXISTING per failure | `06-build-test-results.md` |
-| 19 | 3.2 — Functional test results | All test results, classification | `06-build-test-results.md` |
-| 20 | 3.3 — Startup validation | Start/flags/crash checks | `06-build-test-results.md` |
-| 21 | Exit — Summary | Roll-up of all findings and exit criteria | `00-summary.md` |
