@@ -16,7 +16,7 @@ Validate a Python application's readiness to run on AWS Graviton instances. This
 
 **CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
-**In scope:** aarch64 wheel availability for every pinned dependency (direct and transitive), ARM64-blocking dependency updates and lock regeneration, native extensions and vendored binaries, architecture detection code, x86-only build flags and Dockerfile platform settings, Graviton runtime recommendations (documented, never applied), ARM64 install/build/test validation.
+**In scope:** aarch64 wheel availability for every pinned dependency (direct and transitive), ARM64-blocking dependency updates and lock regeneration, native extensions and vendored binaries, architecture detection code, x86-only build flags and Dockerfile platform settings, Graviton runtime recommendations (documented, never applied), CI changes that only add or switch an architecture, ARM64 install/build/test validation.
 
 **Out of scope:** Python version changes (unless `python.interpreter_bump` allows a bump that is the only path to an aarch64 wheel), package manager switches, base image changes, general dependency modernization, security updates, code refactoring, .gitignore/.dockerignore changes.
 
@@ -24,7 +24,7 @@ Validate a Python application's readiness to run on AWS Graviton instances. This
 
 ## Skill Configuration (Optional)
 
-If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (package manager, package index, validation interpreter tool, test command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the project's declared Python version stays unchanged unless `python.interpreter_bump` allows a bump (a configured interpreter tool selects only the build/validation environment per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md). Record any applied overrides in `01-project-assessment.md`.
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (package manager, package index, validation interpreter tool, test command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the project's declared Python version stays unchanged unless `python.interpreter_bump` allows a bump (a configured interpreter tool selects only the build/validation environment per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md) for the fields, and [document_references/skill-config.template.md](document_references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
 
 ## Entry Criteria
 
@@ -35,12 +35,34 @@ If a `skill-config.md` exists at the project root, read it before Phase 1 and ap
 5. ARM64 build/test environment access (Graviton EC2 or ARM64 containers; an x86 host with QEMU emulation can validate wheel installs, imports and tests, not source builds)
 6. Complete dependency list with current versions (a lock file or exact pins), and access to the package index the project installs from
 7. Existing test suite
+8. Tools the commands call: git, curl, `python3` with pip and the project's package manager, `file`, and a container runtime (Phase 3); the image check (Phase 1.4) uses the docker CLI
 
 ## Transformation Workflow
 
+Copy this checklist into your response and check off each step:
+
+```
+ARM64 migration progress:
+- [ ] Baseline commit; `graviton-validation/raw/` created; `skill-config.md` read if present
+- [ ] 1.1 Deployment type, package manager and interpreter, target OS and glibc, resolved pins (01, raw/)
+- [ ] 1.2 Native files judged by content (02)
+- [ ] 1.3 Each pin probed: MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE / CHECK (03)
+- [ ] 1.4 Architecture code, build flags, images, deployment settings (04)
+- [ ] 1.5 Python version recorded with its support status, not changed (01)
+- [ ] 2.1 Vendored binaries and extensions built for aarch64 (02)
+- [ ] 2.2 Only MUST UPGRADE pins updated, then the Phase 1 probe and scan re-run (03)
+- [ ] 2.3 Architecture detection code updated (04)
+- [ ] 2.4 Build flags, Dockerfiles and deployment settings updated (04)
+- [ ] 2.5 Runtime recommendations documented, not applied (05)
+- [ ] 3.0-3.1 ARM64 install and build; failures classified INFRA / ARM64 / PRE-EXISTING (06)
+- [ ] 3.2 Imports, the loaded check and tests on ARM64, results that change without failing (06)
+- [ ] 3.3 Startup on ARM64 (06)
+- [ ] 00-summary.md: each exit criterion with where it ran
+```
+
 ### Version Control Setup
 
-Initialize git if not already present. Commit after each meaningful step for traceability and rollback.
+Initialize git if not already present:
 
 ```bash
 # Initialize if no git repo exists (local only, no remote required)
@@ -51,19 +73,7 @@ if [ ! -d ".git" ]; then
 fi
 ```
 
-**Commit at each step that produces output or changes files.** Use `git add -A && git commit -m "<message>"` with descriptive messages. Typical commit points:
-
-1. After documentation setup (graviton-validation/ folder created)
-2. After Phase 1 static analysis complete (all analysis reports written)
-3. After native library resolution (Phase 2.1 - vendored binaries rebuilt, extension flags fixed)
-4. After dependency updates (Phase 2.2 - requirements, pyproject or environment files and locks changed)
-5. After architecture code updates (Phase 2.3 - Python source and scripts changed)
-6. After Dockerfile/build config updates (Phase 2.4)
-7. After runtime recommendations (Phase 2.5)
-8. After build validation (Phase 3.1 - install and build results documented)
-9. After final validation and summary (Phase 3.3 + 00-summary.md written)
-
-Not every project will have all steps (e.g., no Dockerfile changes for host-based deployments, no native library resolution if none found). Commit whenever files change, skip commits for steps that produced no changes. Virtual environments and wheel directories created for validation live outside the project tree (Phase 3.0), so `git add -A` never picks them up.
+**Commit after each checklist step that changes files** with `git add -A && git commit -m "<message>"`, the message naming the step; skip the commit when a step changed nothing. Virtual environments and wheel directories created for validation live outside the project tree (Phase 3.0), so `git add -A` never picks them up.
 
 ### Documentation Setup
 
@@ -95,8 +105,8 @@ Analyze the project without making changes. See [phases/phase1-static-analysis.m
 
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, package manager and interpreter detection, target OS/glibc, dependency tree generation, component risk categorization
 2. **1.2 Native Library Validation** - Scan every committed or vendored native file by its content (not its name) for the target's architecture, C library, glibc and libstdc++ versions and page size, layers and in-repo extensions, binaries downloaded at run, build or deploy time, apply tiered FAIL/WARN/PASS policy
-3. **1.3 Dependency ARM64 Compatibility** - Probe every resolved pin (including transitives) for an aarch64 wheel, check hash locks, classify as MUST UPGRADE / RECOMMENDED / COMPATIBLE
-4. **1.4 Architecture-Specific Code Detection** - Find `platform.machine()` checks, ctypes/cffi loads, x86-only build flags and intrinsics, shell architecture gates, amd64 Dockerfile pins
+3. **1.3 Dependency ARM64 Compatibility** - Probe every resolved pin (including transitives) for an aarch64 wheel, check hash locks, classify as MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE (CHECK until the evidence decides)
+4. **1.4 Architecture-Specific Code Detection** - Find `platform.machine()` checks, ctypes/cffi loads, x86-only build flags and intrinsics, shell architecture gates, amd64 Dockerfile pins, and deployment settings that pick x86, set or absent
 5. **1.5 Python Version Check** - Document version and live support status (do NOT change it unless `python.interpreter_bump` allows; a change is one decision for the whole dependency set)
 
 ### Phase 2: Compatibility Resolution
@@ -115,11 +125,13 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 1. **3.0 Build Environment Prep** - Python runtime alignment (same minor version, pip >= 20.3; session-scoped only)
 2. **3.1 Build Validation** - Install as the deployment does, build extensions, classify failures as INFRA/ARM64/PRE-EXISTING
-3. **3.2 Functional Testing** - Import smoke test, loaded check against the x86 baseline, execute test suite, classify failures, determine final build
+3. **3.2 Functional Testing** - Import smoke test, loaded check against the x86 baseline, execute test suite, classify failures, check results that can differ by architecture, determine final build
 4. **3.3 Startup Validation** - Verify application starts on aarch64, aarch64 binaries load, no import or glibc errors
 5. **Write 00-summary.md** - Consolidate exit criteria using template from documentation-standards.md
 
 ## Exit Criteria
+
+A criterion that runs on ARM64 passes only on a Graviton host or the target, such as the arm64 Lambda function; one that ran only under emulation or on another arm64 machine is NOT RUN (Phase 3, "Match the production hosts").
 
 ### Must Pass
 1. Dependencies install on ARM64 from wheels or documented source builds
@@ -142,11 +154,7 @@ Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validat
 
 ## Test Failure Handling
 
-Infrastructure failures (missing database, services, credentials, network or package-index access) are non-blocking. Classify and document them, then run the final build without tests (the Phase 3.1 install and build, without the test step):
-- pip, pip-tools, PEP 621: `python3 -m pip install --require-hashes -r requirements-locked.txt` (if the project has one), `python3 -m pip install -r requirements.txt`, then `python3 -m pip install .` for the project's own extensions
-- uv: `uv sync --frozen`
-- Poetry: `poetry sync`
-- conda: `conda env create -f environment.yml`
+Infrastructure failures (missing database, services, credentials, network or package-index access, or one that fails the same way on the x86 baseline) are non-blocking: deselect only those tests (for pytest, `--deselect <test id>`), list them under CHECK Items, and take that run as the final build (Phase 3.1, Build Strategy step 3). A build that skips every test is never the final build.
 
 ARM64 failures are blocking. Do not skip tests or packages; the failing build is the final build.
 
@@ -154,11 +162,11 @@ ARM64 failures are blocking. Do not skip tests or packages; the failing build is
 
 - Performance benchmarking and load testing
 - Integration testing with external services
-- CI/CD pipeline configuration for ARM64 builds (if `skill-config.md` defines `ci.system`, phrase this recommendation in that system's vocabulary; the skill makes no CI changes itself)
+- CI/CD changes beyond architecture (credentials, deployment steps, triggers, tool versions), recommended in the vocabulary of `ci.system` when `skill-config.md` defines it; changes that only add or switch an architecture are applied in Phase 2.4 unless `ci.changes` is `recommend`
 
 ## Notes
 
 - ARM64 execution environment required for full validation. On x86 without a container runtime, static analysis only; under QEMU emulation, validate wheel installs, imports and tests, but build from source only on ARM64 hardware (see Phase 3 "Emulation limits").
 - Monorepos with several Python packages require analysis of every package and its full resolved dependency set
 - Run the bash blocks with bash 3.2 or later (the Phase 1.3 probe loop gave the same verdicts in bash 3.2.57, bash 5 and zsh 5.9). On macOS, where zsh is the default shell ([Apple](https://support.apple.com/en-us/102360)), start them with `bash`; on Windows, run the skill in a WSL 2 distribution, which runs a Linux kernel ([Microsoft](https://learn.microsoft.com/en-us/windows/wsl/compare-versions)), with the project in the Linux file system
-- Every Graviton vCPU maps to a physical core (no SMT), so performance scales more linearly with CPU load than on x86; load test to the maximum sustainable load before comparing instance types ([transition guide](https://github.com/aws/aws-graviton-getting-started/blob/main/transition-guide.md))
+- Every Graviton vCPU maps to a physical core (no SMT, [AWS Graviton performance testing](https://docs.aws.amazon.com/whitepapers/latest/aws-graviton-performance-testing/other-considerations.html)), so performance scales more linearly with CPU load than on x86; load test to the maximum sustainable load before comparing instance types

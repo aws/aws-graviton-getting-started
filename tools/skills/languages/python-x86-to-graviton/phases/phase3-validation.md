@@ -2,9 +2,18 @@
 
 Install, build and test on ARM64 architecture. Supported platforms: Linux, macOS, WSL.
 
+## Contents
+
+- Container Runtime Detection
+- 3.0 Build Environment Preparation: Python Runtime Alignment; Detect Project Target Version; Session-Scoped Python Switching
+- 3.1 ARM64 Build Validation: Build Strategy; Container Validation; Host-Based Validation
+- 3.2 Functional Testing on ARM64: Results That Change Without Failing
+- 3.3 Startup Validation
+- Write Summary
+
 ## Container Runtime Detection
 
-Before skipping validation, check for a container runtime that can run `linux/arm64` images. Apple Silicon Macs and Graviton hosts run them natively; x86 Linux hosts run them through QEMU emulation.
+Before skipping validation, check for a container runtime that can run `linux/arm64` images. Graviton hosts run them natively, x86 Linux hosts through QEMU emulation, and an Apple Silicon Mac in a Linux VM on Apple's own cores. Only a run on Graviton passes a check ("Match the production hosts" below).
 
 > **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
 
@@ -18,9 +27,10 @@ try: sys.exit(subprocess.run(sys.argv[2:], timeout=float(sys.argv[1])).returncod
 except subprocess.TimeoutExpired: sys.exit(124)' "$@"
   fi
 }
+typeset -f host_timeout > "${TMPDIR:-/tmp}/graviton-python-host_timeout.sh"   # later blocks, perhaps in a new shell, load it from here
 
 # Detect a WORKING container runtime. Being on PATH is not enough: a runtime can be installed
-# but unusable (no daemon, no VM, missing permissions), so ask each one for `info`.
+# but unusable (no daemon, no VM, missing permissions), so ask each one for `info`; one that has not answered in 20 seconds counts as unusable.
 CONTAINER_CMD=""
 for c in finch docker nerdctl podman; do
   if command -v "$c" >/dev/null 2>&1 && host_timeout 20 "$c" info >/dev/null 2>&1; then
@@ -38,34 +48,36 @@ if [ -n "$CONTAINER_CMD" ] && [ "$ARCH" = "x86_64" ]; then
 fi
 ```
 
-On the x86 host used to validate this skill, `finch` was on PATH but `finch info` failed, so a `command -v` cascade would have selected a runtime that cannot run anything; `docker` answered `info` and ran `linux/arm64` containers (`uname -m` printed `aarch64`). On a Graviton host (c9g.xlarge, Amazon Linux 2023) the block selected `docker` and printed `aarch64`. `host_timeout` keeps the host-side limits working where GNU `timeout` is missing: Homebrew's coreutils installs it as `gtimeout`, and also as `timeout` when the system has no `timeout` of its own; without either, `host_timeout` uses Python. Executed in bash 3.2.57 with no `timeout` or `gtimeout` on `PATH`, and in zsh 5.9 the same way: a 1-second command returned 0, a 30-second command given 2 seconds returned 124 after 2 seconds, and an exit code of 3 passed through.
+A `command -v` cascade can pick a runtime that cannot run anything: on the x86 host used to validate this skill, `finch` was on PATH but `finch info` failed. `host_timeout` keeps the host-side limits working where GNU `timeout` is missing: Homebrew's coreutils installs it as `gtimeout`, and also as `timeout` when the system has no `timeout` of its own; without either, `host_timeout` uses Python.
 
 **Decision logic:**
 - **ARM64 host (aarch64/arm64) + container runtime:** Install, build and validate in containers using `$CONTAINER_CMD`. This is the ideal path.
 - **ARM64 host (aarch64/arm64) + no container runtime:** Validate directly on the host, in a virtual environment (§3.0).
 - **x86 host + container runtime with ARM64 support:** Use `--platform linux/arm64`. On x86 Linux this runs under QEMU emulation, which works for installing wheels, importing and testing, but is slow (see "Emulation limits" below).
-- **x86 host + no container runtime:** Static analysis only (Phase 1). Document that ARM64 validation requires an ARM64 environment and recommend a Graviton instance or an ARM64 Mac with a container runtime.
+- **x86 host + no container runtime:** Static analysis only (Phase 1). Document that ARM64 validation needs a Graviton host or the target, and recommend one.
 
-**Match the production hosts.** A container uses its host's kernel, so validate on a host with the production page size (Phase 1.1): a 4KB-page host, including any x86 host under emulation and an Apple Silicon Mac, does not show failures that happen on 64KB pages. When the project builds its own native code, run its tests on the oldest Graviton generation it deploys to (Phase 2.5): a newer generation does not show `Illegal instruction`. Record both in `06-build-test-results.md`.
+**Match the production hosts.** A Phase 3 check passes only on a Graviton host with the production OS and page size (Phase 1.1), or on the target itself, such as the arm64 Lambda function. A `linux/arm64` run under emulation or on another arm64 machine finds failures early, but its CPU and kernel differ from Graviton's: QEMU on an x86 host can report SVE with 512-bit vectors and SME, while Graviton2 has no SVE, Graviton3 has 256-bit SVE, Graviton4 and Graviton5 have 128-bit SVE and SVE2, and none has SME (measured on each), and numpy's `np.dot` computed there matched no Graviton generation's result, because OpenBLAS picks its kernel from the CPU it sees; Apple's M1 to M3 cores have no SVE, and the M4 has SME without SVE ([LLVM's processor definitions](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/AArch64/AArch64Processors.td)); and a container uses its host's kernel, so a host whose page size is smaller than production's (an x86 host has 4KB pages; on a Mac, run `getconf PAGESIZE` in its VM) does not show the failures of 64KB pages. When the project builds its own native code, run its tests on the oldest Graviton generation it deploys to (Phase 2.5): a newer generation does not show `Illegal instruction`. Record where each check ran in `06-build-test-results.md`.
 
 **Do NOT skip validation if a working container runtime is available.** Only recommend external validation as a last resort.
 
-Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands.
+Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CONTAINER_CMD` exists only in the shell that set it: if each command runs in a new shell, start a later block with `CONTAINER_CMD=<the detected runtime>`. A function a later block calls is saved to a file under `${TMPDIR:-/tmp}` by the block that defines it, and the later block loads it in its first lines.
 
 **Emulation limits (x86 host).** Observed while validating this skill with Docker 25.0 and QEMU registered through binfmt_misc:
 
-- **Bound every container run, inside the container.** Five runs wrapped as `timeout N docker run ...` did not stop at their limit: Docker forwarded the stop signal into the emulated container, the container froze (even a plain `sleep 60` never finished), and the command waited until it was cancelled while the container kept running for hours until `docker rm -f`. Put the limit inside the container and remove the container afterwards:
+- **Bound every container run, inside the container.** Each `timeout` value in the blocks is an upper bound, so a stuck command fails instead of holding the session; raise it when a project needs longer. Five runs wrapped as `timeout N docker run ...` did not stop at their limit: Docker forwarded the stop signal into the emulated container, the container froze (even a plain `sleep 60` never finished), and the command waited until it was cancelled while the container kept running for hours until `docker rm -f`. Put the limit inside the container and remove the container afterwards:
   ```bash
-  run_arm64() {  # usage: run_arm64 <seconds> <image> <command...>
-    local limit="$1" img="$2" name="graviton-check-$$"; shift 2
-    host_timeout "$((limit + 20))" $CONTAINER_CMD run --rm --init --name "$name" --platform linux/arm64 \
-      "$img" timeout "$limit" sh -c "$*"
-    local rc=$?
-    $CONTAINER_CMD rm -f "$name" >/dev/null 2>&1   # no-op if the container already exited
-    return $rc
-  }
+  if . "${TMPDIR:-/tmp}/graviton-python-host_timeout.sh"; then
+    run_arm64() {  # usage: run_arm64 <seconds> <image> <command...>
+      local limit="$1" img="$2" name="graviton-check-$$"; shift 2
+      host_timeout "$((limit + 20))" $CONTAINER_CMD run --rm --init --name "$name" --platform linux/arm64 \
+        "$img" timeout "$limit" sh -c "$*"
+      local rc=$?
+      $CONTAINER_CMD rm -f "$name" >/dev/null 2>&1   # no-op if the container already exited
+      return $rc
+    }
+  else echo "CHECK: run the Container Runtime Detection block first: it writes ${TMPDIR:-/tmp}/graviton-python-host_timeout.sh"; fi
   ```
-  With the limit inside the container, a `sleep 60` given 5 seconds returned in 6 seconds with nothing left running. The image must provide `timeout` (`python:3.11-slim` and `alpine:3.20` do).
+  The image must provide `timeout` (`python:3.11-slim` and `alpine:3.20` do).
 - **Do not build packages from source under emulation.** A pygeos source build took about 14 minutes and failed, and one compiler run crashed (`gcc ... failed with exit code -11`). Build from source on Graviton hardware (or an ARM64 CI runner) instead: on a c9g.xlarge the same pygeos build took about 5 seconds once its two workarounds were in place (Phase 2.2).
 - **Installing wheels under emulation is slow too.** A `docker build --platform linux/arm64` of the fixed fixture did not finish within 8 minutes, although no package was compiled: every compiled wheel the builder downloaded was an aarch64 wheel, the rest were pure-Python wheels, and the one sdist was pure Python. Natively on Graviton the same build took 14 seconds. On an x86 host the faster pattern is to download aarch64 wheels natively and only run the checks emulated:
   ```bash
@@ -81,10 +93,11 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands.
 
   # Emulated: run imports, startup and tests against that directory, in place on the read-only mount
   # (nothing is copied or written; -p no:cacheprovider stops pytest writing its cache)
+  # timeout 300 bounds the emulated test run; raise it for a larger suite
   $CONTAINER_CMD run --rm --init --platform linux/arm64 -v /tmp/arm64-site:/site:ro -v "$PWD":/src:ro \
     -e PYTHONPATH=/site -e PYTHONDONTWRITEBYTECODE=1 python:3.11-slim timeout 300 sh -c 'cd /src && python3 -m pytest -q -p no:cacheprovider tests'
   ```
-  For the fixed fixture this ran the full set of import, startup and test checks in 153 seconds; rerun with the flag array above, the installs and the tests (3 passed) took 57 seconds. The ELF scan from §3.1 needs no emulation: run it on the host against `/tmp/arm64-site` and the project's `vendor/` directory. This pattern validates the dependencies and the code, not the Dockerfile; build the image itself on ARM64 when possible.
+The ELF scan from §3.1 needs no emulation: run it on the host against `/tmp/arm64-site` and the project's `vendor/` directory. This pattern validates the dependencies and the code, not the Dockerfile; build the image itself on ARM64 when possible.
 
 ## 3.0 Build Environment Preparation
 
@@ -104,8 +117,8 @@ The highest `manylinux` tag pip accepts comes from the OS glibc, not from where 
 
 Two more things to align before installing:
 
-- **pip version.** pip 19.3 is the minimum that installs `manylinux2014` aarch64 wheels and pip 20.3 the minimum for `manylinux_2_N` tags ([../document_references/wheel-verification.md](../document_references/wheel-verification.md) §2). An older pip cannot see those wheels and falls back to building native packages from source. Check `python3 -m pip --version` and, inside the validation environment only, run `python3 -m pip install --upgrade pip` (the repo's documented workaround, [python.md section 1](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#1-installing-python-packages)). The `python:3.11-slim` image used here ships pip 24.0.
-- **Build prerequisites**, only if an sdist build remains after Phase 2: pure-Python sdists (for example `docopt`) need no compiler; native sdists need the toolchain from [python.md section 1.1](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#11-prerequisites-for-installing-python-packages-from-source) plus the library headers the package names.
+- **pip version.** pip 19.3 is the minimum that installs `manylinux2014` aarch64 wheels and pip 20.3 the minimum for `manylinux_2_N` tags ([../document_references/wheel-verification.md](../document_references/wheel-verification.md) §2). An older pip cannot see those wheels and falls back to building native packages from source. Check `python3 -m pip --version` and, inside the validation environment only, run `python3 -m pip install --upgrade pip`. The `python:3.11-slim` image used here ships pip 24.0.
+- **Build prerequisites**, only if an sdist build remains after Phase 2: pure-Python sdists (for example `docopt`) need no compiler; native sdists need a C compiler and the Python headers (`python3-devel` or `python3-dev`) plus the library headers the package names.
 
 Build-time tools (build backends, compilers) may not support the newest setuptools, compiler or NumPy release. Runtime compatibility != build-time tooling compatibility; this matters whenever Phase 2 leaves an sdist build.
 
@@ -132,7 +145,7 @@ PY_TARGET=$(grep -hoE '^FROM[^#]*python:[0-9]+\.[0-9]+' Dockerfile* 2>/dev/null 
 echo "Project targets Python: $PY_TARGET"
 ```
 
-Executed on all five fixture variants (pip, fixed pip, Poetry, uv, conda): each reported `3.11`. A `requires-python` such as `>=3.11,<3.13` is a range; the first number is the floor, so prefer the Dockerfile or `.python-version` when they exist.
+A `requires-python` such as `>=3.11,<3.13` is a range; the first number is the floor, so prefer the Dockerfile or `.python-version` when they exist.
 
 ### Session-Scoped Python Switching
 
@@ -152,11 +165,9 @@ pyenv shell "$PY_TARGET"
 # conda: a prefix environment, used through `conda run`
 conda create -y -p "${TMPDIR:-/tmp}/graviton-conda" "python=$PY_TARGET" && conda run -p "${TMPDIR:-/tmp}/graviton-conda" python --version
 
-# Containers: the official image for the same minor version
+# Containers: the official image for the same minor version (timeout 60 bounds one emulated start)
 $CONTAINER_CMD run --rm --init --platform linux/arm64 "python:$PY_TARGET-slim" timeout 60 python3 --version
 ```
-
-Executed: `uv venv --seed --python 3.11` produced Python 3.11.9 with pip 26.2.1 while the host's `/usr/bin/python3` stayed at 3.9.25; a `conda create -p ... python=3.11 --dry-run` resolved without touching any shell configuration.
 
 **ALLOWED:** virtual environments, `uv venv`, `pyenv shell` (pyenv's documentation: "select just for current shell session"), conda prefix environments with `conda run`, containers, single-command environment variables.
 
@@ -192,7 +203,7 @@ Executed: `uv venv --seed --python 3.11` produced Python 3.11.9 with pip 26.2.1 
 
    A `from versions:` failure that appears only when installing from a mirror, a connection error, or missing index credentials is `INFRA`.
 
-3. **INFRA or PRE-EXISTING failures:** document them and continue with the remaining steps. The installation that succeeds becomes the **final build**.
+3. **INFRA or PRE-EXISTING failures:** a failure is INFRA only with a cause that does not depend on the architecture: it fails the same way on the x86 baseline, or its message names a missing service, credential, network or index. Document them; rerun the tests with only the failing ones excluded (`pytest --deselect tests/test_db.py::test_query`) and list those under CHECK Items. The installation that succeeds, with the remaining tests passing, becomes the **final build**.
 
 4. **ARM64 failures:** do NOT work around them (no `--no-deps`, no skipping the package). The failing build is the final build and requires resolution in Phase 2.
 
@@ -213,17 +224,20 @@ $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 \
   -c 'import platform, sys; print(platform.machine(), sys.version.split()[0])'     # must print aarch64
 
 # Every native file in the image's Python environment, judged for the target by native_scan from Phase 1.2.1
-# (run this in the same shell, with the TARGET_* values of §1.1). The files are copied out of the image and
+# (loaded on the next line, with the TARGET_* values of §1.1). The files are copied out of the image and
 # scanned here, so no part of the scan runs under emulation.
-GV_SITE=$(mktemp -d "${TMPDIR:-/tmp}/gv-site.XXXXXX"); CID=$($CONTAINER_CMD create --platform linux/arm64 app:arm64)
-$CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 -c \
-  'import sysconfig; print("\n".join(sorted({sysconfig.get_paths()[k] for k in ("purelib", "platlib")})))' |
-  while read -r d; do mkdir -p "$GV_SITE$d" && $CONTAINER_CMD cp "$CID:$d/." "$GV_SITE$d"; done
-$CONTAINER_CMD rm "$CID" >/dev/null
-native_scan "$GV_SITE"; rm -rf "$GV_SITE"
+if . "${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; then
+  TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41; TARGET_PAGE_SIZE=4096   # the §1.1 values
+  GV_SITE=$(mktemp -d "${TMPDIR:-/tmp}/gv-site.XXXXXX"); CID=$($CONTAINER_CMD create --platform linux/arm64 app:arm64)
+  $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 -c \
+    'import sysconfig; print("\n".join(sorted({sysconfig.get_paths()[k] for k in ("purelib", "platlib")})))' |
+    while read -r d; do mkdir -p "$GV_SITE$d" && $CONTAINER_CMD cp "$CID:$d/." "$GV_SITE$d"; done
+  $CONTAINER_CMD rm "$CID" >/dev/null
+  native_scan "$GV_SITE"; rm -rf "$GV_SITE"
+else echo "CHECK: run the Phase 1.2.1 scan block first: it writes ${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; fi
 ```
 
-On an x86 host the `python3` commands run under emulation; bound them inside the container as in "Emulation limits", for example `$CONTAINER_CMD run --rm --init --platform linux/arm64 --entrypoint timeout app:arm64 120 python3 -c '...'` (this also overrides the image's entrypoint). The scan itself runs on the host, on the copied files. Do not accept image metadata as proof: an image built with `FROM --platform=linux/amd64` and `--platform linux/arm64` was reported by `image inspect` as `arm64`, yet its interpreter was an `x86-64` executable (Phase 2.4). The scan opens every file, not only `*.so` files, because a `py3-none-any` wheel can carry executables. Executed on test images built from `python:3.11-slim` for `linux/arm64` with the packages copied in (so no build step ran under emulation), in bash and zsh: for selenium 4.48.0 it reported `{62: 1}` with `FINDING .../selenium/webdriver/common/linux/selenium-manager: not aarch64, e_machine 62 (x86-64)` and no aarch64 build next to it (a blocker: on Graviton, selenium 4.48.0 raises `Unsupported platform/architecture combination: linux/aarch64` before starting it, and the file itself fails with `Exec format error`); for 4.50.0 `{62: 1, 183: 1}`, with a `FINDING` for the x86-64 file that sits next to `linux-arm64/selenium-manager`, which selenium picks and runs on Graviton (fine, by the rule of Phase 1.2.1); for the fixed fixture's 16 packages, `{183: 101}` and no `FINDING`. Copy any project directory that holds compiled objects (for example a `vendor/` directory, or `/var/task` in a Lambda container image) out the same way and scan it too. Scan `platlib` as well as `purelib`: in a Poetry environment on Amazon Linux 2023 every compiled package sat in `lib64/.../site-packages` (platlib), and a purelib-only scan found nothing. Executed natively on Graviton: the image build took 14 seconds, `platform.machine()` inside the image printed `aarch64 3.11.17`, the image's default command started the service on aarch64, and its `/srv/vendor` held the two aarch64 builds next to the two x86-64 ones (`{183: 2, 62: 2}`).
+On an x86 host the `python3` commands run under emulation; bound them inside the container as in "Emulation limits", for example `$CONTAINER_CMD run --rm --init --platform linux/arm64 --entrypoint timeout app:arm64 120 python3 -c '...'` (this also overrides the image's entrypoint). The scan itself runs on the host, on the copied files. Do not accept image metadata as proof: an image built with `FROM --platform=linux/amd64` and `--platform linux/arm64` was reported by `image inspect` as `arm64`, yet its interpreter was an `x86-64` executable (Phase 2.4). The scan opens every file, not only `*.so` files, because a `py3-none-any` wheel can carry executables. For selenium 4.48.0 it reports a `FINDING` for `selenium/webdriver/common/linux/selenium-manager` with no aarch64 build next to it, a blocker: on Graviton, selenium 4.48.0 raises `Unsupported platform/architecture combination: linux/aarch64` before starting it, and the file itself fails with `Exec format error`. From 4.49.0 the x86-64 file sits next to `linux-arm64/selenium-manager`, which selenium picks on Graviton, so that `FINDING` is fine by the rule of Phase 1.2.1. Copy any project directory that holds compiled objects (for example a `vendor/` directory, or `/var/task` in a Lambda container image) out the same way and scan it too. Scan `platlib` as well as `purelib`: in a Poetry environment on Amazon Linux 2023 every compiled package sat in `lib64/.../site-packages` (platlib), and a purelib-only scan found nothing.
 
 Verify the image uses the SAME base image distribution and version and the same Python minor version as the original.
 
@@ -235,20 +249,18 @@ python3 -m pip --version                                                        
 python3 -m pip install --require-hashes -r requirements-locked.txt && python3 -m pip install -r requirements.txt
 ```
 
-Run inside the session-scoped environment from §3.0, then run the ELF scan above against the environment's `purelib` and `platlib`. Executed natively on Graviton, once with the distribution's Python 3.11.16 and once with uv's managed 3.11.9: every package installed from a wheel (docopt from its pure-Python sdist), the imports and the 3 tests passed, and the service loaded `libfastsum-aarch64.so`.
+Run inside the session-scoped environment from §3.0, then run the ELF scan above against the environment's `purelib` and `platlib`.
 
 ## 3.2 Functional Testing on ARM64
 
 > **Output: update `graviton-validation/06-build-test-results.md`**
 
-**Import smoke test first.** Import every package that Phase 1.3 found to ship compiled code, plus the project's own extensions, before running the full suite; a missing aarch64 binary shows up here in seconds. For NumPy, also print the BLAS it uses ([python.md section 2.5](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#25-testing-numpy-and-scipy-installation)):
+**Import smoke test first.** Import every package that Phase 1.3 found to ship compiled code, plus the project's own extensions, before running the full suite; a missing aarch64 binary shows up here in seconds. For NumPy, also print the BLAS it uses:
 
 ```bash
 python3 -c 'import numpy, pandas, PIL, blosc2, shapely, msgpack, markupsafe, charset_normalizer; print("imports OK")'
 python3 -c 'import numpy as np; np.__config__.show()'
 ```
-
-Executed on the fixed fixture in a `linux/arm64` container: all imports succeeded and NumPy 1.26.4 reported `"name": "openblas64"`.
 
 An import can succeed without the package's compiled code, which the loaded check below catches. msgpack, MarkupSafe, charset-normalizer and wrapt fall back to pure Python when their compiled module is missing or built for another architecture, and pip can build such a package from its sdist without the compiled module, and without an error, when the image has no C compiler (executed below for wrapt). List the native files each package has mapped once imported, with the same modules in the ARM64 environment and on the x86 baseline (the production environment, or the same pins installed for x86). Run it where the smoke test runs. For an image, write the block to a file and run it in the image: `$CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$PWD/loaded-check.sh":/loaded-check.sh:ro --entrypoint timeout app:arm64 300 sh /loaded-check.sh` (the image needs `sh`, as the Option B command does):
 
@@ -280,7 +292,7 @@ for name, base in mods:
 EOF
 ```
 
-A module that loads native files on x86 and none on ARM64 runs without its compiled code on Graviton. It is a finding, resolved as Phase 2 resolves its cause. A layer or vendored `site-packages` built for x86 is rebuilt for arm64 (§2.1). A pin without an aarch64 wheel moves to a version with one (§2.2) or is built in a stage that has a compiler. A module that loads none on either architecture is pure Python or loads its code later; import the submodule that holds it (as `PIL.Image` above) or repeat the check after the tests. Executed with the fixed fixture's native packages for Python 3.11: on x86 and on `linux/arm64` each module loaded the same number of native files (numpy 13, pandas 42, `PIL.Image` 1, blosc2 1, shapely 3, msgpack 1, markupsafe 1, charset_normalizer 2). With the x86 install on ARM64 (a layer or vendored `site-packages` built on x86), numpy, pandas, `PIL.Image`, blosc2 and shapely failed to import, while msgpack, markupsafe and charset_normalizer imported and printed `no native file loaded`: `msgpack.Packer` came from `msgpack.fallback` and `markupsafe.escape` from `markupsafe._native`. With `wrapt==1.13.3` in `python:3.10-slim`, which has no C compiler, pip installed the x86 wheel on x86 (`1 native file loaded (wrapt/_wrappers.cpython-310-x86_64-linux-gnu.so)`), and on ARM64, where the release has no aarch64 wheel, built it from source and printed `Successfully installed wrapt-1.13.3` with no compiled module (`no native file loaded`). The §1.3 loop reports that pin as `MUST UPGRADE` (`from versions: 1.14.0rc1, 1.14.0, ...`), so the static finding stands even though the install succeeds.
+A module that loads native files on x86 and none on ARM64 runs without its compiled code on Graviton. It is a finding, resolved as Phase 2 resolves its cause. A layer or vendored `site-packages` built for x86 is rebuilt for arm64 (§2.1). A pin without an aarch64 wheel moves to a version with one (§2.2) or is built in a stage that has a compiler. A CHECK FALLBACK pin (Phase 1.3) that the user keeps on its pure-Python path is that recorded decision, not a finding. A module that loads none on either architecture is pure Python or loads its code later; import the submodule that holds it (as `PIL.Image` above) or repeat the check after the tests. With the x86 install on ARM64 (a layer or vendored `site-packages` built on x86), numpy, pandas, `PIL.Image`, blosc2 and shapely failed to import, while msgpack, markupsafe and charset_normalizer imported and printed `no native file loaded`: `msgpack.Packer` came from `msgpack.fallback` and `markupsafe.escape` from `markupsafe._native`. With `wrapt==1.13.3` in `python:3.10-slim`, which has no C compiler, pip installed the x86 wheel on x86 (`1 native file loaded (wrapt/_wrappers.cpython-310-x86_64-linux-gnu.so)`), and on ARM64, where the release has no aarch64 wheel, built it from source and printed `Successfully installed wrapt-1.13.3` with no compiled module (`no native file loaded`). The §1.3 loop reports that pin as `MUST UPGRADE` (`from versions: 1.14.0rc1, 1.14.0, ...`), so the static finding stands even though the install succeeds.
 
 **Containerized:** the shippable runtime image usually contains the installed packages and the application, but not the tests or the test runner. Run the ARM64 test suite one of these ways:
 
@@ -288,7 +300,11 @@ A module that loads native files on x86 and none on ARM64 runs without its compi
 # Option A: a test stage pinned to --platform=$TARGETPLATFORM in the Dockerfile, built with
 #           $CONTAINER_CMD build --platform linux/arm64 --target test .
 
-# Option B: run the tests in the official image with the source mounted (same Python minor version):
+# Option B: run the tests with the source mounted, in the project's own base image or one of the target's
+#           distribution, same Python minor version: pip picks wheels by the image's glibc (python:3.11-slim
+#           has 2.41, Amazon Linux 2023 has 2.34). For Amazon Linux 2023, use amazonlinux:2023 and run
+#           dnf install -y python3.11 python3.11-pip first, then python3.11 -m pip and python3.11 -m pytest.
+# timeout 900 bounds the install and the test run; raise it for a larger suite
 $CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$PWD":/src:ro python:3.11-slim timeout 900 sh -c \
   'cp -r /src /app && cd /app && pip install -q --require-hashes -r requirements-locked.txt && pip install -q -r requirements.txt -r requirements-dev.txt && python -m pytest -q tests'
 
@@ -296,7 +312,7 @@ $CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$PWD":/src:ro python:3
 #           the emulated part to imports and tests
 ```
 
-On an x86 host, Option B runs pip under emulation, which took longer than 8 minutes for the fixture's dependencies; prefer Option C there. Executed with Option C on the fixed fixture: `3 passed`. Natively on Graviton, Option B finished in 8 seconds with `3 passed`.
+On an ARM64 host, use Option B, or Option A when the Dockerfile already has a test stage. On an x86 host, Option B runs pip under emulation, which took longer than 8 minutes for the fixture's dependencies; use Option C there.
 
 > Note (finch/lima on macOS): `-v` bind mounts only work for host paths shared into the VM. Finch's macOS VM template shares `~`, `/private`, `/var/folders` and `/tmp/lima`, plus any `additional_directories` from Finch's configuration. `/tmp` is not among them, so a project under `/tmp` is not visible inside the VM; use `/private/tmp` or a path under `~`, or `$CONTAINER_CMD build` (which sends the build context) instead.
 
@@ -306,8 +322,21 @@ Classify all failures (`INFRA` / `ARM64` / `PRE-EXISTING`). Exercise the archite
 
 **Final build determination:**
 - All tests pass: the test run is the final build
-- INFRA/PRE-EXISTING failures: document them; the successful install and build is the final build
+- INFRA/PRE-EXISTING failures: the successful install and build, with only those tests excluded (step 3), is the final build
 - ARM64 failures: the failing build is the final build (do not skip tests)
+
+### Results That Change Without Failing
+
+Apply this only when the project builds C or C++ code (extensions, `ctypes` libraries) or writes `long double` values or raw floating-point bytes to files, or compares or hashes numeric results exactly. These differences change a value without an error:
+
+- `char` is signed on x86 and unsigned on arm64, so code that relies on its sign (a `char c; while ((c = fgetc(f)) != EOF)` loop never ends on arm64) needs `-fsigned-char`, or `int8_t` and `uint8_t`.
+- GCC fuses `a * b + c` into one multiply-add on arm64 by default, which an x86-64 build without FMA (x86-64-v3 adds it) cannot do, so build with `-ffp-contract=off` on both when results must keep x86's rounding (`-ffast-math` and `-Ofast` allow more such changes).
+- Out-of-range conversions from floating point to integers differ in C and C++: a `double` that holds 1e10 at run time converts to `int` as -2147483648 on x86 and 2147483647 on Graviton, and numpy's `astype` to an integer type follows it (the conversion is undefined, and a compiler folds a constant such as `(int)1e10` to a value of its own).
+- `long double` is the x87 80-bit format on x86-64 and IEEE 128-bit on arm64 Linux, both 16 bytes, so raw values written on one read back as other numbers on the other, with no error; numpy's `np.longdouble` and its `.npy` files follow it. Regenerate such files on Graviton, or store `float64` or text.
+- The NaN an invalid operation produces has other bits (`fff8000000000000` on x86, `7ff8000000000000` on Graviton): compare NaNs by value, not by raw bytes or hashes.
+- numpy's `exp` and `log` can differ from x86 by up to 2 ULP, and matrix products through OpenBLAS differ too, also between Graviton generations, because OpenBLAS picks its kernel from the core.
+
+A test that compares floating-point values exactly and fails by such a difference goes under User Decisions Pending, with the Recommendation to change nothing until the project's owners accept a tolerance; an unattended run does the same.
 
 ## 3.3 Startup Validation
 
@@ -319,7 +348,7 @@ Verify:
 3. No `ImportError`, `ModuleNotFoundError`, `OSError` from library loads, or `GLIBC_` version errors in the startup log
 4. Accelerated paths load the aarch64 binary (log the path that was loaded; on the fixed fixture: `vendor/libfastsum-aarch64.so`)
 
-Several ARM64 failures do not mention the architecture. The first three rows were observed in `linux/arm64` containers and again natively on Graviton, the next two on Graviton and on AWS Lambda; the last is documented in python.md:
+Several ARM64 failures do not mention the architecture:
 
 | Symptom | Actual cause |
 |---|---|
@@ -328,9 +357,9 @@ Several ARM64 failures do not mention the architecture. The first three rows wer
 | `ModuleNotFoundError: No module named 'numpy.core._multiarray_umath'` | x86 wheel contents copied into an arm64 image (`$BUILDPLATFORM` builder, Phase 2.4) |
 | `exec /usr/local/bin/python3: exec format error` | an amd64 image run on a Graviton host without emulation (an amd64 `--platform` pin, or a local tag holding the amd64 image) |
 | `ImportError: Error importing numpy: you should not try to import numpy from its source directory` | on Lambda, an aarch64 layer attached to an `x86_64` function, or the reverse |
-| `ImportError: /lib64/libm.so.6: version 'GLIBC_2.27' not found` | wheel built for a newer glibc than the OS ([python.md](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#python-wheel-glibc-requirements)) |
+| `ImportError: /lib64/libm.so.6: version 'GLIBC_2.27' not found` | wheel built for a newer glibc than the OS |
 
-> **macOS-host false PASS.** A package can publish macOS arm64 wheels without any Linux aarch64 wheel: `tfx-bsl` 1.21.0 ships `macosx_11_0_arm64` wheels and no `aarch64` file. An install that works on an Apple-Silicon Mac therefore does not show that the package installs on Graviton. Validate in a `linux/arm64` container or on a Graviton host, which is authoritative.
+> **macOS-host false PASS.** A package can publish macOS arm64 wheels without any Linux aarch64 wheel: `tfx-bsl` 1.21.0 ships `macosx_11_0_arm64` wheels and no `aarch64` file. An install that works on an Apple-Silicon Mac therefore does not show that the package installs on Graviton. Check in a `linux/arm64` container instead, and settle the check on a Graviton host ("Match the production hosts").
 
 Recommend to the user for independent testing: performance benchmarking, load testing, resource utilization measurement.
 

@@ -1,5 +1,20 @@
 # ARM64 Transformation - Agent Scope Boundaries
 
+## Contents
+
+- Primary Objective
+- Quick Reference: ARM64 Dependency Update Decision Tree
+- IN SCOPE: What to Fix: 1. Native Library Issues; 2. Build Tool Artifacts; 3. Architecture Detection; 4. Documented ARM64 Bugs; 5. Lock Files; 6. Deployment Configuration; 7. Images and Binaries the Project Pulls
+- OUT OF SCOPE: What NOT to Fix: 1. General Dependency Modernization; 2. Security Updates; 3. Feature Upgrades; 4. Python Version Changes; 5. Code Refactoring; 6. Tooling and Platform Changes
+- Decision Tree: Should I Update This Dependency?
+- Recommendations: Validation Ladder
+- Common Pure Python Libraries
+- Red Flags: When Agent is Going Off-Scope
+- How to Document Scope Compliance: For Updates Made; For Updates NOT Made
+- Learning from Past Mistakes: Case Study: numpy 1.20.3; Case Study: pygeos 0.14 and blosc2 0.6.3; Case Study: mkl; Case Study: docopt 0.6.2; Case Study: the false FAIL
+- Success Criteria
+- When in Doubt
+
 ## 🎯 Primary Objective
 Validate Python application compatibility with AWS Graviton (ARM64) architecture.  
 **Focus ONLY on ARM64-specific compatibility issues.**
@@ -23,14 +38,18 @@ Is this dependency update required for ARM64 compatibility?
 │  │  │     └─ More than one applies (pygeos: a source build or a successor package)?
 │  │  │           → CHECK: user decision with the options (Phase 2.2); the label follows the choice
 │  │  └─ YES → ✅ COMPATIBLE (has ARM64 support)
-│  └─ NO (Pure Python: py3-none-any wheel or pure-Python sdist) → ✅ COMPATIBLE (pure Python works on all architectures)
+│  └─ NO (Pure Python on aarch64: a none-any wheel or a pure-Python sdist)
+│        ├─ Does x86_64 get a compiled wheel of the same pin? → CHECK FALLBACK (Phase 1.3; the Phase 3 loaded check settles it)
+│        ├─ Does it start an image or download a binary with no arm64 build? → ✅ MUST UPGRADE (IN SCOPE 7)
+│        └─ NO → ✅ COMPATIBLE (pure Python works on all architectures)
 │
 ├─ Does current version FAIL to install or build on ARM64?
 │  ├─ YES → Check why:
 │  │  ├─ Missing aarch64 wheel? → ✅ MUST UPGRADE
 │  │  ├─ Hash lock lists only x86_64 hashes? → ✅ MUST UPGRADE (regenerate the lock)
 │  │  ├─ Wheel needs a newer glibc than the target? → ✅ MUST UPGRADE (user decision: older
-│  │  │     wheel, distro package or newer OS)
+│  │  │     wheel, distro package or newer OS; Recommendation: the lowest release whose wheel
+│  │  │     tag the target accepts, else change nothing and list it)
 │  │  ├─ Architecture detection issue? → ✅ MUST UPGRADE
 │  │  └─ Other reason? → Investigate root cause
 │  └─ NO → Continue checking...
@@ -47,6 +66,7 @@ Is this dependency update required for ARM64 compatibility?
 
 RESULT:
 - If no ARM64-specific issue found → Mark COMPATIBLE, do NOT upgrade
+- If the evidence does not decide either way → Mark CHECK, do NOT upgrade; settle it in Phase 3
 - If ARM64-specific issue found → Document evidence and upgrade
 ```
 
@@ -61,8 +81,8 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 
 ### 1. Native Library Issues
 - ✅ A pinned version with an x86_64 wheel and no aarch64 wheel, where a later version restores it. Example from the fixture used to build this skill: `blosc2==0.6.3` has `blosc2-0.6.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl` and no aarch64 file; `0.6.4` is the lowest version with `blosc2-0.6.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl`. Fix: `blosc2==0.6.4`, not `4.x`.
-- ✅ Packages that are x86-only by construction and have an aarch64-capable substitute. Example: `mkl`, `intel-openmp`, `tensorflow-intel`, `tfx-bsl` have no Linux aarch64 file in any release on PyPI (tfx-bsl 1.21.0 has macOS arm64 wheels only, which do not help Graviton). For `mkl` pulled in as a NumPy accelerator, the substitute is the default OpenBLAS-backed NumPy wheel ([python.md section 2](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#2-scientific-and-numerical-application-numpy-scipy-blas-etc)). Substitutions change behaviour, so the user confirms before the skill applies them.
-- ✅ Native code tagged for aarch64 that fails on the target OS: wheels that all need a newer glibc than the target's (a `manylinux_2_28` wheel on Lambda `python3.11`), no `musllinux` aarch64 wheel for an Alpine target, or a package that aborts on 64KB pages (polars 0.20.20 and the earlier releases tested, on AlmaLinux 8). Fix: the lowest version that works on the target OS, verified there (polars 0.20.21). When no version does, the OS, base image or Lambda runtime is the user decision ([wheel-verification.md](wheel-verification.md) section 7; a runtime change also changes the interpreter, so it follows `python.interpreter_bump`).
+- ✅ Packages that are x86-only by construction and have an aarch64-capable substitute. Example: `mkl`, `intel-openmp`, `tensorflow-intel`, `tfx-bsl` have no Linux aarch64 file in any release on PyPI (tfx-bsl 1.21.0 has macOS arm64 wheels only, which do not help Graviton). For `mkl` pulled in as a NumPy accelerator, the substitute is the default OpenBLAS-backed NumPy wheel. Substitutions change behaviour, so the user confirms before the skill applies them.
+- ✅ Native code tagged for aarch64 that fails on the target OS: wheels that all need a newer glibc than the target's (a `manylinux_2_28` wheel on Lambda `python3.11`), no `musllinux` aarch64 wheel for an Alpine target, or a package that aborts on 64KB pages (polars 0.20.20 and the earlier releases tested, on AlmaLinux 8). Fix: the lowest version that works on the target OS, verified there (polars 0.20.21). When no version does, the OS, base image or Lambda runtime is the user decision, whose Recommendation is to change nothing and list it ([wheel-verification.md](wheel-verification.md) section 7; a runtime change also changes the interpreter, so it follows `python.interpreter_bump`).
 - ✅ Committed native files built for x86_64 (the Phase 1.2.1 scan reports `e_machine 62 (x86-64)`, whatever the file is named) with no aarch64 build next to them, including executables, vendored `site-packages`, vendored wheels and Lambda layers.
 - ✅ `ctypes.CDLL` / `cffi` loads of hard-coded x86 library paths.
 
@@ -72,14 +92,12 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 - ✅ Build-time binaries outside the dependency tree that scripts or Dockerfiles download for x86 only, such as a `tool-linux-amd64` release asset in a deploy script (phase 1.3 "Build-Time Binaries Outside the Dependency Tree").
 - ✅ Extension modules whose build flags or sources are x86-only: `-mavx2`, `-mavx512*`, `-msse4*`, `-march=haswell` and similar in `setup.py`/`setup.cfg`/`pyproject.toml`/`CMakeLists.txt`/`Cargo.toml` build scripts; `#include <immintrin.h>`, `<xmmintrin.h>`, `<emmintrin.h>` or inline x86 assembly without an `#ifdef __x86_64__` guard. Fix: guard or replace with a portable path; build on aarch64 in Phase 3. `-march=native` is in scope only when the build happens on x86 and the artefact ships to Graviton.
 - ✅ Native code the project builds with flags for a newer Graviton generation than the oldest it deploys to (`-mcpu=native` on a Graviton4 build host stops with `Illegal instruction` on Graviton2; phase 2.5), and vendored aarch64 objects linked for 4KB pages when the target uses 64KB pages (phase 1.2.1).
-- ✅ Example: the fixture's `setup.py` passed `-mavx2 -march=haswell` on every architecture, so the aarch64 build stopped at `unrecognized command-line option`; guarding the flags with `platform.machine()` fixed it (phase 2.4).
 
 ### 3. Architecture Detection
 - ✅ `platform.machine() == "x86_64"`, `platform.processor()`, `os.uname().machine`, `platform.architecture()`, `sys.maxsize` tricks, or `"amd64"`/`"x86_64"` string literals that select code paths, binaries or download URLs with no `aarch64`/`arm64` branch. Same in shell scripts (`uname -m`), Makefiles and CI files that the deployment runs.
-- ✅ Example: the fixture's `app/service.py` chose its native library by comparing `platform.machine()` with `x86_64` and `AMD64`, with no aarch64 branch (phase 1.4).
 
 ### 4. Documented ARM64 Bugs
-- ✅ The repo documents that OpenBLAS between 0.3.9 and 0.3.17 had data-precision and correctness fixes for aarch64, and that NumPy 1.21.1 and SciPy 1.7.2 are the first releases carrying OpenBLAS 0.3.17 ([python.md section 2](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#2-scientific-and-numerical-application-numpy-scipy-blas-etc)). A NumPy or SciPy pin below those floors installs on Graviton but is a correctness risk: MUST UPGRADE, target exactly 1.21.1 / 1.7.2 (or the lowest version that also has a wheel for the project's cp tag, whichever is higher; numpy's first cp311 aarch64 wheel is 1.23.2).
+- ✅ OpenBLAS releases between 0.3.9 and 0.3.17 carry data-precision and correctness fixes for aarch64, and NumPy 1.21.1 and SciPy 1.7.2 are the first releases with OpenBLAS 0.3.17. A NumPy or SciPy pin below those floors installs on Graviton but is a correctness risk: MUST UPGRADE, target exactly 1.21.1 / 1.7.2 (or the lowest version that also has a wheel for the project's cp tag, whichever is higher; numpy's first cp311 aarch64 wheel is 1.23.2).
 - ✅ Other packages: only with a linked upstream issue or release note that names aarch64/arm64. "It crashed once" is not evidence.
 
 ### 5. Lock Files
@@ -89,8 +107,12 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 ### 6. Deployment Configuration
 - ✅ Dockerfiles that pin `--platform=linux/amd64`, an amd64 image digest, or run `pip install` in a `--platform=$BUILDPLATFORM` stage and copy the result into the runtime image (wheels are architecture-specific; see phase 2.4).
 - ✅ Lambda functions and layers with x86 binaries where the project ships the SAM/CloudFormation template (`Architectures: [arm64]` plus an arm64 layer build).
-- ✅ Kubernetes node selection only when the project already ships manifests, and only the node-selection, registry and ingress lines.
-- ✅ ECS `cpuArchitecture`, EKS `amiType` and AMI IDs, only in files the project ships (phase 1.4). Instance types are recorded as a user decision: choosing the Graviton type is sizing.
+- ✅ Kubernetes node selection only when the project already ships manifests, and only the node-selection, registry and ingress lines (an arm64 selector only together with arm64 capacity, phase2 §2.4).
+- ✅ ECS `cpuArchitecture`, EKS `amiType` and AMI IDs, only in files the project ships (phase 1.4). An instance type gets the Graviton type phase2 §2.4 picks, recorded as a user decision: choosing it is sizing.
+- ✅ CI changes that only add or switch an architecture, in pipelines the project ships (phase2 §2.4), unless `ci.changes` is `recommend`
+
+### 7. Images and Binaries the Project Pulls
+- ✅ An image the project builds from, tests with, deploys or has a library start, with no `linux/arm64` build (Phase 1.4), and a binary a library or script downloads with no arm64 build, even when the library itself is pure Python.
 
 ## ❌ OUT OF SCOPE: What NOT to Fix
 
@@ -110,7 +132,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 - ❌ Example: Django 3 to 5, pandas 1 to 2, "pygeos is deprecated, migrate to shapely 2" (behaviour changes the user did not ask for; for pygeos the skill documents the shapely option and does not perform the API migration)
 
 ### 4. Python Version Changes
-- ❌ Python 3.9 → 3.11 upgrades "because 3.9 is end of life" (governed by `python.interpreter_bump`, default never; the `>= 3.11` recommendation from python.md is recorded as a RECOMMENDED UPGRADE with the live end-of-life date)
+- ❌ Python 3.9 → 3.11 upgrades "because 3.9 is end of life" (governed by `python.interpreter_bump`, default never; the recommendation of a supported release is recorded as a RECOMMENDED UPGRADE with the live end-of-life date)
 - ❌ Changes of interpreter source (distribution package, python.org build, conda, uv-managed build)
 - ❌ Exception: session-scoped Python switching for validation (Phase 3.0), and a bump that `python.interpreter_bump` allows because it is the only path to an aarch64 wheel, decided once for the whole dependency set (phase 1.5)
 
@@ -123,8 +145,8 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 - ❌ Switching package managers or indexes (pip to uv, Poetry to pip, PyPI to a mirror): a tooling choice, not compatibility
 - ❌ Base image distribution or version changes (`python:3.11-slim` to `python:3.12-alpine`): they change glibc, interpreter and ABI at once. The exception is the user-decision path in wheel-verification.md section 7 (glibc too old), which the skill documents but does not apply
 - ❌ Web server, worker model or async framework changes (gunicorn to uvicorn): no repo-documented Graviton requirement
-- ❌ `.gitignore`, `.dockerignore` or CI pipeline edits: phrased as a recommendation only (SKILL.md "User Responsibility")
-- ❌ SDK credential changes after an AMI change: the [EC2 User Guide](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html#use-a-supported-sdk-version-for-imdsv2) lists botocore 1.13.25 (boto3 1.12.6) as the minimum for IMDSv2. Executed on Amazon Linux 2023 with IMDSv2 required: botocore 1.13.22 found no instance-role credentials and 1.13.23 found `iam-role`; 1.13.25 added the handling of an HTTP 405 from the metadata service ("Add 405 case to metadata fetching logic" in botocore's changelog). Amazon Linux 2023 AMIs require IMDSv2 by default. Not an architecture issue; when the migration also moves to such an AMI, note it once in `05-runtime-configuration.md`
+- ❌ `.gitignore` or `.dockerignore` edits, and CI changes beyond architecture: phrased as a recommendation only (SKILL.md "User Responsibility")
+- ❌ SDK credential changes after an AMI change: the [EC2 User Guide](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html#use-a-supported-sdk-version-for-imdsv2) lists botocore 1.13.25 (boto3 1.12.6) as the minimum for IMDSv2, and Amazon Linux 2023 AMIs require IMDSv2 by default. Not an architecture issue; when the migration also moves to such an AMI, note it once in `05-runtime-configuration.md`
 
 ## 🔍 Decision Tree: Should I Update This Dependency?
 
@@ -132,7 +154,7 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 For each dependency, ask in order:
 
 1. Does it contain native code (a platform wheel, or an sdist with compiled sources)?
-   NO → Mark COMPATIBLE, do NOT update
+   NO → Does it start an image or download a binary with no arm64 build? YES → MUST UPGRADE (IN SCOPE 7); NO → Mark COMPATIBLE, do NOT update
    YES → Continue to #2
 
 2. Does current version have an aarch64 wheel for this interpreter and the target's libc?
@@ -148,7 +170,7 @@ For each dependency, ask in order:
    YES → MUST UPGRADE (document evidence)
 ```
 
-**Simple Rule:** If it installs and runs on ARM64 today → **DO NOT UPDATE**
+**Simple Rule:** Update only what ARM64 requires. A dependency, image or tool is in scope when, on the ARM64 target, it fails to install, build or run, runs other code than on x86 because its compiled part did not load (a pure-Python fallback), or pulls an image or binary that has no arm64 build. A confirmed fallback is MUST UPGRADE to the lowest version with an aarch64 wheel, or a user decision when none has one. Everything else stays as it is, even when it is old.
 
 ## 📈 Recommendations: Validation Ladder
 
@@ -156,20 +178,21 @@ A recommendation (a RECOMMENDED UPGRADE or a runtime setting) may be recorded on
 
 | Level | Evidence | Handling |
 |---|---|---|
-| **A** | Documented in this repository with a mechanism (file and section cited) | Record in `05-runtime-configuration.md` as a recommendation with the citation |
+| **A** | Stated in this skill with the condition it applies under (Phase 2.5) | Record in `05-runtime-configuration.md` as a recommendation, with that condition |
 | **B** | Upstream release note, changelog or published benchmark that names aarch64/arm64/Graviton | Record with the link, labelled "upstream-claimed, measure before adopting" |
 | **C** | No written source | Omit. If the user asks, say it is unverified |
 
-A-level sources available in this repository: BLAS threading (`OMP_NUM_THREADS`, `BLIS_NUM_THREADS`) and BLIS as an alternative BLAS in [python.md sections 2.2 and 2.6](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#2-scientific-and-numerical-application-numpy-scipy-blas-etc); PyTorch runtime environment (`DNNL_DEFAULT_FPMATH_MODE=BF16` gated on `bf16` in `/proc/cpuinfo`, `LRU_CACHE_CAPACITY=1024`, `THP_MEM_ALLOC_ENABLE=1`, the OMP thread formula, `torch.compile`, channels-last) in [pytorch.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/pytorch.md); TensorFlow `TF_ENABLE_ONEDNN_OPTS=1` for versions before 2.14 and thread-pool settings in [tensorflow.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/tensorflow.md); ONNX Runtime 1.17+ BF16 session option in [onnx.md](https://github.com/aws/aws-graviton-getting-started/blob/main/machinelearning/onnx.md); interpreter `>= 3.11` in [python.md section 1.2](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#12-recommended-versions); `-mcpu` compiler flags for in-repo extensions in [c-c++.md](https://github.com/aws/aws-graviton-getting-started/blob/main/c-c++.md) and the README processor table.
+Only the settings that Phase 2.5 states are level A.
 
-## 📋 Common Pure Python Libraries (Always ARM64-Compatible)
+## 📋 Common Pure Python Libraries (ARM64-Compatible)
 
-These publish only `none-any` wheels on PyPI (latest release at the time of writing): pytest, six, attrs, requests, urllib3, idna, certifi, click, jinja2, flask, django, fastapi, boto3, botocore, python-dateutil, pytz, packaging, typing-extensions, pydantic.
+These publish only `none-any` wheels on PyPI (in the releases checked; the Phase 1.3 probe still checks each pin): pytest, six, attrs, requests, urllib3, idna, certifi, click, jinja2, flask, django, fastapi, boto3, botocore, python-dateutil, pytz, packaging, typing-extensions, pydantic.
 
-Two traps in that list:
+Three traps in that list:
 
 - **Pure facade, native transitive.** `pydantic` is pure, but it depends on `pydantic-core`, which ships platform wheels (aarch64 present). The transitive gets its own verdict; the probe over the resolved tree catches it.
-- **Native with a pure fallback.** `sqlalchemy`, `charset-normalizer` and `wrapt` publish both `none-any` and platform wheels; `pyyaml`, `markupsafe`, `greenlet` publish platform wheels only but build from source anywhere. All have aarch64 wheels today. If a *pinned* version lacks one, the pure fallback or sdist build is COMPATIBLE unless the project depends on the accelerated path for performance (then it is an improvement note, not a blocker).
+- **Compiled on x86 only, in older releases.** pydantic 1.x is the reverse: its x86_64 wheels are compiled with Cython and no 1.x release has an aarch64 wheel, so a 1.x pin runs its pure-Python code on arm64 (executed for 1.10.26: `pydantic.compiled` is `True` on x86_64 and `False` on arm64). The probe reports it CHECK FALLBACK.
+- **Native with a pure fallback.** `sqlalchemy`, `charset-normalizer` and `wrapt` publish both `none-any` and platform wheels; `pyyaml`, `markupsafe`, `greenlet` publish platform wheels only but build from source anywhere. The probe judges a pin by its own files: an x86_64 wheel and no aarch64 wheel is MUST UPGRADE to the lowest release with one (`wrapt==1.13.3`, `pyyaml==5.4`, `greenlet==0.4.17` and `sqlalchemy==1.3.18` on Python 3.8), because installing the pin anyway builds its sdist, which needs a compiler and, for some of these packages, finishes without the compiled code when none is found; no wheel for the target's Python on either architecture is CHECK SDIST/ABI (the same pins on Python 3.11); a `none-any` wheel next to a compiled x86_64 one is CHECK FALLBACK (pydantic 1.x, above). An sdist build gets the Phase 3 loaded check, which shows whether its compiled code was built.
 
 Do not extend the list from memory. A package is pure when its files list shows only `none-any` wheels or its sdist contains no compiled sources (wheel-verification.md section 5).
 
@@ -184,7 +207,7 @@ Stop if you are about to write any of these as the *reason* for a change:
 - "Python 3.X is end of life" (unless `python.interpreter_bump` allows it, and then only when the bump is the sole path to an aarch64 wheel)
 - "While I am here"
 
-Correct reasons look like: "no `cp311` aarch64 wheel for 0.6.3; 0.6.4 ships one (filename)", "the native scan reports `e_machine 62 (x86-64)` and no aarch64 build", "`--require-hashes` fails on aarch64: Expected sha256 666dbf..., Got 7ab554...", "`platform.machine()` compares to `x86_64` only at service.py:19", "python.md section 2 documents the OpenBLAS 0.3.17 correctness floor".
+Correct reasons look like: "no `cp311` aarch64 wheel for 0.6.3; 0.6.4 ships one (filename)", "the native scan reports `e_machine 62 (x86-64)` and no aarch64 build", "`--require-hashes` fails on aarch64: Expected sha256 666dbf..., Got 7ab554...", "`platform.machine()` compares to `x86_64` only at service.py:19", "NumPy 1.21.1 is the first release with OpenBLAS 0.3.17 and its aarch64 correctness fixes".
 
 ## ✅ How to Document Scope Compliance
 
@@ -217,7 +240,7 @@ Each case comes from the evidence gathered while building this skill (PyPI files
 ### Case Study: numpy 1.20.3 (the floor is per interpreter)
 
 **Initial Analysis (WRONG):**
-> "numpy ships aarch64 wheels since 1.19.0 (python.md), so `numpy==1.20.3` is fine for our Python 3.11 service."
+> "numpy ships aarch64 wheels since 1.19.0 (PyPI), so `numpy==1.20.3` is fine for our Python 3.11 service."
 
 **Why This Was Wrong:**
 - 1.19.0 has aarch64 wheels for cp36-cp38 only.
@@ -252,7 +275,7 @@ Each case comes from the evidence gathered while building this skill (PyPI files
 - The project's numpy already uses OpenBLAS on Graviton (the fixture's conda probe resolved `numpy=1.26.4` against `libopenblas` on `linux-aarch64`).
 
 **Correct Analysis:**
-> "`mkl==2026.1.0` and its transitives have no Linux aarch64 file in any release (PyPI files list). MUST UPGRADE: remove `mkl` after confirming nothing imports it directly (grep for `import mkl`); NumPy/SciPy wheels on aarch64 use OpenBLAS ([python.md section 2](https://github.com/aws/aws-graviton-getting-started/blob/main/python.md#2-scientific-and-numerical-application-numpy-scipy-blas-etc)). Awaiting user confirmation."
+> "`mkl==2026.1.0` and its transitives have no Linux aarch64 file in any release (PyPI files list). MUST UPGRADE: remove `mkl` after confirming nothing imports it directly (grep for `import mkl`); NumPy/SciPy wheels on aarch64 use OpenBLAS. Awaiting user confirmation."
 
 ### Case Study: docopt 0.6.2 (sdist is fine, do nothing)
 
@@ -306,7 +329,7 @@ Each case comes from the evidence gathered while building this skill (PyPI files
 - "Is there concrete evidence this current version breaks on ARM64 (a probe result, a wheel filename, an error message)?"
 - "Am I updating this because it's old, or because ARM64 requires it?"
 
-**If unsure:** Mark as COMPATIBLE and document reasoning. It's better to under-fix than to introduce unnecessary scope creep.
+**If unsure:** Mark it CHECK, not COMPATIBLE, and change nothing. Name the evidence that would settle it and collect it in Phase 3 on ARM64; until then it stays CHECK. It's better to under-fix than to introduce unnecessary scope creep.
 
 ---
 

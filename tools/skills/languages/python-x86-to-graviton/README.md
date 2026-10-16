@@ -41,11 +41,11 @@ cp .skills/python-x86-to-graviton/document_references/skill-config.template.md \
 
 The config lives in *your* repo (not the skill folder), so skill updates never overwrite
 it. It steers **how** the transformation runs but never widens its scope; see
-[document_references/skill-configuration.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/python-x86-to-graviton/document_references/skill-configuration.md).
+[document_references/skill-configuration.md](document_references/skill-configuration.md).
 
 ## Skill Files
 
-[summaries.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/python-x86-to-graviton/summaries.md) is the canonical index of every file in this skill, with its purpose and when it is read. Start at [SKILL.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/languages/python-x86-to-graviton/SKILL.md); it routes to everything else at the step that needs it.
+[summaries.md](summaries.md) is the canonical index of every file in this skill, with its purpose and when it is read. Start at [SKILL.md](SKILL.md); it routes to everything else at the step that needs it.
 
 ## Output
 
@@ -58,7 +58,3 @@ The skill produces a `graviton-validation/` folder in the project root with stru
 - `04-code-scan-findings.md`: Architecture-specific code, build flags and Dockerfile findings
 - `05-runtime-configuration.md`: Graviton runtime recommendations (documented, not applied)
 - `06-build-test-results.md`: Install, build and test results
-
-## Related
-
-- [Python on Graviton guide](../../../../python.md): The upstream Graviton Python documentation this skill draws from
