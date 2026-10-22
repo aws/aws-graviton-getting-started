@@ -15,7 +15,7 @@ Install, build and test on ARM64 architecture. Supported platforms: Linux, macOS
 
 Before skipping validation, check for a container runtime that can run `linux/arm64` images. Graviton hosts run them natively, x86 Linux hosts through QEMU emulation, and an Apple Silicon Mac in a Linux VM on Apple's own cores. Only a run on Graviton passes a check ("Match the production hosts" below).
 
-> **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [skill-configuration.md](skill-configuration.md).
 
 ```bash
 # Host-side time limit: GNU timeout where it exists (Linux, WSL, Homebrew coreutils), else gtimeout, else Python.
@@ -117,7 +117,7 @@ The highest `manylinux` tag pip accepts comes from the OS glibc, not from where 
 
 Two more things to align before installing:
 
-- **pip version.** pip 19.3 is the minimum that installs `manylinux2014` aarch64 wheels and pip 20.3 the minimum for `manylinux_2_N` tags ([../document_references/wheel-verification.md](../document_references/wheel-verification.md) §2). An older pip cannot see those wheels and falls back to building native packages from source. Check `python3 -m pip --version` and, inside the validation environment only, run `python3 -m pip install --upgrade pip`. The `python:3.11-slim` image used here ships pip 24.0.
+- **pip version.** pip 19.3 is the minimum that installs `manylinux2014` aarch64 wheels and pip 20.3 the minimum for `manylinux_2_N` tags ([wheel-verification.md](wheel-verification.md) §2). An older pip cannot see those wheels and falls back to building native packages from source. Check `python3 -m pip --version` and, inside the validation environment only, run `python3 -m pip install --upgrade pip`. The `python:3.11-slim` image used here ships pip 24.0.
 - **Build prerequisites**, only if an sdist build remains after Phase 2: pure-Python sdists (for example `docopt`) need no compiler; native sdists need a C compiler and the Python headers (`python3-devel` or `python3-dev`) plus the library headers the package names.
 
 Build-time tools (build backends, compilers) may not support the newest setuptools, compiler or NumPy release. Runtime compatibility != build-time tooling compatibility; this matters whenever Phase 2 leaves an sdist build.
@@ -173,7 +173,7 @@ $CONTAINER_CMD run --rm --init --platform linux/arm64 "python:$PY_TARGET-slim" t
 
 **FORBIDDEN:** editing `~/.bashrc`/`~/.zshrc`/`~/.bash_profile`, `pyenv global` ("select globally for your user account"), `conda init` (a dry run shows it would modify `~/.bashrc`), `update-alternatives` for `python3`, replacing `/usr/bin/python3`, and `pip install` into the system interpreter. After the transformation, the user's `python3 --version` must match its pre-transformation value.
 
-> **Skill config:** If `skill-config.md` defines `python.interpreter_select` (`uv | pyenv | conda | system`), use that tool for the session-scoped environment above; `system` means the interpreter already on PATH, used through a virtual environment. This selects only the validation environment; the project's declared interpreter is governed by `python.interpreter_bump` (Phase 1.5). See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `python.interpreter_select` (`uv | pyenv | conda | system`), use that tool for the session-scoped environment above; `system` means the interpreter already on PATH, used through a virtual environment. This selects only the validation environment; the project's declared interpreter is governed by `python.interpreter_bump` (Phase 1.5). See [skill-configuration.md](skill-configuration.md).
 
 **If no matching interpreter is found:** document the requirement and provide install commands; do NOT install automatically. Use `python.install_hint` from `skill-config.md` if defined; otherwise suggest `uv python install <version>` or the distribution's package for that version.
 
@@ -183,7 +183,7 @@ $CONTAINER_CMD run --rm --init --platform linux/arm64 "python:$PY_TARGET-slim" t
 
 ### Build Strategy
 
-> **Skill config:** Use `python.test_command` from `skill-config.md` for the test step in §3.2 if defined, and `python.index_url` / `python.extra_index_url` for every install. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** Use `python.test_command` from `skill-config.md` for the test step in §3.2 if defined, and `python.index_url` / `python.extra_index_url` for every install. See [skill-configuration.md](skill-configuration.md).
 
 1. **First attempt:** install exactly as the deployment does, in its order (for the fixture: `pip install --require-hashes -r requirements-locked.txt`, then `pip install -r requirements.txt`), then build the project's own extensions (`pip install .` or the project's build command). Record, per package, whether pip used a wheel (`Downloading <name>-...-aarch64.whl` or `...-none-any.whl`) or built from source (`Building wheel for <name>`). Every source build on aarch64 must be either a pure-Python sdist or a native build the Phase 2 report expected.
 
@@ -367,4 +367,4 @@ Recommend to the user for independent testing: performance benchmarking, load te
 
 > **Output: `graviton-validation/00-summary.md`**
 
-After all phases complete, write the summary using the template from [../document_references/documentation-standards.md](../document_references/documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.
+After all phases complete, write the summary using the template from [documentation-standards.md](documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.

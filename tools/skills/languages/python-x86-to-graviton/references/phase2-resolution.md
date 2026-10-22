@@ -1,6 +1,6 @@
 # Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes, or whose options all lie outside the skill (such as the OS or the base image), stays unchanged and listed.
+Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [agent-scope-boundaries.md](agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes, or whose options all lie outside the skill (such as the OS or the base image), stays unchanged and listed.
 
 ## Contents
 
@@ -98,9 +98,9 @@ except (OSError, RuntimeError):
 
 > **Output: update `graviton-validation/03-dependency-compatibility-report.md`**
 
-Update ONLY dependencies flagged as MUST UPGRADE in Phase 1.3. Do NOT upgrade compatible dependencies. Prefer the *lowest* version that publishes an aarch64 wheel the target accepts (the project's interpreter, and the target's C library and glibc, which the probe's platform tags encode), not the latest: read the candidates from the probe's `from versions:` list (Phase 1.3), pick the lowest one at or above the current pin, and **probe that exact candidate** before writing it ([../document_references/wheel-verification.md](../document_references/wheel-verification.md) §3). Availability is not monotonic, so a version between the pin and the candidate may have no wheel.
+Update ONLY dependencies flagged as MUST UPGRADE in Phase 1.3. Do NOT upgrade compatible dependencies. Prefer the *lowest* version that publishes an aarch64 wheel the target accepts (the project's interpreter, and the target's C library and glibc, which the probe's platform tags encode), not the latest: read the candidates from the probe's `from versions:` list (Phase 1.3), pick the lowest one at or above the current pin, and **probe that exact candidate** before writing it ([wheel-verification.md](wheel-verification.md) §3). Availability is not monotonic, so a version between the pin and the candidate may have no wheel.
 
-> **Skill config:** If `skill-config.md` defines `python.index_url`, the new pin must resolve against that index as well as PyPI. If the mirror lacks the candidate's aarch64 wheel, record an INFRA item ("mirror needs blosc2 0.6.4 aarch64") rather than choosing a different version. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `python.index_url`, the new pin must resolve against that index as well as PyPI. If the mirror lacks the candidate's aarch64 wheel, record an INFRA item ("mirror needs blosc2 0.6.4 aarch64") rather than choosing a different version. See [skill-configuration.md](skill-configuration.md).
 
 **Direct dependencies (pip):** e.g. `blosc2==0.6.3` had no cp311 aarch64 wheel; the lowest candidate in the probe output was 0.6.4, and its probe returned `blosc2-0.6.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl`:
 
@@ -120,7 +120,7 @@ msgpack==1.1.0
 pip install -c constraints.txt -r requirements.txt     # or set PIP_CONSTRAINT=constraints.txt in the Dockerfile
 ```
 
-For other managers use their own mechanism and regenerate the lock, never edit a lock by hand ([../document_references/package-manager-mapping.md](../document_references/package-manager-mapping.md) §2):
+For other managers use their own mechanism and regenerate the lock, never edit a lock by hand ([package-manager-mapping.md](package-manager-mapping.md) §2):
 
 | Manager | Direct pin | Transitive pin | Then |
 |---|---|---|---|
@@ -226,7 +226,7 @@ Without the guard, the build on aarch64 stops at `unrecognized command-line opti
 
 PRESERVE the current base image distribution and version. Do NOT change the Python version or the image tag. One tag change is in scope: a tag or repository that names one architecture (`public.ecr.aws/lambda/python:3.12-x86_64`, `amd64/python:3.11-slim`) becomes the same image's multi-architecture tag (`public.ecr.aws/lambda/python:3.12`, `python:3.11-slim`); the distribution and version stay. An image with no arm64 build at its tag (Phase 1.4) moves to the lowest tag of the same image that lists `linux/arm64` (`mysql:5.7` lists only amd64, `mysql:8.0` lists arm64 too): a user decision, which an unattended run applies and records with how to reverse it. A library that starts such an image moves to its lowest version whose image has an arm64 build (MUST UPGRADE).
 
-> **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `python:3.11-slim` → `<registry>/python:3.11-slim`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting**: if the configured registry does not resolve or pull from the build host, do NOT rewrite the `FROM`; keep the original registry and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets**, record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md`. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `python:3.11-slim` → `<registry>/python:3.11-slim`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting**: if the configured registry does not resolve or pull from the build host, do NOT rewrite the `FROM`; keep the original registry and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets**, record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md`. See [skill-configuration.md](skill-configuration.md).
 
 Single-stage (the whole image is the deployable artifact):
 ```dockerfile
@@ -265,7 +265,7 @@ Host-based deployments skip Docker steps.
 
 If the project contains Kubernetes/Helm manifests (or similar deployment descriptors), ensure they can schedule onto ARM64 nodes. Only touch node selection, image registry, and ingress vocabulary; do NOT restructure manifests or add resources the project does not already have. If no manifests are present, skip this step.
 
-> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use the generic `kubernetes.io/arch` label as the capacity rule below says, and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use the generic `kubernetes.io/arch` label as the capacity rule below says, and leave the existing registry/ingress unchanged. See [skill-configuration.md](skill-configuration.md).
 
 On a one-node Graviton cluster, a Deployment with `nodeSelector: kubernetes.io/arch: amd64` stayed `Pending` with `0/1 nodes are available: 1 node(s) didn't match Pod's node affinity/selector`.
 
@@ -284,7 +284,7 @@ Executed in us-west-2, it listed `m6g.xlarge`, `m7g.xlarge`, `m8g.xlarge` and `m
 
 > **Output: `graviton-validation/05-runtime-configuration.md`**
 
-Do NOT apply runtime settings automatically. Document recommendations in the report for the team to evaluate during performance testing, each with its evidence level from the validation ladder in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md) and the exact source (Phase 2.5 for a level-A row, the link for a level-B row). Include only rows for libraries the project actually uses.
+Do NOT apply runtime settings automatically. Document recommendations in the report for the team to evaluate during performance testing, each with its evidence level from the validation ladder in [agent-scope-boundaries.md](agent-scope-boundaries.md) and the exact source (Phase 2.5 for a level-A row, the link for a level-B row). Include only rows for libraries the project actually uses.
 
 **Interpreter:** target a release the devguide lists as supported (bugfix or security; Phase 1.5 reads it). Record the project's version with its status; any change goes through `python.interpreter_bump`.
 

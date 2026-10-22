@@ -1,8 +1,8 @@
 # Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes, or whose options all lie outside the skill (such as the OS or the base image), stays unchanged and listed.
+Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is required for ARM64 compatibility (findings labelled MUST UPGRADE in [agent-scope-boundaries.md](agent-scope-boundaries.md)). Findings labelled user decision are presented with their options and left unchanged until the user chooses. In an unattended run, where no one can answer (an automated transformation, or a brief that says not to ask), apply the option the decision's Recommendation names instead of waiting, list it under User Decisions Pending as applied, with how to reverse it, and continue; a `skill-config.md` value that rules the change out still wins, and an item no option fixes, or whose options all lie outside the skill (such as the OS or the base image), stays unchanged and listed.
 
-For a .NET Framework or Windows starting point (Phase 1.1), the approved move to modern .NET on Linux comes first, following [../document_references/windows-to-linux.md](../document_references/windows-to-linux.md); the steps below then apply to the moved projects.
+For a .NET Framework or Windows starting point (Phase 1.1), the approved move to modern .NET on Linux comes first, following [windows-to-linux.md](windows-to-linux.md); the steps below then apply to the moved projects.
 
 ## Contents
 
@@ -68,18 +68,18 @@ return NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "native", arch,
 
 > **Output: update `graviton-validation/03-dependency-compatibility-report.md`**
 
-Update ONLY dependencies flagged as MUST UPGRADE in Phase 1.3. Do NOT upgrade compatible dependencies. Prefer the *lowest* version whose native files probe clean for every target RID, not the latest: probe the candidates upward from the version in use and **probe the exact candidate** before writing it ([../document_references/nuget-native-assets.md](../document_references/nuget-native-assets.md) §5). Floors are not always monotonic.
+Update ONLY dependencies flagged as MUST UPGRADE in Phase 1.3. Do NOT upgrade compatible dependencies. Prefer the *lowest* version whose native files probe clean for every target RID, not the latest: probe the candidates upward from the version in use and **probe the exact candidate** before writing it ([nuget-native-assets.md](nuget-native-assets.md) §5). Floors are not always monotonic.
 
 ```bash
 GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
 python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0 --target-rid linux-arm64 --glibc 2.34; echo "exit status $?"
 ```
 
-> **Skill config:** If `skill-config.md` defines `dotnet.target_rids`, the candidate must probe clean for each of those RIDs. Probes use the repository's `NuGet.config`; if the repository's feeds lack the candidate, record an INFRA item ("the feed needs SkiaSharp.NativeAssets.Linux 2.80.0") rather than choosing a different version. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `dotnet.target_rids`, the candidate must probe clean for each of those RIDs. Probes use the repository's `NuGet.config`; if the repository's feeds lack the candidate, record an INFRA item ("the feed needs SkiaSharp.NativeAssets.Linux 2.80.0") rather than choosing a different version. See [skill-configuration.md](skill-configuration.md).
 
 **Read the NuGet audit lines of each probe.** `probe` prints the NU1901 to NU1904 warnings of the probed package and of its dependencies as `NOTE NuGet audit:` lines, each naming its package (its scratch project sets `NuGetAuditMode` to `all`; `assets` keeps the repository's own setting). If the candidate has a warning that the current version does not have, present the floor and the lowest version without the warning as one user decision. For example, SkiaSharp 2.80.0, the arm64 floor, reported `warning NU1903: Package 'SkiaSharp' 2.80.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-j7hp-h8jx-5ppr`, which 1.68.3 did not; 2.88.6 was the lowest release without it. An advisory that the current version already has stays out of scope.
 
-**Where to write the version** depends on how the solution manages packages ([../document_references/package-management-mapping.md](../document_references/package-management-mapping.md)):
+**Where to write the version** depends on how the solution manages packages ([package-management-mapping.md](package-management-mapping.md)):
 
 | Mechanism | Direct reference | Transitive package | Then |
 |---|---|---|---|
@@ -216,7 +216,7 @@ curl -sSL -o /tmp/awscliv2.zip "https://awscli.amazonaws.com/awscli-exe-linux-${
 
 The AWS CLI names its installers by `uname -m`, and `awscli-exe-linux-aarch64.zip` answered HTTP 200. Change only the architecture handling. If a vendor publishes no arm64 asset, the item stays a user decision.
 
-For Windows-only APIs, apply the replacements in [../document_references/windows-to-linux.md](../document_references/windows-to-linux.md) §2.
+For Windows-only APIs, apply the replacements in [windows-to-linux.md](windows-to-linux.md) §2.
 
 ## 2.4 Build Configuration Updates
 
@@ -232,7 +232,7 @@ For Windows-only APIs, apply the replacements in [../document_references/windows
 
 PRESERVE the current base image distribution and version. Do NOT change the .NET version or the image tag. One tag change is in scope: a tag or repository that names one architecture (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim-amd64`, `public.ecr.aws/lambda/dotnet:8-x86_64`) becomes the same image's multi-architecture tag (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim`, `public.ecr.aws/lambda/dotnet:8`); the distribution and version stay. An image with no arm64 build at its tag (Phase 1.4) moves to the lowest tag of the same image that lists `linux/arm64` (`mysql:5.7` lists only amd64, `mysql:8.0` lists arm64 too): a user decision, which an unattended run applies and records with how to reverse it. A library that starts such an image moves to its lowest version whose image has an arm64 build (MUST UPGRADE).
 
-> **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `mcr.microsoft.com/dotnet/aspnet:8.0` → `<registry>/dotnet/aspnet:8.0`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting**: if the configured registry does not resolve or pull from the build host, do NOT rewrite the `FROM`; keep the original registry and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets**, record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md`. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `container.base_image_registry`, redirect the base image(s) to pull from that registry/namespace while keeping the SAME distribution and version (e.g. `mcr.microsoft.com/dotnet/aspnet:8.0` → `<registry>/dotnet/aspnet:8.0`). If absent, leave the existing registry unchanged. **Verify the mirror is reachable before redirecting**: if the configured registry does not resolve or pull from the build host, do NOT rewrite the `FROM`; keep the original registry and record the skipped redirect in `01-project-assessment.md`. **If the project ships no Dockerfile/container assets**, record "container config supplied but not applicable (no container assets)" in `01-project-assessment.md`. See [skill-configuration.md](skill-configuration.md).
 
 Single-stage (the whole image is the deployable artifact):
 ```dockerfile
@@ -294,7 +294,7 @@ Host-based deployments skip Docker steps.
 
 If the project contains Kubernetes/Helm manifests (or similar deployment descriptors), ensure they can schedule onto ARM64 nodes. Only touch node selection, image registry, and ingress vocabulary; do NOT restructure manifests or add resources the project does not already have. If no manifests are present, skip this step.
 
-> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use the generic `kubernetes.io/arch` label as the capacity rule below says, and leave the existing registry/ingress unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `deploy.arch_selector` / `deploy.nodepool_label` / `deploy.registry` / `deploy.ingress_convention`, use those values for the node selector, nodepool label, image registry, and ingress convention respectively. If absent, use the generic `kubernetes.io/arch` label as the capacity rule below says, and leave the existing registry/ingress unchanged. See [skill-configuration.md](skill-configuration.md).
 
 The image a manifest names must be built for linux/arm64 (or as a multi-architecture image) before the deployment can run.
 
@@ -313,7 +313,7 @@ Executed in us-west-2, it listed `m6g.xlarge`, `m7g.xlarge`, `m8g.xlarge` and `m
 
 > **Output: `graviton-validation/05-runtime-configuration.md`**
 
-Do NOT apply runtime settings automatically. Document recommendations in the report for the team to evaluate during performance testing, each with its evidence level from the validation ladder in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md) and the exact source. Include only rows that apply to the project.
+Do NOT apply runtime settings automatically. Document recommendations in the report for the team to evaluate during performance testing, each with its evidence level from the validation ladder in [agent-scope-boundaries.md](agent-scope-boundaries.md) and the exact source. Include only rows that apply to the project.
 
 | Recommendation | Applies when | Level | Source |
 |---|---|---|---|

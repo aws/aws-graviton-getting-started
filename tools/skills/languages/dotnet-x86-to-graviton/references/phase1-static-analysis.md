@@ -2,21 +2,21 @@
 
 Analyze the project without making changes. All findings are documented in `graviton-validation/` files.
 
-> **Skill config:** Wherever a step below picks target runtime identifiers (RIDs), use `dotnet.target_rids` from `skill-config.md` (if defined) in place of the default `linux-arm64`, and use `dotnet.framework_bump` in §1.5. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** Wherever a step below picks target runtime identifiers (RIDs), use `dotnet.target_rids` from `skill-config.md` (if defined) in place of the default `linux-arm64`, and use `dotnet.framework_bump` in §1.5. See [skill-configuration.md](skill-configuration.md).
 
 Phase 1 runs on any host, including x86, and changes nothing in the repository. Three steps execute the repository's MSBuild files:
 - the property listing in §1.1 (`dotnet msbuild -getProperty`), which evaluates every project with its `Directory.Build.props` and `Directory.Build.targets`;
 - `assets` in §1.1, whose restore of a scratch copy also runs any target hooked to restore (a test target with `BeforeTargets="Restore"` ran its `Exec`);
 - for a Windows starting point, the CA1416 build of a scratch copy in §1.4, which runs the whole build.
 
-MSBuild also reads `Directory.Build.rsp` for these steps, and that file can add targets: with `-t:` in it, the property listing ran a target of the repository. List what the repository's MSBuild files can run (block below) before the first of them, and for a repository you do not trust, run Phase 1 in a disposable container or VM. `scan` only reads files, and `probe` and `config` restore a project that the check program writes in a scratch folder, copying only `NuGet.config`. Two steps run container images, with the image's own tools: the libc check of each target image (§1.1) and the OS package lookups (§1.2.2). No test or application of the project runs until Phase 3. The commands were executed in bash 5.2 and zsh 5.9 on Linux. They need the .NET SDK, Python 3.6 or later, and the check program, written once per session with the block in [nuget-native-assets.md §11](../document_references/nuget-native-assets.md#11-the-check-program):
+MSBuild also reads `Directory.Build.rsp` for these steps, and that file can add targets: with `-t:` in it, the property listing ran a target of the repository. List what the repository's MSBuild files can run (block below) before the first of them, and for a repository you do not trust, run Phase 1 in a disposable container or VM. `scan` only reads files, and `probe` and `config` restore a project that the check program writes in a scratch folder, copying only `NuGet.config`. Two steps run container images, with the image's own tools: the libc check of each target image (§1.1) and the OS package lookups (§1.2.2). No test or application of the project runs until Phase 3. The commands were executed in bash 5.2 and zsh 5.9 on Linux. They need the .NET SDK, Python 3.6 or later, and the check program, written once per session with the block in [nuget-native-assets.md §11](nuget-native-assets.md#11-the-check-program):
 
 ```bash
 dotnet --list-sdks
 dotnet --version   # the SDK this repository selects (global.json in this folder or a parent)
 python3 -c 'import sys; assert sys.version_info >= (3, 6), sys.version; print("python3", sys.version.split()[0])'
 GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
-[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (document_references/nuget-native-assets.md, section 11)"
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 ```
 
 > **If `dotnet --version` fails** with `A compatible .NET SDK was not found.`, the repository's `global.json` pins an SDK that is not installed. Apply the session-scoped SDK switch from [phase3-validation.md](phase3-validation.md) §3.0 now: the first `dotnet` command needs it, not only Phase 3.
@@ -125,7 +125,7 @@ except ValueError:
 
 | Starting point | What the properties show | Path |
 |---|---|---|
-| .NET Framework | no `UsingMicrosoftNETSdk`, `TargetFrameworkVersion=v4.x`, a `packages.config`; or `TargetFramework` `net4x` | **MUST UPGRADE:** port to modern .NET on Linux, one approval for the whole solution ([windows-to-linux.md](../document_references/windows-to-linux.md)) |
+| .NET Framework | no `UsingMicrosoftNETSdk`, `TargetFrameworkVersion=v4.x`, a `packages.config`; or `TargetFramework` `net4x` | **MUST UPGRADE:** port to modern .NET on Linux, one approval for the whole solution ([windows-to-linux.md](windows-to-linux.md)) |
 | Modern .NET on Windows | `TargetFramework` ending in `-windows`, `UseWindowsForms=true` or `UseWPF=true`, `RuntimeIdentifier=win-*`, plus the Windows hosting markers above | **MUST UPGRADE:** move to Linux, one approval for the whole solution. Windows Forms and WPF projects have no Linux path: **BLOCKER**, user decision |
 | Modern .NET on Linux | `TargetFramework` `netcoreapp*` or `net5.0` and later, Linux RIDs | the arm64 checks in this skill apply directly |
 | .NET Standard library | `TargetFramework` `netstandard*` | portable; the same checks apply |
@@ -136,7 +136,7 @@ Never decide the starting point from a successful build or publish. With `Enable
 
 ### Determine Target OS and libc
 
-Native files depend on the OS the workload runs on as well as the CPU: glibc or musl, the glibc version, and the kernel's page size ([nuget-native-assets.md §6](../document_references/nuget-native-assets.md#6-target-os-libc-glibc-version-page-size)). Find every target:
+Native files depend on the OS the workload runs on as well as the CPU: glibc or musl, the glibc version, and the kernel's page size ([nuget-native-assets.md §6](nuget-native-assets.md#6-target-os-libc-glibc-version-page-size)). Find every target:
 
 ```bash
 EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
@@ -149,7 +149,7 @@ grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.template
 ```
 
 Then, for each target:
-- **Container images:** read the image's libc, and for a glibc image its libstdc++ version, with the blocks in [nuget-native-assets.md §6](../document_references/nuget-native-assets.md#6-target-os-libc-glibc-version-page-size), which also list the results for the common .NET and Lambda images.
+- **Container images:** read the image's libc, and for a glibc image its libstdc++ version, with the blocks in [nuget-native-assets.md §6](nuget-native-assets.md#6-target-os-libc-glibc-version-page-size), which also list the results for the common .NET and Lambda images.
 - **Lambda managed runtimes:** `dotnet8` and `dotnet10` run on Amazon Linux 2023 (glibc 2.34); `dotnet6` and `dotnetcore3.1` ran on Amazon Linux 2 (glibc 2.26) ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)).
 - **EC2 hosts:** ask for the AMI if no file names it. Amazon Linux 2023 AMIs launch in IMDSv2-only mode by default ([Deprecated in AL2023](https://docs.aws.amazon.com/linux/al2023/ug/deprecated-al2023.html)); §1.3 uses this for the AWS SDK.
 
@@ -165,7 +165,7 @@ For a Lambda function on a managed .NET runtime, the arm64 target is `dotnet8` o
 
 > **If this restore fails** for the SDK reason above, or because the project needs an SDK feature the selected SDK lacks, apply the session-scoped SDK switch from [phase3-validation.md](phase3-validation.md) §3.0 now.
 
-One scratch restore gives both the dependency tree (every resolved package with the shortest reference chain from a project, as JSON) and the per-RID native report used in §1.2 and §1.3. The repository is not modified ([nuget-native-assets.md §3](../document_references/nuget-native-assets.md#3-the-per-rid-check)):
+One scratch restore gives both the dependency tree (every resolved package with the shortest reference chain from a project, as JSON) and the per-RID native report used in §1.2 and §1.3. The repository is not modified ([nuget-native-assets.md §3](nuget-native-assets.md#3-the-per-rid-check)):
 
 ```bash
 GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
@@ -179,7 +179,7 @@ cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findi
 grep -q '^packages: [1-9]' graviton-validation/raw/native-assets.txt || echo "WARNING: no packages resolved; read the restore errors above"
 ```
 
-A project that uses `packages.config` is not in this report: the program prints `CHECK <file>: these packages are not restored by PackageReference and are not in this report; run: config <file>`, and that project gets the per-package check instead ([nuget-native-assets.md §3](../document_references/nuget-native-assets.md#projects-that-still-use-packagesconfig)).
+A project that uses `packages.config` is not in this report: the program prints `CHECK <file>: these packages are not restored by PackageReference and are not in this report; run: config <file>`, and that project gets the per-package check instead ([nuget-native-assets.md §3](nuget-native-assets.md#projects-that-still-use-packagesconfig)).
 
 ### Categorize Components by Risk
 
@@ -192,7 +192,7 @@ A project that uses `packages.config` is not in this report: the program prints 
 
 > **Output: `graviton-validation/02-native-library-report.md`**, **`graviton-validation/raw/native-assets.txt`** (from §1.1) and **`graviton-validation/raw/repo-native-scan.txt`**
 
-Native code reaches a .NET application in four ways ([nuget-native-assets.md §1](../document_references/nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each)):
+Native code reaches a .NET application in four ways ([nuget-native-assets.md §1](nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each)):
 - files under `runtimes/<rid>/native/` in NuGet packages;
 - files that packages keep elsewhere and copy to the output or run;
 - files committed to the repository;
@@ -210,7 +210,7 @@ Statically bundled native code sits in two places. Judge both by content, never 
    - `CHECK`: x86-only files outside `runtimes/`, which fail only if a build target copies them or a tool runs them;
    - an indented `via` line under each `FINDING` and `CHECK`, with the reference chain from a project.
 
-   What each line means, and the package shapes behind them: [nuget-native-assets.md §3 and §4](../document_references/nuget-native-assets.md#3-the-per-rid-check).
+   What each line means, and the package shapes behind them: [nuget-native-assets.md §3 and §4](nuget-native-assets.md#3-the-per-rid-check).
 2. **Files committed to the repository**: vendored libraries, prebuilt helpers, and managed assemblies built for one architecture. Scan the source tree by content. `--source-tree` skips `.git`, `.vs`, `bin`, `obj`, `node_modules` and `graviton-validation`; build and publish outputs are scanned in Phase 3.1:
 
 ```bash
@@ -220,7 +220,7 @@ python3 "$GV_CHECK" scan --source-tree . > graviton-validation/raw/repo-native-s
 cat graviton-validation/raw/repo-native-scan.txt; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
 ```
 
-The same scan reports committed managed assemblies built for x64 or x86, which fail on arm64 as described in [nuget-native-assets.md §1](../document_references/nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each).
+The same scan reports committed managed assemblies built for x64 or x86, which fail on arm64 as described in [nuget-native-assets.md §1](nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each).
 
 ### 1.2.2 Runtime-Extracted Native Library Detection
 
@@ -363,7 +363,7 @@ The full graph, including managed packages, is in `graviton-validation/raw/depen
 
 **COMPATIBLE (No action):** `OK` lines, and managed-only packages (the `managed only` count in the summary line).
 
-**OUT OF SCOPE:** Security advisories that restore reports as NU1901 to NU1904 warnings (the `NOTE NuGet audit:` lines of `native-assets.txt`), such as `NU1903` for Newtonsoft.Json 12.0.3 in the Linux solution. Mention them once and change nothing ([agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)).
+**OUT OF SCOPE:** Security advisories that restore reports as NU1901 to NU1904 warnings (the `NOTE NuGet audit:` lines of `native-assets.txt`), such as `NU1903` for Newtonsoft.Json 12.0.3 in the Linux solution. Mention them once and change nothing ([agent-scope-boundaries.md](agent-scope-boundaries.md)).
 
 For transitive dependencies: the `via` line names the direct reference that pulls the package in. Resolution may require updating that parent, or pinning the transitive package (Phase 2.2).
 
@@ -407,12 +407,12 @@ Minimum ARM64 Version: none
 Resolution: replace with Microsoft.Data.Sqlite (already in the solution, linux-arm64 and linux-musl-arm64 natives); code change in the class that uses it
 ```
 
-> **Verify the package content, never the version number.** Do not infer "old version, so no arm64 file". Confirm with the per-RID report or `probe` ([nuget-native-assets.md §5](../document_references/nuget-native-assets.md#5-finding-the-lowest-version-that-works)). Counter-examples:
+> **Verify the package content, never the version number.** Do not infer "old version, so no arm64 file". Confirm with the per-RID report or `probe` ([nuget-native-assets.md §5](nuget-native-assets.md#5-finding-the-lowest-version-that-works)). Counter-examples:
 > - SQLitePCLRaw.lib.e_sqlite3 2.0.0 already ships a linux-arm64 file;
 > - Microsoft.ML.OnnxRuntime 1.10.0 contains an aarch64 build that NuGet never selects (`runtimes/linux-aarch64`);
 > - glibc needs do not only grow: SQLitePCLRaw.lib.e_sqlite3 2.0.5 needs GLIBC_2.28, while 2.0.6 needs 2.17.
 >
-> Also make a **missing** package fail loudly. `probe` exits 2 and prints NuGet's error when a version does not exist (`error NU1102: Unable to find package SkiaSharp.NativeAssets.Linux with version (= 9.9.9)`), so an absent package is never reported as "no arm64 file". A private feed that lacks the version is INFRA, not ARM64 ([nuget-native-assets.md §9](../document_references/nuget-native-assets.md#9-private-feeds-and-mirrors)).
+> Also make a **missing** package fail loudly. `probe` exits 2 and prints NuGet's error when a version does not exist (`error NU1102: Unable to find package SkiaSharp.NativeAssets.Linux with version (= 9.9.9)`), so an absent package is never reported as "no arm64 file". A private feed that lacks the version is INFRA, not ARM64 ([nuget-native-assets.md §9](nuget-native-assets.md#9-private-feeds-and-mirrors)).
 
 ### Build-Tool Artifacts with OS/Arch RIDs
 
@@ -556,7 +556,7 @@ grep -rnE "${EX[@]}" --include='*.c' --include='*.cc' --include='*.cpp' --includ
   --include=CMakeLists.txt --include=Makefile --include='*.mk' -- '-m(avx|sse|fma|bmi|popcnt|pclmul|aes|crc32|f16c|lzcnt)|-march=|-mtune=|[a-z0-9]+intrin\.h|cpuid\.h|__builtin_ia32_|__cpuid|__rdtsc|__x86_64__|_M_X64|__SSE|__AVX|__m(128|256|512)|_mm[0-9]*_' . 2>/dev/null || true
 ```
 
-What each Windows or .NET Framework hit means on Linux, with the replacement, is in [windows-to-linux.md](../document_references/windows-to-linux.md). The descriptor fixes are in Phase 2.4.
+What each Windows or .NET Framework hit means on Linux, with the replacement, is in [windows-to-linux.md](windows-to-linux.md). The descriptor fixes are in Phase 2.4.
 
 A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`, and the CDK's `aws-eks` `Cluster` without `defaultCapacityInstance` adds `m5.large` (x86) nodes, two unless `defaultCapacity` sets another count; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim-amd64`, `public.ecr.aws/lambda/dotnet:8-x86_64`). Native C or C++ sources the repository builds need an Arm path for any x86 intrinsics they use: `sse2neon.h` ([sse2neon](https://github.com/DLTcollab/sse2neon)) implements the SSE to SSE4.2 and AES intrinsics with NEON, but no AVX (`_mm256_*`); port what it does not cover, and the hot paths found by profiling on Graviton, to NEON intrinsics. `long double` and fast-math flags change results between x86 and Graviton without an error: check them in Phase 3 (Results That Change Without Failing).
 

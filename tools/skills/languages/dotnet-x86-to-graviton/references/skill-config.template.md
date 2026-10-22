@@ -10,7 +10,7 @@
 > Sections are grouped as shared (apply to any language) and per-language. A project
 > that only uses one language keeps just that language's section.
 >
-> Full schema and precedence rules: `document_references/skill-configuration.md`.
+> Full schema and precedence rules: `references/skill-configuration.md`.
 
 ## Container (shared)
 

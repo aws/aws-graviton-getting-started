@@ -15,7 +15,7 @@ Build, publish and test for ARM64. Supported platforms: Linux, macOS, WSL.
 
 Before skipping validation, check for a container runtime that can run `linux/arm64` images. Graviton hosts run them natively, x86 Linux hosts through QEMU emulation, and an Apple Silicon Mac in a Linux VM on Apple's own cores. Only a run on Graviton passes a check ("Match the production hosts" below).
 
-> **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [skill-configuration.md](skill-configuration.md).
 
 ```bash
 # Host-side time limit: GNU timeout where it exists (Linux, WSL, Homebrew coreutils), else gtimeout, else Python.
@@ -56,7 +56,7 @@ A `command -v` cascade can pick a runtime that cannot run anything: on the x86 h
 - **x86 host + container runtime with ARM64 support:** Publish for linux-arm64 natively on the host and run the output with `--platform linux/arm64`. On x86 Linux this runs under QEMU emulation (see "Emulation limits" below).
 - **x86 host + no container runtime:** Static analysis and native publishes with output scans only (Phase 1, §3.1). Document that ARM64 runtime validation needs a Graviton host or the target, and recommend one.
 
-**Match the production hosts.** A Phase 3 check passes only on a Graviton host with the production OS and page size (Phase 1.1), or on the target itself, such as the arm64 Lambda function. A `linux/arm64` run under emulation or on another arm64 machine finds failures early, but its CPU and kernel differ from Graviton's: QEMU on an x86 host can report SVE with 512-bit vectors and SME, while Graviton2 has no SVE, Graviton3 has 256-bit SVE, Graviton4 and Graviton5 have 128-bit SVE and SVE2, and none has SME (measured on each); Apple's M1 to M3 cores have no SVE, and the M4 has SME without SVE ([LLVM's processor definitions](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/AArch64/AArch64Processors.td)); and a container uses its host's kernel, so a host whose page size is smaller than production's (an x86 host has 4KB pages; on a Mac, run `getconf PAGESIZE` in its VM) does not show the failures of 64KB pages (a library aligned for 4KB pages failed on a 64KB-page AlmaLinux 8 host and loaded on a 4KB-page Graviton4 host; [nuget-native-assets.md](../document_references/nuget-native-assets.md) §6). When the project ships native code it builds, run its tests on the oldest Graviton generation it deploys to: a newer generation does not show `Illegal instruction`. Record where each check ran, with the host's page size, in `06-build-test-results.md`.
+**Match the production hosts.** A Phase 3 check passes only on a Graviton host with the production OS and page size (Phase 1.1), or on the target itself, such as the arm64 Lambda function. A `linux/arm64` run under emulation or on another arm64 machine finds failures early, but its CPU and kernel differ from Graviton's: QEMU on an x86 host can report SVE with 512-bit vectors and SME, while Graviton2 has no SVE, Graviton3 has 256-bit SVE, Graviton4 and Graviton5 have 128-bit SVE and SVE2, and none has SME (measured on each); Apple's M1 to M3 cores have no SVE, and the M4 has SME without SVE ([LLVM's processor definitions](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/AArch64/AArch64Processors.td)); and a container uses its host's kernel, so a host whose page size is smaller than production's (an x86 host has 4KB pages; on a Mac, run `getconf PAGESIZE` in its VM) does not show the failures of 64KB pages (a library aligned for 4KB pages failed on a 64KB-page AlmaLinux 8 host and loaded on a 4KB-page Graviton4 host; [nuget-native-assets.md](nuget-native-assets.md) §6). When the project ships native code it builds, run its tests on the oldest Graviton generation it deploys to: a newer generation does not show `Illegal instruction`. Record where each check ran, with the host's page size, in `06-build-test-results.md`.
 
 **Do NOT skip validation if a working container runtime is available.** Only recommend external validation as a last resort.
 
@@ -115,7 +115,7 @@ echo "selected SDK: $(dotnet --version 2>&1 | head -n 1)"
 dotnet --list-sdks
 ```
 
-How `rollForward` chooses is in [../document_references/package-management-mapping.md](../document_references/package-management-mapping.md) §2.7.
+How `rollForward` chooses is in [package-management-mapping.md](package-management-mapping.md) §2.7.
 
 ### Session-Scoped .NET Switching
 
@@ -139,7 +139,7 @@ bash "$script" --version 8.0.425 --install-dir "$SDK_DIR"   # the version global
 
 **FORBIDDEN:** writing to `~/.zshrc`/`~/.bash_profile`/`~/.bashrc`, changing or deleting `global.json`, system-wide installs or package-manager installs without asking, any persistent change.
 
-> **Skill config:** If `skill-config.md` defines `dotnet.sdk_select`, use that source for the validation SDK (an installed SDK, the install script, or the container image). This selects only the SDK used to build and validate; the repository's `global.json` and target frameworks are unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `dotnet.sdk_select`, use that source for the validation SDK (an installed SDK, the install script, or the container image). This selects only the SDK used to build and validate; the repository's `global.json` and target frameworks are unchanged. See [skill-configuration.md](skill-configuration.md).
 
 **If no matching SDK can be installed:** document the requirement and surface the install command; do NOT install automatically outside a temporary folder. Use `dotnet.install_hint` from `skill-config.md` if defined; otherwise point to Microsoft's install script above or the distribution's packages ([Install .NET on Linux](https://learn.microsoft.com/en-us/dotnet/core/install/linux)).
 
@@ -209,7 +209,7 @@ The final build command determines the build score.
 | `TypeInitializationException: The type initializer for 'Microsoft.Data.Sqlite.SqliteConnection' threw an exception.` | a native that needs a newer glibc than the host has: the innermost exception is `DllNotFoundException: Unable to load shared library 'e_sqlite3'`, and `ldd` on the library names the missing `GLIBC_` version (Phase 1.1, target glibc) |
 | `DllNotFoundException` with `ELF load command alignment not page-aligned` (glibc 2.34 and earlier) or `ELF load command address/offset not page-aligned` (glibc 2.35 and later) | a native linked for 4KB pages on a 64KB-page kernel (`scan --page-size 65536`) |
 | `Platform linker ('clang' or 'gcc') not found in PATH` | the Native AOT prerequisites are missing on the build host (Phase 2.4) |
-| `Couldn't find a valid ICU package installed on the system.` | the host or image has no ICU: install `libicu`, or use invariant globalization for the application ([windows-to-linux.md](../document_references/windows-to-linux.md) §5) |
+| `Couldn't find a valid ICU package installed on the system.` | the host or image has no ICU: install `libicu`, or use invariant globalization for the application ([windows-to-linux.md](windows-to-linux.md) §5) |
 | `exec ./<app> failed: No such file or directory` in an arm64 image on an x86 host | an x86-64 apphost (its loader, `/lib64/ld-linux-x86-64.so.2`, is not in the arm64 image): the publish used `-r linux-x64` (Phase 2.4) |
 
 ### Container Validation (if containerized)
@@ -314,4 +314,4 @@ Recommend to user for independent testing: performance benchmarking, load testin
 
 > **Output: `graviton-validation/00-summary.md`**
 
-After all phases complete, write the summary using the template from [../document_references/documentation-standards.md](../document_references/documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.
+After all phases complete, write the summary using the template from [documentation-standards.md](documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.

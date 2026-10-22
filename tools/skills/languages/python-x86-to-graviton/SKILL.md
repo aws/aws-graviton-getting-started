@@ -14,17 +14,17 @@ Validate a Python application's readiness to run on AWS Graviton instances. This
 
 ## Scope Guardrails
 
-**CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
+**CRITICAL: Read [references/agent-scope-boundaries.md](references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
 **In scope:** aarch64 wheel availability for every pinned dependency (direct and transitive), ARM64-blocking dependency updates and lock regeneration, native extensions and vendored binaries, architecture detection code, x86-only build flags and Dockerfile platform settings, Graviton runtime recommendations (documented, never applied), CI changes that only add or switch an architecture, ARM64 install/build/test validation.
 
 **Out of scope:** Python version changes (unless `python.interpreter_bump` allows a bump that is the only path to an aarch64 wheel), package manager switches, base image changes, general dependency modernization, security updates, code refactoring, .gitignore/.dockerignore changes.
 
-> **Verify the wheel on PyPI, never the version number.** Whether a pin installs on Graviton is a fact about the files published for that exact version, interpreter and glibc. Every verdict cites the probe output or the PyPI files list; see [document_references/wheel-verification.md](document_references/wheel-verification.md).
+> **Verify the wheel on PyPI, never the version number.** Whether a pin installs on Graviton is a fact about the files published for that exact version, interpreter and glibc. Every verdict cites the probe output or the PyPI files list; see [references/wheel-verification.md](references/wheel-verification.md).
 
 ## Skill Configuration (Optional)
 
-If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (package manager, package index, validation interpreter tool, test command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the project's declared Python version stays unchanged unless `python.interpreter_bump` allows a bump (a configured interpreter tool selects only the build/validation environment per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md) for the fields, and [document_references/skill-config.template.md](document_references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (package manager, package index, validation interpreter tool, test command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the project's declared Python version stays unchanged unless `python.interpreter_bump` allows a bump (a configured interpreter tool selects only the build/validation environment per Phase 3.0). See [references/skill-configuration.md](references/skill-configuration.md) for the fields, and [references/skill-config.template.md](references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
 
 ## Entry Criteria
 
@@ -77,7 +77,7 @@ fi
 
 ### Documentation Setup
 
-Before Phase 1, create the output structure. See [document_references/documentation-standards.md](document_references/documentation-standards.md) for required sections and templates.
+Before Phase 1, create the output structure. See [references/documentation-standards.md](references/documentation-standards.md) for required sections and templates.
 
 ```bash
 mkdir -p graviton-validation/raw
@@ -101,7 +101,7 @@ Output files produced:
 
 ### Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. See [phases/phase1-static-analysis.md](phases/phase1-static-analysis.md) for detailed steps; per-manager commands are in [document_references/package-manager-mapping.md](document_references/package-manager-mapping.md).
+Analyze the project without making changes. See [references/phase1-static-analysis.md](references/phase1-static-analysis.md) for detailed steps; per-manager commands are in [references/package-manager-mapping.md](references/package-manager-mapping.md).
 
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, package manager and interpreter detection, target OS/glibc, dependency tree generation, component risk categorization
 2. **1.2 Native Library Validation** - Scan every committed or vendored native file by its content (not its name) for the target's architecture, C library, glibc and libstdc++ versions and page size, layers and in-repo extensions, binaries downloaded at run, build or deploy time, apply tiered FAIL/WARN/PASS policy
@@ -111,7 +111,7 @@ Analyze the project without making changes. See [phases/phase1-static-analysis.m
 
 ### Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues only. See [phases/phase2-resolution.md](phases/phase2-resolution.md) for detailed steps.
+Apply fixes for ARM64-blocking issues only. See [references/phase2-resolution.md](references/phase2-resolution.md) for detailed steps.
 
 1. **2.1 Native Library Resolution** - Rebuild vendored binaries and extensions for aarch64 (on ARM64 hardware; plain C libraries can also be cross-compiled), re-vendor layers from aarch64 wheels, update loading logic
 2. **2.2 Dependency Updates** - Update ONLY MUST UPGRADE dependencies to the lowest version with an aarch64 wheel, regenerate locks through the project's manager, substitute x86-only packages with user confirmation
@@ -121,7 +121,7 @@ Apply fixes for ARM64-blocking issues only. See [phases/phase2-resolution.md](ph
 
 ### Phase 3: ARM64 Validation & Testing
 
-Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validation.md) for detailed steps.
+Build and test on ARM64. See [references/phase3-validation.md](references/phase3-validation.md) for detailed steps.
 
 1. **3.0 Build Environment Prep** - Python runtime alignment (same minor version, pip >= 20.3; session-scoped only)
 2. **3.1 Build Validation** - Install as the deployment does, build extensions, classify failures as INFRA/ARM64/PRE-EXISTING

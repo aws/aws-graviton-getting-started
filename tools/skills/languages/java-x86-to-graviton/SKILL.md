@@ -14,7 +14,7 @@ Validate a Java application's readiness to run on AWS Graviton instances. This t
 
 ## Scope Guardrails
 
-**CRITICAL: Read [document_references/agent-scope-boundaries.md](document_references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
+**CRITICAL: Read [references/agent-scope-boundaries.md](references/agent-scope-boundaries.md) before starting.** This file contains the decision tree for every dependency analysis and prevents scope creep.
 
 **In scope:** Native library ARM64 binaries, ARM64-blocking dependency updates, architecture detection code, x86-only JVM options that stop an ARM64 JVM, Graviton JVM flag recommendations (documented, not applied), CI changes that only add or switch an architecture, ARM64 build/test validation.
 
@@ -22,7 +22,7 @@ Validate a Java application's readiness to run on AWS Graviton instances. This t
 
 ## Skill Configuration (Optional)
 
-If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (build/validation JDK, build command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the application's shipped JDK distribution stays unchanged (a configured JDK preference selects only the build/validation environment per Phase 3.0). See [document_references/skill-configuration.md](document_references/skill-configuration.md) for the fields, and [document_references/skill-config.template.md](document_references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (build/validation JDK, build command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the application's shipped JDK distribution stays unchanged (a configured JDK preference selects only the build/validation environment per Phase 3.0). See [references/skill-configuration.md](references/skill-configuration.md) for the fields, and [references/skill-config.template.md](references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
 
 ## Entry Criteria
 
@@ -75,7 +75,7 @@ fi
 
 ### Documentation Setup
 
-Before Phase 1, create the output structure. See [document_references/documentation-standards.md](document_references/documentation-standards.md) for required sections and templates.
+Before Phase 1, create the output structure. See [references/documentation-standards.md](references/documentation-standards.md) for required sections and templates.
 
 ```bash
 mkdir -p graviton-validation/raw
@@ -97,7 +97,7 @@ Output files produced:
 
 ### Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. See [phases/phase1-static-analysis.md](phases/phase1-static-analysis.md) for detailed steps.
+Analyze the project without making changes. See [references/phase1-static-analysis.md](references/phase1-static-analysis.md) for detailed steps.
 
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, dependency tree generation, component risk categorization
 2. **1.2 Native Library Validation** - Scan for .so files (bundled and runtime-extracted), apply tiered FAIL/WARN/CHECK/PASS policy
@@ -107,7 +107,7 @@ Analyze the project without making changes. See [phases/phase1-static-analysis.m
 
 ### Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues only. See [phases/phase2-resolution.md](phases/phase2-resolution.md) for detailed steps.
+Apply fixes for ARM64-blocking issues only. See [references/phase2-resolution.md](references/phase2-resolution.md) for detailed steps.
 
 1. **2.1 Native Library Resolution** - Cross-compile or obtain ARM64 .so files, update loading logic
 2. **2.2 Dependency Updates** - Update ONLY MUST UPGRADE dependencies (including transitive via dependencyManagement)
@@ -117,7 +117,7 @@ Apply fixes for ARM64-blocking issues only. See [phases/phase2-resolution.md](ph
 
 ### Phase 3: ARM64 Validation & Testing
 
-Build and test on ARM64. See [phases/phase3-validation.md](phases/phase3-validation.md) for detailed steps.
+Build and test on ARM64. See [references/phase3-validation.md](references/phase3-validation.md) for detailed steps.
 
 1. **3.0 Build Environment Prep** - Java runtime alignment for annotation processor compatibility (session-scoped only)
 2. **3.1 Build Validation** - Full build, classify failures as INFRA/ARM64/PRE-EXISTING

@@ -2,7 +2,7 @@
 
 Analyze the project without making changes. All findings are documented in `graviton-validation/` files.
 
-> **Skill config:** Wherever a step below runs `pip`, `uv`, `poetry` or `conda`, use `python.package_manager` from `skill-config.md` (if defined) to skip auto-detection, `python.index_url` / `python.extra_index_url` as the index for every probe (and probe PyPI as well, see §1.3), and `python.interpreter_bump` in §1.5. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** Wherever a step below runs `pip`, `uv`, `poetry` or `conda`, use `python.package_manager` from `skill-config.md` (if defined) to skip auto-detection, `python.index_url` / `python.extra_index_url` as the index for every probe (and probe PyPI as well, see §1.3), and `python.interpreter_bump` in §1.5. See [skill-configuration.md](skill-configuration.md).
 
 Phase 1 runs on any host, including x86, and installs nothing into the project or its environment. Most checks read files or ask the package index; three kinds of step run code. The §1.1 dry run (`pip install --dry-run` without `--only-binary`) runs the build backend (`setup.py` or the `pyproject.toml` backend) of every sdist it resolves, and of the project itself when the step installs `.`. The §1.1 target probe runs the base image's own `python3` in a container, and §1.2.2 runs the distribution's package tools in containers. The §1.3 probes pass `--only-binary=:all:`, so they never build or run a package. For a repository or an index you do not trust, run Phase 1 in a disposable container or VM. The project's own code and tests run only in Phase 3.
 
@@ -69,7 +69,7 @@ grep -nE '^\[tool\.uv\.workspace\]|^\[tool\.uv\.sources\]|path = "|develop = tru
 
 ### Detect Package Manager and Interpreter
 
-Record every manager marker present, then decide which file the **deployment** installs from (that file is authoritative; a `pyproject.toml` kept only for packaging does not decide anything). Full detection table and per-manager commands: [../document_references/package-manager-mapping.md](../document_references/package-manager-mapping.md).
+Record every manager marker present, then decide which file the **deployment** installs from (that file is authoritative; a `pyproject.toml` kept only for packaging does not decide anything). Full detection table and per-manager commands: [package-manager-mapping.md](package-manager-mapping.md).
 
 ```bash
 ls -1 requirements*.txt constraints*.txt pyproject.toml setup.py setup.cfg poetry.lock uv.lock \
@@ -93,7 +93,7 @@ Also record where that interpreter comes from (official image, distribution pack
 
 ### Determine Target OS and glibc
 
-The wheel a pin resolves to must also be accepted by the target's libc and pip, and native code also depends on the kernel page size of the hosts it runs on (see [../document_references/wheel-verification.md](../document_references/wheel-verification.md) §1, §2 and §7). Read the libc and the interpreter from the runtime image:
+The wheel a pin resolves to must also be accepted by the target's libc and pip, and native code also depends on the kernel page size of the hosts it runs on (see [wheel-verification.md](wheel-verification.md) §1, §2 and §7). Read the libc and the interpreter from the runtime image:
 
 `$CONTAINER_CMD` below is the working container runtime: run the detection block in [phase3-validation.md, Container Runtime Detection](phase3-validation.md#container-runtime-detection) first (in a new shell, set `CONTAINER_CMD` again; the block also applies `container.runtime` from `skill-config.md`). With no working runtime, follow the "No container runtime" item after the block.
 
@@ -140,7 +140,7 @@ The probe asks the image's own `python3`, because `sh -c` with `ldd --version` a
 
 - **No `python3` in the base image** (the fallback line): the deployment installs Python in a later step (`apt-get install python3`, `dnf install python3.11`), so the interpreter and pip come from that package. The libc still comes from the base image; read the rest from the built image or the distribution's package before §1.3.
 - **Lambda functions deployed as .zip archives** have no image: the runtime identifier sets the OS. `python3.12` and later run on Amazon Linux 2023 (glibc 2.34), `python3.10` and `python3.11` on Amazon Linux 2 (glibc 2.26) ([Lambda Python runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html)); wheel-verification.md §7 shows a `manylinux_2_28` layer that imports on `python3.12` and fails on `python3.11`. For container-image functions, run the block against the image.
-- **No arm64 variant of the base image:** both runs stop with `no matching manifest for linux/arm64 in the manifest list entries` (executed with `amazonlinux:2018.03`, whose manifest list has only `amd64`). That is a MUST UPGRADE finding, and the replacement image is a user decision ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), OUT OF SCOPE).
+- **No arm64 variant of the base image:** both runs stop with `no matching manifest for linux/arm64 in the manifest list entries` (executed with `amazonlinux:2018.03`, whose manifest list has only `amd64`). That is a MUST UPGRADE finding, and the replacement image is a user decision ([agent-scope-boundaries.md](agent-scope-boundaries.md), OUT OF SCOPE).
 - **No container runtime:** use the table in wheel-verification.md §7 and say so. For host-based deployments read the AMI's distribution.
 - **Kernel page size of the deployment hosts.** A container uses its host's kernel, so the page size comes from the EC2 hosts or Kubernetes nodes, not from the image: a Debian 13 container on an AlmaLinux 8 Graviton2 host reported 65536. Run `getconf PAGESIZE` on a deployment host (executed on Graviton: AlmaLinux 8.10 65536; AlmaLinux 9.8 and Amazon Linux 2023 4096); if no host can be reached, ask the team that runs them and record the page size as unknown until then. Set `TARGET_PAGE_SIZE` to the value in bytes: the scan in §1.2.1 judges page alignment only when it is set. A 64KB-page target needs Phase 3 on a 64KB-page host: on AlmaLinux 8, polars 0.20.20 aborted with `<jemalloc>: Unsupported system page size`, as did every earlier release tested back to 0.15.1, while 0.20.21 and the later releases tested imported. On the 4KB AlmaLinux 9 host polars 0.15.1 imported, so a 4KB validation host hides the failure.
 
@@ -200,7 +200,7 @@ When two install steps pin different versions of one package, keep and probe bot
 
 > **Output: `graviton-validation/02-native-library-report.md`** and **`graviton-validation/raw/site-packages-so-scan.txt`**
 
-Native code reaches a Python deployment in three ways: **wheels** from the index (handled in §1.3 by probing the index, not by scanning), **binaries committed to the repository** (vendored `.so`, Lambda layers, pre-built modules), and **extensions the project builds itself** (`setup.py` `ext_modules`, Cython, Rust, pybind11, CMake). This section covers the last two. All three depend on the target OS as well as the CPU (libc, page size, CPU generation, OS packages; [../document_references/wheel-verification.md](../document_references/wheel-verification.md) §1).
+Native code reaches a Python deployment in three ways: **wheels** from the index (handled in §1.3 by probing the index, not by scanning), **binaries committed to the repository** (vendored `.so`, Lambda layers, pre-built modules), and **extensions the project builds itself** (`setup.py` `ext_modules`, Cython, Rust, pybind11, CMake). This section covers the last two. All three depend on the target OS as well as the CPU (libc, page size, CPU generation, OS packages; [wheel-verification.md](wheel-verification.md) §1).
 
 ### 1.2.1 Statically Bundled .so Scanning
 
@@ -574,7 +574,7 @@ $CONTAINER_CMD run --rm --init --platform "$NATIVE" amazonlinux:2023 timeout 300
   'dnf -q --forcearch=aarch64 repoquery --available --latest-limit 1 --qf "%{name}-%{version}-%{release}.%{arch}" geos-devel python3.11 2>/dev/null'
 ```
 
-A package with no arm64 candidate is a MUST UPGRADE finding, and its substitute is a user decision (as for `mkl` in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md)).
+A package with no arm64 candidate is a MUST UPGRADE finding, and its substitute is a user decision (as for `mkl` in [agent-scope-boundaries.md](agent-scope-boundaries.md)).
 
 ### 1.2.3 Tiered Validation Policy
 
@@ -603,7 +603,7 @@ else echo "CHECK: run the Phase 1.2.1 scan block first: it writes ${TMPDIR:-/tmp
 
 ### Generate Filtered Tree
 
-The Python equivalent of a "native-artifact-only tree" is the probe output: one verdict per pin, for the project's interpreter, against the aarch64 platform tags. The probe and its exact flags are defined and demonstrated in [../document_references/wheel-verification.md](../document_references/wheel-verification.md) §3; this is the loop over the resolved list:
+The Python equivalent of a "native-artifact-only tree" is the probe output: one verdict per pin, for the project's interpreter, against the aarch64 platform tags. The probe and its exact flags are defined and demonstrated in [wheel-verification.md](wheel-verification.md) §3; this is the loop over the resolved list:
 
 ```bash
 PYVER=3.11; ABI="cp${PYVER/./}"
@@ -692,7 +692,7 @@ With hashes for the x86 wheels only, the dry run stops at `ERROR: THESE PACKAGES
 
 ### Classify Each Dependency
 
-Apply the decision tree in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md) to every line of `raw/wheel-availability.txt`:
+Apply the decision tree in [agent-scope-boundaries.md](agent-scope-boundaries.md) to every line of `raw/wheel-availability.txt`:
 
 **MUST UPGRADE (Blocking):** no aarch64 wheel for the pinned version and interpreter where a later version has one (upgrade to the **lowest** such version); no aarch64 wheel in any release and the package is x86-only by nature (substitute, user confirms); hash lock excludes the aarch64 wheel (regenerate); wheel tag exceeds the target glibc (user decision); documented aarch64 correctness bug at this version (NumPy < 1.21.1, SciPy < 1.7.2, whose OpenBLAS lacks aarch64 correctness fixes).
 
@@ -706,7 +706,7 @@ Apply the decision tree in [../document_references/agent-scope-boundaries.md](..
 
 **CHECK INDEX lines are not verdicts:** an index that may have the wheel did not answer (credentials, network, a server error), or no configured index has the project. Fix access or the index settings, or probe PyPI as in the skill-config note above, and rerun the loop for those pins; never label a pin from a failed request. An index that answers 403 or 404 for a project page does not have that project, and pip uses the other indexes: the loop keeps their verdict and appends `not on <url> (403)`. A private index can also answer 403 or 404 when the probe may not read it; when a note names one that should carry the package, check access to it (wheel-verification.md §9).
 
-**A pin the decision tree sends to a user decision stays CHECK until the user chooses** (pygeos in [agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md): a source build is COMPATIBLE, a move to `shapely>=2.0` is MUST UPGRADE). The loop's line for it records only the probe result; the report lists it under User Decisions Pending.
+**A pin the decision tree sends to a user decision stays CHECK until the user chooses** (pygeos in [agent-scope-boundaries.md](agent-scope-boundaries.md): a source build is COMPATIBLE, a move to `shapely>=2.0` is MUST UPGRADE). The loop's line for it records only the probe result; the report lists it under User Decisions Pending.
 
 For transitive dependencies: record which direct dependency pulls each one in (the `# transitive via` provenance plus the manager's tree). Resolution usually happens at the parent (`mkl` removal removes all six Intel transitives).
 
@@ -785,7 +785,7 @@ The descriptor pattern is case-insensitive and allows an optional quote and `:` 
 
 A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`, and the CDK's `aws-eks` `Cluster` without `defaultCapacityInstance` adds `m5.large` (x86) nodes, two unless `defaultCapacity` sets another count; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`public.ecr.aws/lambda/python:3.12-x86_64`) or its repository (`amd64/python:3.11-slim`). cibuildwheel's default, `archs = "auto"`, builds only `x86_64` wheels on a Linux x86_64 runner, so a project that builds its wheels on x86 runners ships no aarch64 wheel until `archs` (or `CIBW_ARCHS_LINUX`) adds `aarch64` (Phase 2.4 "CI pipelines"). `long double`, numpy's long double types and fast-math flags change results between x86 and Graviton without an error: check them in Phase 3 (Results That Change Without Failing).
 
-Instance types and AMI IDs need arm64 counterparts. A Graviton instance type is a sizing decision: record it under User Decisions Pending with the default from Phase 2.4. An AMI ID names one architecture: `aws ec2 describe-images --image-ids <id> --query 'Images[].[ImageId,Architecture,Name]'` shows which (executed: `al2023-ami-2023.12.20260930.0-kernel-6.18-x86_64` reports `x86_64` and its `-arm64` sibling `arm64`), and the arm64 AMI of the same release replaces it; the public SSM parameter `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` has an `-arm64` counterpart. ECS `cpuArchitecture` takes `X86_64` or `ARM64` (Fargate defaults to `X86_64`), and EKS `amiType` values come in pairs (`AL2023_x86_64_STANDARD` and `AL2023_ARM_64_STANDARD`). Change these only where the project ships the files ([../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md), IN SCOPE 6).
+Instance types and AMI IDs need arm64 counterparts. A Graviton instance type is a sizing decision: record it under User Decisions Pending with the default from Phase 2.4. An AMI ID names one architecture: `aws ec2 describe-images --image-ids <id> --query 'Images[].[ImageId,Architecture,Name]'` shows which (executed: `al2023-ami-2023.12.20260930.0-kernel-6.18-x86_64` reports `x86_64` and its `-arm64` sibling `arm64`), and the arm64 AMI of the same release replaces it; the public SSM parameter `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64` has an `-arm64` counterpart. ECS `cpuArchitecture` takes `X86_64` or `ARM64` (Fargate defaults to `X86_64`), and EKS `amiType` values come in pairs (`AL2023_x86_64_STANDARD` and `AL2023_ARM_64_STANDARD`). Change these only where the project ships the files ([agent-scope-boundaries.md](agent-scope-boundaries.md), IN SCOPE 6).
 
 For each `CDLL` or `dlopen`, read the code that builds the path: a hard-coded x86 filename or a lookup table without an `aarch64` key is a FAIL. The heuristic misses a file that mentions `aarch64` anywhere, such as a test whose only assertion runs under `if platform.machine() == "x86_64":`; only the first grep shows it. An x86 header under `#ifdef __x86_64__` is fine; x86-only compiler flags are not.
 
@@ -842,4 +842,4 @@ done < graviton-validation/raw/images.txt
    A bump is only in scope when it is the sole path to an aarch64 wheel for a required package; "3.10 is end of life" alone never justifies it.
 
    **One interpreter for the whole dependency set.** The interpreter is one decision covering every pin, never made for one package at a time, because a bump made for one package changes the wheel every other pin needs. Before proposing or applying a bump, rerun the §1.3 loop for each candidate interpreter over the whole resolved list (`PYVER=3.Y`, run in a 3.Y environment from Phase 3.0), and record for each candidate which pins are not COMPATIBLE and the lowest versions that fix them (03 report, Interpreter-ABI Blockers). Keep the current interpreter when every MUST UPGRADE finding is fixable there; otherwise choose the lowest candidate at which every pin is, and apply the bump and all of its pin changes together. When no single interpreter works for every pin, report the table as a user decision and change nothing.
-5. Record `pip` on the target (§1.1): pip 19.3 is the first release that installs `manylinux2014` aarch64 wheels ([pip's changelog](https://pip.pypa.io/en/stable/news/)), and pip 20.3 the first that sees the `manylinux_2_N` tags most current aarch64 wheels carry ([../document_references/wheel-verification.md](../document_references/wheel-verification.md) §2); plan the upgrade in Phase 3 if it is older than 20.3.
+5. Record `pip` on the target (§1.1): pip 19.3 is the first release that installs `manylinux2014` aarch64 wheels ([pip's changelog](https://pip.pypa.io/en/stable/news/)), and pip 20.3 the first that sees the `manylinux_2_N` tags most current aarch64 wheels carry ([wheel-verification.md](wheel-verification.md) §2); plan the upgrade in Phase 3 if it is older than 20.3.

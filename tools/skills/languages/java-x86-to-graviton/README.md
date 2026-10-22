@@ -18,6 +18,7 @@ Copy this folder into your Java project:
 
 ```bash
 mkdir -p /path/to/your/project/.skills && \
+  rm -rf /path/to/your/project/.skills/java-x86-to-graviton && \
   cp -r tools/skills/languages/java-x86-to-graviton /path/to/your/project/.skills/
 ```
 
@@ -33,13 +34,13 @@ an internal image registry, your cluster's ARM64 node labels — copy the templa
 `skill-config.md` at your project root and fill in what applies:
 
 ```bash
-cp .skills/java-x86-to-graviton/document_references/skill-config.template.md \
+cp .skills/java-x86-to-graviton/references/skill-config.template.md \
    skill-config.md
 ```
 
 The config lives in *your* repo (not the skill folder), so skill updates never overwrite
 it. It steers **how** the transformation runs but never widens its scope — see
-[document_references/skill-configuration.md](document_references/skill-configuration.md).
+[references/skill-configuration.md](references/skill-configuration.md).
 
 ## Skill Files
 
