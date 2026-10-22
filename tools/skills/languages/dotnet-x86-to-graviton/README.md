@@ -38,13 +38,13 @@ your cluster's ARM64 node labels), copy the template to a `skill-config.md` at y
 root and fill in what applies:
 
 ```bash
-cp .skills/dotnet-x86-to-graviton/document_references/skill-config.template.md \
+cp .skills/dotnet-x86-to-graviton/references/skill-config.template.md \
    skill-config.md
 ```
 
 The config lives in *your* repo (not the skill folder), so skill updates never overwrite
 it. It steers **how** the transformation runs but never widens its scope; see
-[document_references/skill-configuration.md](document_references/skill-configuration.md).
+[references/skill-configuration.md](references/skill-configuration.md).
 
 ## Skill Files
 

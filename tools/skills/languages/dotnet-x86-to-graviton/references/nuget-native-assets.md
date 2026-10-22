@@ -48,7 +48,7 @@ Write the program once per session (§11), then run from the repository root (th
 
 ```bash
 GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"   # written by the block in §11
-[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (document_references/nuget-native-assets.md, section 11)"
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (nuget-native-assets.md, section 11)"
 mkdir -p graviton-validation/raw
 python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 > graviton-validation/raw/native-assets.txt; rc=$?
 cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
@@ -57,7 +57,7 @@ cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findi
 What `assets` does:
 - **Works on a copy.** It copies the tree to a temporary folder (without `bin`, `obj`, `.git`, `.vs`, `node_modules`, `graviton-validation`), restores every solution at the root (or every project if there is none) for the source and target RIDs, and deletes the copy afterwards. The repository is not touched. A restore with extra RIDs in the repository itself rewrites its tracked `packages.lock.json` files (§8).
 - **Reads the assets files of its own restore.** Before restoring, it deletes every `project.assets.json` and `project.nuget.cache` in the copy, then reads each `project.assets.json` the restore writes, in any folder (`obj/`, `artifacts/obj/<project>/`, a custom `BaseIntermediateOutputPath`), so a file left by an earlier restore or a removed project is never read.
-- **Runs the repository's MSBuild files.** The restore imports the copy's `Directory.Build.props` and `Directory.Build.targets`, reads its `Directory.Build.rsp`, and runs any target hooked to restore. The start of [Phase 1](../phases/phase1-static-analysis.md) lists the steps that do this and how to list such code first.
+- **Runs the repository's MSBuild files.** The restore imports the copy's `Directory.Build.props` and `Directory.Build.targets`, reads its `Directory.Build.rsp`, and runs any target hooked to restore. The start of [Phase 1](phase1-static-analysis.md) lists the steps that do this and how to list such code first.
 - **Reports every package with native files for these RIDs**, one line per target RID and file:
   - `OK` when the file is an aarch64 build for the target's libc, with the highest `GLIBC_` and `GLIBCXX_` versions it needs, its smallest LOAD alignment (and its `vaddr-offset align` when that is below `0x10000`, §6), and after `needs` the libraries it needs. Each of those comes from the package or must come from the target image: libSkiaSharp.so 2.80.0 needs `libfontconfig.so.1`, which `mcr.microsoft.com/dotnet/aspnet:8.0` and `:10.0` do not contain, so the fixture's Dockerfile installs `libfontconfig1`. Without it, the fixture's thumbnail test failed under arm64 emulation with `libfontconfig.so.1: cannot open shared object file`;
   - `FINDING` when the target RID gets no file, or gets one that is not an aarch64 build, is an Android build, is built for the other libc, needs a newer glibc or libstdc++ than the target's, is linked for a smaller page size than the target's (§6), or is a Windows or macOS binary.
