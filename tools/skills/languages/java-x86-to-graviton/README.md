@@ -18,6 +18,7 @@ Copy this folder into your Java project:
 
 ```bash
 mkdir -p /path/to/your/project/.skills && \
+  rm -rf /path/to/your/project/.skills/java-x86-to-graviton && \
   cp -r tools/skills/languages/java-x86-to-graviton /path/to/your/project/.skills/
 ```
 
