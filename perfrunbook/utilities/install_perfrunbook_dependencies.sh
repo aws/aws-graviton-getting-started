@@ -8,9 +8,12 @@
 PERFRUNBOOK_VENV="/opt/perfrunbook-venv"
 
 install_python_dependencies () {
-  python3 -m venv "${PERFRUNBOOK_VENV}"
+  "${1:-python3}" -m venv "${@:2}" "${PERFRUNBOOK_VENV}"
   "${PERFRUNBOOK_VENV}/bin/pip" install --upgrade pip
-  "${PERFRUNBOOK_VENV}/bin/pip" install pandas numpy scipy matplotlib sh seaborn plotext
+  if ! "${PERFRUNBOOK_VENV}/bin/pip" install pandas numpy scipy matplotlib sh seaborn plotext; then
+    echo "Failed to install the Python dependencies into ${PERFRUNBOOK_VENV}"
+    exit 1
+  fi
 }
 
 install_al2023_dependencies () {
@@ -121,9 +124,10 @@ install_sles_15_sp6_dependencies() {
     zypper --quiet --non-interactive install bcc-tools
 
     echo "------ INSTALL ANALYSIS TOOLS AND DEPENDENCIES ------"
-    # Install Python and pip
-    zypper --quiet --non-interactive install python3 python3-pip
-    install_python_dependencies
+    # The default python3 is 3.6, and matplotlib has no aarch64 wheel for 3.6.
+    # Use python3.11, and --clear replaces a python3 venv from an earlier run.
+    zypper --quiet --non-interactive install python311
+    install_python_dependencies python3.11 --clear
 
     # Get FlameGraph tools
     git clone https://github.com/brendangregg/FlameGraph.git FlameGraph
