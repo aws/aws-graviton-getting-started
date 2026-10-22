@@ -15,7 +15,7 @@ Build and test on ARM64 architecture. Supported platforms: Linux, macOS, WSL.
 
 Before skipping build validation, check for local container runtimes. A `linux/arm64` container runs natively on a Graviton host, under QEMU emulation on an x86 Linux host, and in a Linux VM on an Apple Silicon Mac's own cores. Only a run on Graviton passes a check ("Match the production hosts" below).
 
-> **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below — but only after verifying it is installed; if the pinned runtime is not present, fall back to the auto-detection cascade. If `container.runtime` is absent, auto-detect as below. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below — but only after verifying it is installed; if the pinned runtime is not present, fall back to the auto-detection cascade. If `container.runtime` is absent, auto-detect as below. See [skill-configuration.md](skill-configuration.md).
 
 ```bash
 # Detect available container runtimes
@@ -162,7 +162,7 @@ JAVA_HOME=/path/to/java-21 ${BUILD_CMD} clean install
 
 **Version preference:** Java 21 > 17 > 11. After transformation, user's `java -version` must match pre-transformation.
 
-> **Skill config:** If `skill-config.md` defines `jdk.preferred_distribution` / `jdk.discovery_glob` / `jdk.version_select`, use them to locate the build/validation JDK instead of the defaults below. This selects only the JDK used to build and validate — the application's shipped distribution is unchanged. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** If `skill-config.md` defines `jdk.preferred_distribution` / `jdk.discovery_glob` / `jdk.version_select`, use them to locate the build/validation JDK instead of the defaults below. This selects only the JDK used to build and validate — the application's shipped distribution is unchanged. See [skill-configuration.md](skill-configuration.md).
 
 **If no compatible version found:** Document requirement, provide install commands, do NOT install automatically. Use `jdk.install_hint` from `skill-config.md` if defined; otherwise the defaults below:
 ```bash
@@ -178,7 +178,7 @@ JAVA_HOME=/path/to/java-21 ${BUILD_CMD} clean install
 
 ### Build Strategy
 
-> **Skill config:** Substitute `build.maven_invocation` / `build.gradle_invocation` from `skill-config.md` for the `mvn` / `./gradlew` commands below if defined (e.g. `./mvnw`), falling back to the bare command if the specified wrapper is not present. Also applies to the `${BUILD_CMD}` used in §3.0 and the test commands in §3.2. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** Substitute `build.maven_invocation` / `build.gradle_invocation` from `skill-config.md` for the `mvn` / `./gradlew` commands below if defined (e.g. `./mvnw`), falling back to the bare command if the specified wrapper is not present. Also applies to the `${BUILD_CMD}` used in §3.0 and the test commands in §3.2. See [skill-configuration.md](skill-configuration.md).
 
 1. **First attempt** - full build with tests:
    - Gradle: `./gradlew clean build`
@@ -295,7 +295,7 @@ grep -E 'shared library load of .* was successful' "graviton-validation/raw/load
 
 Compare the two lists without the JDK's own libraries (its `lib/` folder; the x86 JDK also loads `libjsvml.so`, which the ARM64 JDK does not have). A library the x86 run loads that the ARM64 run does not is a finding with its Phase 1.2 cause, or the user's recorded decision to keep the pure Java path. In a container, pass the option with `-e JAVA_TOOL_OPTIONS=-Xlog:os=info`. JDK 8 has no `-Xlog` (`Unrecognized option: -Xlog:os=info`); there, list the files the running JVM has mapped with `grep -oE '/[^ ]+\.so[^ ]*( \(deleted\))?$' /proc/<pid>/maps | sort -u`, where a library its loader extracted and then deleted, as Netty does, ends in `(deleted)`. Netty also reports it: `io.netty.channel.epoll.Epoll.isAvailable()` and `io.netty.handler.ssl.OpenSsl.isAvailable()` return false when the native build did not load, and `unavailabilityCause()` says why; log both at startup or in a test, on both architectures.
 
-> **macOS-host false FAIL.** When running host-based startup/tests on an Apple-Silicon Mac (`os.name=Mac, os.arch=aarch64`), a runtime-extracting native lib may load its `Linux/aarch64` binary fine on Graviton yet throw on macOS because the resolved JAR has no *Mac*/aarch64 binary (e.g. snappy-java added `Mac/aarch64/libsnappyjava.dylib` only in 1.1.8.2; the minimal Graviton floor 1.1.2.2 has `Linux/aarch64` but not Mac). A native-load failure on the macOS host is a **host-dev artifact, not a Graviton verdict** when the JAR contains a verified `Linux/aarch64` binary (per §1.2.1); check in a `linux/arm64` container instead, and settle the check on a Graviton host ("Match the production hosts"), rather than marking the migration FAILED. Same principle as the JNA darwin-aarch64 case in [../document_references/agent-scope-boundaries.md](../document_references/agent-scope-boundaries.md).
+> **macOS-host false FAIL.** When running host-based startup/tests on an Apple-Silicon Mac (`os.name=Mac, os.arch=aarch64`), a runtime-extracting native lib may load its `Linux/aarch64` binary fine on Graviton yet throw on macOS because the resolved JAR has no *Mac*/aarch64 binary (e.g. snappy-java added `Mac/aarch64/libsnappyjava.dylib` only in 1.1.8.2; the minimal Graviton floor 1.1.2.2 has `Linux/aarch64` but not Mac). A native-load failure on the macOS host is a **host-dev artifact, not a Graviton verdict** when the JAR contains a verified `Linux/aarch64` binary (per §1.2.1); check in a `linux/arm64` container instead, and settle the check on a Graviton host ("Match the production hosts"), rather than marking the migration FAILED. Same principle as the JNA darwin-aarch64 case in [agent-scope-boundaries.md](agent-scope-boundaries.md).
 
 Recommend to user for independent testing: performance benchmarking, load testing, resource utilization measurement.
 
@@ -303,4 +303,4 @@ Recommend to user for independent testing: performance benchmarking, load testin
 
 > **Output: `graviton-validation/00-summary.md`**
 
-After all phases complete, write the summary using the template from [../document_references/documentation-standards.md](../document_references/documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.
+After all phases complete, write the summary using the template from [documentation-standards.md](documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.

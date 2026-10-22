@@ -2,7 +2,7 @@
 
 Analyze the project without making changes. All findings are documented in `graviton-validation/` files.
 
-> **Skill config:** Wherever a step below runs `mvn` or `./gradlew`, substitute `build.maven_invocation` / `build.gradle_invocation` from `skill-config.md` if defined (e.g. `./mvnw`). If it specifies a Maven wrapper (`./mvnw`) that is not present, fall back to bare `mvn`. See [../document_references/skill-configuration.md](../document_references/skill-configuration.md).
+> **Skill config:** Wherever a step below runs `mvn` or `./gradlew`, substitute `build.maven_invocation` / `build.gradle_invocation` from `skill-config.md` if defined (e.g. `./mvnw`). If it specifies a Maven wrapper (`./mvnw`) that is not present, fall back to bare `mvn`. See [skill-configuration.md](skill-configuration.md).
 
 ## Contents
 
