@@ -16,7 +16,7 @@ dotnet --list-sdks
 dotnet --version   # the SDK this repository selects (global.json in this folder or a parent)
 python3 -c 'import sys; assert sys.version_info >= (3, 6), sys.version; print("python3", sys.version.split()[0])'
 GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
-[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (nuget-native-assets.md, section 11)"
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 ```
 
 > **If `dotnet --version` fails** with `A compatible .NET SDK was not found.`, the repository's `global.json` pins an SDK that is not installed. Apply the session-scoped SDK switch from [phase3-validation.md](phase3-validation.md) §3.0 now: the first `dotnet` command needs it, not only Phase 3.

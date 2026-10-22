@@ -48,7 +48,7 @@ Write the program once per session (§11), then run from the repository root (th
 
 ```bash
 GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"   # written by the block in §11
-[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (nuget-native-assets.md, section 11)"
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 mkdir -p graviton-validation/raw
 python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 > graviton-validation/raw/native-assets.txt; rc=$?
 cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
