@@ -10,14 +10,7 @@ For the full specification, see [agentskills.io](https://agentskills.io).
 
 ## Platform Compatibility
 
-Each skill folder contains two entry point files to support the broadest range of AI tools:
-
-| File | Platforms | Format |
-|------|-----------|--------|
-| `SKILL.md` | Claude Code, Cursor, Codex, Windsurf, Gemini CLI, GitHub Copilot, and [20+ others](https://agentskills.io) | [Agent Skills spec](https://agentskills.io/specification) |
-| `POWER.md` | Kiro | Kiro Powers format (`displayName`, `keywords`, `author` frontmatter) |
-
-Both files contain the same instructions — only the frontmatter differs. Your platform will pick up the file it recognizes and ignore the other.
+Each skill follows the [Agent Skills specification](https://agentskills.io/specification): a single `SKILL.md` entry point plus optional `references/` and `scripts/` directories. This one format is recognized by Kiro, Claude Code, Cursor, Codex, Windsurf, Gemini CLI, GitHub Copilot, and [20+ other tools](https://agentskills.io).
 
 ## Available Skills
 
@@ -150,10 +143,8 @@ Each skill folder contains:
 ```
 <skill-name>/
 ├── SKILL.md                    # Entry point (Agent Skills format)
-├── POWER.md                    # Entry point (Kiro format)
 ├── summaries.md                # Canonical file index for agent discovery
-├── phases/                     # Detailed phase instructions
-├── document_references/        # Scope guardrails and output standards
+├── references/                 # Phase instructions, scope guardrails, output standards
 └── README.md                   # Human-readable overview
 ```
 
@@ -162,10 +153,10 @@ Each skill folder contains:
 See the [skill template](_templates/SKILL.template.md) for the boilerplate structure. When creating a new skill:
 
 1. Create a folder under `languages/` named to match the skill's `name` field
-2. Create both `SKILL.md` (Agent Skills frontmatter) and `POWER.md` (Kiro frontmatter) with the same body content
-3. Add a `summaries.md` listing every file in the skill, each with its purpose and when it is read. This is the **canonical** inventory — link it from `SKILL.md`/`POWER.md`, and do not duplicate the file list elsewhere in the skill
+2. Create `SKILL.md` with Agent Skills frontmatter (`name`, `description`, optional `metadata`)
+3. Add a `summaries.md` listing every file in the skill, each with its purpose and when it is read. This is the **canonical** inventory — link it from `SKILL.md`, and do not duplicate the file list elsewhere in the skill
 4. Add a `README.md` with a human-readable overview that points at `summaries.md` for the file map
-5. Keep the main entry point under 500 lines — split detailed instructions into `phases/`, `references/`, or `scripts/` subdirectories
+5. Keep the main entry point under 500 lines — split detailed instructions into `references/` or `scripts/` subdirectories
 6. Link each supporting file inline from the step that needs it, so an agent reading top to bottom reaches it just in time. `summaries.md` serves agents that enter mid-skill or need the whole map at once
 
 Fill in language-specific details based on the existing [Graviton documentation](../../) for each language.
