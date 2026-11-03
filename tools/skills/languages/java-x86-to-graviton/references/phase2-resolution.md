@@ -24,8 +24,12 @@ CC=aarch64-linux-gnu-gcc make
 # Or on ARM64 machine (distro defaults are correct for Graviton)
 make
 
-# Verify
-file libname.so  # Should show "ARM aarch64"
+# Verify with the Phase 1.2.1 check, once per target of Phase 1.1 (without python3, "${GV_PY[@]}" of Phase 1.2.1)
+for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one check per target that Phase 1.1 recorded; with none, one check named target
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
+python3 "$(sed -n 's/^GV_JAVA_CHECK=//p' graviton-validation/raw/session.env | tail -n 1)" "${GV_T[@]}" libname.so   # no FINDING line
+done
 ```
 
 **If source unavailable:** Prompt user for ARM64-compatible version or confirm pure Java fallback.
@@ -54,7 +58,7 @@ try {
 
 > **Output: update `graviton-validation/03-dependency-compatibility-report.md`**
 
-Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was confirmed to lack the `linux/aarch64` binary; see the verification note in Phase 1.3). Do NOT upgrade compatible dependencies. Prefer the *lowest* version whose ARM64 binary works on the target, not the latest, to stay minimal: **confirm that candidate's JAR actually contains the aarch64 binary** (`scan_archive` from Phase 1.2.1 shows an `ARM aarch64` line) rather than trusting a remembered version number, and that the libraries the binary needs (`readelf -d` lists them) are in the target image (`netty-tcnative`'s `linux-aarch_64-fedora` builds need libraries the Amazon Linux 2023 images do not include (`libssl.so.1.1` up to at least 2.0.66, `libapr-1.so.0` in 2.0.84), while `netty-tcnative-boringssl-static` needs only glibc's libraries); the exact floor varies by library and some intermediate versions are unpublished.
+Update ONLY dependencies flagged as MUST UPGRADE (i.e. the resolved JAR was confirmed to lack the `linux/aarch64` binary; see the verification note in Phase 1.3). Do NOT upgrade compatible dependencies. Prefer the *lowest* version whose ARM64 binary works on the target, not the latest, to stay minimal: **confirm that candidate's JAR actually contains the aarch64 binary** (the Phase 1.2.1 check prints an `OK` line for it) rather than trusting a remembered version number, and that the libraries the binary needs (the `needs` list of that line) are in the target image (`netty-tcnative`'s `linux-aarch_64-fedora` builds need libraries the Amazon Linux 2023 images do not include (`libssl.so.1.1` up to at least 2.0.66, `libapr-1.so.0` in 2.0.84), while `netty-tcnative-boringssl-static` needs only glibc's libraries); the exact floor varies by library and some intermediate versions are unpublished.
 
 **Direct dependencies (Maven):** e.g. snappy-java confirmed lacking `Linux/aarch64/libsnappyjava.so`:
 ```xml
@@ -106,7 +110,13 @@ configurations.all {
 }
 ```
 
-After the updates, copy the dependencies again and re-run the Phase 1.2.1 scan; a MUST UPGRADE item still without an `ARM aarch64` build that suits the target comes back to this step, or goes under User Decisions Pending when no version has one.
+After the updates, keep the Phase 1 output that the reports cite, then copy the dependencies again and re-run the Phase 1.2.1 check; a MUST UPGRADE item that still has a `FINDING` comes back to this step, or goes under User Decisions Pending when every version has one.
+
+```bash
+for f in graviton-validation/raw/native-check-*.txt; do   # once per target: a rerun keeps the first copy
+  case $f in *-phase1.txt) ;; *) [ -e "${f%.txt}-phase1.txt" ] || cp "$f" "${f%.txt}-phase1.txt";; esac
+done
+```
 
 ## 2.3 Architecture Detection Code Updates
 
@@ -153,7 +163,7 @@ A stage that runs GraalVM `native-image` builds an executable for the platform i
 
 Multi-stage — **Maven** (builder produces `target/*.jar`):
 ```dockerfile
-# Builder: $BUILDPLATFORM = run the build natively on the builder's arch (faster; a JAR's bytecode is arch-neutral)
+# Builder: $BUILDPLATFORM = run the build natively on the builder's arch (faster; the same JAR as an arm64 build unless a classifier or profile follows the build host)
 FROM --platform=$BUILDPLATFORM <current-builder-image>:<current-version> AS builder
 WORKDIR /app
 COPY . .

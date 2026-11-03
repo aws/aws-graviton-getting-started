@@ -38,6 +38,19 @@ ci.system:  <internal CI system>   # vocabulary for CI recommendations
 ci.changes: apply                  # apply | recommend: CI changes that only add or switch an architecture
 ```
 
+## Target (shared)
+
+```
+# Where the workload runs, for what the repository does not record. Every field is optional; left blank, the
+# skill judges the targets the repository names. The C library and its versions always come from each target's
+# files, never from these fields.
+target.hosts:  <e.g. ec2:al2023 page=4096; ec2:rhel-8 page=65536; eks-node:al2023; lambda:java21>
+               # entries separated by ';': <kind>:<distribution or Lambda runtime>, optionally
+               # page=<bytes> (getconf PAGESIZE on that host) and kernel=<release> (uname -r there);
+               # kinds: ec2, ecs-node, eks-node, fargate, lambda
+target.images: <target images the repository does not name, e.g. an internal base image tag>
+```
+
 ## Java
 
 ```

@@ -29,8 +29,8 @@ Then ask your AI assistant:
 ## Customizing for your environment (optional)
 
 By default the skill uses neutral, vendor-agnostic defaults. To orient it around your
-team's toolchain — a specific JDK distribution to build/validate with, the Maven Wrapper,
-an internal image registry, your cluster's ARM64 node labels — copy the template to a
+team's toolchain (a specific JDK distribution to build/validate with, the Maven Wrapper,
+an internal image registry, your cluster's ARM64 node labels, the hosts and images you deploy to), copy the template to a
 `skill-config.md` at your project root and fill in what applies:
 
 ```bash

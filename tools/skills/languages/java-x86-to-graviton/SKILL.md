@@ -1,6 +1,6 @@
 ---
 name: java-x86-to-graviton
-description: Validates Java application compatibility with AWS Graviton (ARM64) architecture by analyzing native libraries, dependencies (including transitive), and architecture-specific code. Performs static analysis, applies ARM64-required dependency updates, documents Graviton JVM flag recommendations, and validates builds on ARM64. Use when migrating Java workloads from x86 to Graviton, validating ARM64 readiness, or running AWS Transform Custom java-x86-to-graviton transformations.
+description: Validates Java application compatibility with AWS Graviton (ARM64) architecture by analyzing native libraries, dependencies (including transitive), and architecture-specific code. Performs static analysis, applies ARM64-required dependency updates, documents Graviton JVM flag recommendations, and validates builds on ARM64. Use whenever a Java workload is to run on Graviton (arm64), to assess or migrate it, even if the skill is not named; also for running AWS Transform Custom java-x86-to-graviton transformations.
 metadata:
   author: AWS
   version: "1.0"
@@ -22,7 +22,7 @@ Validate a Java application's readiness to run on AWS Graviton instances. This t
 
 ## Skill Configuration (Optional)
 
-If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (build/validation JDK, build command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the application's shipped JDK distribution stays unchanged (a configured JDK preference selects only the build/validation environment per Phase 3.0). See [references/skill-configuration.md](references/skill-configuration.md) for the fields, and [references/skill-config.template.md](references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (build/validation JDK, build command, container registry and runtime, deployment and CI vocabulary, target hosts and images) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the application's shipped JDK distribution stays unchanged (a configured JDK preference selects only the build/validation environment per Phase 3.0). See [references/skill-configuration.md](references/skill-configuration.md) for the fields, and [references/skill-config.template.md](references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
 
 ## Entry Criteria
 
@@ -33,22 +33,24 @@ If a `skill-config.md` exists at the project root, read it before Phase 1 and ap
 5. ARM64 build/test environment access (Graviton EC2 or ARM64 containers)
 6. Complete dependency list with current versions
 7. Existing test suite
-8. Tools the commands call: git, curl, `unzip`, `file` and `readelf`, the project's Maven or Gradle build, and a container runtime (Phase 3); the image check (Phase 1.4) uses the docker CLI
+8. Tools the commands call: git, curl, Python 3.6 or later (or a container runtime, which runs the check in a Python image), the project's Maven or Gradle build, and a container runtime (Phase 1.1 and Phase 3); the OS-package check (§1.2.2) and the image check (Phase 1.4) use the docker CLI
 
 ## Transformation Workflow
+
+**Assessment only:** when the user asks for an assessment, or for the project to stay unchanged, skip Version Control Setup, run Phase 1 and stop. First read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) in full, then run the blocks that apply, in order: the verdicts come from the checks those blocks run, and your own inspection of binaries or package files does not replace them. A `CHECK` those blocks print stays a `CHECK` in the report, never a PASS, with the step that settles it. Phase 1 changes none of the project's existing files; it writes the reports Documentation Setup lists to a new `graviton-validation/` folder, `00-summary.md` last. Report what Phases 2 and 3 would change or run as recommendations, each with its default.
 
 Copy this checklist into your response and check off each step:
 
 ```
 ARM64 migration progress:
 - [ ] Baseline commit; `graviton-validation/raw/` created; `skill-config.md` read if present
-- [ ] 1.1 Deployment type, modules, dependency tree, risk categories (01, raw/)
+- [ ] 1.1 Deployment type, modules, target OS and libc, dependency tree, risk categories (01, raw/)
 - [ ] 1.2 Native files inside and outside archives, judged by content (02)
 - [ ] 1.3 Each dependency: MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE / CHECK (03)
 - [ ] 1.4 Architecture code, JVM options, images, deployment settings (04)
 - [ ] 1.5 Java version and distribution recorded, not changed (01)
 - [ ] 2.1 Native libraries resolved (02)
-- [ ] 2.2 Only MUST UPGRADE dependencies updated, then the 1.2.1 scan re-run (03)
+- [ ] 2.2 Only MUST UPGRADE dependencies updated, then the 1.2.1 check re-run (03)
 - [ ] 2.3 Architecture detection code updated (04)
 - [ ] 2.4 Dockerfiles, build and deployment settings updated (04)
 - [ ] 2.5 JVM flags documented, not applied (05)
@@ -77,6 +79,8 @@ fi
 
 Before Phase 1, create the output structure. See [references/documentation-standards.md](references/documentation-standards.md) for required sections and templates.
 
+Report a check as run, or a result as observed, only when you ran the command in this session, and name the command or its output file in `raw/`; a check you did not run is NOT RUN. When several versions were checked, list the ones checked, not a range, unless every version in the range was checked. Take every count in the reports (versions, files, findings, packages) from a command's output, not from reading. A `FINDING` keeps its label in every report and in the final answer; say whether the project's code reaches it only from a run that shows it. Say that a file passes the check for a target, not that it loads there, unless a run loaded it.
+
 ```bash
 mkdir -p graviton-validation/raw
 ```
@@ -93,21 +97,22 @@ Output files produced:
 | `06-build-test-results.md` | 3.0-3.3 | Build, test results, startup checks |
 | `raw/dependency-tree-full.txt` | 1.1 | Raw dependency tree |
 | `raw/dependency-tree-native.txt` | 1.3 | Filtered native-artifact tree |
+| `raw/native-check-<target>.txt` | 1.2, 2.2 | Native files judged by content, per deployable, one file per target |
 | `00-summary.md` | End | Executive summary and exit criteria |
 
 ### Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. See [references/phase1-static-analysis.md](references/phase1-static-analysis.md) for detailed steps.
+Analyze the project without making changes. Read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) before starting.
 
-1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, dependency tree generation, component risk categorization
-2. **1.2 Native Library Validation** - Scan for .so files (bundled and runtime-extracted), apply tiered FAIL/WARN/CHECK/PASS policy
+1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, target OS and libc from each image's files, dependency tree generation, component risk categorization
+2. **1.2 Native Library Validation** - Every native file judged by content for the target OS (bundled, runtime-extracted, downloaded), OS packages, tiered FAIL/WARN/CHECK/PASS policy
 3. **1.3 Dependency ARM64 Compatibility** - Analyze full transitive tree, classify as MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE (CHECK until the evidence decides)
 4. **1.4 Architecture-Specific Code Detection** - Find `os.arch` checks, JNI/JNA usage missing ARM64 handling, x86-only JVM options, and deployment settings that pick x86, set or absent
 5. **1.5 Java Version Check** - Document version and distribution (do NOT change either)
 
 ### Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues only. See [references/phase2-resolution.md](references/phase2-resolution.md) for detailed steps.
+Apply fixes for ARM64-blocking issues only. Read [references/phase2-resolution.md](references/phase2-resolution.md) before starting.
 
 1. **2.1 Native Library Resolution** - Cross-compile or obtain ARM64 .so files, update loading logic
 2. **2.2 Dependency Updates** - Update ONLY MUST UPGRADE dependencies (including transitive via dependencyManagement)
@@ -117,7 +122,7 @@ Apply fixes for ARM64-blocking issues only. See [references/phase2-resolution.md
 
 ### Phase 3: ARM64 Validation & Testing
 
-Build and test on ARM64. See [references/phase3-validation.md](references/phase3-validation.md) for detailed steps.
+Build and test on ARM64. Read [references/phase3-validation.md](references/phase3-validation.md) before starting.
 
 1. **3.0 Build Environment Prep** - Java runtime alignment for annotation processor compatibility (session-scoped only)
 2. **3.1 Build Validation** - Full build, classify failures as INFRA/ARM64/PRE-EXISTING
