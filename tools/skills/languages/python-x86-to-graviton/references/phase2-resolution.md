@@ -33,7 +33,7 @@ $CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$PWD":/w -w /w -e HOST
 $CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$PWD":/w -w /w -e HOST_IDS="$(id -u):$(id -g)" python:3.11-slim timeout 900 sh -c \
   'apt-get update && apt-get install -y gcc libc6-dev && pip wheel --no-deps -w dist . && chown -R "$HOST_IDS" dist build *.egg-info'
 python3 -m zipfile -l dist/*.whl | grep '\.so'   # the extension, e.g. _fixture_ext.cpython-311-aarch64-linux-gnu.so
-python3 -m zipfile -e dist/*.whl "${TMPDIR:-/tmp}/whl" && cp "${TMPDIR:-/tmp}"/whl/_fixture_ext.*.so vendor/   # only if the project vendors the built file
+W=$(mktemp -d "${TMPDIR:-/tmp}/graviton-whl.XXXXXX") && python3 -m zipfile -e dist/*.whl "$W" && cp "$W"/_fixture_ext.*.so vendor/   # only if the project vendors the built file
 
 # Verify
 file vendor/libfastsum-aarch64.so  # Must show "ARM aarch64"
@@ -59,7 +59,8 @@ Before rebuilding, remove x86-only compiler flags, or apply them only on x86 (se
 **Lambda layers and vendored site-packages:** re-create them for arm64 from the pins listed by `*.dist-info` (Phase 1.2.2). pip can download aarch64 wheels from an x86 host; offer the tags the target's glibc accepts (Phase 1.1), which for a layer is the function runtime's:
 
 ```bash
-if . "${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; then
+GV_SCAN=$(sed -n 's/^GV_SCAN=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the function's file, recorded by §1.2.1
+if [ -f "$GV_SCAN" ] && . "$GV_SCAN"; then
   PYVER=3.11              # the function's runtime: python3.11 -> 3.11, python3.12 -> 3.12
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.26    # Phase 1.1: 2.26 for python3.10 and python3.11 (Amazon Linux 2), 2.34 for python3.12 and later
   TARGET_PAGE_SIZE=       # the function's page size, if measured in it (getconf PAGESIZE); unset, the scan skips the page check
@@ -67,8 +68,10 @@ if . "${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; then
   while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
   python3 -m pip install "${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: \
     --python-version "$PYVER" --implementation cp --target python/ -r layer-requirements.txt
-  native_scan python   # the function from Phase 1.2.1: no FINDING line
-else echo "CHECK: run the Phase 1.2.1 scan block first: it writes ${TMPDIR:-/tmp}/graviton-python-native_scan.sh"; fi
+  GV_TDIR=$(awk -F '\t' -v t="public.ecr.aws_lambda_python_$PYVER" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # §1.1's copy of public.ecr.aws/lambda/python:$PYVER, the runtime's OS
+  if [ -n "$GV_TDIR" ]; then TARGET_ROOT=$GV_TDIR TARGET_LIBC= TARGET_LIBC_VER= native_scan python   # no FINDING line
+  else echo "CHECK: no §1.1 copy of public.ecr.aws/lambda/python:$PYVER: the scan judges the glibc release only"; TARGET_ROOT= native_scan python; fi
+else echo "CHECK: run the Phase 1.2.1 scan block first: it records the function's file in graviton-validation/raw/session.env"; fi
 ```
 
 The scan also reports executables inside `py3-none-any` wheels, such as selenium 4.48.0's x86-64 `selenium-manager`, which a check of one file misses. Layer contents go in `python/` at the root of the zip ([AWS Lambda Python layers](https://docs.aws.amazon.com/lambda/latest/dg/python-layers.html)). A package with no aarch64 wheel fails this command; resolve it in §2.2 first. The tag list matters: confluent-kafka 2.15.1's only aarch64 wheel is `manylinux_2_28`, so with `TARGET_LIBC_VER=2.26` the command fails for it, and a layer built from that wheel anyway imported on an arm64 `python3.12` function and failed on `python3.11` with `version 'GLIBC_2.28' not found` (Phase 1.1).
@@ -138,9 +141,10 @@ The uv and Poetry rows were executed on the fixture variants (each regenerated l
 TARGET_LIBC_VER=2.41    # Phase 1.1 (python:3.11-slim): every tag the target's glibc accepts, as in the Phase 1.3 probe
 PLAT=(); i=${TARGET_LIBC_VER#*.}
 while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
-python3 -m pip download --only-binary=:all: --no-deps -d /tmp/aarch64-wheels "${PLAT[@]}" \
+D=$(mktemp -d "${TMPDIR:-/tmp}/graviton-wheels.XXXXXX") || D=$PWD/graviton-validation/raw/wheels   # a new folder no other user can write
+python3 -m pip download --only-binary=:all: --no-deps -d "$D" "${PLAT[@]}" \
   --platform manylinux2014_aarch64 --python-version 3.11 --implementation cp --abi cp311 "MarkupSafe==2.1.5"
-python3 -m pip hash --algorithm sha256 /tmp/aarch64-wheels/MarkupSafe-2.1.5-*.whl
+python3 -m pip hash --algorithm sha256 "$D"/MarkupSafe-2.1.5-*.whl
 # append the printed --hash=sha256:... as a second --hash on the MarkupSafe line
 # or: pip-compile --generate-hashes requirements.in   (records the hashes of all published files)
 ```
