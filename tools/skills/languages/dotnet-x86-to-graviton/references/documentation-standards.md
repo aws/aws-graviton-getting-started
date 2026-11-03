@@ -5,7 +5,7 @@
 - Purpose
 - Output Folder Structure
 - Agent Instructions
-- File Specifications: `00-summary.md`; `01-project-assessment.md`; `02-native-library-report.md`; `03-dependency-compatibility-report.md`; `04-code-scan-findings.md`; `05-runtime-configuration.md`; `06-build-test-results.md`; `raw/project-properties.txt`; `raw/dependency-tree.json`; `raw/native-assets.txt`; `raw/dependency-tree-native.txt`; `raw/repo-native-scan.txt`; `raw/ca1416.txt`; `raw/output-scan.txt`; `raw/native-assets-phase1.txt`, `raw/dependency-tree-phase1.json`
+- File Specifications: `00-summary.md`; `01-project-assessment.md`; `02-native-library-report.md`; `03-dependency-compatibility-report.md`; `04-code-scan-findings.md`; `05-runtime-configuration.md`; `06-build-test-results.md`; `raw/project-properties.txt`; `raw/dependency-tree-<target>.json`; `raw/native-assets-<target>.txt`; `raw/dependency-tree-native.txt`; `raw/repo-native-scan-<target>.txt`; `raw/ca1416.txt`; `raw/output-scan-<target>.txt`; `raw/native-assets-<target>-phase1.txt`, `raw/dependency-tree-<target>-phase1.json`; `raw/session.env`; `raw/target-roots.txt`
 
 ## Purpose
 
@@ -27,15 +27,17 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
     ├── 06-build-test-results.md              # Builds, publishes and output scans, tests, container and startup checks
     └── raw/                                  # Machine-generated artefacts, never hand-edited
         ├── project-properties.txt            # Evaluated properties of every project (Phase 1.1)
-        ├── dependency-tree.json              # Every resolved package with its reference chain (Phase 1.1)
-        ├── native-assets.txt                 # Per-RID native report (Phase 1.1, re-run in Phase 2.2)
+        ├── dependency-tree-<target>.json     # Every resolved package with its reference chain (Phase 1.1)
+        ├── native-assets-<target>.txt        # Per-RID native report (Phase 1.1, re-run in Phase 2.2)
         ├── dependency-tree-native.txt        # The FINDING, CHECK and OK lines with their chains (Phase 1.3)
-        ├── repo-native-scan.txt              # Committed native files and assemblies by content (Phase 1.2)
+        ├── repo-native-scan-<target>.txt     # Committed native files and assemblies by content (Phase 1.2)
         ├── ca1416.txt                        # Windows-only API call sites (Phase 1.4, Windows starting points)
-        └── output-scan.txt                   # Publish outputs by content (Phase 3.1)
+        ├── output-scan-<target>.txt          # Publish outputs by content (Phase 3.1)
+        ├── session.env                       # Paths that later blocks read in a new shell (the check program, saved functions)
+        └── target-roots.txt                  # Each target's name and its image's folder, or glibc=VERSION with no image (Phase 1.1)
 ```
 
-`raw/native-assets-packages-config.txt` (Phase 1.1, `packages.config` projects) and the Phase 2.2 copies `raw/native-assets-phase1.txt` and `raw/dependency-tree-phase1.json` are added when they apply.
+`raw/native-assets-packages-config.txt` (Phase 1.1, `packages.config` projects) and the Phase 2.2 copies `raw/native-assets-<target>-phase1.txt` and `raw/dependency-tree-<target>-phase1.json` are added when they apply. `<target>` is the target's name in `raw/target-roots.txt` (Phase 1.1).
 
 ## Agent Instructions
 
@@ -122,9 +124,11 @@ Projects no solution lists: <none | list>
 - **Policy applied:** `dotnet.framework_bump` = ask | approved=<tfm> | never; outcome: unchanged | <change and why>
 
 ## Target OS and libc
-- **Targets:** <image | AMI | Lambda runtime>, each with its libc and version, measured by <the Phase 1.1 or nuget-native-assets.md §6 block | the Lambda runtime table>
-- **Target RIDs:** <linux-arm64[, linux-musl-arm64]>; lowest glibc: <2.NN>; page size: <4KB | 64KB>
+- **Targets:** <image | AMI | Lambda runtime>, each with its OS (os-release name), C library and version, and highest `GLIBCXX_`, read from <the image's files (the nuget-native-assets.md §6 block) | the Lambda runtime table | `ldd --version` on the host>
+- **Target RIDs:** <linux-arm64[, linux-musl-arm64]>; lowest glibc: <2.NN>; check options of each run: <--target-root FOLDER | --glibc and --glibcxx>, --page-size
+- **Deployment hosts:** <host>: page size <4KB | 64KB | unknown>, kernel <release | unknown>, from <`getconf PAGESIZE` and `uname -r` there | `page=` and `kernel=` in `target.hosts` | the team that runs the hosts>
 - **Globalization:** <InvariantGlobalization, ICU and tzdata in the target images (windows-to-linux.md §5)>
+- **From skill-config:** <none | the `target.hosts` and `target.images` entries used, and each value a target's files or a host measurement overruled>
 
 ## Feeds
 <nuget.org | the sources and package source mapping in NuGet.config; versions missing from a feed: INFRA items>
@@ -147,7 +151,7 @@ Projects no solution lists: <none | list>
 # Native Library Report
 
 ## Package Native Files
-Summary of raw/native-assets.txt: <N> packages, <M> with native files for these RIDs, <F> findings, <C> checks (detail per package in 03).
+Summary of raw/native-assets-<target>.txt: <N> packages, <M> with native files for these RIDs, <F> findings, <C> checks (detail per package in 03).
 
 ## Statically Bundled Libraries
 | File | Location | Architecture (by content) | aarch64 build present | Verdict | Established | Resolution |
@@ -207,6 +211,8 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 | Item | Via | Why it is not settled | Settled by | Result |
 |---|---|---|---|---|
 | Microsoft.CodeCoverage | Microsoft.NET.Test.Sdk 17.11.1 | x86-64 instrumentation libraries in build/, used only for coverage collection | coverage collected on Graviton (Phase 3.2) | <PASS, or NOT RUN with the reason> |
+
+A library whose `NOTE` names the build for the target is not a CHECK item: list its Phase 3 confirmation with the Phase 3 steps.
 
 ## Transitive Dependency Resolutions
 | Transitive | Pulled in by | Issue | Mechanism used |
@@ -349,28 +355,28 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 
 ---
 
-### `raw/dependency-tree.json`
+### `raw/dependency-tree-<target>.json`
 
 **Created:** Phase 1.1 (Generate Dependency Tree)
 **Purpose:** Every resolved package per project and target framework, with the reference chain from the project (`assets --tree`). Kept for traceability; not hand-edited.
 
 ---
 
-### `raw/native-assets.txt`
+### `raw/native-assets-<target>.txt`
 
 **Created:** Phase 1.1 (Generate Dependency Tree), re-run in Phase 2.2
-**Purpose:** The per-RID native report: `OK`, `FINDING`, `CHECK` and `NOTE` lines with `via` chains, and the summary line. Kept for traceability; not hand-edited.
+**Purpose:** The per-RID native report: the target line, `OK`, `FINDING`, `CHECK` and `NOTE` lines with `via` chains, and the summary lines. Kept for traceability; not hand-edited.
 
 ---
 
 ### `raw/dependency-tree-native.txt`
 
 **Created:** Phase 1.3 (Generate Filtered Tree)
-**Purpose:** The `FINDING`, `CHECK` and `OK` lines of `native-assets.txt` with their chains: the packages with native files. Kept for traceability; not hand-edited.
+**Purpose:** The `FINDING`, `CHECK` and `OK` lines of `native-assets-<target>.txt` with their chains: the packages with native files. Kept for traceability; not hand-edited.
 
 ---
 
-### `raw/repo-native-scan.txt`
+### `raw/repo-native-scan-<target>.txt`
 
 **Created:** Phase 1.2.1
 **Purpose:** `scan --source-tree` output: every ELF, PE and Mach-O file committed to the repository, with its architecture. Kept for traceability; not hand-edited.
@@ -384,14 +390,14 @@ Source RID: linux-x64 | win-x64. Target RIDs: <linux-arm64[, linux-musl-arm64]>.
 
 ---
 
-### `raw/output-scan.txt`
+### `raw/output-scan-<target>.txt`
 
 **Created:** Phase 3.1
 **Purpose:** The publish result and `scan` output of every executable project for each target RID. Kept for traceability; not hand-edited.
 
 ---
 
-### `raw/native-assets-phase1.txt`, `raw/dependency-tree-phase1.json`
+### `raw/native-assets-<target>-phase1.txt`, `raw/dependency-tree-<target>-phase1.json`
 
 **Created:** Phase 2.2
 **Purpose:** Copies of the Phase 1 files, kept before the post-fix re-run overwrites them. Kept for traceability; not hand-edited.

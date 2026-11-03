@@ -310,7 +310,7 @@ Do not extend the list from memory. A package is managed only when the per-RID c
 - The minimal version is not always the one to apply without asking: NuGet audit flags SkiaSharp 2.80.0 to 2.88.5 (NU1903, GHSA-j7hp-h8jx-5ppr) but not 1.68.3, so the arm64 floor brings a new advisory. 2.88.6 is the lowest release without it, and also probes clean for linux-arm64. That choice goes to the user once; it is not a reason to jump to the latest release
 
 **Correct Analysis:**
-> "SkiaSharp.NativeAssets.Linux 1.68.3: no linux-arm64 native file. Status: MUST UPGRADE. Minimum ARM64 version: **2.80.0** (with SkiaSharp 2.80.0), the lowest that probes clean, needing GLIBC_2.17. Restore flags 2.80.0 with NU1903, which 1.68.3 did not have; 2.88.6 is the lowest release without it (user decision: 2.80.0 or 2.88.6). For an Alpine target the floor is 3.119.0, the first with linux-musl-arm64: a decision tied to the target OS."
+> "SkiaSharp.NativeAssets.Linux 1.68.3: no linux-arm64 native file. Status: MUST UPGRADE. Minimum ARM64 version: **2.80.0** (with SkiaSharp 2.80.0), the lowest that probes clean, needing GLIBC_2.17. Restore flags 2.80.0 with NU1903, which 1.68.3 did not have; 2.88.6 is the lowest release without it (user decision: 2.80.0 or 2.88.6). For an Alpine target, probe with `--target-rid linux-musl-arm64`: a decision tied to the target OS."
 
 **The transferable lesson:** a content-based verdict can still carry a wrong *minimum version*. Probe upward from the version in use and stop at the first that reports no findings ([nuget-native-assets.md §5](nuget-native-assets.md#5-finding-the-lowest-version-that-works)).
 

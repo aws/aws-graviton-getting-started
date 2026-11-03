@@ -28,7 +28,8 @@ mkdir -p src/Fixture.Core/native/arm64   # the folder for the aarch64 build, nex
 $CONTAINER_CMD run --rm --init --platform linux/amd64 -v "$PWD":/w -w /w -e HOST_IDS="$(id -u):$(id -g)" ubuntu:24.04 timeout 600 sh -c \
   'apt-get update && apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross && aarch64-linux-gnu-gcc -shared -fPIC -O2 -o src/Fixture.Core/native/arm64/libfastsum.so native/fastsum.c && chown "$HOST_IDS" src/Fixture.Core/native/arm64/libfastsum.so'
 echo "cross-compile: exit $?"   # must be 0 before the scan below means anything
-GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block of nuget-native-assets.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 python3 "$GV_CHECK" scan src/Fixture.Core/native/arm64   # the file's line must start with "ELF aarch64", and no FINDING may follow
 ```
 
@@ -71,7 +72,9 @@ return NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "native", arch,
 Update ONLY dependencies flagged as MUST UPGRADE in Phase 1.3. Do NOT upgrade compatible dependencies. Prefer the *lowest* version whose native files probe clean for every target RID, not the latest: probe the candidates upward from the version in use and **probe the exact candidate** before writing it ([nuget-native-assets.md](nuget-native-assets.md) §5). Floors are not always monotonic.
 
 ```bash
-GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block of nuget-native-assets.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
+# The target of Phase 1.1: for a target image, --target-root FOLDER in place of --target-rid and --glibc
 python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0 --target-rid linux-arm64 --glibc 2.34; echo "exit status $?"
 ```
 
@@ -136,12 +139,18 @@ Commit the lock files with the change.
 After the changes, keep the Phase 1 evidence that `03-dependency-compatibility-report.md` cites, then re-run the Phase 1.1 check:
 
 ```bash
-cp graviton-validation/raw/native-assets.txt graviton-validation/raw/native-assets-phase1.txt
-cp graviton-validation/raw/dependency-tree.json graviton-validation/raw/dependency-tree-phase1.json
-GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
-python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 --glibc 2.34 \
-  --tree graviton-validation/raw/dependency-tree.json > graviton-validation/raw/native-assets.txt; rc=$?
-cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
+for f in graviton-validation/raw/native-assets-*.txt graviton-validation/raw/dependency-tree-*.json; do   # keep every target's Phase 1 files
+  case $f in *-phase1.*) ;; *) [ -e "$f" ] && [ ! -e "${f%.*}-phase1.${f##*.}" ] && cp "$f" "${f%.*}-phase1.${f##*.}";; esac   # once: a rerun keeps the first copy
+done
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block of nuget-native-assets.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
+for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that Phase 1.1 recorded; with none, one run named target
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
+python3 "$GV_CHECK" assets --source-rid linux-x64 "${GV_T[@]}" \
+  --tree "graviton-validation/raw/dependency-tree-$GV_TAG.json" > "graviton-validation/raw/native-assets-$GV_TAG.txt"; rc=$?   # one pair of files per target, named for it
+cat "graviton-validation/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
+done
 ```
 
 ## 2.3 Architecture Detection Code Updates
