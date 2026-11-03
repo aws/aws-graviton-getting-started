@@ -32,7 +32,7 @@ Then ask your AI assistant:
 
 By default the skill uses neutral, vendor-agnostic defaults. To orient it around your
 team's toolchain (an internal PyPI mirror, uv-managed interpreters, a preferred test
-command, an internal image registry, your cluster's ARM64 node labels), copy the template
+command, an internal image registry, your cluster's ARM64 node labels, the hosts and images you deploy to), copy the template
 to a `skill-config.md` at your project root and fill in what applies:
 
 ```bash

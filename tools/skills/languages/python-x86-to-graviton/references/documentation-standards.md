@@ -5,7 +5,7 @@
 - Purpose
 - Output Folder Structure
 - Agent Instructions
-- File Specifications: `00-summary.md`; `01-project-assessment.md`; `02-native-library-report.md`; `03-dependency-compatibility-report.md`; `04-code-scan-findings.md`; `05-runtime-configuration.md`; `06-build-test-results.md`; `raw/dependency-tree-full.txt`; `raw/wheel-availability.txt`; `raw/requirements-resolved.txt`; `raw/site-packages-so-scan.txt`; `raw/wheel-availability-phase1.txt`, `raw/requirements-resolved-phase1.txt`
+- File Specifications: `00-summary.md`; `01-project-assessment.md`; `02-native-library-report.md`; `03-dependency-compatibility-report.md`; `04-code-scan-findings.md`; `05-runtime-configuration.md`; `06-build-test-results.md`; `raw/dependency-tree-full.txt`; `raw/wheel-availability.txt`; `raw/requirements-resolved.txt`; `raw/site-packages-so-scan-<target>.txt`; `raw/wheel-availability-phase1.txt`, `raw/requirements-resolved-phase1.txt`
 
 ## Purpose
 
@@ -29,7 +29,9 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
         ├── dependency-tree-full.txt          # Manager-native tree, or .json for a pip report (Phase 1.1)
         ├── requirements-resolved.txt         # Flat pinned list the probe ran on (Phase 1.3)
         ├── wheel-availability.txt            # Probe output, one verdict line per pin (Phase 1.3)
-        └── site-packages-so-scan.txt         # every native file found by content, its properties, FINDING lines (Phase 1.2)
+        ├── site-packages-so-scan-<target>.txt   # every native file found by content, its properties, FINDING lines; one file per target (Phase 1.2)
+        ├── session.env                       # Paths that later blocks read in a new shell (the check program, saved functions)
+        └── target-roots.txt                  # Each target's name and its image's folder, or glibc=VERSION with no image (Phase 1.1)
 ```
 
 ## Agent Instructions
@@ -114,12 +116,14 @@ Monorepo / multiple packages: <No | Yes, list each package and its manager>
 - **Policy applied:** `python.interpreter_bump` = never | ask | approved=<3.X>; outcome: unchanged | bump approved to <3.X> because <sole path to aarch64 wheel for X>; evaluated across all pins (03 report, Interpreter-ABI Blockers)
 
 ## Target OS and glibc
-- **Base image / AMI:** <python:3.11-slim (Debian 13) | amazonlinux:2023 | ...>
-- **libc:** <glibc 2.41 | musl 1.2>, measured by <the Phase 1.1 probe in the image | the Lambda runtime | repo table in wheel-verification.md section 7>
+- **Targets:** <image | AMI | Lambda runtime>, each with its OS (os-release name), C library and version, and highest `GLIBCXX_`, read from <the image's files (the Phase 1.1 block) | the Lambda runtime table | `ldd --version` on the host>
+- **libc for the wheel probes:** <glibc 2.41 | musl 1.2>, from <the Phase 1.1 probe in the image | the Lambda runtime | the table in wheel-verification.md section 7>
 - **Highest wheel tag accepted:** manylinux_2_<N> | musllinux_1_<N>
-- **Kernel page size on the deployment hosts:** <4KB | 64KB | unknown>, from <`getconf PAGESIZE` on <host> | the team that runs the hosts>
+- **Deployment hosts:** <host>: page size <4KB | 64KB | unknown>, kernel <release | unknown>, from <`getconf PAGESIZE` and `uname -r` there | `page=` and `kernel=` in `target.hosts` | the team that runs the hosts>
 - **Graviton generations deployed:** <e.g. Graviton2 and Graviton4 | unknown>; oldest: <generation>
 - **pip on target:** <version>; >= 20.3 required for current aarch64 wheels, which carry `manylinux_2_N` tags (19.3 sees only `manylinux2014`) (upgrade recorded if applied)
+- **Scan settings:** <TARGET_ROOT, or TARGET_LIBC, TARGET_LIBC_VER and TARGET_GLIBCXX; TARGET_PAGE_SIZE> of each scan
+- **From skill-config:** <none | the `target.hosts` and `target.images` entries used, and each value a target's files or a host measurement overruled>
 
 ## Private Index / Mirror
 <none | URL (from skill-config python.index_url or pip.conf); aarch64 coverage checked: yes/no>
@@ -192,6 +196,8 @@ Interpreter probed: cp3XY. Target libc: <glibc 2.NN | musl 1.N> (every manylinux
 | Item | Via | Why it is not settled | Settled by | Result |
 |---|---|---|---|---|
 | <dependency> | <direct or via> | <the CHECK line, for example CHECK INDEX: an index did not answer, or CHECK FALLBACK: aarch64 gets only the pure-Python wheel> | <the step: the sdist listing, the index answering, the Phase 3 import or loaded check, a user decision> | <the label it got, or still CHECK with the reason> |
+
+A library whose `NOTE` names the build for the target is not a CHECK item: list its Phase 3 confirmation with the Phase 3 steps.
 
 ## RECOMMENDED UPGRADE (Non-Blocking)
 | Dependency | Pinned | Recommended version | Reason | Evidence level | Action taken |
@@ -367,10 +373,10 @@ Interpreter decision, one for the whole dependency set (Phase 1.5), one row per 
 
 ---
 
-### `raw/site-packages-so-scan.txt`
+### `raw/site-packages-so-scan-<target>.txt`
 
 **Created:** Phase 1.2.1
-**Purpose:** `native_scan` output: every native file in the project tree, including members of layer zips, vendored wheels and static archives, with its properties (architecture, C library, `GLIBC_` and `GLIBCXX_` floors, page alignment, needed libraries), the target it was judged for, and one `FINDING` line per problem. Kept for traceability; not hand-edited.
+**Purpose:** `native_scan` output: every native file in the project tree, including members of layer zips, vendored wheels and static archives, with its properties (architecture, C library, `GLIBC_` and `GLIBCXX_` floors, page alignment, needed libraries), the target it was judged for (first line), and its `FINDING`, `CHECK` and `NOTE` lines. Kept for traceability; not hand-edited.
 
 ---
 

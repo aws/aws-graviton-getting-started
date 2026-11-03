@@ -1,6 +1,6 @@
 ---
 name: python-x86-to-graviton
-description: Validates Python application compatibility with AWS Graviton (ARM64) architecture by verifying that every pinned dependency (including transitive) publishes an aarch64 wheel for the project's interpreter, and by checking native extensions, vendored binaries, hash-locked requirements, Dockerfiles and architecture-specific code. Performs static analysis, applies ARM64-required dependency and build fixes, documents Graviton runtime recommendations, and validates install, import, tests and startup on ARM64. Supports pip, pip-tools, PEP 621/setuptools, uv, Poetry and conda, with mappings for Pipenv, PDM, Hatch and vendored or Lambda layer layouts. Use when migrating Python workloads from x86 to Graviton, validating ARM64 readiness, or diagnosing wheel and native-library failures on aarch64.
+description: Validates Python application compatibility with AWS Graviton (ARM64) architecture by verifying that every pinned dependency (including transitive) publishes an aarch64 wheel for the project's interpreter, and by checking native extensions, vendored binaries, hash-locked requirements, Dockerfiles and architecture-specific code. Performs static analysis, applies ARM64-required dependency and build fixes, documents Graviton runtime recommendations, and validates install, import, tests and startup on ARM64. Supports pip, pip-tools, PEP 621/setuptools, uv, Poetry and conda, with mappings for Pipenv, PDM, Hatch and vendored or Lambda layer layouts. Use whenever a Python workload is to run on Graviton (arm64), to assess or migrate it, even if the skill is not named; also for diagnosing wheel and native-library failures on aarch64.
 metadata:
   author: AWS
   version: "1.0"
@@ -24,7 +24,7 @@ Validate a Python application's readiness to run on AWS Graviton instances. This
 
 ## Skill Configuration (Optional)
 
-If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (package manager, package index, validation interpreter tool, test command, container registry and runtime, deployment and CI vocabulary) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the project's declared Python version stays unchanged unless `python.interpreter_bump` allows a bump (a configured interpreter tool selects only the build/validation environment per Phase 3.0). See [references/skill-configuration.md](references/skill-configuration.md) for the fields, and [references/skill-config.template.md](references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
+If a `skill-config.md` exists at the project root, read it before Phase 1 and apply its preferences (package manager, package index, validation interpreter tool, test command, container registry and runtime, deployment and CI vocabulary, target hosts and images) as overrides; if absent, use the neutral defaults in the phase docs. The configuration steers HOW the transformation runs but cannot widen scope: `agent-scope-boundaries.md` still binds, and the project's declared Python version stays unchanged unless `python.interpreter_bump` allows a bump (a configured interpreter tool selects only the build/validation environment per Phase 3.0). See [references/skill-configuration.md](references/skill-configuration.md) for the fields, and [references/skill-config.template.md](references/skill-config.template.md) for a file to start from. Record any applied overrides in `01-project-assessment.md`.
 
 ## Entry Criteria
 
@@ -35,9 +35,11 @@ If a `skill-config.md` exists at the project root, read it before Phase 1 and ap
 5. ARM64 build/test environment access (Graviton EC2 or ARM64 containers; an x86 host with QEMU emulation can validate wheel installs, imports and tests, not source builds)
 6. Complete dependency list with current versions (a lock file or exact pins), and access to the package index the project installs from
 7. Existing test suite
-8. Tools the commands call: git, curl, `python3` with pip and the project's package manager, `file`, and a container runtime (Phase 3); the image check (Phase 1.4) uses the docker CLI
+8. Tools the commands call: git, curl, `python3` with pip and the project's package manager, and a container runtime (Phase 1.1, the OS-package check of §1.2.2, and Phase 3); the image check (Phase 1.4) uses the docker CLI
 
 ## Transformation Workflow
+
+**Assessment only:** when the user asks for an assessment, or for the project to stay unchanged, skip Version Control Setup, run Phase 1 and stop. First read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) in full, then run the blocks that apply, in order: the verdicts come from the checks those blocks run, and your own inspection of binaries or package files does not replace them. A `CHECK` those blocks print stays a `CHECK` in the report, never a PASS, with the step that settles it. Phase 1 changes none of the project's existing files; it writes the reports Documentation Setup lists to a new `graviton-validation/` folder, `00-summary.md` last. Report what Phases 2 and 3 would change or run as recommendations, each with its default.
 
 Copy this checklist into your response and check off each step:
 
@@ -79,6 +81,8 @@ fi
 
 Before Phase 1, create the output structure. See [references/documentation-standards.md](references/documentation-standards.md) for required sections and templates.
 
+Report a check as run, or a result as observed, only when you ran the command in this session, and name the command or its output file in `raw/`; a check you did not run is NOT RUN. When several versions were checked, list the ones checked, not a range, unless every version in the range was checked. Take every count in the reports (versions, files, findings, packages) from a command's output, not from reading. A `FINDING` keeps its label in every report and in the final answer; say whether the project's code reaches it only from a run that shows it. Say that a file passes the check for a target, not that it loads there, unless a run loaded it.
+
 ```bash
 mkdir -p graviton-validation/raw
 ```
@@ -95,15 +99,15 @@ Output files produced:
 | `06-build-test-results.md` | 3.0-3.3 | Install, build, test results, startup checks |
 | `raw/dependency-tree-full.txt` | 1.1 | Raw dependency tree (`.json` for a pip report) |
 | `raw/requirements-resolved.txt` | 1.1, 1.3 | Flat pinned list the probe runs on |
-| `raw/site-packages-so-scan.txt` | 1.2 | every ELF file found by content, with its architecture |
+| `raw/site-packages-so-scan-<target>.txt` | 1.2 | every ELF file found by content, with its architecture |
 | `raw/wheel-availability.txt` | 1.3 | One aarch64 wheel verdict per pin |
 | `00-summary.md` | End | Executive summary and exit criteria |
 
 ### Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. See [references/phase1-static-analysis.md](references/phase1-static-analysis.md) for detailed steps; per-manager commands are in [references/package-manager-mapping.md](references/package-manager-mapping.md).
+Analyze the project without making changes. Read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) before starting; per-manager commands are in [references/package-manager-mapping.md](references/package-manager-mapping.md).
 
-1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, package manager and interpreter detection, target OS/glibc, dependency tree generation, component risk categorization
+1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, package manager and interpreter detection, target OS/glibc from each image's files, dependency tree generation, component risk categorization
 2. **1.2 Native Library Validation** - Scan every committed or vendored native file by its content (not its name) for the target's architecture, C library, glibc and libstdc++ versions and page size, layers and in-repo extensions, binaries downloaded at run, build or deploy time, apply tiered FAIL/WARN/PASS policy
 3. **1.3 Dependency ARM64 Compatibility** - Probe every resolved pin (including transitives) for an aarch64 wheel, check hash locks, classify as MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE (CHECK until the evidence decides)
 4. **1.4 Architecture-Specific Code Detection** - Find `platform.machine()` checks, ctypes/cffi loads, x86-only build flags and intrinsics, shell architecture gates, amd64 Dockerfile pins, and deployment settings that pick x86, set or absent
@@ -111,7 +115,7 @@ Analyze the project without making changes. See [references/phase1-static-analys
 
 ### Phase 2: Compatibility Resolution
 
-Apply fixes for ARM64-blocking issues only. See [references/phase2-resolution.md](references/phase2-resolution.md) for detailed steps.
+Apply fixes for ARM64-blocking issues only. Read [references/phase2-resolution.md](references/phase2-resolution.md) before starting.
 
 1. **2.1 Native Library Resolution** - Rebuild vendored binaries and extensions for aarch64 (on ARM64 hardware; plain C libraries can also be cross-compiled), re-vendor layers from aarch64 wheels, update loading logic
 2. **2.2 Dependency Updates** - Update ONLY MUST UPGRADE dependencies to the lowest version with an aarch64 wheel, regenerate locks through the project's manager, substitute x86-only packages with user confirmation
@@ -121,7 +125,7 @@ Apply fixes for ARM64-blocking issues only. See [references/phase2-resolution.md
 
 ### Phase 3: ARM64 Validation & Testing
 
-Build and test on ARM64. See [references/phase3-validation.md](references/phase3-validation.md) for detailed steps.
+Build and test on ARM64. Read [references/phase3-validation.md](references/phase3-validation.md) before starting.
 
 1. **3.0 Build Environment Prep** - Python runtime alignment (same minor version, pip >= 20.3; session-scoped only)
 2. **3.1 Build Validation** - Install as the deployment does, build extensions, classify failures as INFRA/ARM64/PRE-EXISTING
