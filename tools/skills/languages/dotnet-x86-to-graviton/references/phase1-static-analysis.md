@@ -15,7 +15,7 @@ MSBuild also reads `Directory.Build.rsp` for these steps, and that file can add 
 dotnet --list-sdks
 dotnet --version   # the SDK this repository selects (global.json in this folder or a parent)
 python3 -c 'import sys; assert sys.version_info >= (3, 6), sys.version; print("python3", sys.version.split()[0])'
-GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block recorded
 [ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 ```
 
@@ -45,7 +45,7 @@ Examples below refer to three test solutions:
 
 ## 1.1 Project Structure Analysis
 
-> **Output: `graviton-validation/01-project-assessment.md`**, **`graviton-validation/raw/project-properties.txt`**, **`graviton-validation/raw/dependency-tree.json`** and **`graviton-validation/raw/native-assets.txt`**
+> **Output: `graviton-validation/01-project-assessment.md`**, **`graviton-validation/raw/project-properties.txt`**, **`graviton-validation/raw/dependency-tree-<target>.json`** and **`graviton-validation/raw/native-assets-<target>.txt`**
 
 ### Determine Deployment Type
 
@@ -149,17 +149,18 @@ grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.template
 ```
 
 Then, for each target:
-- **Container images:** read the image's libc, and for a glibc image its libstdc++ version, with the blocks in [nuget-native-assets.md §6](nuget-native-assets.md#6-target-os-libc-glibc-version-page-size), which also list the results for the common .NET and Lambda images.
-- **Lambda managed runtimes:** `dotnet8` and `dotnet10` run on Amazon Linux 2023 (glibc 2.34); `dotnet6` and `dotnetcore3.1` ran on Amazon Linux 2 (glibc 2.26) ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)).
+- **Container images:** copy each image's files with the block in [nuget-native-assets.md §6](nuget-native-assets.md#6-target-os-libc-glibc-version-page-size) which records the folder for the scans (`--target-root`): the check reads the C library (and so the target RID), the glibc versions and the libstdc++ level from it.
+- **Lambda managed runtimes:** the runtime identifier sets the OS, as the runtimes table shows ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)): Amazon Linux 2023 has glibc 2.34, Amazon Linux 2 glibc 2.26. AWS publishes a base image for each runtime, listed with its OS ([AWS base images for .NET](https://docs.aws.amazon.com/lambda/latest/dg/csharp-image.html)): read the one for the function's runtime as for a container image; if it cannot be read, pass `--glibc` with that OS's version and leave `--glibcxx` out.
 - **EC2 hosts:** ask for the AMI if no file names it. Amazon Linux 2023 AMIs launch in IMDSv2-only mode by default ([Deprecated in AL2023](https://docs.aws.amazon.com/linux/al2023/ug/deprecated-al2023.html)); §1.3 uses this for the AWS SDK.
 
-Record four values for the rest of the skill:
+Record for the rest of the skill:
 - the **target RIDs**: `linux-arm64`, plus `linux-musl-arm64` when any target image is Alpine;
-- the **lowest glibc version** across the targets;
-- the **lowest libstdc++ version** (`GLIBCXX_3.4.N`) across the glibc targets, when it can be read for each of them (from an image, with the block in §6; a Lambda managed runtime has no image to read it from);
-- the **page size** when a target kernel uses 64KB pages (AlmaLinux 8 and Rocky Linux 8 aarch64).
+- each **target** in `raw/target-roots.txt`, which the scans read, one run per target with its output files named for it: the §6 block of nuget-native-assets.md records an image's name and the folder of its files (`--target-root`). For a target with no image, record a name of its own and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/raw/target-roots.txt` for an Amazon Linux 2023 host.
+- the **page size** when a target kernel uses 64KB pages (AlmaLinux 8 and Rocky Linux 8 aarch64), as `GV_PAGE=65536`.
 
-For a Lambda function on a managed .NET runtime, the arm64 target is `dotnet8` or `dotnet10` (§1.5), so the lowest glibc is 2.34; the managed runtime's libstdc++ version cannot be read, so `--glibcxx` is left out. When no file names the target OS, as for an EC2 host whose AMI no file names, ask.
+For a Lambda function on a managed .NET runtime, read its runtime's base image as the Lambda bullet above says. When no file names the target OS, as for an EC2 host whose AMI no file names, ask.
+
+> **Skill config:** `target.hosts` and `target.images` in `skill-config.md` add targets to the ones the repository names; a host's `page=` and `kernel=` count only when they were not measured there. The C library and its versions still come from each target's files.
 
 ### Generate Dependency Tree
 
@@ -168,15 +169,19 @@ For a Lambda function on a managed .NET runtime, the arm64 target is `dotnet8` o
 One scratch restore gives both the dependency tree (every resolved package with the shortest reference chain from a project, as JSON) and the per-RID native report used in §1.2 and §1.3. The repository is not modified ([nuget-native-assets.md §3](nuget-native-assets.md#3-the-per-rid-check)):
 
 ```bash
-GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block of nuget-native-assets.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 mkdir -p graviton-validation/raw
-# --source-rid: linux-x64 for a Linux starting point, win-x64 for Windows. --glibc: the target's version (Determine Target OS and libc);
-# add --glibcxx and --page-size when those values were recorded there.
-python3 "$GV_CHECK" assets --source-rid linux-x64 --target-rid linux-arm64 --glibc 2.34 \
-  --tree graviton-validation/raw/dependency-tree.json > graviton-validation/raw/native-assets.txt; rc=$?
-cat graviton-validation/raw/native-assets.txt; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
+# --source-rid: linux-x64 for a Linux starting point, win-x64 for Windows
+for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that Phase 1.1 recorded; with none, one run named target
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
+python3 "$GV_CHECK" assets --source-rid linux-x64 "${GV_T[@]}" \
+  --tree "graviton-validation/raw/dependency-tree-$GV_TAG.json" > "graviton-validation/raw/native-assets-$GV_TAG.txt"; rc=$?   # one pair of files per target, named for it
+cat "graviton-validation/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 # Sanity check: nothing resolved is a failed restore, not an all-clear (unless the solution references no packages)
-grep -q '^packages: [1-9]' graviton-validation/raw/native-assets.txt || echo "WARNING: no packages resolved; read the restore errors above"
+grep -q '^packages: [1-9]' "graviton-validation/raw/native-assets-$GV_TAG.txt" || echo "WARNING: no packages resolved; read the restore errors above"
+done
 ```
 
 A project that uses `packages.config` is not in this report: the program prints `CHECK <file>: these packages are not restored by PackageReference and are not in this report; run: config <file>`, and that project gets the per-package check instead ([nuget-native-assets.md §3](nuget-native-assets.md#projects-that-still-use-packagesconfig)).
@@ -190,7 +195,7 @@ A project that uses `packages.config` is not in this report: the program prints 
 
 ## 1.2 Native Library Validation (.so File Analysis)
 
-> **Output: `graviton-validation/02-native-library-report.md`**, **`graviton-validation/raw/native-assets.txt`** (from §1.1) and **`graviton-validation/raw/repo-native-scan.txt`**
+> **Output: `graviton-validation/02-native-library-report.md`**, **`graviton-validation/raw/native-assets-<target>.txt`** (from §1.1) and **`graviton-validation/raw/repo-native-scan-<target>.txt`**
 
 Native code reaches a .NET application in four ways ([nuget-native-assets.md §1](nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each)):
 - files under `runtimes/<rid>/native/` in NuGet packages;
@@ -204,20 +209,25 @@ The per-RID report from §1.1 covers the first two. This section reads it, scans
 
 Statically bundled native code sits in two places. Judge both by content, never by name: a Linux library can be named `SQLite.Interop.dll`, and an executable has no extension.
 
-1. **NuGet packages.** Read `graviton-validation/raw/native-assets.txt` from §1.1. Each package with native files for the source or target RIDs gets one line per target RID and file:
-   - `OK`: an aarch64 build for the target's libc, with the GLIBC_ and GLIBCXX_ versions it needs, its LOAD alignment and the libraries it needs;
-   - `FINDING`: no file for the target RID, or a file that is x86-64, an Android build, built for the other libc, too new for the target's glibc or libstdc++, linked for a smaller page size than the target's, or a Windows or macOS binary;
-   - `CHECK`: x86-only files outside `runtimes/`, which fail only if a build target copies them or a tool runs them;
+1. **NuGet packages.** Read `graviton-validation/raw/native-assets-<target>.txt` from §1.1. Its first line names the target; each package with native files for the source or target RIDs then gets one line per target RID and file:
+   - `OK`: an aarch64 build the target's loader accepts;
+   - `FINDING`: no file for the target RID, or one the target's loader refuses;
+   - `CHECK`: a file that only a build step, a tool or a load in the target image settles;
    - an indented `via` line under each `FINDING` and `CHECK`, with the reference chain from a project.
 
    What each line means, and the package shapes behind them: [nuget-native-assets.md §3 and §4](nuget-native-assets.md#3-the-per-rid-check).
 2. **Files committed to the repository**: vendored libraries, prebuilt helpers, and managed assemblies built for one architecture. Scan the source tree by content. `--source-tree` skips `.git`, `.vs`, `bin`, `obj`, `node_modules` and `graviton-validation`; build and publish outputs are scanned in Phase 3.1:
 
 ```bash
-GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block of nuget-native-assets.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 mkdir -p graviton-validation/raw
-python3 "$GV_CHECK" scan --source-tree . > graviton-validation/raw/repo-native-scan.txt; rc=$?
-cat graviton-validation/raw/repo-native-scan.txt; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
+for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that Phase 1.1 recorded; with none, one scan named target
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
+python3 "$GV_CHECK" scan "${GV_T[@]}" --source-tree . > "graviton-validation/raw/repo-native-scan-$GV_TAG.txt"; rc=$?
+cat "graviton-validation/raw/repo-native-scan-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
+done
 ```
 
 The same scan reports committed managed assemblies built for x64 or x86, which fail on arm64 as described in [nuget-native-assets.md §1](nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each).
@@ -247,24 +257,29 @@ Windows system DLLs never exist on Linux: a `[DllImport("kernel32.dll")]` call f
 Fetch each download into a scratch folder and scan what it holds, whatever its URL says. Resolve the script's variables in the URL first; an archive is unpacked first:
 
 ```bash
-GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block of nuget-native-assets.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list above
-d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX"); mkdir "$d/x"
-if curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
+d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX") && mkdir "$d/x" || { d=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }
+if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
   # Unpack by the first bytes, not the name: a .deb (an ar archive), an .rpm, a zip or a tar archive
   case "$(od -An -tx1 -N4 "$d/download" | tr -d ' \t\n')" in
     213c6172) if head -c 64 "$d/download" | grep -q debian-binary; then   # another ar archive is a static library, which the scan reads
                 (cd "$d/x" && ar x ../download && for t in data.tar.*; do tar -xf "$t"; done) && rm "$d/download" \
                   || echo "CHECK: $URL is a .deb this host cannot unpack (needs ar, and tar with xz or zstd)"
               fi ;;
-    edabeedb) { if command -v rpm2cpio > /dev/null 2>&1; then (cd "$d/x" && rpm2cpio ../download | cpio -idm --quiet)
-                else bsdtar -xf "$d/download" -C "$d/x"; fi; } && rm "$d/download" \
-                || echo "CHECK: $URL is an .rpm this host cannot unpack (needs rpm2cpio and cpio, or bsdtar)" ;;
+    edabeedb) { if command -v bsdtar > /dev/null 2>&1; then bsdtar -xf "$d/download" -C "$d/x"   # bsdtar keeps every path inside the folder
+                else (cd "$d/x" && rpm2cpio ../download | cpio -idm --quiet --no-absolute-filenames); fi; } && rm "$d/download" \
+                || echo "CHECK: $URL is an .rpm this host cannot unpack (needs bsdtar, or rpm2cpio and GNU cpio)" ;;
     *) python3 -m zipfile -e "$d/download" "$d/x" 2>/dev/null || tar -xf "$d/download" -C "$d/x" 2>/dev/null ;;
   esac
-  python3 "$GV_CHECK" scan "$d"
+  for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that Phase 1.1 recorded; with none, one scan named target
+  GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+  GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
+  echo "== $GV_TAG"; python3 "$GV_CHECK" scan "${GV_T[@]}" "$d"
+  done
 else echo "CHECK: $URL did not download"; fi
-rm -rf "$d"
+[ -z "$d" ] || rm -rf "$d"
 ```
 
 Executed: jq 1.6's `jq-linux64`, whose URL names no architecture, gave `FINDING download is x86-64`; jq 1.7.1's `jq-linux-arm64` gave no finding. A download that cannot be fetched from here (credentials, a private network) stays CHECK until it is scanned where it can be.
@@ -275,9 +290,9 @@ Check that every OS package exists for arm64 on the target OS, from a container 
 # Debian or Ubuntu target: ask its package index for the arm64 builds, from a container that runs natively on this host
 IMG=mcr.microsoft.com/dotnet/aspnet:8.0   # the runtime image (Determine Target OS and libc)
 PKGS="libfontconfig1"                     # the packages its Dockerfile installs
-command -v timeout > /dev/null 2>&1 || timeout() { shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit
+command -v timeout > /dev/null 2>&1 || timeout() { while [ $# -gt 1 ]; do case $1 in -k|-s|--kill-after|--signal) shift 2;; -*) shift;; *) break;; esac; done; shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit, dropping the options and the duration
 NATIVE="linux/$(docker version -f '{{.Server.Arch}}')"
-ARM_PKGS=$(echo "$PKGS" | sed 's/[^ ][^ ]*/&:arm64/g')
+ARM_PKGS=$(echo "$PKGS" | sed -E 's/([^ =]+)(=[^ ]*)?/\1:arm64\2/g')   # pkg:arm64, and pkg:arm64=VERSION for a pinned version
 # On an amd64 Ubuntu image the x86 mirrors carry no arm64 files (apt-get update: "binary-arm64/Packages 404 Not
 # Found"): keep the image's sources for amd64 and read arm64 from ports.ubuntu.com
 PORTS='. /etc/os-release
@@ -298,11 +313,11 @@ timeout 600 docker run --rm --init --platform "$NATIVE" --entrypoint timeout "$I
 # Amazon Linux 2023 (dnf) target: ask the aarch64 repositories, from a container that runs natively on this host
 IMG=public.ecr.aws/amazonlinux/amazonlinux:2023
 PKGS="fontconfig libicu"
-command -v timeout > /dev/null 2>&1 || timeout() { shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit
+command -v timeout > /dev/null 2>&1 || timeout() { while [ $# -gt 1 ]; do case $1 in -k|-s|--kill-after|--signal) shift 2;; -*) shift;; *) break;; esac; done; shift; "$@"; }   # no GNU timeout (macOS without coreutils): run without the host-side limit, dropping the options and the duration
 NATIVE="linux/$(docker version -f '{{.Server.Arch}}')"
 # 480 seconds inside the container stops dnf; 600 outside stops the container if it does not exit
 timeout 600 docker run --rm --init --platform "$NATIVE" --entrypoint timeout "$IMG" 480 \
-  sh -c "dnf -q --forcearch aarch64 repoquery --arch aarch64,noarch --latest-limit 1 $PKGS"
+  sh -c "dnf -q --forcearch aarch64 repoquery --arch aarch64,noarch --latest-limit 1 $PKGS"; echo "repoquery exit status $? (0: a package with no line has no aarch64 build; another status: the query failed, which is no answer)"
 ```
 
 - **Debian or Ubuntu** (observed on Debian 12, Ubuntu 22.04 and Ubuntu 24.04): judge only the requested `:arm64` packages, because some dependencies resolve to the host's architecture in this simulation. A package with no arm64 build stops it: `E: Unable to locate package <name>:arm64`.
@@ -328,12 +343,13 @@ timeout 600 docker run --rm --init --platform "$NATIVE" --entrypoint timeout "$I
 - The line is a `CHECK` (a file outside `runtimes/` that only a tool or a test step uses), OR a managed fallback exists, OR source is available for recompilation (the Linux solution's `libfastsum.so` has its C source in `native/fastsum.c`)
 
 **PASS if:**
-- The line is `OK`: an aarch64 ELF build for the target's libc, needing no newer GLIBC_ version than the target has, with a LOAD alignment no smaller than the target's page size
+- The line is `OK`: an aarch64 ELF build for the target's libc, needing no newer GLIBC_ version than the target has, with a LOAD alignment no smaller than the target's page size. A `CHECK` is not a PASS: an assessment reports it as `CHECK` with the step that settles it
 
 For x86-only native files: check for source in the repository, document recompilation needs (Phase 2.1), or ask the user. Validate a single file with:
 
 ```bash
-GV_CHECK="${TMPDIR:-/tmp}/dotnet_graviton_check.py"
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block of nuget-native-assets.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
 python3 "$GV_CHECK" scan path/to/folder   # the file's line must start with "ELF aarch64", and no FINDING may follow
 file path/to/folder/libname.so            # where file(1) exists: must show "ARM aarch64"
 ```
@@ -349,11 +365,11 @@ file path/to/folder/libname.so            # where file(1) exists: must show "ARM
 Name filters miss packages whose names do not look native. The per-RID report from §1.1 is already the filtered view: it lists exactly the packages that have native files for these RIDs, found by content, each with its reference chain. Save it:
 
 ```bash
-grep -E '^(FINDING|CHECK|OK|  via)' graviton-validation/raw/native-assets.txt > graviton-validation/raw/dependency-tree-native.txt
+grep -hE '^(FINDING|CHECK|OK|  via)' graviton-validation/raw/native-assets-*.txt > graviton-validation/raw/dependency-tree-native.txt   # every target's file
 cat graviton-validation/raw/dependency-tree-native.txt
 ```
 
-The full graph, including managed packages, is in `graviton-validation/raw/dependency-tree.json`.
+The full graph, including managed packages, is in `graviton-validation/raw/dependency-tree-<target>.json`.
 
 ### Classify Each Dependency
 
@@ -363,7 +379,7 @@ The full graph, including managed packages, is in `graviton-validation/raw/depen
 
 **COMPATIBLE (No action):** `OK` lines, and managed-only packages (the `managed only` count in the summary line).
 
-**OUT OF SCOPE:** Security advisories that restore reports as NU1901 to NU1904 warnings (the `NOTE NuGet audit:` lines of `native-assets.txt`), such as `NU1903` for Newtonsoft.Json 12.0.3 in the Linux solution. Mention them once and change nothing ([agent-scope-boundaries.md](agent-scope-boundaries.md)).
+**OUT OF SCOPE:** Security advisories that restore reports as NU1901 to NU1904 warnings (the `NOTE NuGet audit:` lines of `native-assets-<target>.txt`), such as `NU1903` for Newtonsoft.Json 12.0.3 in the Linux solution. Mention them once and change nothing ([agent-scope-boundaries.md](agent-scope-boundaries.md)).
 
 For transitive dependencies: the `via` line names the direct reference that pulls the package in. Resolution may require updating that parent, or pinning the transitive package (Phase 2.2).
 
@@ -377,7 +393,7 @@ Check the resolved version:
 
 ```bash
 # AWS SDK for .NET: AWSSDK.Core before 3.3.103.66 has no IMDSv2 (session token) support
-python3 - graviton-validation/raw/dependency-tree.json <<'EOF'
+python3 - "$(ls graviton-validation/raw/dependency-tree-*.json 2> /dev/null | head -n 1)" <<'EOF'   # one target's tree: the packages are the same for each
 import json, re, sys
 seen = set()
 for proj, frameworks in json.load(open(sys.argv[1])).items():
@@ -402,7 +418,7 @@ Dependency: Stub.System.Data.SQLite.Core.NetStandard (transitive via System.Data
 Current Version: 1.0.119
 Status: MUST UPGRADE (substitute: user decision)
 Reason: no linux-arm64 native file in this or any stable release; its linux-x64 file SQLite.Interop.dll is an x86-64 ELF library
-Evidence: native-assets.txt: FINDING no linux-arm64 native: Stub.System.Data.SQLite.Core.NetStandard/1.0.119 (linux-x64 has 1; runtimes/ folders: linux-x64, osx-x64, win-x64, win-x86)
+Evidence: native-assets-<target>.txt: FINDING no linux-arm64 native: Stub.System.Data.SQLite.Core.NetStandard/1.0.119 (linux-x64 has 1; runtimes/ folders: linux-x64, osx-x64, win-x64, win-x86)
 Minimum ARM64 Version: none
 Resolution: replace with Microsoft.Data.Sqlite (already in the solution, linux-arm64 and linux-musl-arm64 natives); code change in the class that uses it
 ```
@@ -505,12 +521,14 @@ Flag code that:
 ```bash
 SOLUTION=Orders.slnx   # the solution (or project) from 1.1
 mkdir -p graviton-validation/raw
-d=$(mktemp -d)
-python3 -c 'import shutil, sys; shutil.copytree(".", sys.argv[1], symlinks=True, ignore=shutil.ignore_patterns(".git", ".vs", "bin", "obj", "node_modules", "graviton-validation"))' "$d/src"
-(cd "$d/src" && dotnet build "$SOLUTION" -p:EnableWindowsTargeting=true -p:RestoreLockedMode=false > "$d/build.txt" 2>&1; echo "build exit $?")
-grep -oE '[^ ]+\.(cs|vb|fs)\([0-9]+,[0-9]+\): (warning|error) CA1416: [^[]+' "$d/build.txt" | sed "s#^$d/src/##" | sort -u | tee graviton-validation/raw/ca1416.txt
-echo "CA1416 call sites: $(wc -l < graviton-validation/raw/ca1416.txt)"
-rm -rf "$d"
+d=$(mktemp -d) || d=   # a new, empty folder, or nothing: the copy below needs it
+if [ -n "$d" ]; then
+  python3 -c 'import shutil, sys; shutil.copytree(".", sys.argv[1], symlinks=True, ignore=shutil.ignore_patterns(".git", ".vs", "bin", "obj", "node_modules", "graviton-validation"))' "$d/src"
+  (cd "$d/src" && dotnet build "$SOLUTION" -p:EnableWindowsTargeting=true -p:RestoreLockedMode=false > "$d/build.txt" 2>&1; echo "build exit $?")
+  grep -oE '[^ ]+\.(cs|vb|fs)\([0-9]+,[0-9]+\): (warning|error) CA1416: [^[]+' "$d/build.txt" | sed "s#^$d/src/##" | sort -u | tee graviton-validation/raw/ca1416.txt
+  echo "CA1416 call sites: $(wc -l < graviton-validation/raw/ca1416.txt)"
+  rm -rf "$d"
+else echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; fi
 ```
 
 CA1416 does not report three cases:
@@ -559,6 +577,8 @@ grep -rnE "${EX[@]}" --include='*.c' --include='*.cc' --include='*.cpp' --includ
 What each Windows or .NET Framework hit means on Linux, with the replacement, is in [windows-to-linux.md](windows-to-linux.md). The descriptor fixes are in Phase 2.4.
 
 A setting that is absent also picks an architecture. A Lambda function that names none runs on x86_64, the default of the Lambda API, Terraform and the CDK, whose templates then carry no `Architectures`; a Fargate task definition without `cpuArchitecture` runs `X86_64`, and an ECS task on EC2 capacity without it goes where its capacity providers place it; an EKS managed node group with no instance type launches `t3.medium`, and the CDK's `aws-eks` `Cluster` without `defaultCapacityInstance` adds `m5.large` (x86) nodes, two unless `defaultCapacity` sets another count; the CDK's `MachineImage.latestAmazonLinux2023()` without `cpuType` picks the x86_64 AMI. So each function, task definition and node group the resource lines list needs an arm64 setting (Phase 2.4), whether or not an architecture line matched it. An image can also name one architecture: through its tag (`mcr.microsoft.com/dotnet/aspnet:8.0-bookworm-slim-amd64`, `public.ecr.aws/lambda/dotnet:8-x86_64`). Native C or C++ sources the repository builds need an Arm path for any x86 intrinsics they use: `sse2neon.h` ([sse2neon](https://github.com/DLTcollab/sse2neon)) implements the SSE to SSE4.2 and AES intrinsics with NEON, but no AVX (`_mm256_*`); port what it does not cover, and the hot paths found by profiling on Graviton, to NEON intrinsics. `long double` and fast-math flags change results between x86 and Graviton without an error: check them in Phase 3 (Results That Change Without Failing).
+
+A Graviton instance type is a sizing decision: record it under User Decisions Pending with the default from Phase 2.4, also when no file in the repository names the hosts (the same series and size as the hosts' x86 instance type).
 
 Every image the project builds from, tests with or deploys has to list `linux/arm64`, including images a library starts at run time: a test that calls `WithImage("mysql:5.7")` starts `mysql:5.7`, which has no arm64 build. List the images and read each one's platforms from its registry, without pulling it:
 
@@ -609,16 +629,9 @@ for r in json.load(sys.stdin)["releases-index"]:
    - .NET 10 needs glibc 2.27, which Amazon Linux 2 (glibc 2.26) does not have; .NET 8 needs glibc 2.23. On Graviton4, in an `amazonlinux:2` container, .NET 8.0.31 ran a console app and .NET 10.0.12 stopped at ``Failed to load .../libcoreclr.so, error: /lib64/libm.so.6: version `GLIBC_2.27' not found``; .NET 10.0.12 ran on AlmaLinux 8 (glibc 2.28).
    - The .NET Framework does not support Linux, and Windows is not supported on Graviton.
 3. **Support:** the block above prints each release's type (`lts` or `sts`), support phase and end of support from Microsoft's release index. Use the newest `lts` release in `active` support for new Graviton workloads, or an earlier release in `active` or `maintenance` support when the project needs it; a release in `eol` is out of support.
-4. **Lambda:** changing a function's architecture means uploading new code built for it ([Lambda architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html)). After a runtime's block-update date, "Lambda begins blocking the update of code and configuration for existing functions", but "You can still upgrade the function configuration to a supported runtime" ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)):
+4. **Lambda:** changing a function's architecture means uploading new code built for it ([Lambda architectures](https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html)). After a runtime's block-update date, "Lambda begins blocking the update of code and configuration for existing functions", but "You can still upgrade the function configuration to a supported runtime" ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)). Read the function's runtime in that table (its OS and its deprecation, block-create and block-update dates) when you assess it: a runtime past its block-update date cannot move to arm64 as it is, and must move too (MUST UPGRADE).
 
-   | Runtime | OS | Deprecation | Block create | Block update |
-   |---|---|---|---|---|
-   | `dotnet10` | Amazon Linux 2023 | Nov 14, 2028 | Dec 14, 2028 | Jan 15, 2029 |
-   | `dotnet8` | Amazon Linux 2023 | Nov 10, 2026 | Jul 29, 2027 | Aug 31, 2027 |
-   | `dotnet6` | Amazon Linux 2 | Dec 20, 2024 | Jul 29, 2027 | Aug 31, 2027 |
-   | `dotnetcore3.1` | Amazon Linux 2 | Apr 3, 2023 | Apr 3, 2023 | May 3, 2023 |
-
-   So the Linux solution's `dotnetcore3.1` function cannot move to arm64 as it is: its runtime must move too (MUST UPGRADE). The Lambda API refused a new `dotnetcore3.1` function for both architectures: `The runtime parameter of dotnetcore3.1 is no longer supported for creating or updating AWS Lambda functions.`
+   For example, the Linux solution's `dotnetcore3.1` function cannot move to arm64 as it is. The Lambda API refused a new `dotnetcore3.1` function for both architectures: `The runtime parameter of dotnetcore3.1 is no longer supported for creating or updating AWS Lambda functions.`
 5. **DO NOT change** target frameworks or the SDK, except where the move to Graviton requires it:
    - a .NET Framework or `-windows` target framework: port to modern .NET on Linux (MUST UPGRADE);
    - a runtime that cannot run on arm64 as it is, such as Lambda `dotnetcore3.1`;

@@ -18,7 +18,7 @@ Teams can steer HOW this transformation runs (which runtime identifiers to targe
 
 ## Section Layout
 
-Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`) that apply regardless of language, and **per-language** sections (`.NET`) holding toolchain fields specific to that ecosystem. A project keeps only the language section(s) it uses; a field in a language section the project does not use is simply ignored.
+Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`, `Target`) that apply regardless of language, and **per-language** sections (`.NET`) holding toolchain fields specific to that ecosystem. A project keeps only the language section(s) it uses; a field in a language section the project does not use is simply ignored.
 
 ## Precedence Rules
 
@@ -53,6 +53,10 @@ Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`) th
    than failing, and record the fallback.
 8. **Absent configuration → neutral defaults**, and applied overrides are recorded in
    `01-project-assessment.md`.
+9. **Target fields add targets and host facts; files and measurements win.** `target.*` never removes a target the
+   repository names or widens the transformation. The C library and its versions come from each target's files, and a
+   page size or kernel release measured on a host wins over a configured one; record any difference in
+   `01-project-assessment.md`.
 
 ## Field Reference
 
@@ -64,6 +68,8 @@ Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`) th
 | `deploy.registry` / `deploy.ingress_convention` | Deployment (shared) | Manifest registry & ingress | existing registry/ingress left unchanged; phase2 §2.4 "Deployment manifests" |
 | `ci.system` | CI (shared) | CI vocabulary in the post-transformation note | generic CI/CD wording; SKILL.md "User Responsibility (Post-Transformation)" |
 | `ci.changes` | CI (shared) | Whether CI changes that only add or switch an architecture are applied or recommended | `apply`; phase2 §2.4 "CI pipelines" |
+| `target.hosts` | Target (shared) | Hosts the repository does not record, with facts it cannot show (page size, kernel release) | the repository's targets; page size measured on each host, else not judged (one NOTE lists the 4 KB-only files); phase1 §1.1 |
+| `target.images` | Target (shared) | Images besides the repository's | the repository's images; phase1 §1.1 |
 | `dotnet.target_rids` | .NET | Target RIDs for every per-RID check, probe and scan | `linux-arm64`, plus `linux-musl-arm64` when a target image is Alpine; phase1 §1.1 "Determine Target OS and libc" |
 | `dotnet.framework_bump` | .NET | How a Graviton-required target framework change is approved | `ask`; phase1 §1.5, phase2 §2.2 "Target framework changes" |
 | `dotnet.sdk_select` | .NET | Tool that provides the session-scoped validation SDK | first that works: an installed SDK that matches `global.json`, the official install script into a temporary folder, the SDK container image; phase3 "Session-Scoped .NET Switching" |

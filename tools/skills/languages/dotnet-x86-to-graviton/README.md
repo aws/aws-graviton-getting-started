@@ -35,7 +35,7 @@ Then ask your AI assistant:
 By default the skill uses neutral, vendor-agnostic defaults. To orient it around your
 team's toolchain (target runtime identifiers such as linux-musl-arm64 for Alpine images,
 where the validation SDK comes from, a preferred test command, an internal image registry,
-your cluster's ARM64 node labels), copy the template to a `skill-config.md` at your project
+your cluster's ARM64 node labels, the hosts and images you deploy to), copy the template to a `skill-config.md` at your project
 root and fill in what applies:
 
 ```bash
