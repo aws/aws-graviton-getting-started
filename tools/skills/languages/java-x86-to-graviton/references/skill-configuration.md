@@ -23,7 +23,7 @@ labels).
 
 ## Section Layout
 
-Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`) that apply
+Fields are grouped into **shared** sections (`Container`, `Deployment`, `CI`, `Target`) that apply
 regardless of language, and **per-language** sections (`Java`) holding toolchain fields
 specific to that ecosystem. A project keeps only the language section(s) it uses; a field
 in a language section the project does not use is simply ignored.
@@ -48,6 +48,10 @@ in a language section the project does not use is simply ignored.
    `./gradlew`, so an absent Gradle wrapper is itself the default — treat as neutral.)
 6. **Absent configuration → neutral defaults**, and applied overrides are recorded in
    `01-project-assessment.md`.
+7. **Target fields add targets and host facts; files and measurements win.** `target.*` never removes a target the
+   repository names or widens the transformation. The C library and its versions come from each target's files, and a
+   page size or kernel release measured on a host wins over a configured one; record any difference in
+   `01-project-assessment.md`.
 
 ## Field Reference
 
@@ -59,6 +63,8 @@ in a language section the project does not use is simply ignored.
 | `deploy.registry` / `deploy.ingress_convention` | Deployment (shared) | Manifest registry & ingress | existing registry/ingress left unchanged — phase2 §2.4 "Deployment manifests" |
 | `ci.system` | CI (shared) | CI vocabulary in the post-transformation note | generic CI/CD wording — SKILL.md "User Responsibility (Post-Transformation)" |
 | `ci.changes` | CI (shared) | Whether CI changes that only add or switch an architecture are applied or recommended | `apply`; phase2 §2.4 "CI pipelines" |
+| `target.hosts` | Target (shared) | Hosts the repository does not record, with facts it cannot show (page size, kernel release) | the repository's targets; page size measured on each host, else not judged (one NOTE lists the 4 KB-only files); phase1 §1.1 |
+| `target.images` | Target (shared) | Images besides the repository's | the repository's images; phase1 §1.1 |
 | `jdk.preferred_distribution` / `jdk.discovery_glob` | Java | Build/validation JDK discovery | Corretto-named find glob — phase3 "Session-Scoped Java Switching" |
 | `jdk.version_select` | Java | How a JDK major is resolved | `/usr/libexec/java_home -v` (macOS) / find glob (Linux) |
 | `jdk.install_hint` | Java | Install command surfaced if no JDK is found | Corretto install block — phase3 "If no compatible version found" |

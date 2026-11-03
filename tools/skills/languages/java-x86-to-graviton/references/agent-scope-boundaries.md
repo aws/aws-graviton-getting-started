@@ -71,9 +71,9 @@ If all answers are **NO** → **Do not upgrade** (out of scope)
 - ✅ Missing ARM64 native library artifacts
 - ✅ Example: snappy-java 1.1.1.7 → 1.1.2.2 (1.1.1.7 ships no `Linux/aarch64/libsnappyjava.so`; 1.1.2.2 is the lowest that does)
 
-> ⚠️ **Verify the JAR, never the version number.** Many libraries added Linux aarch64 support years earlier than people assume: JNA has shipped `linux-aarch64/libjnidispatch.so` since 4.2.0, and snappy-java's `Linux/aarch64/libsnappyjava.so` first appears in **1.1.2.2**, about fifteen releases before the 1.1.4 that is commonly cited. On Graviton, 1.1.2.1 stops with `[FAILED_TO_LOAD_NATIVE_LIBRARY] no native library is found for os.name=Linux and os.arch=aarch64`, and 1.1.2.2 loads. Before writing MUST UPGRADE, confirm the *resolved* JAR actually lacks the aarch64 binary: run `scan_archive` from phase1-static-analysis.md §1.2.1 on it and look for an `ARM aarch64` line.
+> ⚠️ **Verify the JAR, never the version number.** Many libraries added Linux aarch64 support years earlier than people assume: JNA has shipped `linux-aarch64/libjnidispatch.so` since 4.2.0, and snappy-java's `Linux/aarch64/libsnappyjava.so` first appears in **1.1.2.2**, about fifteen releases before the 1.1.4 that is commonly cited. On Graviton, 1.1.2.1 stops with `[FAILED_TO_LOAD_NATIVE_LIBRARY] no native library is found for os.name=Linux and os.arch=aarch64`, and 1.1.2.2 loads. Before writing MUST UPGRADE, confirm the *resolved* JAR actually lacks the aarch64 binary: run the phase1-static-analysis.md §1.2.1 check on it.
 >
-> **When checking a floor, make a missing artifact fail loudly** (Phase 1.2.3): a saved 404 page reads like a JAR with no aarch64 binary, a false MUST UPGRADE. Confirm the version exists in `maven-metadata.xml` (snappy-java has `1.1.3-M1` and `1.1.3-M2` but no released `1.1.3`).
+> **When checking a floor, make a missing artifact fail loudly** (Phase 1.3): the check reports a saved 404 page as `CHECK ... not an archive or a native file`, not as a JAR with no aarch64 binary. Confirm the version exists in `maven-metadata.xml` (snappy-java has `1.1.3-M1` and `1.1.3-M2` but no released `1.1.3`).
 
 ### 2. Build Tool Artifacts
 - ✅ Protoc compiler missing ARM64 executables
@@ -203,7 +203,7 @@ These are **almost always** ARM64-compatible without updates:
 | Dependency | Old → New | ARM64 Issue | Evidence |
 |------------|-----------|-------------|----------|
 | protoc | 3.3.0 → 3.5.0 | 3.3.0 publishes no `linux-aarch_64` exe (x86 only) | `mvn` build log shows "Could not find artifact ...:exe:linux-aarch_64"; Central listing for 3.5.0 shows `protoc-3.5.0-linux-aarch_64.exe` |
-| snappy-java | 1.1.1.7 → 1.1.2.2 | 1.1.1.7 JAR has no `Linux/aarch64/libsnappyjava.so` | `unzip -l snappy-java-1.1.1.7.jar \| grep aarch64` returns nothing |
+| snappy-java | 1.1.1.7 → 1.1.2.2 | 1.1.1.7 JAR has no `Linux/aarch64/libsnappyjava.so` | the Phase 1.2.1 check: `FINDING ...Linux/x86_64/libsnappyjava.so: is x86-64; no aarch64 Linux build of this library` |
 ```
 
 ### For Updates NOT Made:
@@ -246,8 +246,6 @@ These are **almost always** ARM64-compatible without updates:
 **What Was Wrong — the target version:**
 - `linux-aarch_64` first appears in **protoc 3.5.0**, not 3.17 or 3.21. Every release from 3.5.0 through 3.16.x already ships it.
 - Recommending 3.21.0+ violates the minimality rule (*prefer the lowest version whose ARM64 binary works on the target*) and drags ~18 minor versions of unrelated change into an ARM64 migration.
-- Worse, `protoc` is usually pinned via a shared `${protobuf.version}` property, so an oversized bump also moves `protobuf-java` — a runtime library — turning a compatibility fix into unrequested modernization.
-- Citing `osx-aarch_64` alongside `linux-aarch_64` conflates the **macOS** floor (`osx-aarch_64` lands in 3.17.3) with the Linux one, which is what inflates the recommended version. Graviton is Linux: `linux-aarch_64` alone decides the verdict.
 
 **Correct Analysis:**
 > "Protoc 3.3.0 publishes no ARM64 executable (`linux-aarch_64` absent; only x86_32/x86_64 for linux/osx/windows). Build fails on Graviton with 'Could not resolve artifact ...:exe:linux-aarch_64'. Status: MUST UPGRADE. Minimum ARM64 version: **3.5.0** — the lowest release publishing `linux-aarch_64`. Note: if this bump moves a shared `${protobuf.version}`, document the resulting `protobuf-java` change as a consequence of the required fix."
@@ -266,7 +264,7 @@ These are **almost always** ARM64-compatible without updates:
 - "Old + has native code" is not evidence of a missing Graviton binary.
 
 **Correct Analysis:**
-> "JNA 5.6.0: JAR contains `linux-aarch64/libjnidispatch.so` (verified with `scan_archive`). Loads on Graviton unmodified. Status: COMPATIBLE. No update required for ARM64."
+> "JNA 5.6.0: JAR contains `linux-aarch64/libjnidispatch.so` (verified with the Phase 1.2.1 check). Loads on Graviton unmodified. Status: COMPATIBLE. No update required for ARM64."
 
 **Lesson:** Always inspect the resolved JAR for the `linux/aarch64` binary before deciding. A version number cannot tell you whether the Graviton binary is present.
 

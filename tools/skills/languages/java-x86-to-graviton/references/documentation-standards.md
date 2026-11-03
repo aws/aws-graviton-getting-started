@@ -12,7 +12,7 @@ This document defines the standard output folder structure, canonical filenames,
 
 ## Output Folder Structure
 
-All transformation output documents MUST be written to a single folder named `graviton-validation/` in the project root. The agent MUST create this folder and its `raw/` subfolder at the start of Phase 1 before any analysis begins.
+All transformation output documents MUST be written to a single folder named `graviton-validation/` in the project root (Agent Instructions 1).
 
 ```
 <project-root>/
@@ -26,7 +26,11 @@ All transformation output documents MUST be written to a single folder named `gr
     ├── 06-build-test-results.md             # Build validation, test results, failure classification
     └── raw/                                 # Machine-generated artifacts (not hand-authored)
         ├── dependency-tree-full.txt         # Full dependency tree output
-        └── dependency-tree-native.txt       # Filtered tree (native-code artifacts only)
+        ├── dependency-tree-native.txt       # Filtered tree (native-code artifacts only)
+        ├── native-check-<target>.txt        # Native files judged by content, one file per target (Phase 1.2.1)
+        ├── native-check-<target>-phase1.txt # The Phase 1 output, kept before Phase 2.2 re-runs the check
+        ├── session.env                      # Paths that later blocks read in a new shell (the check program, saved functions)
+        └── target-roots.txt                 # Each target's name and its image's folder, or glibc=VERSION with no image (Phase 1.1)
 ```
 
 ## Agent Instructions
@@ -39,6 +43,7 @@ All transformation output documents MUST be written to a single folder named `gr
 6. **If a section has no findings**, include the section header with an explicit "No findings" statement. Do not omit empty sections — their absence is ambiguous.
 7. **Do not create documentation files outside `graviton-validation/`.** All transformation documentation lives in this single folder.
 8. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce, is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the recommended option, the smallest change the evidence supports (an unattended run applies it and says how to reverse it), and the rest under CHECK Items with the step that settles each.
+9. **Every verdict cites its evidence and says where it was established.** A dependency row without the Phase 1.2.1 check's line (`OK`, `FINDING`, `CHECK`) is incomplete; a code finding without file:line is incomplete. The `Established` column says where the verdict comes from: `predicted` (read from files on any host, as the check does), `emulated` (observed in a `linux/arm64` environment under emulation), `other arm64` (observed on arm64 hardware that is not Graviton, such as an Apple Silicon Mac), `graviton` (observed on a Graviton host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict; only `graviton` and `target` observations pass a check or settle a CHECK. A `predicted` finding stays a finding when a Phase 3 run passes, because a run shows only the code paths it exercised.
 
 ---
 
@@ -60,6 +65,7 @@ All transformation output documents MUST be written to a single folder named `gr
 - **JDK Distribution:** <distribution>
 - **Build Tool:** Maven <version> | Gradle <version>
 - **Multi-Module:** Yes (N modules) | No
+- **Target OS / libc:** <image, AMI or Lambda runtime; glibc 2.NN or musl 1.N>
 - **Date:** <ISO 8601>
 
 ## Exit Criteria Checklist
@@ -111,6 +117,16 @@ Reference detail files: 02-native-library-report.md, 03-dependency-compatibility
 - **ARM64 Support Status:** Supported | Supported with limitations
 - **Known Graviton Issues:** None | <description>
 
+## Target OS and libc
+- **Targets:** <image | AMI | Lambda runtime>, each with its OS (os-release name), C library and version, and highest `GLIBCXX_`, read from <the image's files (the Phase 1.1 block) | the Lambda runtime table | `ldd --version` on the host>
+- **Deployment hosts:** <host>: page size <4KB | 64KB | unknown>, kernel <release | unknown>, from <`getconf PAGESIZE` and `uname -r` there | `page=` and `kernel=` in `target.hosts` | the team that runs the hosts>
+- **Graviton generations deployed:** <e.g. Graviton2 and Graviton4 | unknown>; oldest: <generation>
+- **Check options:** <the target of each Phase 1.2.1 run: `--target-root` and its folder, or `--libc glibc --glibc VERSION` for a target with no image>
+- **From skill-config:** <none | the `target.hosts` and `target.images` entries used, and each value a target's files or a host measurement overruled>
+
+## Skill Configuration Overrides Applied
+<none | field: value, effect>
+
 ## Component Risk Categorization
 | Component | Risk Level | Rationale |
 |-----------|-----------|-----------|
@@ -129,16 +145,16 @@ Reference detail files: 02-native-library-report.md, 03-dependency-compatibility
 # Native Library Report
 
 ## Statically Bundled Libraries
-| Library | Source JAR/Location | Architecture | Verdict | Resolution |
-|---------|-------------------|--------------|---------|------------|
-| libfoo.so | commons-crypto-1.1.0.jar | x86_64 only | FAIL | Upgraded to 1.2.0 (includes aarch64) |
-| libbar.so | app-native/lib/ | ARM aarch64 | PASS | No action needed |
+| Library | Source JAR/Location | Architecture (by content) | aarch64 build present | Verdict | Established | Resolution |
+|---|---|---|---|---|---|---|
+| libfoo.so | commons-crypto-1.1.0.jar | `FINDING ...: is x86-64; no aarch64 Linux build of this library` | No | FAIL | predicted | Upgraded to 1.2.0 (includes aarch64) |
+| libbar.so | app-native/lib/ | `OK ...: ELF aarch64 shared library, glibc, GLIBC_2.17` | Yes | PASS | predicted | No action needed |
 
 ## Runtime-Extracted Libraries
-| Dependency | Artifact | Extracts Native Code | ARM64 Support in Current Version | Verdict | Resolution |
-|------------|----------|---------------------|----------------------------------|---------|------------|
-| netty-transport-native-epoll | 4.1.68.Final | Yes | Yes (linux-aarch_64 classifier) | PASS | No action needed |
-| snappy-java | 1.1.1.7 | Yes | No (JAR has no Linux/aarch64/libsnappyjava.so) | FAIL | Upgraded to 1.1.2.2 |
+| Dependency | Artifact | Extracts Native Code | ARM64 Support in Current Version | Verdict | Established | Resolution |
+|---|---|---|---|---|---|---|
+| netty-transport-native-epoll | 4.1.68.Final | Yes | Yes (linux-aarch_64 classifier) | PASS | predicted | No action needed |
+| snappy-java | 1.1.1.7 | Yes | No (JAR has no Linux/aarch64/libsnappyjava.so) | FAIL | predicted | Upgraded to 1.1.2.2 |
 
 ## Resolution Details
 <For each FAIL or WARN, describe the resolution approach>
@@ -163,9 +179,9 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 # Dependency ARM64 Compatibility Report
 
 ## MUST UPGRADE (Blocking)
-| Dependency | Current Version | Minimum ARM64 Version | Applied Version | ARM64 Issue | Evidence |
-|------------|----------------|----------------------|-----------------|-------------|----------|
-| org.xerial.snappy:snappy-java | 1.1.1.7 | 1.1.2.2 | 1.1.2.2 | JAR has no Linux/aarch64/libsnappyjava.so | `unzip -l ... \| grep aarch64` empty; UnsatisfiedLinkError on aarch64 |
+| Dependency | Current Version | Minimum ARM64 Version | Applied Version | ARM64 Issue | Evidence | Established |
+|---|---|---|---|---|---|---|
+| org.xerial.snappy:snappy-java | 1.1.1.7 | 1.1.2.2 | 1.1.2.2 | JAR has no Linux/aarch64/libsnappyjava.so | Phase 1.2.1 check: `FINDING ...Linux/x86_64/libsnappyjava.so: is x86-64; no aarch64 Linux build of this library` | predicted |
 
 ## User Decisions Pending
 | Item | Current | Options | Recommendation | Applied |
@@ -177,16 +193,18 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 |---|---|---|---|---|
 | <dependency or file> | <direct or the dependency that pulls it in> | <for example: a native library extracted or downloaded at run time> | <the Phase 3 step on ARM64> | <the label it got, or still CHECK with the reason> |
 
+A library whose `NOTE` names the build for the target is not a CHECK item: list its Phase 3 confirmation with the Phase 3 steps.
+
 ## RECOMMENDED UPGRADE (Non-Blocking)
 | Dependency | Current Version | Recommended Version | Reason | Action Taken |
 |------------|----------------|--------------------|---------|----|
 | <dep> | <ver> | <ver> | ARM64 perf improvement | Documented for user |
 
 ## COMPATIBLE (No Action Needed)
-| Dependency | Version | Basis |
-|------------|---------|-------|
-| junit:junit | 3.8.1 | Pure Java — no native code |
-| com.google.guava:guava | 31.1-jre | Pure Java — no native code |
+| Dependency | Version | Basis | Established |
+|---|---|---|---|
+| junit:junit | 3.8.1 | Pure Java: no native code | predicted |
+| com.google.guava:guava | 31.1-jre | Pure Java: no native code | predicted |
 
 ## Transitive Dependency Resolutions
 | Transitive Dependency | Pulled In By | Issue | Resolution Method |
@@ -220,6 +238,17 @@ No native libraries (bundled or runtime-extracted) detected. All dependencies ar
 |------|---------|---------|--------|
 | Dockerfile | 9 | `JAVA_TOOL_OPTIONS=-XX:UseAVX=2`: x86-only, an ARM64 JVM does not start | removed for arm64 (Phase 2.4) |
 | template.yaml | 14 | Lambda function with no `Architectures`, so it runs on x86_64 | `Architectures: [arm64]` (Phase 2.4) |
+
+## Dockerfile and Deployment Descriptors
+| File:line | Issue | Action |
+|---|---|---|
+| Dockerfile:1 | FROM --platform=linux/amd64 for the build stage | pin removed; build driven by --platform linux/arm64 |
+
+## Shell Scripts and CI
+| File:line | Pattern | Action |
+|---|---|---|
+| deploy/deploy.sh:5 | uname -m gate for x86_64 only | case on x86_64 and aarch64 |
+| .github/workflows/ci.yml:14 | `docker build` without `--platform` | architecture-only change applied (Phase 2.4 "CI pipelines"): `--platform linux/amd64,linux/arm64` |
 
 ## Changes Applied
 <Summary of code changes made in Phase 2.3 to add ARM64 handling>
@@ -321,3 +350,10 @@ No architecture-specific code patterns, JNI, or JNA usage detected. All code is 
 
 **Created:** Phase 1.3 step 1
 **Purpose:** Filtered dependency tree showing only known native-code artifacts. Kept for traceability; not hand-edited.
+
+---
+
+### `raw/native-check-<target>.txt`
+
+**Created:** Phase 1.2.1, re-run in Phase 2.2
+**Purpose:** The Phase 1.2.1 check's output for one target (`<target>` is its name in `raw/target-roots.txt`), one run per module output and one for the repository's own files. Kept for traceability; not hand-edited.

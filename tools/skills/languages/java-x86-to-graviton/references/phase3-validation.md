@@ -45,6 +45,7 @@ echo "Host architecture: $ARCH"
 - **ARM64 host (aarch64/arm64) + container runtime:** Build and validate in containers using `$CONTAINER_CMD`. This is the ideal path.
 - **ARM64 host (aarch64/arm64) + no container runtime:** Build and validate directly on host.
 - **x86 host + container runtime with ARM64 support:** Use `--platform linux/arm64` to build and find failures early. On x86 Linux this runs under QEMU emulation, which is slower.
+- **x86 host + container runtime that cannot run arm64 images:** as with no container runtime. Do not register an emulator, a privileged host change that is the user's decision.
 - **x86 host + no container runtime:** Static analysis only. Document that ARM64 build validation needs a Graviton host or the target, and recommend one.
 
 **Do NOT skip the ARM64 container build if a container runtime is available.** Even on macOS, if Docker or Finch is installed, attempt it: it finds failures early. A pass there counts only after a run on Graviton (below).
@@ -191,7 +192,7 @@ JAVA_HOME=/path/to/java-21 ${BUILD_CMD} clean install
 
 3. **INFRA or PRE-EXISTING failures:** a failure is INFRA only with a cause that does not depend on the architecture: it fails the same way on the x86 baseline, or its message names a missing service, credential or network resource. Document them, rerun with only those tests excluded, and list them under CHECK Items; that run becomes the **final build**. A build that skips every test is never the final build:
    - Maven: `mvn clean install -Dtest='!InfraTest' -Dsurefire.failIfNoSpecifiedTests=false`
-   - Gradle: `./gradlew clean build --init-script "${TMPDIR:-/tmp}/exclude-infra.gradle"`, with `allprojects { tasks.withType(Test).configureEach { filter { excludeTestsMatching 'com.example.InfraTest' } } }` in that file, outside the project
+   - Gradle: `./gradlew clean build --init-script "$D/exclude-infra.gradle"`, with `allprojects { tasks.withType(Test).configureEach { filter { excludeTestsMatching 'com.example.InfraTest' } } }` in that file, outside the project in `D=$(mktemp -d "${TMPDIR:-/tmp}/graviton.XXXXXX")`, a folder no other user can write
 
 4. **ARM64 failures:** Do NOT skip tests. Build fails, requires resolution.
 
@@ -281,7 +282,7 @@ Verify:
 1. Application starts without errors
 2. The project's existing JVM options (start scripts, Dockerfile, `JAVA_TOOL_OPTIONS`) accepted without errors; an x86-only option such as `-XX:UseAVX=2` stops the JVM on ARM64 with `Unrecognized VM option`
 3. No immediate runtime crashes
-4. The native libraries the x86 baseline loads are loaded on ARM64 too, including the CHECK items from Phase 1.2 (the loaded check below)
+4. The native libraries the x86 baseline loads are loaded on ARM64 too, including the builds the Phase 1.2 `NOTE` lines name (the loaded check below); a Phase 1.2 `CHECK` on a glibc build for a musl target is settled by the check with the image's files (§1.1), not by this load, which passes while a call that reaches a missing symbol stops the JVM
 
 ```bash
 # Loaded check (JDK 9 and later): the native libraries the JVM loaded, from its own log. Run the project's start
