@@ -1,19 +1,6 @@
-# Native Library Verification
-
-> The check program of Phase 1.2: it judges every native file in JARs, WARs, EARs and on disk by its content, for the target of Phase 1.1. It needs Python 3.6 or later; `--help` prints its rules.
-
-## Contents
-
-- 1. The Check Program
-
-## 1. The Check Program
-
-Run this block once per session, in any shell. It writes the program to a temporary file, replacing any earlier copy; the program only reads files:
-
-```bash
-GV_DIR=$(mktemp -d "${TMPDIR:-/tmp}/graviton.XXXXXX") || GV_DIR=$PWD/graviton-validation/raw   # a private folder (mode 700): no other user can plant a file in it
-GV_CHECK=$GV_DIR/java_graviton_check.py; mkdir -p graviton-validation/raw && printf 'GV_JAVA_CHECK=%s\n' "$GV_CHECK" >> graviton-validation/raw/session.env   # later blocks, perhaps in a new shell, read the path here
-cat > "$GV_CHECK" <<'EOF'
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT-0
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 """Graviton (Linux arm64) check of the native files a Java application carries. Needs Python 3.6 or later only.
 
   java_graviton_check.py [--libc glibc|musl] [--glibc VERSION] [--glibcxx VERSION] [--page-size BYTES]
@@ -1062,6 +1049,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-EOF
-python3 "$GV_CHECK" --help 2> /dev/null | head -n 2   # no output without python3: Phase 1.2.1 then runs it in a Python image
-```

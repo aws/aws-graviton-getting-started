@@ -181,11 +181,11 @@ EOF
 rm -f "$init"
 ```
 
-Then judge every native file by its content with the check program in [native-library-verification.md](native-library-verification.md) (write it first with the block there). It reads JARs, WARs and EARs in memory, with the archives nested in them (Spring Boot `BOOT-INF/lib`, WAR `WEB-INF/lib`, EARs of WARs, shaded JARs), and native files on disk, whatever their names, and judges each for the target of §1.1. Without Python 3.6 or later (`maven:3-eclipse-temurin-21` and `eclipse-temurin:21` ship no `python3`) the block runs it in a Python image, with the project and the target folder mounted read-only:
+Then judge every native file by its content with the check program, `scripts/java_graviton_check.py` (Documentation Setup in SKILL.md records its path). It reads JARs, WARs and EARs in memory, with the archives nested in them (Spring Boot `BOOT-INF/lib`, WAR `WEB-INF/lib`, EARs of WARs, shaded JARs), and native files on disk, whatever their names, and judges each for the target of §1.1. Without Python 3.6 or later (`maven:3-eclipse-temurin-21` and `eclipse-temurin:21` ship no `python3`) the block runs it in a Python image, with the project and the target folder mounted read-only:
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_JAVA_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the block in native-library-verification.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/native-library-verification.md)"
+GV_CHECK=$(sed -n 's/^GV_JAVA_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/java_graviton_check.py"
 # Without python3 3.6 or later, run the program in a Python image, with the project, the program, the targets' folders
 # and the local Maven and Gradle repositories mounted read-only (braces: zsh reads "$GV_CHECK:r" as a modifier)
 GV_MNT=(-v "${PWD}:${PWD}:ro" -v "${GV_CHECK}:${GV_CHECK}:ro")

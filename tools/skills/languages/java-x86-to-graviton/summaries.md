@@ -14,7 +14,7 @@ This file is the canonical inventory of the skill. Every file in the skill folde
 
 * "references/agent-scope-boundaries.md": "CRITICAL guardrails. Decision tree for every dependency analysis, IN SCOPE vs OUT OF SCOPE definitions, common pure Java libraries (always compatible), red flags for scope creep, and case studies (JUnit wrong vs Protoc correct). MUST be read before starting."
 
-* "references/native-library-verification.md": "The Phase 1.2 check program, written to ${TMPDIR:-/tmp} once per session: every native file in JARs, WARs, EARs and on disk judged by content for the target OS. Read before Phase 1.2."
+* "scripts/java_graviton_check.py": "The Phase 1.2 check program (Python 3.6+, read-only): every native file in JARs, WARs, EARs and on disk judged by content for the target OS. Run it, do not read it; --help prints its options and rules."
 
 * "references/documentation-standards.md": "Defines the mandatory graviton-validation/ output folder structure, canonical filenames (00-summary.md through 06-build-test-results.md plus raw/), required sections for each file. Read before Phase 1."
 
