@@ -83,8 +83,22 @@ Before Phase 1, create the output structure. See [references/documentation-stand
 
 Report a check as run, or a result as observed, only when you ran the command in this session, and name the command or its output file in `raw/`; a check you did not run is NOT RUN. When several versions were checked, list the ones checked, not a range, unless every version in the range was checked. Take every count in the reports (versions, files, findings, packages) from a command's output, not from reading. A `FINDING` keeps its label in every report and in the final answer; say whether the project's code reaches it only from a run that shows it. Say that a file passes the check for a target, not that it loads there, unless a run loaded it.
 
+Set `GV_DOTNET_SKILL_DIR` on the first line to the absolute path of the folder that holds this `SKILL.md`, then run this block once, from the repository root. Left empty, the block looks for the skill in the hidden folders of the project, then of the home folder, where installs put skills (`.agents/skills`, `.claude/skills`, `~/.config/goose/skills` and the like), and prints the folder it uses. It records the check program's path in `raw/session.env`, where every later block reads it, even in a new shell:
+
 ```bash
+GV_DOTNET_SKILL_DIR=   # the absolute path of the folder that holds this SKILL.md
+GV_DOTNET_SKILL_DIR=${GV_DOTNET_SKILL_DIR%/SKILL.md}   # the folder, also when the line names the file
+if [ -z "$GV_DOTNET_SKILL_DIR" ] || [ ! -f "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" ]; then   # empty or wrong: look where installs put skills
+  GV_FOUND=$( { find "$PWD" -mindepth 1 -maxdepth 1 -type d -name '.*' | sort; find "$HOME" -mindepth 1 -maxdepth 1 -type d -name '.*' | sort
+    find "$HOME/.config" -mindepth 1 -maxdepth 1 -type d | sort; } 2> /dev/null | awk '!seen[$0]++' | while IFS= read -r p; do
+    [ ! -f "$p/skills/dotnet-x86-to-graviton/scripts/dotnet_graviton_check.py" ] || printf '%s\n' "$p/skills/dotnet-x86-to-graviton"; done)
+  GV_DOTNET_SKILL_DIR=$(printf '%s\n' "$GV_FOUND" | head -n 1)   # the project's copy before the home folder's
+  [ "$(printf '%s\n' "$GV_FOUND" | grep -c .)" -le 1 ] || echo "NOTE: other copies: $(printf '%s\n' "$GV_FOUND" | sed 1d | tr '\n' ' ')(set GV_DOTNET_SKILL_DIR if the SKILL.md you follow is in one of them)"
+fi
 mkdir -p graviton-validation/raw
+if [ -n "$GV_DOTNET_SKILL_DIR" ] && [ -f "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" ] && GV_DOTNET_SKILL_DIR=$(CDPATH= cd -- "$GV_DOTNET_SKILL_DIR" && pwd); then
+  echo "skill folder: $GV_DOTNET_SKILL_DIR"; printf 'GV_DOTNET_CHECK=%s\n' "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" >> graviton-validation/raw/session.env
+else echo "ERROR: scripts/dotnet_graviton_check.py not found: set GV_DOTNET_SKILL_DIR to the folder that holds this SKILL.md and rerun, or reinstall the whole skill folder"; fi
 ```
 
 Output files produced:
@@ -105,6 +119,10 @@ Output files produced:
 | `raw/ca1416.txt` | 1.4 | Windows-only API call sites (Windows starting points) |
 | `raw/output-scan-<target>.txt` | 3.1 | Publish outputs, by content |
 | `00-summary.md` | End | Executive summary and exit criteria |
+
+### Available Scripts
+
+- **`scripts/dotnet_graviton_check.py`**: the per-RID check. `assets` restores a scratch copy of the repository and judges, by content, the native files each resolved NuGet package gets for each target RID; `scan` judges the files of a build or publish output, an extracted image or the repository; `probe` checks one package version and `config` the packages of a `packages.config`. Needs Python 3.6 or later, and the .NET SDK for all but `scan`; it never writes to the repository. `--help` prints its commands and rules. The Phase 1 to 3 blocks run it; do not copy or rewrite it.
 
 ### Phase 1: Static Compatibility Analysis
 
@@ -175,6 +193,5 @@ ARM64 failures are blocking. Do not skip tests or projects; the failing build is
 
 - ARM64 execution environment required for full validation. On x86 without a container runtime, static analysis and output scans only; under QEMU emulation, run published output and tests built on the host, never builds, and treat the results as smoke tests (see Phase 3 "Emulation limits").
 - Solutions with many projects require analysis of every project, including projects no solution lists, and its full resolved package set
-- The per-RID check is one Python program embedded in [references/nuget-native-assets.md](references/nuget-native-assets.md) §11; its block writes it to `${TMPDIR:-/tmp}` once per session, and the other blocks call it from there
 - The bash blocks were executed in bash 5.2 and zsh 5.9 on Linux. On Windows, run the skill in a WSL 2 distribution, which runs a Linux kernel ([Microsoft](https://learn.microsoft.com/en-us/windows/wsl/compare-versions)), with the project in the Linux file system
 - Every Graviton vCPU maps to a physical core (no SMT, [AWS Graviton performance testing](https://docs.aws.amazon.com/whitepapers/latest/aws-graviton-performance-testing/other-considerations.html)), so performance scales more linearly with CPU load than on x86; load test to the maximum sustainable load before comparing instance types

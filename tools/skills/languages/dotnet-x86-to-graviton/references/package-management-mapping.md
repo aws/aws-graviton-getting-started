@@ -88,8 +88,8 @@ With Paket 10.3.1 as a local tool:
 So when a fix must come from an internal feed, probe it with an empty cache, from the repository root so that its `NuGet.config` applies:
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path the §11 block of nuget-native-assets.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: write the check program first (references/nuget-native-assets.md, section 11)"
+GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
+[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
 cache=$(mktemp -d)
 NUGET_PACKAGES="$cache" python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0; echo "exit status $?"
 rm -rf "$cache"
