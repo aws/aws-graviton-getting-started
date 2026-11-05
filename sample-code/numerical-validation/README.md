@@ -2,7 +2,7 @@
 
 A small C++ pricing model and a comparison script for measuring how floating-point results differ when the same code runs on different CPU architectures, for example x86-64 and AWS Graviton (arm64).
 
-The model prices one million European call options with the Black-Scholes closed form. It reports the total book value and a 64-bit fingerprint of every individual price, and can write every price to a file. The comparison script takes two such files and reports how many prices differ, by how much, and whether the differences are within tolerances you set.
+The model prices one million European call options with the Black-Scholes closed form. It reports the total book value and a 64-bit fingerprint of every individual price, and can write every price to a file. The comparison script takes two such files and reports how many prices differ, by how much, and whether the differences are within tolerances you set. Each "price" in the output is the value of a position: the option's Black-Scholes price multiplied by a quantity between 100 and 9,999.
 
 This is not a benchmark suite or a pricing library. It is a way to turn the question "do the numbers change on Graviton?" into measured figures for a workload that exercises the same math functions (`log`, `exp`, `sqrt`, `erfc`) that real pricers depend on.
 
@@ -28,6 +28,8 @@ This needs the AWS CLI v2 with credentials and `python3` on your machine. It lau
 2. Same arm64 host, contraction on vs off.
 3. x86-64 vs arm64, both with contraction off.
 
+It also needs a default VPC in the region whose subnets give instances a route to the internet, because the script launches instances without a subnet and they must reach Systems Manager, the Amazon Linux package repositories, and Amazon S3. Many organizations remove the default VPC; if yours has, run the harness in an account or region that has one.
+
 Then it terminates the instances and deletes the bucket and security group it created. The per-run resources carry a unique run id so concurrent runs do not interfere: the instances and security group are tagged `Project=graviton-numerical-validation` and `RunId=<id>`, and the bucket is named `gnv-results-<account>-<id>`. A single shared IAM role (`graviton-numerical-validation-role`) is left in place for reuse and removed only by the account-wide sweep (`--cleanup-only` with no `--run-id`). `--cleanup-only --run-id <id>` removes one run's instances, security group and bucket, and leaves the shared role alone. The run takes about ten minutes and the report and dumps are saved under `results/run-<id>/`.
 
 Instances are reached with SSM Run Command. No SSH key pair is created and the security group has no inbound rules.
@@ -35,7 +37,7 @@ Instances are reached with SSM Run Command. No SSH key pair is created and the s
 Options:
 
 ```
---region R                 default us-east-1 (c9g is also in us-east-2, us-west-2, eu-central-1)
+--region R                 default us-east-1 (both default types are also in us-east-2, us-west-2, eu-central-1, ap-northeast-1)
 --x86 TYPE                 default c8a.xlarge
 --arm TYPE                 default c9g.xlarge
 --bench                    also run the throughput benchmark (see below)
@@ -51,7 +53,7 @@ Options:
 ./run-aws.sh --bench
 ```
 
-After the correctness comparison, this builds and runs `bench.cpp` on both hosts and adds a table with options priced per second, cores and threads per core, CPU utilisation during the timed region, and, best effort, the current On-Demand and Spot price for each instance type in the region, so you get options per second per dollar. If the caller lacks `pricing:GetProducts` the price columns say `n/a` and the run still completes.
+After the correctness comparison, this builds and runs `bench.cpp` on both hosts and adds a table with options priced per second, cores and threads per core, CPU utilization during the timed region, and, best effort, the current On-Demand and Spot price for each instance type in the region, so you get options per second per dollar. If the caller lacks `pricing:GetProducts` the price columns say `n/a` and the run still completes.
 
 The benchmark prices 16 million options on all hardware threads, best of 8 repeats, with inputs generated outside the timed region. It uses the same Black-Scholes kernel as `pricer.cpp`. Read the result as one data point about this kernel on one instance size. A closed-form formula with no memory pressure, no branching and no library calls beyond libm says little about a real pricing library. The benchmark table is appended to the run's `report.txt` with the date it was taken.
 
@@ -189,7 +191,7 @@ The correctness comparison is the point of the harness; `pricer` and `compare.py
 ## References
 
 - IEEE Std 754-2019, IEEE Standard for Floating-Point Arithmetic. Basic operations must be correctly rounded; correct rounding of `exp`, `log`, `erf` and other elementary functions is recommended, not required.
-- B. Gladman, V. Innocente, J. Mather, K. Ozaki, P. Zimmermann, "Accuracy of Mathematical Functions in Single, Double, Extended Double and Quadruple Precision", 2026. Measured worst-case errors for glibc and other math libraries. https://members.loria.fr/PZimmermann/papers/accuracy.pdf
+- B. Gladman, V. Innocente, J. Mather, K. Ozaki, P. Zimmermann, "Accuracy of Mathematical Functions in Single, Double, Double Extended, and Quadruple Precision", 2026. Measured worst-case errors for glibc and other math libraries. https://homepages.loria.fr/pzimmermann/papers/accuracy.pdf
 - The CORE-MATH project, correctly rounded elementary functions being integrated into glibc and other libms. https://core-math.gitlabpages.inria.fr/
 - glibc source, x86-64 FMA variants of libm functions selected by ifunc: https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/fpu/multiarch/Makefile and https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/fpu/multiarch/e_exp.c
 - GCC manual, `-ffp-contract`. https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html

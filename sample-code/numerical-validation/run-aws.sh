@@ -219,7 +219,7 @@ offered=$(aws_ ec2 describe-instance-type-offerings --location-type region \
     --filters "Name=instance-type,Values=$X86_TYPE,$ARM_TYPE" \
     --query 'InstanceTypeOfferings[].InstanceType')
 for t in "$X86_TYPE" "$ARM_TYPE"; do
-    grep -qw "$t" <<<"$offered" || die "$t is not offered in $REGION. Try --region us-east-2, us-west-2 or eu-central-1."
+    grep -qw "$t" <<<"$offered" || die "$t is not offered in $REGION. Try --region us-east-1, us-east-2, us-west-2, eu-central-1 or ap-northeast-1."
 done
 
 ami_for() {
@@ -414,12 +414,12 @@ if [ "$BENCH" = 1 ]; then
     # Pricing API region names for the regions where both default types exist.
     location_for() {
         case "$1" in
-            us-east-1)    echo "US East (N. Virginia)";;
-            us-east-2)    echo "US East (Ohio)";;
-            us-west-2)    echo "US West (Oregon)";;
-            eu-central-1) echo "EU (Frankfurt)";;
-            eu-west-1)    echo "EU (Ireland)";;
-            *)            echo "";;
+            us-east-1)      echo "US East (N. Virginia)";;
+            us-east-2)      echo "US East (Ohio)";;
+            us-west-2)      echo "US West (Oregon)";;
+            eu-central-1)   echo "EU (Frankfurt)";;
+            ap-northeast-1) echo "Asia Pacific (Tokyo)";;
+            *)              echo "";;
         esac
     }
     od_price() {  # best effort; the Pricing API lives in us-east-1
