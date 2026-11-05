@@ -237,9 +237,9 @@ NOTE: Linux versions of OpenJDK and current Amazon Corretto releases (Corretto 1
 [Agent Skills](tools/skills/) are portable instruction packages that AI coding assistants can follow to perform Graviton migrations and estimate their savings. They work across 20+ platforms including Claude Code, Kiro, Cursor, Codex, Windsurf, Gemini CLI, and GitHub Copilot.
 
 Available skills:
- * [Java x86-to-Graviton migration](tools/skills/languages/java-x86-to-graviton/) - dependency audit, native library validation, JVM optimization, ARM64 build validation
- * [Python x86-to-Graviton migration](tools/skills/languages/python-x86-to-graviton/) - aarch64 wheel verification for every pinned dependency, native extension validation, runtime recommendations, ARM64 install and test validation
- * [.NET x86-to-Graviton migration](tools/skills/languages/dotnet-x86-to-graviton/) - per-RID native file verification for every NuGet package that needs native code, Windows-only API and native file validation, the move to Linux for Windows and .NET Framework applications, ARM64 publish and test validation
+ * [Java x86-to-Graviton migration](tools/skills/migration/java-x86-to-graviton/) - dependency audit, native library validation, JVM optimization, ARM64 build validation
+ * [Python x86-to-Graviton migration](tools/skills/migration/python-x86-to-graviton/) - aarch64 wheel verification for every pinned dependency, native extension validation, runtime recommendations, ARM64 install and test validation
+ * [.NET x86-to-Graviton migration](tools/skills/migration/dotnet-x86-to-graviton/) - per-RID native file verification for every NuGet package that needs native code, Windows-only API and native file validation, the move to Linux for Windows and .NET Framework applications, ARM64 publish and test validation
  * [Graviton savings assessment](tools/skills/cost/graviton-savings-assessment/) - fleet-wide Graviton savings estimate from Cost Explorer and AWS pricing across EC2, RDS, ElastiCache, and OpenSearch, with migration waves and shareable reports
 
 See [tools/skills/](tools/skills/) for installation instructions and the full catalogue.

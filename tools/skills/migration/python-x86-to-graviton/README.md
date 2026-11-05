@@ -21,7 +21,7 @@ Copy this folder into your Python project:
 ```bash
 mkdir -p /path/to/your/project/.skills && \
   rm -rf /path/to/your/project/.skills/python-x86-to-graviton && \
-  cp -r tools/skills/languages/python-x86-to-graviton /path/to/your/project/.skills/
+  cp -r tools/skills/migration/python-x86-to-graviton /path/to/your/project/.skills/
 ```
 
 Then ask your AI assistant:

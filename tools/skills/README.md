@@ -14,13 +14,13 @@ Each skill follows the [Agent Skills specification](https://agentskills.io/speci
 
 ## Available Skills
 
-### Languages
+### Migration
 
 | Skill | Language | Status | Description |
 |-------|----------|--------|-------------|
-| [java-x86-to-graviton](languages/java-x86-to-graviton/) | Java | Stable | Full x86-to-Graviton migration: dependency audit, native library validation, JVM optimization, ARM64 build validation |
-| [python-x86-to-graviton](languages/python-x86-to-graviton/) | Python | Beta | Full x86-to-Graviton migration: aarch64 wheel verification for every pinned dependency (including transitives), native extension and vendored binary validation, runtime recommendations, ARM64 install and test validation |
-| [dotnet-x86-to-graviton](languages/dotnet-x86-to-graviton/) | .NET | Beta | Full x86-to-Graviton migration: per-RID native file verification for every resolved NuGet package (including transitives), committed native file and Windows-only API validation, the move to Linux for Windows and .NET Framework starting points, runtime recommendations, ARM64 build, publish and test validation |
+| [java-x86-to-graviton](migration/java-x86-to-graviton/) | Java | Stable | Full x86-to-Graviton migration: dependency audit, native library validation, JVM optimization, ARM64 build validation |
+| [python-x86-to-graviton](migration/python-x86-to-graviton/) | Python | Beta | Full x86-to-Graviton migration: aarch64 wheel verification for every pinned dependency (including transitives), native extension and vendored binary validation, runtime recommendations, ARM64 install and test validation |
+| [dotnet-x86-to-graviton](migration/dotnet-x86-to-graviton/) | .NET | Beta | Full x86-to-Graviton migration: per-RID native file verification for every resolved NuGet package (including transitives), committed native file and Windows-only API validation, the move to Linux for Windows and .NET Framework starting points, runtime recommendations, ARM64 build, publish and test validation |
 
 ### Cost
 
@@ -30,16 +30,16 @@ Each skill follows the [Agent Skills specification](https://agentskills.io/speci
 
 ## How to Install
 
-Each skill installs on its own. The commands below install the Java skill; set `SKILL` to another folder name from [Available Skills](#available-skills) (for example `python-x86-to-graviton`) to install that skill instead, and set `CATEGORY` to the folder it sits in (`languages` or `cost`). Run the project-level commands (GitHub Copilot, Windsurf, Roo Code, Any platform) from your project's root directory.
+Each skill installs on its own. The commands below install the Java skill; set `SKILL` to another folder name from [Available Skills](#available-skills) (for example `python-x86-to-graviton`) to install that skill instead, and set `CATEGORY` to the folder it sits in (`migration` or `cost`). Run the project-level commands (GitHub Copilot, Windsurf, Roo Code, Any platform) from your project's root directory.
 
 ### Kiro
 
 Open the **Agent Steering & Skills** panel, click **+** > **Import a skill** > **GitHub**, and paste the URL of the skill you want:
 
 ```
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/java-x86-to-graviton
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/python-x86-to-graviton
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/dotnet-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/java-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/python-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/dotnet-x86-to-graviton
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/cost/graviton-savings-assessment
 ```
 
@@ -48,16 +48,16 @@ https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/cost/
 Open **Settings** (`Cmd+Shift+J` / `Ctrl+Shift+J`) > **Rules** > **Add Rule** > **Remote Rule (GitHub)** and paste the URL of the skill you want:
 
 ```
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/java-x86-to-graviton
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/python-x86-to-graviton
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/dotnet-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/java-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/python-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/dotnet-x86-to-graviton
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/cost/graviton-savings-assessment
 ```
 
 ### Claude Code
 
 ```bash
-CATEGORY=languages
+CATEGORY=migration
 SKILL=java-x86-to-graviton
 : "${CATEGORY:?set CATEGORY first}" "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
@@ -71,7 +71,7 @@ SKILL=java-x86-to-graviton
 ### GitHub Copilot / VS Code
 
 ```bash
-CATEGORY=languages
+CATEGORY=migration
 SKILL=java-x86-to-graviton
 : "${CATEGORY:?set CATEGORY first}" "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
@@ -85,7 +85,7 @@ SKILL=java-x86-to-graviton
 ### OpenAI Codex
 
 ```bash
-CATEGORY=languages
+CATEGORY=migration
 SKILL=java-x86-to-graviton
 : "${CATEGORY:?set CATEGORY first}" "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
@@ -99,7 +99,7 @@ SKILL=java-x86-to-graviton
 ### Windsurf
 
 ```bash
-CATEGORY=languages
+CATEGORY=migration
 SKILL=java-x86-to-graviton
 : "${CATEGORY:?set CATEGORY first}" "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
@@ -113,7 +113,7 @@ SKILL=java-x86-to-graviton
 ### Gemini CLI
 
 ```bash
-CATEGORY=languages
+CATEGORY=migration
 SKILL=java-x86-to-graviton
 : "${CATEGORY:?set CATEGORY first}" "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
@@ -127,7 +127,7 @@ SKILL=java-x86-to-graviton
 ### Roo Code
 
 ```bash
-CATEGORY=languages
+CATEGORY=migration
 SKILL=java-x86-to-graviton
 : "${CATEGORY:?set CATEGORY first}" "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
@@ -141,7 +141,7 @@ SKILL=java-x86-to-graviton
 ### Goose
 
 ```bash
-CATEGORY=languages
+CATEGORY=migration
 SKILL=java-x86-to-graviton
 : "${CATEGORY:?set CATEGORY first}" "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
@@ -157,7 +157,7 @@ SKILL=java-x86-to-graviton
 Copy the skill folder into the cross-platform standard path:
 
 ```bash
-CATEGORY=languages
+CATEGORY=migration
 SKILL=java-x86-to-graviton
 : "${CATEGORY:?set CATEGORY first}" "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
@@ -189,7 +189,7 @@ Each skill folder contains:
 
 See the [skill template](_templates/SKILL.template.md) for the boilerplate structure. When creating a new skill:
 
-1. Create a folder under the matching category (`languages/` for a language migration, `cost/` for savings and cost analysis) named to match the skill's `name` field
+1. Create a folder under the matching category (`migration/` for a language migration, `cost/` for savings and cost analysis) named to match the skill's `name` field
 2. Create `SKILL.md` with Agent Skills frontmatter (`name`, `description`, optional `metadata`)
 3. Add a `summaries.md` listing every file in the skill, each with its purpose and when it is read. This is the **canonical** inventory — link it from `SKILL.md`, and do not duplicate the file list elsewhere in the skill
 4. Add a `README.md` with a human-readable overview that points at `summaries.md` for the file map
