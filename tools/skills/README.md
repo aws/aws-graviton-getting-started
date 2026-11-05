@@ -16,9 +16,9 @@ Each skill follows the [Agent Skills specification](https://agentskills.io/speci
 
 | Skill | Language | Status | Description |
 |-------|----------|--------|-------------|
-| [java-x86-to-graviton](languages/java-x86-to-graviton/) | Java | Stable | Full x86-to-Graviton migration: dependency audit, native library validation, JVM optimization, ARM64 build validation |
-| [python-x86-to-graviton](languages/python-x86-to-graviton/) | Python | Beta | Full x86-to-Graviton migration: aarch64 wheel verification for every pinned dependency (including transitives), native extension and vendored binary validation, runtime recommendations, ARM64 install and test validation |
-| [dotnet-x86-to-graviton](languages/dotnet-x86-to-graviton/) | .NET | Beta | Full x86-to-Graviton migration: per-RID native file verification for every resolved NuGet package (including transitives), committed native file and Windows-only API validation, the move to Linux for Windows and .NET Framework starting points, runtime recommendations, ARM64 build, publish and test validation |
+| [java-x86-to-graviton](migration/java-x86-to-graviton/) | Java | Stable | Full x86-to-Graviton migration: dependency audit, native library validation, JVM optimization, ARM64 build validation |
+| [python-x86-to-graviton](migration/python-x86-to-graviton/) | Python | Beta | Full x86-to-Graviton migration: aarch64 wheel verification for every pinned dependency (including transitives), native extension and vendored binary validation, runtime recommendations, ARM64 install and test validation |
+| [dotnet-x86-to-graviton](migration/dotnet-x86-to-graviton/) | .NET | Beta | Full x86-to-Graviton migration: per-RID native file verification for every resolved NuGet package (including transitives), committed native file and Windows-only API validation, the move to Linux for Windows and .NET Framework starting points, runtime recommendations, ARM64 build, publish and test validation |
 
 ## How to Install
 
@@ -29,9 +29,9 @@ Each skill installs on its own. The commands below install the Java skill; set `
 Open the **Agent Steering & Skills** panel, click **+** > **Import a skill** > **GitHub**, and paste the URL of the skill you want:
 
 ```
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/java-x86-to-graviton
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/python-x86-to-graviton
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/dotnet-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/java-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/python-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/dotnet-x86-to-graviton
 ```
 
 ### Cursor
@@ -39,9 +39,9 @@ https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/langu
 Open **Settings** (`Cmd+Shift+J` / `Ctrl+Shift+J`) > **Rules** > **Add Rule** > **Remote Rule (GitHub)** and paste the URL of the skill you want:
 
 ```
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/java-x86-to-graviton
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/python-x86-to-graviton
-https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/dotnet-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/java-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/python-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/migration/dotnet-x86-to-graviton
 ```
 
 ### Claude Code
@@ -50,10 +50,10 @@ https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/langu
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/migration/$SKILL" && \
   mkdir -p ~/.claude/skills && \
   rm -rf ~/.claude/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.claude/skills/ && \
+  cp -r "/tmp/graviton-skill/tools/skills/migration/$SKILL" ~/.claude/skills/ && \
   rm -rf /tmp/graviton-skill
 ```
 
@@ -63,10 +63,10 @@ SKILL=java-x86-to-graviton
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/migration/$SKILL" && \
   mkdir -p .github/skills && \
   rm -rf .github/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .github/skills/ && \
+  cp -r "/tmp/graviton-skill/tools/skills/migration/$SKILL" .github/skills/ && \
   rm -rf /tmp/graviton-skill
 ```
 
@@ -76,10 +76,10 @@ SKILL=java-x86-to-graviton
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/migration/$SKILL" && \
   mkdir -p ~/.codex/skills && \
   rm -rf ~/.codex/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.codex/skills/ && \
+  cp -r "/tmp/graviton-skill/tools/skills/migration/$SKILL" ~/.codex/skills/ && \
   rm -rf /tmp/graviton-skill
 ```
 
@@ -89,10 +89,10 @@ SKILL=java-x86-to-graviton
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/migration/$SKILL" && \
   mkdir -p .windsurf/skills && \
   rm -rf .windsurf/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .windsurf/skills/ && \
+  cp -r "/tmp/graviton-skill/tools/skills/migration/$SKILL" .windsurf/skills/ && \
   rm -rf /tmp/graviton-skill
 ```
 
@@ -102,10 +102,10 @@ SKILL=java-x86-to-graviton
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/migration/$SKILL" && \
   mkdir -p ~/.gemini/skills && \
   rm -rf ~/.gemini/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.gemini/skills/ && \
+  cp -r "/tmp/graviton-skill/tools/skills/migration/$SKILL" ~/.gemini/skills/ && \
   rm -rf /tmp/graviton-skill
 ```
 
@@ -115,10 +115,10 @@ SKILL=java-x86-to-graviton
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/migration/$SKILL" && \
   mkdir -p .roo/skills && \
   rm -rf .roo/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .roo/skills/ && \
+  cp -r "/tmp/graviton-skill/tools/skills/migration/$SKILL" .roo/skills/ && \
   rm -rf /tmp/graviton-skill
 ```
 
@@ -128,10 +128,10 @@ SKILL=java-x86-to-graviton
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/migration/$SKILL" && \
   mkdir -p ~/.config/goose/skills && \
   rm -rf ~/.config/goose/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.config/goose/skills/ && \
+  cp -r "/tmp/graviton-skill/tools/skills/migration/$SKILL" ~/.config/goose/skills/ && \
   rm -rf /tmp/graviton-skill
 ```
 
@@ -143,10 +143,10 @@ Copy the skill folder into the cross-platform standard path:
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
   git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/migration/$SKILL" && \
   mkdir -p .agents/skills && \
   rm -rf .agents/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .agents/skills/ && \
+  cp -r "/tmp/graviton-skill/tools/skills/migration/$SKILL" .agents/skills/ && \
   rm -rf /tmp/graviton-skill
 ```
 
@@ -168,7 +168,7 @@ Each skill folder contains:
 
 See the [skill template](_templates/SKILL.template.md) for the boilerplate structure. When creating a new skill:
 
-1. Create a folder under `languages/` named to match the skill's `name` field
+1. Create a folder under `migration/` named to match the skill's `name` field
 2. Create `SKILL.md` with Agent Skills frontmatter (`name`, `description`, optional `metadata`)
 3. Add a `summaries.md` listing every file in the skill, each with its purpose and when it is read. This is the **canonical** inventory — link it from `SKILL.md`, and do not duplicate the file list elsewhere in the skill
 4. Add a `README.md` with a human-readable overview that points at `summaries.md` for the file map
