@@ -30,7 +30,6 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
         ├── requirements-resolved.txt         # Flat pinned list the probe ran on (Phase 1.3)
         ├── wheel-availability.txt            # Probe output, one verdict line per pin (Phase 1.3)
         ├── site-packages-so-scan-<target>.txt   # every native file found by content, its properties, FINDING lines; one file per target (Phase 1.2)
-        ├── session.env                       # Paths that later blocks read in a new shell (the check program, saved functions)
         └── target-roots.txt                  # Each target's name and its image's folder, or glibc=VERSION with no image (Phase 1.1)
 ```
 

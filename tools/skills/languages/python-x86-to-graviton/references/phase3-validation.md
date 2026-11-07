@@ -18,18 +18,10 @@ Before skipping validation, check for a container runtime that can run `linux/ar
 > **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [skill-configuration.md](skill-configuration.md).
 
 ```bash
-# Host-side time limit: GNU timeout where it exists (Linux, WSL, Homebrew coreutils), else gtimeout, else Python.
-host_timeout() {  # usage: host_timeout <seconds> <command...>; exit code 124 on timeout, like timeout(1)
-  if case "$(command -v timeout 2>/dev/null)" in /*) true;; *) false;; esac; then command timeout -k 10 "$@"   # the program: Phase 1 defines a shell function of that name with no limit
-  elif command -v gtimeout >/dev/null 2>&1; then gtimeout -k 10 "$@"
-  else python3 -c 'import subprocess, sys
-try: sys.exit(subprocess.run(sys.argv[2:], timeout=float(sys.argv[1])).returncode)
-except subprocess.TimeoutExpired: sys.exit(124)' "$@"
-  fi
-}
-GV_DIR=$(mktemp -d "${TMPDIR:-/tmp}/graviton.XXXXXX") || GV_DIR=$PWD/graviton-validation/raw   # a private folder (mode 700): no other user can plant a file in it
-mkdir -p graviton-validation/raw && typeset -f host_timeout > "$GV_DIR/host_timeout.sh" && printf 'GV_PY_TIMEOUT=%s\n' "$GV_DIR/host_timeout.sh" >> graviton-validation/raw/session.env   # later blocks, perhaps in a new shell, read the path here
-
+GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+# host_timeout <seconds> <command...>: a host-side time limit (GNU timeout, else gtimeout, else Python), from the skill's scripts/host_timeout.sh
+if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/host_timeout.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/host_timeout.sh"; then   # the skill's own file only
+mkdir -p graviton-validation/raw
 # Detect a WORKING container runtime. Being on PATH is not enough: a runtime can be installed
 # but unusable (no daemon, no VM, missing permissions), so ask each one for `info`; one that has not answered in 20 seconds counts as unusable.
 CONTAINER_CMD=""
@@ -47,6 +39,7 @@ echo "Host architecture: $ARCH"
 if [ -n "$CONTAINER_CMD" ] && [ "$ARCH" = "x86_64" ]; then
   $CONTAINER_CMD run --rm --init --platform linux/arm64 alpine:3.20 timeout 30 uname -m   # must print aarch64
 fi
+else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 A `command -v` cascade can pick a runtime that cannot run anything: on the x86 host used to validate this skill, `finch` was on PATH but `finch info` failed. `host_timeout` keeps the host-side limits working where GNU `timeout` is missing: Homebrew's coreutils installs it as `gtimeout`, and also as `timeout` when the system has no `timeout` of its own; without either, `host_timeout` uses Python.
@@ -62,14 +55,14 @@ A `command -v` cascade can pick a runtime that cannot run anything: on the x86 h
 
 **Do NOT skip validation if a working container runtime is available.** Only recommend external validation as a last resort.
 
-Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CONTAINER_CMD` exists only in the shell that set it: if each command runs in a new shell, start a later block with `CONTAINER_CMD=<the detected runtime>`. A function a later block calls is saved by the block that defines it to a file in a new folder under `${TMPDIR:-/tmp}`, whose path that block records in `graviton-validation/raw/session.env`; the later block reads the path there in its first lines.
+Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CONTAINER_CMD` exists only in the shell that set it: if each command runs in a new shell, start a later block with `CONTAINER_CMD=<the detected runtime>`. `host_timeout` and `native_scan` are functions in the skill's `scripts/host_timeout.sh` and `scripts/native_scan.sh`; a block that calls one loads its file from the folder on its first line (`GV_PY_SKILL_DIR`).
 
 **Emulation limits (x86 host).** Observed with Docker 25.0 and QEMU:
 
 - **Bound every container run, inside the container.** Each `timeout` value in the blocks is an upper bound, so a stuck command fails instead of holding the session; raise it when a project needs longer. Five runs wrapped as `timeout N docker run ...` did not stop at their limit: Docker forwarded the stop signal into the emulated container, the container froze (even a plain `sleep 60` never finished), and the command waited until it was cancelled while the container kept running for hours until `docker rm -f`. Put the limit inside the container and remove the container afterwards:
   ```bash
-  GV_TO=$(sed -n 's/^GV_PY_TIMEOUT=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)
-  if [ -f "$GV_TO" ] && . "$GV_TO"; then
+  GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+  if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/host_timeout.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/host_timeout.sh"; then   # the skill's own file only
     run_arm64() {  # usage: run_arm64 <seconds> <image> <command...>
       local limit="$1" img="$2" name="graviton-check-$$"; shift 2
       host_timeout "$((limit + 20))" $CONTAINER_CMD run --rm --init --name "$name" --platform linux/arm64 \
@@ -78,7 +71,7 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CON
       $CONTAINER_CMD rm -f "$name" >/dev/null 2>&1   # no-op if the container already exited
       return $rc
     }
-  else echo "CHECK: run the Container Runtime Detection block first: it records host_timeout's file in graviton-validation/raw/session.env"; fi
+  else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
   ```
   The image must provide `timeout` (`python:3.11-slim` and `alpine:3.20` do).
 - **Do not build packages from source under emulation.** A pygeos source build took about 14 minutes and failed, and one compiler run crashed (`gcc ... failed with exit code -11`). Build from source on Graviton hardware (or an ARM64 CI runner) instead: on a c9g.xlarge the same pygeos build took about 5 seconds once its two workarounds were in place (Phase 2.2).
@@ -89,17 +82,18 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CON
   PLAT=(); i=${TARGET_LIBC_VER#*.}
   while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
   P=("${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: --python-version 3.11 --implementation cp --abi cp311)
-  SITE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-arm64-site.XXXXXX") || SITE=$PWD/graviton-validation/raw/arm64-site   # a new folder no other user can write
-  python3 -m pip install "${P[@]}" --target "$SITE" --require-hashes -r requirements-locked.txt
-  mkdir -p graviton-validation/raw && grep -v '^docopt==' requirements.txt > graviton-validation/raw/req-wheels.txt    # --platform needs wheels; pure-Python sdists go in separately
-  python3 -m pip install "${P[@]}" --target "$SITE" --upgrade -r graviton-validation/raw/req-wheels.txt -r requirements-dev.txt   # the project's test requirements
-  python3 -m pip install --no-deps --target "$SITE" --upgrade docopt==0.6.2
+  if SITE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-arm64-site.XXXXXX"); then   # a new folder no other user can write
+    python3 -m pip install "${P[@]}" --target "$SITE" --require-hashes -r requirements-locked.txt
+    mkdir -p graviton-validation/raw && grep -v '^docopt==' requirements.txt > graviton-validation/raw/req-wheels.txt    # --platform needs wheels; pure-Python sdists go in separately
+    python3 -m pip install "${P[@]}" --target "$SITE" --upgrade -r graviton-validation/raw/req-wheels.txt -r requirements-dev.txt   # the project's test requirements
+    python3 -m pip install --no-deps --target "$SITE" --upgrade docopt==0.6.2
 
-  # Emulated: run imports, startup and tests against that directory, in place on the read-only mount
-  # (nothing is copied or written; -p no:cacheprovider stops pytest writing its cache)
-  # timeout 300 bounds the emulated test run; raise it for a larger suite
-  $CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$SITE":/site:ro -v "$PWD":/src:ro \
-    -e PYTHONPATH=/site -e PYTHONDONTWRITEBYTECODE=1 python:3.11-slim timeout 300 sh -c 'cd /src && python3 -m pytest -q -p no:cacheprovider tests'
+    # Emulated: run imports, startup and tests against that directory, in place on the read-only mount
+    # (nothing is copied or written; -p no:cacheprovider stops pytest writing its cache)
+    # timeout 300 bounds the emulated test run; raise it for a larger suite
+    $CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$SITE":/site:ro -v "$PWD":/src:ro \
+      -e PYTHONPATH=/site -e PYTHONDONTWRITEBYTECODE=1 python:3.11-slim timeout 300 sh -c 'cd /src && python3 -m pytest -q -p no:cacheprovider tests'
+  else echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; fi
   ```
 The ELF scan from §3.1 needs no emulation: run it on the host against `$SITE` and the project's `vendor/` directory. This pattern validates the dependencies and the code, not the Dockerfile; build the image itself on ARM64 when possible.
 
@@ -223,6 +217,7 @@ The final build command determines the build score.
 - Correct: `$CONTAINER_CMD run --rm --entrypoint python3 app:arm64 -c '...'`
 
 ```bash
+GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed (for the scan at the end)
 # Build
 $CONTAINER_CMD build --platform linux/arm64 -t app:arm64 .
 
@@ -233,8 +228,7 @@ $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 \
 # Every native file in the image's Python environment, judged for the target by native_scan from Phase 1.2.1
 # (loaded on the next line, with the target of §1.1). The files are copied out of the image and scanned
 # here, so no part of the scan runs under emulation.
-GV_SCAN=$(sed -n 's/^GV_SCAN=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the function's file, recorded by §1.2.1
-if [ -f "$GV_SCAN" ] && . "$GV_SCAN"; then
+if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/native_scan.sh"; then   # the skill's own file only
   BASE=python:3.11-slim   # the image the Dockerfile's last FROM names (§1.1 copied it)
   TARGET_ROOT=$(awk -F '\t' -v t="$(printf '%s' "$BASE" | tr -c 'A-Za-z0-9._-' '_')" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null); TARGET_PAGE_SIZE=4096   # its folder, recorded under its name
   [ -d "$TARGET_ROOT" ] || { TARGET_ROOT=; echo "CHECK: no §1.1 copy of $BASE: copy it with the §1.1 block, or set TARGET_LIBC and TARGET_LIBC_VER to its values"; }
@@ -247,7 +241,7 @@ if [ -f "$GV_SCAN" ] && . "$GV_SCAN"; then
     native_scan "$GV_SITE"
   else echo "CHECK: the image's files were not copied (mktemp or create failed: see the error above)"; fi
   [ -z "$GV_SITE" ] || rm -rf "$GV_SITE"
-else echo "CHECK: run the Phase 1.2.1 scan block first: it records the function's file in graviton-validation/raw/session.env"; fi
+else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 On an x86 host the `python3` commands run under emulation; bound them inside the container as in "Emulation limits", for example `$CONTAINER_CMD run --rm --init --platform linux/arm64 --entrypoint timeout app:arm64 120 python3 -c '...'` (this also overrides the image's entrypoint). The scan itself runs on the host, on the copied files. Do not accept image metadata as proof: an image built with `FROM --platform=linux/amd64` and `--platform linux/arm64` was reported by `image inspect` as `arm64`, yet its interpreter was an `x86-64` executable (Phase 2.4). The scan opens every file, not only `*.so` files, because a `py3-none-any` wheel can carry executables. For selenium 4.48.0 it reports a `FINDING` for `selenium/webdriver/common/linux/selenium-manager` with no aarch64 build next to it, a blocker: on Graviton, selenium 4.48.0 raises `Unsupported platform/architecture combination: linux/aarch64` before starting it, and the file itself fails with `Exec format error`. From 4.49.0 the x86-64 file sits next to `linux-arm64/selenium-manager`, which selenium picks on Graviton: the scan prints a `NOTE` naming that build, which Phase 3 confirms. Copy any project directory that holds compiled objects (for example a `vendor/` directory, or `/var/task` in a Lambda container image) out the same way and scan it too. Scan `platlib` as well as `purelib`: in a Poetry environment on Amazon Linux 2023 every compiled package sat in `lib64/.../site-packages` (platlib), and a purelib-only scan found nothing.

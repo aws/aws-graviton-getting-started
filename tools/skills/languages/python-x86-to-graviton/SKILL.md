@@ -83,8 +83,24 @@ Before Phase 1, create the output structure. See [references/documentation-stand
 
 Report a check as run, or a result as observed, only when you ran the command in this session, and name the command or its output file in `raw/`; a check you did not run is NOT RUN. When several versions were checked, list the ones checked, not a range, unless every version in the range was checked. Take every count in the reports (versions, files, findings, packages) from a command's output, not from reading. A `FINDING` keeps its label in every report and in the final answer; say whether the project's code reaches it only from a run that shows it. Say that a file passes the check for a target, not that it loads there, unless a run loaded it.
 
+Set `GV_PY_SKILL_DIR` on the first line to the absolute path of the folder that holds this `SKILL.md`, then run this block once, from the project root. Left empty, the block looks for the skill only where user-level installs put skills (folders such as `~/.claude/skills`, `~/.agents/skills` and `~/.config/goose/skills`), never inside the project, and prints the folder it uses. Every later block that runs one of this skill's scripts starts with `GV_PY_SKILL_DIR=`: put that folder there each time. The blocks run only the scripts in that folder and never take a program path from a file in the project, so a project under analysis cannot point them at code of its own:
+
 ```bash
+GV_PY_SKILL_DIR=   # the absolute path of the folder that holds this SKILL.md
+GV_PY_SKILL_DIR=${GV_PY_SKILL_DIR%/SKILL.md}   # the folder, also when the line names the file
+GV_PROJECT=$(pwd -P)
+if [ -z "$GV_PY_SKILL_DIR" ]; then   # not given: look where user-level installs put skills, never inside the project
+  GV_FOUND=$( { find "$HOME" -mindepth 1 -maxdepth 1 -type d -name '.*'; find "$HOME/.config" -mindepth 1 -maxdepth 1 -type d; } 2> /dev/null | sort -u |
+    while IFS= read -r p; do [ -f "$p/skills/python-x86-to-graviton/scripts/native_scan.py" ] || continue
+      p=$(CDPATH= cd -- "$p/skills/python-x86-to-graviton" && pwd -P) || continue; case $p/ in "$GV_PROJECT"/*) ;; *) printf '%s\n' "$p";; esac; done)
+  GV_PY_SKILL_DIR=$(printf '%s\n' "$GV_FOUND" | head -n 1)
+  [ "$(printf '%s\n' "$GV_FOUND" | grep -c .)" -le 1 ] || echo "NOTE: other copies: $(printf '%s\n' "$GV_FOUND" | sed 1d | tr '\n' ' ')(set GV_PY_SKILL_DIR if the SKILL.md you follow is in one of them)"
+fi
 mkdir -p graviton-validation/raw
+if [ -n "$GV_PY_SKILL_DIR" ] && [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.py" ] && GV_PY_SKILL_DIR=$(CDPATH= cd -- "$GV_PY_SKILL_DIR" && pwd -P); then
+  echo "skill folder: $GV_PY_SKILL_DIR"
+  case $GV_PY_SKILL_DIR/ in "$GV_PROJECT"/*) echo "NOTE: the skill folder is inside the project, so the scripts it runs are files of the project: use it only on a project you trust";; esac
+else echo "ERROR: scripts/native_scan.py not found: set GV_PY_SKILL_DIR to the folder that holds this SKILL.md and rerun, or reinstall the whole skill folder"; fi
 ```
 
 Output files produced:
@@ -102,6 +118,11 @@ Output files produced:
 | `raw/site-packages-so-scan-<target>.txt` | 1.2 | every ELF file found by content, with its architecture |
 | `raw/wheel-availability.txt` | 1.3 | One aarch64 wheel verdict per pin |
 | `00-summary.md` | End | Executive summary and exit criteria |
+
+### Available Scripts
+
+- **`scripts/native_scan.py`**: judges every native file under the paths it is given by its content, for the target OS of Phase 1.1: ELF, Mach-O and PE files on disk, in zip archives (wheels, Lambda layer zips, eggs) and in static archives. Needs Python 3.6 or later only and reads files only; exit status 1 means a `FINDING`. The blocks run it through `native_scan`; do not copy or rewrite it.
+- **`scripts/native_scan.sh`**, **`scripts/platforms.sh`** and **`scripts/host_timeout.sh`**: shell functions that the blocks load with `.` (bash or zsh); loading them runs nothing. `native_scan PATH...` runs `native_scan.py` with the target variables (`TARGET_ROOT`, or `TARGET_LIBC`, `TARGET_LIBC_VER`, `TARGET_GLIBCXX`, `TARGET_PAGE_SIZE`); `platforms ARCH` sets `PLAT` to one `--platform` flag per wheel tag the target's libc accepts; `host_timeout <seconds> <command...>` bounds a command on the host (exit status 124 on timeout, like `timeout`).
 
 ### Phase 1: Static Compatibility Analysis
 

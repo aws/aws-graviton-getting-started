@@ -59,8 +59,8 @@ Before rebuilding, remove x86-only compiler flags, or apply them only on x86 (se
 **Lambda layers and vendored site-packages:** re-create them for arm64 from the pins listed by `*.dist-info` (Phase 1.2.2). pip can download aarch64 wheels from an x86 host; offer the tags the target's glibc accepts (Phase 1.1), which for a layer is the function runtime's:
 
 ```bash
-GV_SCAN=$(sed -n 's/^GV_SCAN=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the function's file, recorded by §1.2.1
-if [ -f "$GV_SCAN" ] && . "$GV_SCAN"; then
+GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/native_scan.sh"; then   # the skill's own file only
   PYVER=3.11              # the function's runtime: python3.11 -> 3.11, python3.12 -> 3.12
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.26    # Phase 1.1: 2.26 for python3.10 and python3.11 (Amazon Linux 2), 2.34 for python3.12 and later
   TARGET_PAGE_SIZE=       # the function's page size, if measured in it (getconf PAGESIZE); unset, the scan skips the page check
@@ -71,7 +71,7 @@ if [ -f "$GV_SCAN" ] && . "$GV_SCAN"; then
   GV_TDIR=$(awk -F '\t' -v t="public.ecr.aws_lambda_python_$PYVER" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # §1.1's copy of public.ecr.aws/lambda/python:$PYVER, the runtime's OS
   if [ -n "$GV_TDIR" ]; then TARGET_ROOT=$GV_TDIR TARGET_LIBC= TARGET_LIBC_VER= native_scan python   # no FINDING line
   else echo "CHECK: no §1.1 copy of public.ecr.aws/lambda/python:$PYVER: the scan judges the glibc release only"; TARGET_ROOT= native_scan python; fi
-else echo "CHECK: run the Phase 1.2.1 scan block first: it records the function's file in graviton-validation/raw/session.env"; fi
+else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 The scan also reports executables inside `py3-none-any` wheels, such as selenium 4.48.0's x86-64 `selenium-manager`, which a check of one file misses. Layer contents go in `python/` at the root of the zip ([AWS Lambda Python layers](https://docs.aws.amazon.com/lambda/latest/dg/python-layers.html)). A package with no aarch64 wheel fails this command; resolve it in §2.2 first. The tag list matters: confluent-kafka 2.15.1's only aarch64 wheel is `manylinux_2_28`, so with `TARGET_LIBC_VER=2.26` the command fails for it, and a layer built from that wheel anyway imported on an arm64 `python3.12` function and failed on `python3.11` with `version 'GLIBC_2.28' not found` (Phase 1.1).
@@ -141,10 +141,10 @@ The uv and Poetry rows were executed on the fixture variants (each regenerated l
 TARGET_LIBC_VER=2.41    # Phase 1.1 (python:3.11-slim): every tag the target's glibc accepts, as in the Phase 1.3 probe
 PLAT=(); i=${TARGET_LIBC_VER#*.}
 while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
-D=$(mktemp -d "${TMPDIR:-/tmp}/graviton-wheels.XXXXXX") || D=$PWD/graviton-validation/raw/wheels   # a new folder no other user can write
-python3 -m pip download --only-binary=:all: --no-deps -d "$D" "${PLAT[@]}" \
+D=$(mktemp -d "${TMPDIR:-/tmp}/graviton-wheels.XXXXXX") || { D=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }   # a new folder no other user can write, or nothing
+[ -n "$D" ] && python3 -m pip download --only-binary=:all: --no-deps -d "$D" "${PLAT[@]}" \
   --platform manylinux2014_aarch64 --python-version 3.11 --implementation cp --abi cp311 "MarkupSafe==2.1.5"
-python3 -m pip hash --algorithm sha256 "$D"/MarkupSafe-2.1.5-*.whl
+[ -n "$D" ] && python3 -m pip hash --algorithm sha256 "$D"/MarkupSafe-2.1.5-*.whl
 # append the printed --hash=sha256:... as a second --hash on the MarkupSafe line
 # or: pip-compile --generate-hashes requirements.in   (records the hashes of all published files)
 ```
@@ -152,7 +152,7 @@ python3 -m pip hash --algorithm sha256 "$D"/MarkupSafe-2.1.5-*.whl
 **Packages with no aarch64 build in any release:** these need a substitute, and substitutions change behaviour, so present the evidence and wait for the user (an unattended run applies the recommended substitute, as stated at the top of this phase). `mkl` (and its transitives `intel-openmp`, `tbb`, `intel-cmplr-lib-ur`, `tcmlib`, `umf`, `onemkl-license`) has no Linux aarch64 file in any release. Confirm nothing imports it directly, then remove it:
 
 ```bash
-grep -rnE --exclude-dir=.venv --exclude-dir=.git --include='*.py' '^[[:space:]]*(import|from)[[:space:]]+mkl([^[:alnum:]_]|$)' .   # no output = safe to remove
+grep -rnE --exclude-dir='*-x86-to-graviton' --exclude-dir=.venv --exclude-dir=.git --include='*.py' '^[[:space:]]*(import|from)[[:space:]]+mkl([^[:alnum:]_]|$)' .   # no output = safe to remove
 ```
 
 The default NumPy and SciPy wheels use OpenBLAS, so removing `mkl` leaves NumPy working with OpenBLAS on Graviton.

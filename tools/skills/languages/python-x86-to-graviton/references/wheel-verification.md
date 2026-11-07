@@ -63,21 +63,12 @@ pip version floors (from [pip's changelog](https://pip.pypa.io/en/stable/news/))
 This runs on any host (x86 laptops and CI included) because `pip download` with explicit platform flags never executes code from the package. It asks the index: "for this exact pin, Python X.Y, CPython ABI, and these Linux ARM64 platform tags, is there a binary wheel?"
 
 ```bash
+GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 # The target's libc from Phase 1.1 (Amazon Linux 2023: glibc 2.34; Alpine: TARGET_LIBC=musl TARGET_LIBC_VER=1.2; no target named: both empty)
 TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34
-# pip matches each --platform value exactly: offer every tag the target's libc accepts, newest first
-platforms() { # $1=arch ; sets PLAT
-  local i="${TARGET_LIBC_VER#*.}"; PLAT=()
-  case "$i" in ''|*[!0-9]*) i=99;; esac   # no version given: every tag; the wheel's tag names the version it needs
-  if [ "$TARGET_LIBC" = musl ]; then
-    while [ "$i" -ge 1 ]; do PLAT+=(--platform "musllinux_1_${i}_$1"); i=$((i - 1)); done
-  else
-    while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_$1"); i=$((i - 1)); done
-    PLAT+=(--platform "manylinux2014_$1")
-  fi
-}
-GV_DIR=$(mktemp -d "${TMPDIR:-/tmp}/graviton.XXXXXX") || GV_DIR=$PWD/graviton-validation/raw   # a private folder (mode 700): no other user can plant a file in it
-typeset -f platforms > "$GV_DIR/platforms.sh"; mkdir -p graviton-validation/raw && printf 'GV_PLATFORMS=%s\n' "$GV_DIR/platforms.sh" >> graviton-validation/raw/session.env   # later blocks, perhaps in a new shell, read the path here
+# pip matches each --platform value exactly: platforms ARCH (scripts/platforms.sh) offers every tag the target's libc accepts, newest first
+if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
+mkdir -p graviton-validation/raw
 # Usage: probe <requirement> <arch>; prints the wheel filename on success.
 # --only-binary=:all: is mandatory: without it pip accepts the sdist and the
 # probe "passes" for a package that has no aarch64 wheel at all (false PASS).
@@ -108,6 +99,7 @@ probe() {
   [ -z "$miss" ] || echo "not on $miss"
   rm -rf "$d"; return 1
 }
+else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 Executed results (pip 26.2.1, `PYVER=3.11`, glibc 2.34):
@@ -141,15 +133,15 @@ The three distinct meanings of a FAIL, and a pure-Python PASS that x86_64 does n
 Transitive dependencies get the same treatment, but you do not need to enumerate them by hand. `pip install --dry-run --report` resolves the whole tree for the target platform:
 
 ```bash
-GV_PLATFORMS=$(sed -n 's/^GV_PLATFORMS=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the function's file, recorded by the probe block
-if [ -f "$GV_PLATFORMS" ] && . "$GV_PLATFORMS"; then
+GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
   platforms aarch64   # one --platform per tag the target's libc accepts
   python3 -m pip install --dry-run --ignore-installed --only-binary=:all: \
     --report graviton-validation/raw/wheel-availability.json -q "${PLAT[@]}" \
     --python-version 3.11 --implementation cp --abi cp311 \
     --target /tmp/graviton-probe-target -r graviton-validation/raw/requirements-resolved.txt
-else echo "CHECK: run the section 3 block first: it records the function's file in graviton-validation/raw/session.env"; fi
+else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 The report lists every package pip would install: each `install[].download_info.url` ends in the wheel filename for aarch64, and `install[].requested` is `true` for direct dependencies and `false` for transitives. If the resolution fails, pip names the first package without an aarch64 wheel; fix or exclude it and re-run until the report completes, recording each failure as you go.
@@ -280,15 +272,15 @@ ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE. ...
 Adding the aarch64 wheel's hash as a second `--hash=` on the same line makes the install pass. Detect the condition statically:
 
 ```bash
+GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 # Any hashed requirement that resolves to a different file on aarch64 fails this dry run:
-GV_PLATFORMS=$(sed -n 's/^GV_PLATFORMS=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the function's file, recorded by the probe block
-if [ -f "$GV_PLATFORMS" ] && . "$GV_PLATFORMS"; then
+if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
   platforms aarch64   # one --platform per tag the target's libc accepts
   python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
     --python-version 3.11 --implementation cp --abi cp311 --target /tmp/graviton-probe-target \
     -r requirements-locked.txt
-else echo "CHECK: run the section 3 block first: it records the function's file in graviton-validation/raw/session.env"; fi
+else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 Fix per manager (details in [package-manager-mapping.md](package-manager-mapping.md)): `pip-compile --generate-hashes` records hashes for **all** published files of each version, so a lock produced that way already contains the aarch64 hashes; a hand-made lock needs `pip hash` of the aarch64 wheel appended; `poetry.lock` and `uv.lock` are cross-platform and already carry every wheel's hash (verified on the fixture: both locks list `*_aarch64.whl` entries), so they only need regenerating if they predate the aarch64 wheel. A hash lock is also tied to the interpreter version: under Python 3.12, the fixture's lock (x86_64 and aarch64 hashes for the cp311 wheels) failed with `Expected sha256 6ec585f6... or b91c0375... Got ac07bad8...`, because pip downloaded the cp312 wheel.
