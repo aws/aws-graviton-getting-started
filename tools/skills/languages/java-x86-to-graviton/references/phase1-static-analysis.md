@@ -181,15 +181,19 @@ EOF
 rm -f "$init"
 ```
 
-Then judge every native file by its content with the check program, `scripts/java_graviton_check.py` (Documentation Setup in SKILL.md records its path). It reads JARs, WARs and EARs in memory, with the archives nested in them (Spring Boot `BOOT-INF/lib`, WAR `WEB-INF/lib`, EARs of WARs, shaded JARs), and native files on disk, whatever their names, and judges each for the target of §1.1. Without Python 3.6 or later (`maven:3-eclipse-temurin-21` and `eclipse-temurin:21` ship no `python3`) the block runs it in a Python image, with the project and the target folder mounted read-only:
+Then judge every native file by its content with the check program, `scripts/java_graviton_check.py`, which the block runs from the skill folder on its first line (the folder that Documentation Setup in SKILL.md printed). It reads JARs, WARs and EARs in memory, with the archives nested in them (Spring Boot `BOOT-INF/lib`, WAR `WEB-INF/lib`, EARs of WARs, shaded JARs), and native files on disk, whatever their names, and judges each for the target of §1.1. Without Python 3.6 or later (`maven:3-eclipse-temurin-21` and `eclipse-temurin:21` ship no `python3`) the block runs it in a Python image, with the project and the target folder mounted read-only:
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_JAVA_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/java_graviton_check.py"
+GV_JAVA_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_JAVA_SKILL_DIR/scripts/java_graviton_check.py
+if case $GV_JAVA_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 # Without python3 3.6 or later, run the program in a Python image, with the project, the program, the targets' folders
 # and the local Maven and Gradle repositories mounted read-only (braces: zsh reads "$GV_CHECK:r" as a modifier)
 GV_MNT=(-v "${PWD}:${PWD}:ro" -v "${GV_CHECK}:${GV_CHECK}:ro")
-while IFS= read -r t; do [ ! -d "$t" ] || GV_MNT+=(-v "${t}:${t}:ro"); done < <(cut -f2 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u)
+while IFS= read -r t; do case $t in glibc=*|"") continue;; esac   # only the folders the §1.1 block made: the list is a file in the project
+  case ${t#"${TMPDIR:-/tmp}/graviton-target-root."} in "$t"|""|*/*) echo "CHECK: $t not mounted: not a folder that the §1.1 block made";;
+    *) [ -d "$t" ] && [ -O "$t" ] && GV_MNT+=(-v "${t}:${t}:ro");; esac
+done < <(cut -f2 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u)
 for d in "$HOME/.m2" "$HOME/.gradle"; do [ -d "$d" ] && GV_MNT+=(-v "${d}:${d}:ro"); done   # §1.3 checks JARs in the local repositories too
 if python3 -c 'import sys; sys.exit(sys.version_info < (3, 6))' 2> /dev/null; then GV_PY=(python3)
 else GV_PY=("${CONTAINER_CMD:-docker}" run --rm --network none "${GV_MNT[@]}" -w "$PWD" public.ecr.aws/docker/library/python:3-slim python3); fi
@@ -204,6 +208,7 @@ GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#
   echo "== repository files"; "${GV_PY[@]}" "$GV_CHECK" "${GV_T[@]}" --source-tree .
 } | tee "graviton-validation/raw/native-check-$GV_TAG.txt"   # one file per target, named for it
 done
+else echo "ERROR: set GV_JAVA_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 If a dependency could not be materialized (offline or blocked `copy-dependencies`), run the check on its JARs in `~/.m2/repository` or `~/.gradle/caches`, for the coordinates in the dependency tree only.
@@ -240,16 +245,22 @@ grep -rnE "netty-transport-native|netty-tcnative|io\.grpc.*netty|conscrypt|jnr-f
 Downloads in scripts, Dockerfiles and CI bring native code in outside the build. List every one, then fetch each into a scratch folder and run the §1.2.1 check on what it holds, whatever its URL says (resolve the script's variables in the URL first):
 
 ```bash
+GV_JAVA_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 grep -rnE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --exclude-dir=node_modules --include='*.sh' --include='Dockerfile*' --include='*.[Dd]ockerfile' \
   --include='Containerfile*' --include='Makefile' --include='*.y*ml' --include='Jenkinsfile*' '(curl|wget|Invoke-WebRequest|iwr|Start-BitsTransfer)[[:space:]]|^[[:space:]]*ADD([[:space:]]+--[^[:space:]]+)*[[:space:]]+https?:|releases/(latest/)?download/' . 2>/dev/null || true
 URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list
-GV_CHECK=$(sed -n 's/^GV_JAVA_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the recorded program
-d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX") && mkdir "$d/x" || { d=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }
+GV_CHECK=$GV_JAVA_SKILL_DIR/scripts/java_graviton_check.py; d=
+if case $GV_JAVA_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
+  d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX") && mkdir "$d/x" || { d=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }
+else echo "ERROR: set GV_JAVA_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 # Without python3 3.6 or later, the program runs in a Python image with the download, the program and the targets'
 # folders mounted read-only (braces: zsh reads "$d:r" as a modifier)
 if python3 -c 'import sys; sys.exit(sys.version_info < (3, 6))' 2> /dev/null; then GV_PY=(python3)
 else GV_PY=("${CONTAINER_CMD:-docker}" run --rm --network none -v "${d}:${d}:ro" -v "${GV_CHECK}:${GV_CHECK}:ro")
-  while IFS= read -r t; do [ ! -d "$t" ] || GV_PY+=(-v "${t}:${t}:ro"); done < <(cut -f2 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u)
+  while IFS= read -r t; do case $t in glibc=*|"") continue;; esac   # only the folders the §1.1 block made: the list is a file in the project
+    case ${t#"${TMPDIR:-/tmp}/graviton-target-root."} in "$t"|""|*/*) echo "CHECK: $t not mounted: not a folder that the §1.1 block made";;
+      *) [ -d "$t" ] && [ -O "$t" ] && GV_PY+=(-v "${t}:${t}:ro");; esac
+  done < <(cut -f2 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u)
   GV_PY+=(public.ecr.aws/docker/library/python:3-slim python3); fi
 if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
   # Unpack by the first bytes, not the name: a .deb (an ar archive), an .rpm, a zip or a tar archive
@@ -268,7 +279,7 @@ if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
   GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
   echo "== $GV_TAG"; "${GV_PY[@]}" "$GV_CHECK" "${GV_T[@]}" "$d" | sed "s#$d/##g"
   done
-else echo "CHECK: $URL did not download"; fi
+else [ -z "$d" ] || echo "CHECK: $URL did not download"; fi
 [ -z "$d" ] || rm -rf "$d"
 ```
 
@@ -349,11 +360,15 @@ Flag each JAR with a §1.2.1 `FINDING` as MUST UPGRADE (never infer it from the 
 
 For x86-only native files: check for source in the repository, document recompilation needs, or prompt the user. Validate a file with:
 ```bash
+GV_JAVA_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_JAVA_SKILL_DIR/scripts/java_graviton_check.py
+if case $GV_JAVA_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one check per target that §1.1 recorded; with none, one check named target
 GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
-python3 "$(sed -n 's/^GV_JAVA_CHECK=//p' graviton-validation/raw/session.env | tail -n 1)" "${GV_T[@]}" libname.so   # no FINDING line (without python3: "${GV_PY[@]}" of §1.2.1)
+python3 "$GV_CHECK" "${GV_T[@]}" libname.so   # no FINDING line (without python3: "${GV_PY[@]}" of §1.2.1)
 done
+else echo "ERROR: set GV_JAVA_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 ## 1.3 Dependency ARM64 Compatibility Analysis

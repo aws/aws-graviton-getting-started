@@ -9,14 +9,15 @@ Phase 1 runs on any host, including x86, and changes nothing in the repository. 
 - `assets` in §1.1, whose restore of a scratch copy also runs any target hooked to restore (a test target with `BeforeTargets="Restore"` ran its `Exec`);
 - for a Windows starting point, the CA1416 build of a scratch copy in §1.4, which runs the whole build.
 
-MSBuild also reads `Directory.Build.rsp` for these steps, and that file can add targets: with `-t:` in it, the property listing ran a target of the repository. List what the repository's MSBuild files can run (block below) before the first of them, and for a repository you do not trust, run Phase 1 in a disposable container or VM. `scan` only reads files, and `probe` and `config` restore a project that the check program writes in a scratch folder, copying only `NuGet.config`. Two steps run container images, with the image's own tools: the libc check of each target image (§1.1) and the OS package lookups (§1.2.2). No test or application of the project runs until Phase 3. The commands were executed in bash 5.2 and zsh 5.9 on Linux. They need the .NET SDK, Python 3.6 or later, and the check program, `scripts/dotnet_graviton_check.py`, whose path the Documentation Setup block in SKILL.md records:
+MSBuild also reads `Directory.Build.rsp` for these steps, and that file can add targets: with `-t:` in it, the property listing ran a target of the repository. List what the repository's MSBuild files can run (block below) before the first of them, and for a repository you do not trust, run Phase 1 in a disposable container or VM. `scan` only reads files, and `probe` and `config` restore a project that the check program writes in a scratch folder, copying only `NuGet.config`. Two steps run container images, with the image's own tools: the libc check of each target image (§1.1) and the OS package lookups (§1.2.2). No test or application of the project runs until Phase 3. The commands were executed in bash 5.2 and zsh 5.9 on Linux. They need the .NET SDK, Python 3.6 or later, and the check program, `scripts/dotnet_graviton_check.py`, which each block runs from the skill folder on its first line (the folder that the Documentation Setup block in SKILL.md printed):
 
 ```bash
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 dotnet --list-sdks
 dotnet --version   # the SDK this repository selects (global.json in this folder or a parent)
 python3 -c 'import sys; assert sys.version_info >= (3, 6), sys.version; print("python3", sys.version.split()[0])'
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" ];; *) false;; esac; then echo "check program: $GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py"
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 > **If `dotnet --version` fails** with `A compatible .NET SDK was not found.`, the repository's `global.json` pins an SDK that is not installed. Apply the session-scoped SDK switch from [phase3-validation.md](phase3-validation.md) §3.0 now: the first `dotnet` command needs it, not only Phase 3.
@@ -169,8 +170,9 @@ For a Lambda function on a managed .NET runtime, read its runtime's base image a
 One scratch restore gives both the dependency tree (every resolved package with the shortest reference chain from a project, as JSON) and the per-RID native report used in §1.2 and §1.3. The repository is not modified ([nuget-native-assets.md §3](nuget-native-assets.md#3-the-per-rid-check)):
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 mkdir -p graviton-validation/raw
 # --source-rid: linux-x64 for a Linux starting point, win-x64 for Windows
 for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that Phase 1.1 recorded; with none, one run named target
@@ -182,6 +184,7 @@ cat "graviton-validation/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (
 # Sanity check: nothing resolved is a failed restore, not an all-clear (unless the solution references no packages)
 grep -q '^packages: [1-9]' "graviton-validation/raw/native-assets-$GV_TAG.txt" || echo "WARNING: no packages resolved; read the restore errors above"
 done
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 A project that uses `packages.config` is not in this report: the program prints `CHECK <file>: these packages are not restored by PackageReference and are not in this report; run: config <file>`, and that project gets the per-package check instead ([nuget-native-assets.md §3](nuget-native-assets.md#projects-that-still-use-packagesconfig)).
@@ -219,8 +222,9 @@ Statically bundled native code sits in two places. Judge both by content, never 
 2. **Files committed to the repository**: vendored libraries, prebuilt helpers, and managed assemblies built for one architecture. Scan the source tree by content. `--source-tree` skips `.git`, `.vs`, `bin`, `obj`, `node_modules` and `graviton-validation`; build and publish outputs are scanned in Phase 3.1:
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 mkdir -p graviton-validation/raw
 for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that Phase 1.1 recorded; with none, one scan named target
 GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
@@ -228,6 +232,7 @@ GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *
 python3 "$GV_CHECK" scan "${GV_T[@]}" --source-tree . > "graviton-validation/raw/repo-native-scan-$GV_TAG.txt"; rc=$?
 cat "graviton-validation/raw/repo-native-scan-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
 done
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 The same scan reports committed managed assemblies built for x64 or x86, which fail on arm64 as described in [nuget-native-assets.md §1](nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each).
@@ -257,8 +262,9 @@ Windows system DLLs never exist on Linux: a `[DllImport("kernel32.dll")]` call f
 Fetch each download into a scratch folder and scan what it holds, whatever its URL says. Resolve the script's variables in the URL first; an archive is unpacked first:
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 URL='https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64'   # one download from the list above
 d=$(mktemp -d "${TMPDIR:-/tmp}/graviton-download.XXXXXX") && mkdir "$d/x" || { d=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }
 if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
@@ -280,6 +286,7 @@ if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
   done
 else echo "CHECK: $URL did not download"; fi
 [ -z "$d" ] || rm -rf "$d"
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 Executed: jq 1.6's `jq-linux64`, whose URL names no architecture, gave `FINDING download is x86-64`; jq 1.7.1's `jq-linux-arm64` gave no finding. A download that cannot be fetched from here (credentials, a private network) stays CHECK until it is scanned where it can be.
@@ -348,10 +355,12 @@ timeout 600 docker run --rm --init --platform "$NATIVE" --entrypoint timeout "$I
 For x86-only native files: check for source in the repository, document recompilation needs (Phase 2.1), or ask the user. Validate a single file with:
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 python3 "$GV_CHECK" scan path/to/folder   # the file's line must start with "ELF aarch64", and no FINDING may follow
 file path/to/folder/libname.so            # where file(1) exists: must show "ARM aarch64"
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 ## 1.3 Dependency ARM64 Compatibility Analysis

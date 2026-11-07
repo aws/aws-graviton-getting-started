@@ -23,14 +23,16 @@ For each x86-only native file committed to the repository (Phase 1.2.1):
 Build the aarch64 file with the project's own native build, on aarch64 hardware (a Graviton host or an ARM64 CI runner, directly or in a `linux/arm64` container, which runs natively there). On an x86 host the same container runs under emulation, where compiling is slow and unsupported (Phase 3, "Emulation limits"), so do not compile there. A plain C library can instead be cross-compiled on the x86 host with no emulation; Ubuntu 24.04 packages the cross compiler as `gcc-aarch64-linux-gnu`:
 
 ```bash
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed (for the scan at the end)
 mkdir -p src/Fixture.Core/native/arm64   # the folder for the aarch64 build, next to the x64 one
 # timeout 600 bounds the cross-compiler install and the build; raise it for a larger build
 $CONTAINER_CMD run --rm --init --platform linux/amd64 -v "$PWD":/w -w /w -e HOST_IDS="$(id -u):$(id -g)" ubuntu:24.04 timeout 600 sh -c \
   'apt-get update && apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross && aarch64-linux-gnu-gcc -shared -fPIC -O2 -o src/Fixture.Core/native/arm64/libfastsum.so native/fastsum.c && chown "$HOST_IDS" src/Fixture.Core/native/arm64/libfastsum.so'
 echo "cross-compile: exit $?"   # must be 0 before the scan below means anything
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 python3 "$GV_CHECK" scan src/Fixture.Core/native/arm64   # the file's line must start with "ELF aarch64", and no FINDING may follow
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 The block is for x86 hosts: on Graviton4 the x86-64 image could not start (`[FATAL tini (8)] exec timeout failed: Exec format error`), and the scan of the then empty folder printed `files by kind: none` with `findings: 0`, so check the `cross-compile` exit status before reading the scan. On an arm64 host, compile natively instead, for example `clang -shared -fPIC -O2 -o src/Fixture.Core/native/arm64/libfastsum.so native/fastsum.c`. `HOST_IDS` hands the file the container writes back to your user: on a Linux host, files written through a bind mount otherwise belong to root. A library that links other native libraries needs their aarch64 builds too; build it on aarch64 hardware.
@@ -72,10 +74,12 @@ return NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "native", arch,
 Update ONLY dependencies flagged as MUST UPGRADE in Phase 1.3. Do NOT upgrade compatible dependencies. Prefer the *lowest* version whose native files probe clean for every target RID, not the latest: probe the candidates upward from the version in use and **probe the exact candidate** before writing it ([nuget-native-assets.md](nuget-native-assets.md) §5). Floors are not always monotonic.
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 # The target of Phase 1.1: for a target image, --target-root FOLDER in place of --target-rid and --glibc
 python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0 --target-rid linux-arm64 --glibc 2.34; echo "exit status $?"
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 > **Skill config:** If `skill-config.md` defines `dotnet.target_rids`, the candidate must probe clean for each of those RIDs. Probes use the repository's `NuGet.config`; if the repository's feeds lack the candidate, record an INFRA item ("the feed needs SkiaSharp.NativeAssets.Linux 2.80.0") rather than choosing a different version. See [skill-configuration.md](skill-configuration.md).
@@ -139,11 +143,12 @@ Commit the lock files with the change.
 After the changes, keep the Phase 1 evidence that `03-dependency-compatibility-report.md` cites, then re-run the Phase 1.1 check:
 
 ```bash
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 for f in graviton-validation/raw/native-assets-*.txt graviton-validation/raw/dependency-tree-*.json; do   # keep every target's Phase 1 files
   case $f in *-phase1.*) ;; *) [ -e "$f" ] && [ ! -e "${f%.*}-phase1.${f##*.}" ] && cp "$f" "${f%.*}-phase1.${f##*.}";; esac   # once: a rerun keeps the first copy
 done
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that Phase 1.1 recorded; with none, one run named target
 GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
@@ -151,6 +156,7 @@ python3 "$GV_CHECK" assets --source-rid linux-x64 "${GV_T[@]}" \
   --tree "graviton-validation/raw/dependency-tree-$GV_TAG.json" > "graviton-validation/raw/native-assets-$GV_TAG.txt"; rc=$?   # one pair of files per target, named for it
 cat "graviton-validation/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 done
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 ## 2.3 Architecture Detection Code Updates

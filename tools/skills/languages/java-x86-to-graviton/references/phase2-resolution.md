@@ -18,6 +18,7 @@ For each x86-only .so identified in Phase 1:
 
 **If source code available:**
 ```bash
+GV_JAVA_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed (for the check at the end)
 # Cross-compilation
 CC=aarch64-linux-gnu-gcc make
 
@@ -25,11 +26,14 @@ CC=aarch64-linux-gnu-gcc make
 make
 
 # Verify with the Phase 1.2.1 check, once per target of Phase 1.1 (without python3, "${GV_PY[@]}" of Phase 1.2.1)
+GV_CHECK=$GV_JAVA_SKILL_DIR/scripts/java_graviton_check.py
+if case $GV_JAVA_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one check per target that Phase 1.1 recorded; with none, one check named target
 GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
-python3 "$(sed -n 's/^GV_JAVA_CHECK=//p' graviton-validation/raw/session.env | tail -n 1)" "${GV_T[@]}" libname.so   # no FINDING line
+python3 "$GV_CHECK" "${GV_T[@]}" libname.so   # no FINDING line
 done
+else echo "ERROR: set GV_JAVA_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 **If source unavailable:** Prompt user for ARM64-compatible version or confirm pure Java fallback.

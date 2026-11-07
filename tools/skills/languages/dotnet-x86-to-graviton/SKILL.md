@@ -83,21 +83,23 @@ Before Phase 1, create the output structure. See [references/documentation-stand
 
 Report a check as run, or a result as observed, only when you ran the command in this session, and name the command or its output file in `raw/`; a check you did not run is NOT RUN. When several versions were checked, list the ones checked, not a range, unless every version in the range was checked. Take every count in the reports (versions, files, findings, packages) from a command's output, not from reading. A `FINDING` keeps its label in every report and in the final answer; say whether the project's code reaches it only from a run that shows it. Say that a file passes the check for a target, not that it loads there, unless a run loaded it.
 
-Set `GV_DOTNET_SKILL_DIR` on the first line to the absolute path of the folder that holds this `SKILL.md`, then run this block once, from the repository root. Left empty, the block looks for the skill in the hidden folders of the project, then of the home folder, where installs put skills (`.agents/skills`, `.claude/skills`, `~/.config/goose/skills` and the like), and prints the folder it uses. It records the check program's path in `raw/session.env`, where every later block reads it, even in a new shell:
+Set `GV_DOTNET_SKILL_DIR` on the first line to the absolute path of the folder that holds this `SKILL.md`, then run this block once, from the repository root. Left empty, the block looks for the skill only where user-level installs put skills (folders such as `~/.claude/skills`, `~/.agents/skills` and `~/.config/goose/skills`), never inside the repository, and prints the folder it uses. Every later block that runs one of this skill's scripts starts with `GV_DOTNET_SKILL_DIR=`: put that folder there each time. The blocks run only the scripts in that folder and never take a program path from a file in the repository, so a repository under analysis cannot point them at code of its own:
 
 ```bash
 GV_DOTNET_SKILL_DIR=   # the absolute path of the folder that holds this SKILL.md
 GV_DOTNET_SKILL_DIR=${GV_DOTNET_SKILL_DIR%/SKILL.md}   # the folder, also when the line names the file
-if [ -z "$GV_DOTNET_SKILL_DIR" ] || [ ! -f "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" ]; then   # empty or wrong: look where installs put skills
-  GV_FOUND=$( { find "$PWD" -mindepth 1 -maxdepth 1 -type d -name '.*' | sort; find "$HOME" -mindepth 1 -maxdepth 1 -type d -name '.*' | sort
-    find "$HOME/.config" -mindepth 1 -maxdepth 1 -type d | sort; } 2> /dev/null | awk '!seen[$0]++' | while IFS= read -r p; do
-    [ ! -f "$p/skills/dotnet-x86-to-graviton/scripts/dotnet_graviton_check.py" ] || printf '%s\n' "$p/skills/dotnet-x86-to-graviton"; done)
-  GV_DOTNET_SKILL_DIR=$(printf '%s\n' "$GV_FOUND" | head -n 1)   # the project's copy before the home folder's
+GV_PROJECT=$(pwd -P)
+if [ -z "$GV_DOTNET_SKILL_DIR" ]; then   # not given: look where user-level installs put skills, never inside the project
+  GV_FOUND=$( { find "$HOME" -mindepth 1 -maxdepth 1 -type d -name '.*'; find "$HOME/.config" -mindepth 1 -maxdepth 1 -type d; } 2> /dev/null | sort -u |
+    while IFS= read -r p; do [ -f "$p/skills/dotnet-x86-to-graviton/scripts/dotnet_graviton_check.py" ] || continue
+      p=$(CDPATH= cd -- "$p/skills/dotnet-x86-to-graviton" && pwd -P) || continue; case $p/ in "$GV_PROJECT"/*) ;; *) printf '%s\n' "$p";; esac; done)
+  GV_DOTNET_SKILL_DIR=$(printf '%s\n' "$GV_FOUND" | head -n 1)
   [ "$(printf '%s\n' "$GV_FOUND" | grep -c .)" -le 1 ] || echo "NOTE: other copies: $(printf '%s\n' "$GV_FOUND" | sed 1d | tr '\n' ' ')(set GV_DOTNET_SKILL_DIR if the SKILL.md you follow is in one of them)"
 fi
 mkdir -p graviton-validation/raw
-if [ -n "$GV_DOTNET_SKILL_DIR" ] && [ -f "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" ] && GV_DOTNET_SKILL_DIR=$(CDPATH= cd -- "$GV_DOTNET_SKILL_DIR" && pwd); then
-  echo "skill folder: $GV_DOTNET_SKILL_DIR"; printf 'GV_DOTNET_CHECK=%s\n' "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" >> graviton-validation/raw/session.env
+if [ -n "$GV_DOTNET_SKILL_DIR" ] && [ -f "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" ] && GV_DOTNET_SKILL_DIR=$(CDPATH= cd -- "$GV_DOTNET_SKILL_DIR" && pwd -P); then
+  echo "skill folder: $GV_DOTNET_SKILL_DIR"
+  case $GV_DOTNET_SKILL_DIR/ in "$GV_PROJECT"/*) echo "NOTE: the skill folder is inside the repository, so the scripts it runs are files of the repository: use it only on a repository you trust";; esac
 else echo "ERROR: scripts/dotnet_graviton_check.py not found: set GV_DOTNET_SKILL_DIR to the folder that holds this SKILL.md and rerun, or reinstall the whole skill folder"; fi
 ```
 
@@ -123,6 +125,7 @@ Output files produced:
 ### Available Scripts
 
 - **`scripts/dotnet_graviton_check.py`**: the per-RID check. `assets` restores a scratch copy of the repository and judges, by content, the native files each resolved NuGet package gets for each target RID; `scan` judges the files of a build or publish output, an extracted image or the repository; `probe` checks one package version and `config` the packages of a `packages.config`. Needs Python 3.6 or later, and the .NET SDK for all but `scan`; it never writes to the repository. `--help` prints its commands and rules. The Phase 1 to 3 blocks run it; do not copy or rewrite it.
+- **`scripts/host_timeout.sh`** and **`scripts/run_arm64.sh`**: shell functions that the Phase 3 blocks load with `.` (bash or zsh); loading them runs nothing. `host_timeout <seconds> <command...>` bounds a command on the host (exit status 124 on timeout, like `timeout`), and `run_arm64 <seconds> <image> <command...>` runs a command in a `linux/arm64` container with the limit inside the container, then removes the container.
 
 ### Phase 1: Static Compatibility Analysis
 

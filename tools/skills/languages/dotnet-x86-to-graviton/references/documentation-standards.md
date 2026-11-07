@@ -5,7 +5,7 @@
 - Purpose
 - Output Folder Structure
 - Agent Instructions
-- File Specifications: `00-summary.md`; `01-project-assessment.md`; `02-native-library-report.md`; `03-dependency-compatibility-report.md`; `04-code-scan-findings.md`; `05-runtime-configuration.md`; `06-build-test-results.md`; `raw/project-properties.txt`; `raw/dependency-tree-<target>.json`; `raw/native-assets-<target>.txt`; `raw/dependency-tree-native.txt`; `raw/repo-native-scan-<target>.txt`; `raw/ca1416.txt`; `raw/output-scan-<target>.txt`; `raw/native-assets-<target>-phase1.txt`, `raw/dependency-tree-<target>-phase1.json`; `raw/session.env`; `raw/target-roots.txt`
+- File Specifications: `00-summary.md`; `01-project-assessment.md`; `02-native-library-report.md`; `03-dependency-compatibility-report.md`; `04-code-scan-findings.md`; `05-runtime-configuration.md`; `06-build-test-results.md`; `raw/project-properties.txt`; `raw/dependency-tree-<target>.json`; `raw/native-assets-<target>.txt`; `raw/dependency-tree-native.txt`; `raw/repo-native-scan-<target>.txt`; `raw/ca1416.txt`; `raw/output-scan-<target>.txt`; `raw/native-assets-<target>-phase1.txt`, `raw/dependency-tree-<target>-phase1.json`; `raw/target-roots.txt`
 
 ## Purpose
 
@@ -33,7 +33,6 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
         ├── repo-native-scan-<target>.txt     # Committed native files and assemblies by content (Phase 1.2)
         ├── ca1416.txt                        # Windows-only API call sites (Phase 1.4, Windows starting points)
         ├── output-scan-<target>.txt          # Publish outputs by content (Phase 3.1)
-        ├── session.env                       # Paths that later blocks read in a new shell (the check program, saved functions)
         └── target-roots.txt                  # Each target's name and its image's folder, or glibc=VERSION with no image (Phase 1.1)
 ```
 

@@ -88,11 +88,13 @@ With Paket 10.3.1 as a local tool:
 So when a fix must come from an internal feed, probe it with an empty cache, from the repository root so that its `NuGet.config` applies:
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 cache=$(mktemp -d)
 NUGET_PACKAGES="$cache" python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0; echo "exit status $?"
 rm -rf "$cache"
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 A version that probes clean on nuget.org but not through the repository's feeds is an INFRA finding for the feed owner. Never edit sources or mappings to make a check pass.

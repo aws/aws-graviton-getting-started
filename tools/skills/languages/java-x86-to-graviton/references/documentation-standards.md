@@ -29,7 +29,6 @@ All transformation output documents MUST be written to a single folder named `gr
         ├── dependency-tree-native.txt       # Filtered tree (native-code artifacts only)
         ├── native-check-<target>.txt        # Native files judged by content, one file per target (Phase 1.2.1)
         ├── native-check-<target>-phase1.txt # The Phase 1 output, kept before Phase 2.2 re-runs the check
-        ├── session.env                      # Paths that later blocks read in a new shell (the check program, saved functions)
         └── target-roots.txt                 # Each target's name and its image's folder, or glibc=VERSION with no image (Phase 1.1)
 ```
 

@@ -18,18 +18,9 @@ Before skipping validation, check for a container runtime that can run `linux/ar
 > **Skill config:** If `skill-config.md` defines `container.runtime`, pin `CONTAINER_CMD` to that value instead of running the auto-detection cascade below, but only after verifying it works; if the pinned runtime does not respond, fall back to the cascade. See [skill-configuration.md](skill-configuration.md).
 
 ```bash
-# Host-side time limit: GNU timeout where it exists (Linux, WSL, Homebrew coreutils), else gtimeout, else Python.
-host_timeout() {  # usage: host_timeout <seconds> <command...>; exit code 124 on timeout, like timeout(1)
-  if case "$(command -v timeout 2>/dev/null)" in /*) true;; *) false;; esac; then command timeout -k 10 "$@"   # the program: Phase 1 defines a shell function of that name with no limit
-  elif command -v gtimeout >/dev/null 2>&1; then gtimeout -k 10 "$@"
-  else python3 -c 'import subprocess, sys
-try: sys.exit(subprocess.run(sys.argv[2:], timeout=float(sys.argv[1])).returncode)
-except subprocess.TimeoutExpired: sys.exit(124)' "$@"
-  fi
-}
-GV_DIR=$(mktemp -d "${TMPDIR:-/tmp}/graviton.XXXXXX") || GV_DIR=$PWD/graviton-validation/raw   # a private folder (mode 700): no other user can plant a file in it
-mkdir -p graviton-validation/raw && typeset -f host_timeout > "$GV_DIR/host_timeout.sh" && printf 'GV_DOTNET_TIMEOUT=%s\n' "$GV_DIR/host_timeout.sh" >> graviton-validation/raw/session.env   # later blocks, perhaps in a new shell, read the path here
-
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+# host_timeout <seconds> <command...>: a host-side time limit (GNU timeout, else gtimeout, else Python), from the skill's scripts/host_timeout.sh
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_DOTNET_SKILL_DIR/scripts/host_timeout.sh" ];; *) false;; esac && . "$GV_DOTNET_SKILL_DIR/scripts/host_timeout.sh"; then   # the skill's own file only
 # Detect a WORKING container runtime. Being on PATH is not enough: a runtime can be installed
 # but unusable (no daemon, no VM, missing permissions), so ask each one for `info`; one that has not answered in 20 seconds counts as unusable.
 CONTAINER_CMD=""
@@ -47,6 +38,7 @@ echo "Host architecture: $ARCH"
 if [ -n "$CONTAINER_CMD" ] && [ "$ARCH" = "x86_64" ]; then
   $CONTAINER_CMD run --rm --init --platform linux/arm64 mcr.microsoft.com/dotnet/runtime-deps:8.0 timeout 30 uname -m   # must print aarch64
 fi
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 A `command -v` cascade can pick a runtime that cannot run anything: on the x86 host used to validate this skill, `finch` was on PATH but `finch info` failed. After a reboot of that host cleared QEMU's registration, the same container printed `[FATAL tini (6)] exec timeout failed: Exec format error` and the block exited 1: the runtime works but has no ARM64 support.
@@ -62,28 +54,11 @@ A `command -v` cascade can pick a runtime that cannot run anything: on the x86 h
 
 **Do NOT skip validation if a working container runtime is available.** Only recommend external validation as a last resort.
 
-Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CONTAINER_CMD` exists only in the shell that set it: if each command runs in a new shell, start a later block with `CONTAINER_CMD=<the detected runtime>`. `host_timeout` and `run_arm64` (below) are saved by their defining blocks to files in a new folder under `${TMPDIR:-/tmp}`, whose paths those blocks record in `graviton-validation/raw/session.env`; a later block that calls one reads its path there in its first lines.
+Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CONTAINER_CMD` exists only in the shell that set it: if each command runs in a new shell, start a later block with `CONTAINER_CMD=<the detected runtime>`. `host_timeout` and `run_arm64` are functions in the skill's `scripts/host_timeout.sh` and `scripts/run_arm64.sh`; a block that calls one loads its file from the folder on its first line (`GV_DOTNET_SKILL_DIR`).
 
 **Emulation limits (x86 host).** Microsoft's supported-OS lists say "The QEMU emulator is not supported to run .NET apps" ([.NET 8](https://github.com/dotnet/core/blob/main/release-notes/8.0/supported-os.md)), so an emulated run is a smoke test, and the verdict for anything it cannot show comes from Graviton. Observed with Docker and QEMU:
 
-- **Bound every container run, inside the container,** and remove the container afterwards (each `timeout` value in the blocks is an upper bound, so a stuck command fails instead of holding the session; raise it when a project needs longer):
-  ```bash
-  GV_TO=$(sed -n 's/^GV_DOTNET_TIMEOUT=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)
-  if [ -f "$GV_TO" ] && . "$GV_TO"; then
-    run_arm64() {  # usage: run_arm64 <seconds> <image> <command...>; extra docker options go in RUN_ARM64_OPTS (a string)
-      local limit="$1" img="$2" name="graviton-check-$$"; shift 2
-      # The options go through $(printf) so that zsh splits them too (zsh does not split ${RUN_ARM64_OPTS}).
-      # shellcheck disable=SC2046
-      host_timeout "$((limit + 20))" $CONTAINER_CMD run --rm --init --name "$name" --platform linux/arm64 $(printf '%s' "${RUN_ARM64_OPTS:-}") \
-        --entrypoint timeout "$img" "$limit" sh -c "$*"
-      local rc=$?
-      $CONTAINER_CMD rm -f "$name" >/dev/null 2>&1   # no-op if the container already exited
-      return $rc
-    }
-    typeset -f run_arm64 > "${GV_TO%/*}/run_arm64.sh" && printf 'GV_DOTNET_RUN_ARM64=%s\n' "${GV_TO%/*}/run_arm64.sh" >> graviton-validation/raw/session.env   # later blocks, perhaps in a new shell, read the path here
-  else echo "CHECK: run the Container Runtime Detection block first: it records host_timeout's file in graviton-validation/raw/session.env"; fi
-  ```
-  The `--entrypoint timeout` form also works with images whose entrypoint is the application.
+- **Bound every container run, inside the container,** and remove the container afterwards (each `timeout` value in the blocks is an upper bound, so a stuck command fails instead of holding the session; raise it when a project needs longer). `run_arm64 <seconds> <image> <command...>` in the skill's `scripts/run_arm64.sh` does both: it runs the command with `--entrypoint timeout`, a form that also works with images whose entrypoint is the application, under `host_timeout` on the host, and removes the container afterwards. Extra container options go in `RUN_ARM64_OPTS` (a string); it needs `CONTAINER_CMD` and `host_timeout`.
 - **Do not compile under emulation.** `dotnet test` of a test project inside the arm64 SDK image was killed (`exit 137`) during its restore and build. Build and publish natively for linux-arm64 on the host (the SDK cross-targets managed code), and run only the result in the container.
 - **x86-64 executables do not fail the way they fail on Graviton.** On an x86 host, the kernel runs an x86-64 executable directly even inside an arm64 container: Selenium Manager 4.48.0's x86-64 binary ran there, and an image whose apphost was x86-64 stopped with `exec ./Fixture.Api failed: No such file or directory` (the x86-64 loader is missing), not with an architecture error. On Graviton4 the same Selenium Manager binary did not start: bash reported `cannot execute binary file` (exit 126), and `execve` from a program failed with errno 8, `Exec format error`. Judge executables by content (§3.1) and on Graviton.
 
@@ -162,13 +137,14 @@ script="$GV_SDK/dotnet-install.sh"; SDK_DIR="$GV_SDK/sdk-8.0.425"
 2. **Publish every executable project for each target RID and scan the output by content.** A successful publish is not evidence: it exited 0 with native files missing and for a Windows Forms project (Phase 1). The scan is:
 
 ```bash
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 mkdir -p graviton-validation/raw
 # Keep tracked lock files as they are: locked mode when the repository has them (a RID they lack then fails with NU1004)
 LOCK=false; [ -n "$(find . -name packages.lock.json -not -path '*/obj/*' -print 2>/dev/null | head -n 1)" ] && LOCK=true
-GV_PUB=$(mktemp -d "${TMPDIR:-/tmp}/graviton-publish.XXXXXX") || GV_PUB=$PWD/graviton-validation/raw/publish   # a new folder no other user can write
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one publish and scan per target that Phase 1.1 recorded; with none, one publish and scan named target
+GV_PUB=$(mktemp -d "${TMPDIR:-/tmp}/graviton-publish.XXXXXX") || { GV_PUB=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }   # a new folder no other user can write, or nothing
+[ -n "$GV_PUB" ] && for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one publish and scan per target that Phase 1.1 recorded; with none, one publish and scan named target
 GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 RID=linux-arm64; [ -z "$GV_TDIR" ] || [ ! -e "$GV_TDIR/lib/ld-musl-aarch64.so.1" ] || RID=linux-musl-arm64   # the RID follows the target's C library
@@ -187,6 +163,7 @@ grep -E 'OutputType=Exe' graviton-validation/raw/project-properties.txt | cut -d
     python3 "$GV_CHECK" scan --target-rid "$RID" "${GV_T[@]}" "$out"
   done | tee "graviton-validation/raw/output-scan-$GV_TAG.txt"
 done
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 A Native AOT project cross-published from x64 fails with `error : unrecognized command-line option ‘--target=aarch64-linux-gnu’` and is reported `NOT SCANNED: publish failed`: publish it on arm64 hardware (Phase 2.4), or record it as NOT RUN with the reason when none is available.
@@ -228,6 +205,7 @@ The final build command determines the build score.
 - Correct: `$CONTAINER_CMD run --entrypoint dotnet app:arm64 --info`
 
 ```bash
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed (for the scan at the end)
 # Build
 $CONTAINER_CMD build --platform linux/arm64 -t app:arm64 .
 
@@ -237,13 +215,13 @@ cid=$($CONTAINER_CMD create --platform linux/arm64 app:arm64)
 GV_APP=$(mktemp -d "${TMPDIR:-/tmp}/graviton-image-app.XXXXXX") || GV_APP=   # a new, private folder, or nothing: no copy without it
 [ -z "$GV_APP" ] || $CONTAINER_CMD cp "$cid":/app/. "$GV_APP"
 $CONTAINER_CMD rm -f "$cid" > /dev/null
-GV_CHECK=$(sed -n 's/^GV_DOTNET_CHECK=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)   # the path Documentation Setup in SKILL.md recorded
-[ -f "$GV_CHECK" ] || echo "ERROR: run the Documentation Setup block in SKILL.md first: it records the path of scripts/dotnet_graviton_check.py"
+GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 BASE=mcr.microsoft.com/dotnet/aspnet:8.0   # the image the Dockerfile's last FROM names (Phase 1.1 copied it)
 GV_TDIR=$(awk -F '\t' -v t="$(printf '%s' "$BASE" | tr -c 'A-Za-z0-9._-' '_')" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its folder, recorded under its name
 GV_T=(); if [ -d "$GV_TDIR" ]; then GV_T=(--target-root "$GV_TDIR"); else echo "CHECK: no Phase 1.1 copy of $BASE: copy it with the §6 block of nuget-native-assets.md, or give the scan its --target-rid and --glibc"; fi
-if [ -n "$GV_APP" ]; then python3 "$GV_CHECK" scan "${GV_T[@]}" "$GV_APP"   # the application files, from the path the Dockerfile copies them to (/app)
-else echo "CHECK: the image's files were not copied (mktemp made no folder)"; fi
+if [ -z "$GV_APP" ]; then echo "CHECK: the image's files were not copied (mktemp made no folder)"
+elif case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then python3 "$GV_CHECK" scan "${GV_T[@]}" "$GV_APP"   # only the skill's own program; the application files, from the path the Dockerfile copies them to (/app)
+else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 # Must show: Architecture: arm64, RID: linux-arm64, and no FINDING
 ```
 
@@ -271,13 +249,12 @@ then the §3.1 build, publish and scan, and the tests in §3.2. The `dotnet --in
 **x86 host:** build the test project natively for linux-arm64 and run only the tests in the arm64 SDK image (Debian 12, glibc 2.36) or, for a target of another distribution, in its image with its .NET SDK package (Amazon Linux 2023: `dnf install -y dotnet-sdk-8.0`), with the OS packages the runtime image installs (Phase 1.2.2): a native library is judged by the target's glibc. A test stage in the Dockerfile pinned to `$TARGETPLATFORM` compiles under emulation, which was killed, so use it only on arm64 hosts.
 
 ```bash
-GV_TO=$(sed -n 's/^GV_DOTNET_TIMEOUT=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)
-GV_RA=$(sed -n 's/^GV_DOTNET_RUN_ARM64=//p' graviton-validation/raw/session.env 2> /dev/null | tail -n 1)
-if [ -f "$GV_TO" ] && [ -f "$GV_RA" ] && . "$GV_TO" && . "$GV_RA"; then
+GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
+GV_S=$GV_DOTNET_SKILL_DIR/scripts
+if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_S/host_timeout.sh" ] && [ -f "$GV_S/run_arm64.sh" ];; *) false;; esac && . "$GV_S/host_timeout.sh" && . "$GV_S/run_arm64.sh" \
+  && out=$(mktemp -d "${TMPDIR:-/tmp}/graviton-tests-arm64.XXXXXX"); then   # the skill's own files only, and a new folder no other user can write
   TEST_PROJECT=tests/Fixture.Tests     # each test project
   OS_PACKAGES="libfontconfig1"         # what the runtime image installs (Phase 1.2.2); the SDK image lacks them
-  out=$(mktemp -d "${TMPDIR:-/tmp}/graviton-tests-arm64.XXXXXX") || out=$PWD/graviton-validation/raw/tests-arm64   # a new folder no other user can write
-  mkdir -p "$out"
   LOCK=false; [ -n "$(find . -name packages.lock.json -not -path '*/obj/*' -print 2>/dev/null | head -n 1)" ] && LOCK=true
   # Native build for linux-arm64 (no emulation): compiling under emulation was killed (exit 137)
   dotnet build "$TEST_PROJECT" -c Release -r linux-arm64 --self-contained false -p:RestoreLockedMode=$LOCK -o "$out" < /dev/null > "$out.log" 2>&1; echo "build -r linux-arm64: exit $?"
@@ -286,10 +263,10 @@ if [ -f "$GV_TO" ] && [ -f "$GV_RA" ] && . "$GV_TO" && . "$GV_RA"; then
   RUN_ARM64_OPTS="-v $out:/t:ro -w /tmp" run_arm64 480 mcr.microsoft.com/dotnet/sdk:8.0 \
     "apt-get update -qq > /dev/null && apt-get install -y -qq --no-install-recommends $OS_PACKAGES > /dev/null && dotnet test /t/$(basename "$TEST_PROJECT").dll --results-directory /tmp/results"
   echo "tests on arm64: exit $?"
-else echo "CHECK: run the Container Runtime Detection and Emulation limits blocks first: they record the files of host_timeout and run_arm64 in graviton-validation/raw/session.env"; fi
+else echo "ERROR: no test run: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed, or TMPDIR to a writable folder"; fi
 ```
 
-`run_arm64` and `host_timeout` come from "Container Runtime Detection" and "Emulation limits" above; the block's first line loads them. Without the OS package the thumbnail test failed with `DllNotFoundException` naming `libfontconfig.so.1` (INFRA: the test environment lacked a package the runtime image has).
+`run_arm64` and `host_timeout` come from the skill's `scripts/` folder; the block loads them from the folder on its first line. Without the OS package the thumbnail test failed with `DllNotFoundException` naming `libfontconfig.so.1` (INFRA: the test environment lacked a package the runtime image has).
 
 **Code coverage.** Microsoft's [dotnet-coverage](https://learn.microsoft.com/en-us/dotnet/core/additional-tools/dotnet-coverage) page says "Dynamic instrumentation is available on Windows (x86, x64 and Arm64), Linux (x64), and macOS (x64)" and "Static instrumentation is available on all platforms", and the per-RID check reports Microsoft.CodeCoverage's x86-64 instrumentation libraries as a `CHECK` (Phase 1.3). On Graviton4 with Microsoft.CodeCoverage 17.11.1, `dotnet test <project> --collect "Code Coverage"` wrote a `.coverage` file with data, and `--collect "Code Coverage;Format=cobertura"` counted 227 of 3,369 lines covered, against 233 on x64; the only lines that differed were the architecture branches (the resolver's X64 and Arm64 arms, the AVX2 loops on x64, the Vector128 loop on arm64). So the `CHECK` closes when coverage runs this way on Graviton; record the result in `06-build-test-results.md`. Running a built test assembly (`dotnet test <dll>`) does not load the collector on any architecture (`Unable to find a datacollector with friendly name 'Code Coverage'` on x64 too), so it cannot answer this.
 
