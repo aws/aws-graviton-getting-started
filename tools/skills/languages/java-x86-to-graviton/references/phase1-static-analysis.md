@@ -1,8 +1,15 @@
 # Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. All findings are documented in `graviton-validation/` files.
+Analyze the project without changing its source or build files. All findings are documented in `graviton-validation/` files.
 
 > **Skill config:** Wherever a step below runs `mvn` or `./gradlew`, substitute `build.maven_invocation` / `build.gradle_invocation` from `skill-config.md` if defined (e.g. `./mvnw`). If it specifies a Maven wrapper (`./mvnw`) that is not present, fall back to bare `mvn`. See [skill-configuration.md](skill-configuration.md).
+
+Phase 1 runs on any host, including x86. Besides the reports in `graviton-validation/`, it writes build output inside the project: §1.2.1 copies the resolved dependency JARs into `target/deps` (Maven) or into each project's `build/deps` (Gradle). In a multi-module Maven reactor, §1.1 and §1.2.1 need `mvn install -DskipTests` first, which builds every module and installs it into the local repository, `~/.m2/repository` by default ([lifecycle](https://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html), [settings](https://maven.apache.org/settings.html)). Three kinds of step run code:
+- the build tool, in §1.1, §1.2.1 and §1.3, with the project's build files and the plugins and repositories they name. Gradle evaluates the settings file and the build file of every project, which are code ([build lifecycle](https://docs.gradle.org/current/userguide/build_lifecycle.html)), and runs the init script that §1.2.1 writes; Maven loads the extensions that the project declares in `.mvn/extensions.xml` or in the POM ([extensions](https://maven.apache.org/guides/mini/guide-using-extensions.html)). `./gradlew` and `./mvnw` are scripts from the repository that download the Gradle or Maven version their wrapper properties name ([Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html), [Maven Wrapper](https://maven.apache.org/tools/wrapper/));
+- the OS package lookups of §1.2.2, which run each target image's package tools (`apt-get`, `dnf`) in a container, natively on this host;
+- on a host without Python 3.6 or later, the check program, in a `python:3-slim` container with no network.
+
+The libc check of §1.1 copies files out of a container that it never starts; the files that §1.2.2 downloads are unpacked and read, never run; and the check program, `scripts/java_graviton_check.py`, only reads files. For a repository you do not trust, run Phase 1 in a disposable container or VM. No test or application of the project runs until Phase 3.
 
 ## Contents
 

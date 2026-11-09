@@ -1,10 +1,10 @@
 # Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. All findings are documented in `graviton-validation/` files.
+Analyze the project without changing its source or build files. All findings are documented in `graviton-validation/` files.
 
 > **Skill config:** Wherever a step below runs `pip`, `uv`, `poetry` or `conda`, use `python.package_manager` from `skill-config.md` (if defined) to skip auto-detection, `python.index_url` / `python.extra_index_url` as the index for every probe (and probe PyPI as well, see §1.3), and `python.interpreter_bump` in §1.5. See [skill-configuration.md](skill-configuration.md).
 
-Phase 1 runs on any host, including x86, and installs nothing into the project or its environment. Most checks read files or ask the package index; three kinds of step run code. The §1.1 dry run (`pip install --dry-run` without `--only-binary`) runs the build backend (`setup.py` or the `pyproject.toml` backend) of every sdist it resolves, and of the project itself when the step installs `.`. The §1.1 target probe runs the base image's own `python3` in a container, and §1.2.2 runs the distribution's package tools in containers. The §1.3 probes pass `--only-binary=:all:`, so they never build or run a package. For a repository or an index you do not trust, run Phase 1 in a disposable container or VM. The project's own code and tests run only in Phase 3.
+Phase 1 runs on any host, including x86, and installs nothing into the project or its environment. Most checks read files or ask the package index; three kinds of step run code. The §1.1 dry run (`pip install --dry-run` without `--only-binary`) runs the build backend (`setup.py` or the `pyproject.toml` backend) of every sdist it resolves, and of the project itself when the step installs `.`. With setuptools as the backend, that dry run also writes a `<name>.egg-info/` folder into the project (pip 25.0.1, for a `setup.py` and for a `pyproject.toml` project). The §1.1 target probe runs the base image's own `python3` in a container, and §1.2.2 runs the distribution's package tools in containers. The §1.3 probes pass `--only-binary=:all:`, so they never build or run a package. For a repository or an index you do not trust, run Phase 1 in a disposable container or VM. The project's own code and tests run only in Phase 3.
 
 ## Contents
 

@@ -73,7 +73,7 @@ if [ ! -d ".git" ]; then
 fi
 ```
 
-**Commit after each checklist step that changes files** with `git add -A && git commit -m "<message>"`, the message naming the step; skip the commit when a step changed nothing.
+**Commit after each checklist step that changes files** with `git add -A && git commit -m "<message>"`, the message naming the step; skip the commit when a step changed nothing. Maven and Gradle write `target/` and `build/` inside the project, and §1.2.1 copies the resolved dependency JARs into `target/deps` or `build/deps`: if the repository does not ignore them, stage the changed files by name instead of `git add -A` (adding a `.gitignore` is out of scope).
 
 ### Documentation Setup
 
@@ -122,7 +122,7 @@ Output files produced:
 
 ### Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. Read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) before starting.
+Analyze the project without changing its source or build files; the build tool still runs and writes build output, as the opening of [references/phase1-static-analysis.md](references/phase1-static-analysis.md) lists. Read it before starting.
 
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, target OS and libc from each image's files, dependency tree generation, component risk categorization
 2. **1.2 Native Library Validation** - Every native file judged by content for the target OS (bundled, runtime-extracted, downloaded), OS packages, tiered FAIL/WARN/CHECK/PASS policy

@@ -75,7 +75,7 @@ if [ ! -d ".git" ]; then
 fi
 ```
 
-**Commit after each checklist step that changes files** with `git add -A && git commit -m "<message>"`, the message naming the step; skip the commit when a step changed nothing. Virtual environments and wheel directories created for validation live outside the project tree (Phase 3.0), so `git add -A` never picks them up.
+**Commit after each checklist step that changes files** with `git add -A && git commit -m "<message>"`, the message naming the step; skip the commit when a step changed nothing. Virtual environments and wheel directories created for validation live outside the project tree (Phase 3.0), so `git add -A` never picks them up. A dry run or an install of `.` with setuptools writes `<name>.egg-info/` into the project, and the install also writes `build/`: if the repository does not ignore them, stage the changed files by name instead of `git add -A` (adding a `.gitignore` is out of scope).
 
 ### Documentation Setup
 
@@ -126,7 +126,7 @@ Output files produced:
 
 ### Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. Read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) before starting; per-manager commands are in [references/package-manager-mapping.md](references/package-manager-mapping.md).
+Analyze the project without changing its source or build files. Read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) before starting; per-manager commands are in [references/package-manager-mapping.md](references/package-manager-mapping.md).
 
 1. **1.1 Project Structure Analysis** - Deployment type, multi-module detection, package manager and interpreter detection, target OS/glibc from each image's files, dependency tree generation, component risk categorization
 2. **1.2 Native Library Validation** - Scan every committed or vendored native file by its content (not its name) for the target's architecture, C library, glibc and libstdc++ versions and page size, layers and in-repo extensions, binaries downloaded at run, build or deploy time, apply tiered FAIL/WARN/PASS policy
