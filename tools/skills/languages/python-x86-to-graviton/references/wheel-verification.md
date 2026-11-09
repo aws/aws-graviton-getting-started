@@ -56,7 +56,7 @@ A wheel filename is `{name}-{version}-{python tag}-{abi tag}-{platform tag}.whl`
 
 Legacy manylinux aliases, from [PEP 600](https://peps.python.org/pep-0600/): `manylinux1` = `manylinux_2_5`, `manylinux2010` = `manylinux_2_12`, `manylinux2014` = `manylinux_2_17`. Only `manylinux2014` and later have aarch64 variants; `manylinux1`/`manylinux2010` are x86 only.
 
-pip version floors (from [pip's changelog](https://pip.pypa.io/en/stable/news/)): `manylinux2014` tags were added in **pip 19.3** (2019-10-14), so Graviton needs pip 19.3 or later; perennial `manylinux_2_N` tags (PEP 600) were added in **pip 20.3** (2020-11-30). An older pip on the target cannot see aarch64 wheels at all and will build everything from source. Check `python3 -m pip --version` on the target before interpreting any install failure, and upgrade with `python3 -m pip install --upgrade pip`. Current aarch64 wheels mostly carry `manylinux_2_N` tags only (numpy 2.5.3, pillow 12.3.0 and torch 2.14.1 publish no `manylinux2014` aarch64 wheel), so pip 20.3 is the floor that matters.
+pip version floors (from [pip's changelog](https://pip.pypa.io/en/stable/news/)): `manylinux2014` tags were added in **pip 19.3** (2019-10-14), so Graviton needs pip 19.3 or later; perennial `manylinux_2_N` tags (PEP 600) were added in **pip 20.3** (2020-11-30). An older pip on the target cannot see aarch64 wheels at all and will build everything from source. Check `python3 -m pip --version` on the target before interpreting any install failure, and, below 20.3, upgrade with `python3 -m pip install 'pip>=20.3'`. Current aarch64 wheels mostly carry `manylinux_2_N` tags only (numpy 2.5.3, pillow 12.3.0 and torch 2.14.1 publish no `manylinux2014` aarch64 wheel), so pip 20.3 is the floor that matters.
 
 ## 3. The Probe: `pip download` Against the aarch64 Platform
 
@@ -298,7 +298,7 @@ An extra index (`PIP_EXTRA_INDEX_URL`, `extra-index-url` in `pip.conf`, or `pyth
 | `--only-binary=:all:` omitted | probe PASSES by downloading the sdist | Always include it; the probe is about wheels |
 | Wrong `--abi`/`--python-version` | FAIL for a package that has aarch64 wheels | Use the project's interpreter (phase 1.1), then cross-check x86_64 with the same ABI |
 | Target OS glibc below the wheel tag | `from versions: none` on the target, PASS in the probe | Probe with the target's glibc tag set (section 7); confirm with `pip debug --verbose` on the target |
-| Old pip on the target (< 19.3, or < 20.3 for `manylinux_2_N`) | every native package builds from source on Graviton | Upgrade pip first (`python3 -m pip install --upgrade pip`) |
+| Old pip on the target (< 19.3, or < 20.3 for `manylinux_2_N`) | every native package builds from source on Graviton | Upgrade pip first (`python3 -m pip install 'pip>=20.3'`) |
 | `curl` without `--fail` | empty files list for a typo or unpublished version | Check the exit status; a 404 is not evidence |
 | Reading the first aarch64 release as the floor | quoting numpy 1.19.0 to a Python 3.11 project | The floor is per interpreter ABI (numpy 1.23.2 for cp311) |
 | Assuming availability is monotonic | upgrading blosc2 0.6.3 to 0.6.1, or pygeos 0.14 to "latest" | Check the exact candidate version; blosc2 0.3.1-0.6.3 and pygeos >= 0.14 have no aarch64 wheels |
