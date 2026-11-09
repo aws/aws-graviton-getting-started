@@ -181,7 +181,7 @@ Each skill folder contains:
 ├── SKILL.md                    # Entry point (Agent Skills format)
 ├── summaries.md                # Canonical file index for agent discovery
 ├── references/                 # Phase instructions, scope guardrails, output standards
-├── scripts/                    # Optional executable helpers the skill runs (for example graviton-savings-assessment)
+├── scripts/                    # Optional executable helpers the skill runs
 └── README.md                   # Human-readable overview
 ```
 
