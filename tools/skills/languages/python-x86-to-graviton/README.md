@@ -2,6 +2,17 @@
 
 Validates Python application compatibility with AWS Graviton (ARM64) architecture and applies the minimum changes required to run on ARM64.
 
+## Before you run it
+
+The skill is provided as is, for migration assessment, without warranty, under the licenses of the [aws-graviton-getting-started](https://github.com/aws/aws-graviton-getting-started) repository (see [LICENSE-SUMMARY](https://github.com/aws/aws-graviton-getting-started/blob/main/LICENSE-SUMMARY)). Review and test every change it makes before the change reaches production. It works on the project you bring to it, and your AI assistant runs its commands in your shell, with your permissions and network access:
+
+- Phase 1 runs pip's dry run, which runs the build backend of every source distribution it resolves and, when it resolves `.`, of the project itself, and runs the base image's `python3` and the target images' package tools in containers. The opening of [references/phase1-static-analysis.md](references/phase1-static-analysis.md) lists every step that runs code.
+- Phase 2 changes dependency pins and locks, build configuration, architecture checks in the code, Dockerfiles and CI files.
+- Phase 3 installs the dependencies and the project into a new virtual environment or folder under the temporary directory, and runs the project's tests and the application, on an ARM64 host or in an arm64 container.
+- The skill writes its reports into `graviton-validation/` at the project root. After each step that changes files, it commits to the local git repository, which it creates with `git init` when there is none. It never pushes: review the commits before you push them.
+
+Run it on a project whose code you would build and run yourself. For a repository you did not write or do not trust, run it in a disposable container or VM.
+
 ## What it does
 
 This skill guides an AI coding assistant through a complete Python Graviton migration:

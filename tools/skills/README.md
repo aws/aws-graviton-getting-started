@@ -2,6 +2,17 @@
 
 Portable Agent Skills that help developers migrate codebases to AWS Graviton (ARM64) processors.
 
+## Before you use a skill
+
+The skills are provided as is, for migration assessment, without warranty, under the licenses of this repository (see [LICENSE-SUMMARY](../../LICENSE-SUMMARY)): [CC BY-SA 4.0](../../LICENSE) for the documentation and [MIT-0](../../LICENSE-SAMPLECODE) for its sample code, including the scripts in each skill's `scripts/` folder. Review and test every change a skill makes before the change reaches production. A skill works on the project you bring to it, and your AI assistant runs the skill's commands in your shell, with your permissions and network access. During a run, the skill:
+
+- runs the project's build tooling with the project's own build files, from Phase 1 on: `mvn` or `./gradlew`, `dotnet restore` and MSBuild, or `pip` and the project's Python build backend; in Phase 3 it also runs the project's tests and the application;
+- runs containers with Docker or another container runtime, from images that include the base images the project's Dockerfiles name;
+- downloads what the checks need: packages from the project's package sources, into the caches the build tools normally use; container images; and, for .NET, an SDK that the repository needs and that is not installed, into a temporary folder;
+- writes its reports into a `graviton-validation/` folder at the project root, changes the project in Phase 2 (dependency versions, build files, code that checks the architecture, Dockerfiles, CI files), and commits each step that changes files to the local git repository, which it creates with `git init` when there is none. The skills never push: review the commits before you push them.
+
+Run a skill on a project whose code you would build and run yourself. For a repository you did not write or do not trust, such as a fork or someone else's pull request, run the skill in a disposable container or VM. The opening of `references/phase1-static-analysis.md` in each skill lists the Phase 1 steps that run code.
+
 ## What are Agent Skills?
 
 Agent Skills are an open standard for packaging expert instructions in a format AI coding assistants can follow. Each skill is a folder containing instructions, references, and scripts that teach an agent how to perform a specific task — in this case, migrating applications to Graviton.
