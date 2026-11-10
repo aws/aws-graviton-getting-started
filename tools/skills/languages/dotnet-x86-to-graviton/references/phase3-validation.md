@@ -102,8 +102,17 @@ If the repository needs an SDK that is not installed, install it into a temporar
 ```bash
 GV_SDK=$(mktemp -d "${TMPDIR:-/tmp}/graviton-dotnet-sdk.XXXXXX")   # a new folder no other user can write
 script="$GV_SDK/dotnet-install.sh"; SDK_DIR="$GV_SDK/sdk-8.0.425"
-[ -n "$GV_SDK" ] && curl -fsSL -o "$script" https://dot.net/v1/dotnet-install.sh &&
+# Microsoft signs the script; it runs only when the signature verifies against the key whose fingerprint Microsoft
+# publishes (https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-install-script), in a keyring of its own
+GV_FPR=2B930AB1228D11D5D7F6B6ACB9CF1A51FC7D3ACF
+if [ -n "$GV_SDK" ] && command -v gpg > /dev/null 2>&1 && mkdir -m 700 "$GV_SDK/gnupg" &&
+   curl -fsSL -o "$script" https://dot.net/v1/dotnet-install.sh && curl -fsSL -o "$script.sig" https://dot.net/v1/dotnet-install.sig &&
+   curl -fsSL -o "$GV_SDK/dotnet-install.asc" https://dot.net/v1/dotnet-install.asc &&
+   gpg --homedir "$GV_SDK/gnupg" --batch --quiet --import "$GV_SDK/dotnet-install.asc" 2> /dev/null &&
+   gpg --homedir "$GV_SDK/gnupg" --batch --status-fd 1 --verify "$script.sig" "$script" 2> /dev/null | grep -q "^\[GNUPG:\] VALIDSIG .* $GV_FPR\$"; then
   bash "$script" --version 8.0.425 --install-dir "$SDK_DIR"   # the version global.json asks for
+else echo "ERROR: dotnet-install.sh not run: it runs only with gpg and a signature that verifies against the key $GV_FPR; or install the SDK from Microsoft's packages: https://learn.microsoft.com/en-us/dotnet/core/install/linux"; fi
+[ -z "$GV_SDK" ] || [ ! -d "$GV_SDK/gnupg" ] || gpgconf --homedir "$GV_SDK/gnupg" --kill all 2> /dev/null   # the agent the import started
 (
   export DOTNET_ROOT="$SDK_DIR" PATH="$SDK_DIR:$PATH"
   dotnet --list-sdks          # now lists only the SDK in $SDK_DIR

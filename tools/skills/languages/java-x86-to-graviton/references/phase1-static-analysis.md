@@ -272,16 +272,33 @@ else GV_PY=("${CONTAINER_CMD:-docker}" run --rm --network none -v "${d}:${d}:ro"
   done < <(cut -f2 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u)
   GV_PY+=(public.ecr.aws/docker/library/python:3-slim python3); fi
 if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
+  # Unpack an archive only when its files add up to at most 2 GiB (a zip: stored or deflated members only); a larger one
+  # is a CHECK and is scanned as it is. A format Python cannot read (an .rpm, zstd) is unpacked as before.
+  gv_fits() { r=$("${GV_PY[@]}" -I -c 'import sys, tarfile, zipfile
+try:
+    if zipfile.is_zipfile(sys.argv[1]):
+        m = zipfile.ZipFile(sys.argv[1]).infolist()
+        other = sorted(set(i.compress_type for i in m) - {0, 8})
+        if other:
+            sys.exit("members compressed with method %s, which this block does not unpack" % other[0])
+        n = sum(i.file_size for i in m)
+    else:
+        n = sum(i.size for i in tarfile.open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+if n > 1 << 31:
+    sys.exit("its files add up to %d bytes, more than the 2 GiB this block unpacks" % n)' "$1" 2>&1) && return 0
+    echo "CHECK: $2 not unpacked: $r"; return 1; }
   # Unpack by the first bytes, not the name: a .deb (an ar archive), an .rpm, a zip or a tar archive
   case "$(od -An -tx1 -N4 "$d/download" | tr -d ' \t\n')" in
     213c6172) if head -c 64 "$d/download" | grep -q debian-binary; then   # another ar archive is a static library, which the scan reads
-                (cd "$d/x" && ar x ../download && for t in data.tar.*; do tar -xf "$t"; done) && rm "$d/download" \
+                (cd "$d/x" && ar x ../download && for t in data.tar.*; do if gv_fits "$d/x/$t" "$URL ($t)"; then tar -xf "$t"; fi; done) && rm "$d/download" \
                   || echo "CHECK: $URL is a .deb this host cannot unpack (needs ar, and tar with xz or zstd)"
               fi ;;
     edabeedb) { if command -v bsdtar > /dev/null 2>&1; then bsdtar -xf "$d/download" -C "$d/x"   # bsdtar keeps every path inside the folder
                 else (cd "$d/x" && rpm2cpio ../download | cpio -idm --quiet --no-absolute-filenames); fi; } && rm "$d/download" \
                 || echo "CHECK: $URL is an .rpm this host cannot unpack (needs bsdtar, or rpm2cpio and GNU cpio)" ;;
-    *) tar -xf "$d/download" -C "$d/x" 2> /dev/null ;;   # a zip, such as a JAR, the check reads as it is
+    *) gv_fits "$d/download" "$URL" && tar -xf "$d/download" -C "$d/x" 2> /dev/null ;;   # a zip, such as a JAR, the check reads as it is
   esac
   for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that §1.1 recorded; with none, one scan named target
   case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
