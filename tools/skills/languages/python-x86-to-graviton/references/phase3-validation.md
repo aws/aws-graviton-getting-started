@@ -83,10 +83,10 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CON
   while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
   P=("${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: --python-version 3.11 --implementation cp --abi cp311)
   if SITE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-arm64-site.XXXXXX"); then   # a new folder no other user can write
-    python3 -m pip install "${P[@]}" --target "$SITE" --require-hashes -r requirements-locked.txt
+    python3 -I -m pip install "${P[@]}" --target "$SITE" --require-hashes -r requirements-locked.txt
     mkdir -p graviton-validation/raw && grep -v '^docopt==' requirements.txt > graviton-validation/raw/req-wheels.txt    # --platform needs wheels; pure-Python sdists go in separately
-    python3 -m pip install "${P[@]}" --target "$SITE" --upgrade -r graviton-validation/raw/req-wheels.txt -r requirements-dev.txt   # the project's test requirements
-    python3 -m pip install --no-deps --target "$SITE" --upgrade docopt==0.6.2
+    python3 -I -m pip install "${P[@]}" --target "$SITE" --upgrade -r graviton-validation/raw/req-wheels.txt -r requirements-dev.txt   # the project's test requirements
+    python3 -I -m pip install --no-deps --target "$SITE" --upgrade docopt==0.6.2
 
     # Emulated: run imports, startup and tests against that directory, in place on the read-only mount
     # (nothing is copied or written; -p no:cacheprovider stops pytest writing its cache)
@@ -115,7 +115,7 @@ The highest `manylinux` tag pip accepts comes from the OS glibc, not from where 
 
 Two more things to align before installing:
 
-- **pip version.** pip 19.3 is the minimum that installs `manylinux2014` aarch64 wheels and pip 20.3 the minimum for `manylinux_2_N` tags ([wheel-verification.md](wheel-verification.md) §2). An older pip cannot see those wheels and falls back to building native packages from source. Check `python3 -m pip --version` and, inside the validation environment only, run `python3 -m pip install 'pip>=20.3'`: it leaves a pip of 20.3 or later as it is and otherwise installs the newest pip for the interpreter, while `--upgrade pip` would replace a working pip with the newest one every time (executed: Python 3.8 kept pip 23.0.1, and moved pip 20.2.4 to 25.0.1). The `python:3.11-slim` image used here ships pip 24.0.
+- **pip version.** pip 19.3 is the minimum that installs `manylinux2014` aarch64 wheels and pip 20.3 the minimum for `manylinux_2_N` tags ([wheel-verification.md](wheel-verification.md) §2). An older pip cannot see those wheels and falls back to building native packages from source. Check `python3 -I -m pip --version` and, inside the validation environment only, run `python3 -I -m pip install 'pip>=20.3'`: it leaves a pip of 20.3 or later as it is and otherwise installs the newest pip for the interpreter, while `--upgrade pip` would replace a working pip with the newest one every time (executed: Python 3.8 kept pip 23.0.1, and moved pip 20.2.4 to 25.0.1). The `python:3.11-slim` image used here ships pip 24.0.
 - **Build prerequisites**, only if an sdist build remains after Phase 2: pure-Python sdists (for example `docopt`) need no compiler; native sdists need a C compiler and the Python headers (`python3-devel` or `python3-dev`) plus the library headers the package names.
 
 Build-time tools (build backends, compilers) may not support the newest setuptools, compiler or NumPy release. Runtime compatibility != build-time tooling compatibility; this matters whenever Phase 2 leaves an sdist build.
@@ -251,9 +251,9 @@ Verify the image uses the SAME base image distribution and version and the same 
 ### Host-Based Validation
 
 ```bash
-python3 -c 'import platform, sys; print(platform.machine(), sys.version.split()[0])'   # aarch64, project version
-python3 -m pip --version                                                               # >= 20.3
-python3 -m pip install --require-hashes -r requirements-locked.txt && python3 -m pip install -r requirements.txt
+python3 -I -c 'import platform, sys; print(platform.machine(), sys.version.split()[0])'   # aarch64, project version
+python3 -I -m pip --version                                                               # >= 20.3
+python3 -I -m pip install --require-hashes -r requirements-locked.txt && python3 -I -m pip install -r requirements.txt
 ```
 
 Run inside the session-scoped environment from §3.0, then run the ELF scan above against the environment's `purelib` and `platlib`.

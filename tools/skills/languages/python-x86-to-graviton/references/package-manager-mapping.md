@@ -45,12 +45,12 @@ All commands below were executed on the fixture variants used to build this skil
 
 | Step | Command | Notes |
 |---|---|---|
-| Flat pins | the file itself. Resolve unpinned or ranged entries first: `python3 -m pip install --dry-run --ignore-installed --report graviton-validation/raw/requirements-report.json -r requirements.txt` then extract `name==version` from `install[].metadata` | `--dry-run --report` (pip >= 22.2) resolves without installing |
+| Flat pins | the file itself. Resolve unpinned or ranged entries first: `python3 -I -m pip install --dry-run --ignore-installed --report graviton-validation/raw/requirements-report.json -r requirements.txt` then extract `name==version` from `install[].metadata` | `--dry-run --report` (pip >= 22.2) resolves without installing |
 | Dependency tree | `pip install --dry-run --report`: `install[].requested` is `true` for direct dependencies, `false` for transitives | pip has no tree command; `pipdeptree` is a third-party package and needs an installed environment |
 | aarch64 probe | `pip download --only-binary=:all: "${PLAT[@]}" --python-version 3.11 --implementation cp --abi cp311 <pin>` per pin, or the whole file at once with `pip install --dry-run --only-binary=:all: "${PLAT[@]}" --target /tmp/probe -r requirements.txt` | `PLAT` holds one `--platform` for every tag the target's libc accepts (`platforms` in wheel-verification.md section 3); pip matches each value exactly, so a shorter list misses wheels. See wheel-verification.md sections 3 and 8 |
 | Hash lock check | `pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes "${PLAT[@]}" --python-version 3.11 --implementation cp --abi cp311 --target /tmp/probe -r requirements-locked.txt` | fails with `THESE PACKAGES DO NOT MATCH THE HASHES` when only x86_64 hashes are present |
 | Pin / override | edit the pin in `requirements.txt`; for a transitive, add it to a `constraints.txt` passed with `-c constraints.txt` (constraints pin without installing) | executed: `-c` with `msgpack==1.1.0` while installing `blosc2==0.6.4` resolved msgpack 1.1.0 |
-| Regenerate hashes | `python3 -m pip hash --algorithm sha256 <aarch64 wheel>` and append a second `--hash=` to the line, or switch the file to pip-tools (below) | hand-made locks need every platform's hash listed |
+| Regenerate hashes | `python3 -I -m pip hash --algorithm sha256 <aarch64 wheel>` and append a second `--hash=` to the line, or switch the file to pip-tools (below) | hand-made locks need every platform's hash listed |
 | Install / test | `pip install -r requirements.txt` (plus `--require-hashes -r requirements-locked.txt` if present); tests per the project (`pytest`, `python -m unittest`, `tox`, Makefile target) | use `python.test_command` from `skill-config.md` if set |
 
 ### 2.2 pip-tools
@@ -68,7 +68,7 @@ All commands below were executed on the fixture variants used to build this skil
 
 | Step | Command | Notes |
 |---|---|---|
-| Flat pins | read `[project].dependencies`, `[project.optional-dependencies]`, `[dependency-groups]` with the standard library: `python3 -c 'import tomllib; d=tomllib.load(open("pyproject.toml","rb")); print("\n".join(d["project"]["dependencies"]))'` (Python 3.11 or later; on Python 3.7 to 3.10, load tomli 2.0.1 from a scratch folder in its place, which installs nothing into the interpreter: `D=$(mktemp -d) && python3 -m pip install -q --target "$D" tomli==2.0.1 && PYTHONPATH="$D" python3 -c 'import tomli as tomllib; d=tomllib.load(open("pyproject.toml","rb")); print("\n".join(d["project"]["dependencies"]))'`) | executed on the fixture: 11 direct pins. Do **not** rely on `pip install --dry-run .`: it must build the project first and fails on layouts setuptools cannot auto-discover (fixture: `Multiple top-level packages discovered in a flat-layout`) |
+| Flat pins | read `[project].dependencies`, `[project.optional-dependencies]`, `[dependency-groups]` with the standard library: `python3 -I -c 'import tomllib; d=tomllib.load(open("pyproject.toml","rb")); print("\n".join(d["project"]["dependencies"]))'` (Python 3.11 or later; on Python 3.7 to 3.10, load tomli 2.0.1 from a scratch folder in its place, which installs nothing into the interpreter: `D=$(mktemp -d) && python3 -I -m pip install -q --target "$D" tomli==2.0.1 && python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); import tomli as tomllib; d=tomllib.load(open("pyproject.toml","rb")); print("\n".join(d["project"]["dependencies"]))' "$D"`) | executed on the fixture: 11 direct pins. Do **not** rely on `pip install --dry-run .`: it must build the project first and fails on layouts setuptools cannot auto-discover (fixture: `Multiple top-level packages discovered in a flat-layout`) |
 | `setup.py` / `setup.cfg` | `install_requires` in `setup.cfg` is plain text; for `setup.py`, `python3 setup.py --help` cannot list deps reliably, so run `pip install --dry-run --report` on the project or read the file | ranges, not pins: resolve with `--dry-run --report` |
 | Tree / probe | `pip install --dry-run --ignore-installed --only-binary=:all: --report <file> "${PLAT[@]}" ... --target /tmp/probe -r <extracted-list>` | executed: first blocker reported was `blosc2==0.6.3 (from versions: 0.6.4, ...)`; fix, re-run, repeat |
 | Pin / override | edit `[project].dependencies`; transitive pins go in a `constraints.txt` consumed by the install command, or `PIP_CONSTRAINT=constraints.txt` in the Dockerfile | PEP 621 has no override table |
@@ -120,9 +120,9 @@ awk '/^[[:space:]]*- pip:[[:space:]]*$/ {f=1; ind=index($0,"-"); next}
 awk '/^dependencies:/ {f=1; next} f && /^[[:space:]]*- pip:/ {exit}
      f && /^[[:space:]]*- [A-Za-z0-9_.-]+=[0-9]/ {sub(/^[[:space:]]*- /, ""); split($0, a, "=");
        if (a[1] != "python" && a[1] != "pip") print a[1] "==" a[2]}' environment.yml > graviton-validation/raw/conda-constraints.txt
-python3 -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-pip-section.json \
+python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-pip-section.json \
   -c graviton-validation/raw/conda-constraints.txt -r graviton-validation/raw/conda-pip-section.txt
-python3 - <<'EOF'
+python3 -I - <<'EOF'
 import json
 r = json.load(open("graviton-validation/raw/dependency-tree-pip-section.json"))
 with open("graviton-validation/raw/requirements-resolved.txt", "w") as out:

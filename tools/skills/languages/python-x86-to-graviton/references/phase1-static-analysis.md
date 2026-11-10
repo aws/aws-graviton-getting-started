@@ -206,13 +206,13 @@ else [ -z "$GV_ROOT" ] || rmdir "$GV_ROOT"; echo "$IMG: no arm64 container was c
 - **No container runtime:** use the table in wheel-verification.md §7 and say so. For host-based deployments read the AMI's distribution.
 - **Kernel page size of the deployment hosts.** A container uses its host's kernel, so the page size comes from the EC2 hosts or Kubernetes nodes, not from the image: a Debian 13 container on an AlmaLinux 8 Graviton2 host reported 65536. Run `getconf PAGESIZE` on a deployment host (executed on Graviton: AlmaLinux 8.10 65536; AlmaLinux 9.8 and Amazon Linux 2023 4096); if no host can be reached, ask the team that runs them and record the page size as unknown until then. Set `TARGET_PAGE_SIZE` to the value in bytes: the scan in §1.2.1 judges page alignment only when it is set. A 64KB-page target needs Phase 3 on a 64KB-page host: on AlmaLinux 8, polars 0.20.20 aborted with `<jemalloc>: Unsupported system page size`, as did every earlier release tested back to 0.15.1, while 0.20.21 and the later releases tested imported. On the 4KB AlmaLinux 9 host polars 0.15.1 imported, so a 4KB validation host hides the failure.
 
-Record `pip` on the target: below 19.3 it cannot install aarch64 wheels at all, and below 20.3 it cannot see `manylinux_2_N` tags; plan the `python3 -m pip install 'pip>=20.3'` step for Phase 3. `pip=none` (the `python3` of Amazon Linux 2023 and AlmaLinux 9, and distroless) means pip has to come from a virtual environment or a distribution package; `venv=no` (distroless) means `python3 -m venv` does not work either.
+Record `pip` on the target: below 19.3 it cannot install aarch64 wheels at all, and below 20.3 it cannot see `manylinux_2_N` tags; plan the `python3 -I -m pip install 'pip>=20.3'` step for Phase 3. `pip=none` (the `python3` of Amazon Linux 2023 and AlmaLinux 9, and distroless) means pip has to come from a virtual environment or a distribution package; `venv=no` (distroless) means `python3 -m venv` does not work either.
 
 ### Generate Dependency Tree
 
 Produce two artefacts: the manager-native tree (provenance: who pulls in what) and the **flat pinned list** that §1.3 probes. Per-manager commands are in package-manager-mapping.md §2.
 
-> **Use the project's Python version for this step.** pip resolves for the interpreter that runs it, so run these commands with the project's minor version, not the analysis host's default: create the session-scoped environment from [phase3-validation.md](phase3-validation.md) §3.0 now, as below. Executed on the fixture with the host's default Python 3.12, the first resolution failed with `Failed to build 'pygeos' when getting requirements to build wheel`, because pygeos 0.14 has no cp312 wheel and pip tried to build it just to read its metadata.
+> **Use the project's Python version for this step.** pip resolves for the interpreter that runs it, so run these commands with the project's minor version, not the analysis host's default: create the session-scoped environment from [phase3-validation.md](phase3-validation.md) §3.0 now, as below. Executed on the fixture with the host's default Python 3.12, the first resolution failed with `Failed to build 'pygeos' when getting requirements to build wheel`, because pygeos 0.14 has no cp312 wheel and pip tried to build it just to read its metadata. The skill's commands run Python in isolated mode (`python3 -I`), so a file in the project named like a standard-library module or `pip` is not imported in its place; isolated mode also leaves out packages installed with `pip install --user`, so `python3 -I -m pip --version` names the pip these commands run.
 
 The pip form:
 
@@ -223,14 +223,14 @@ uv venv --seed --python 3.11 "$GV_VENV"    # the project's minor version (Phase 
 mkdir -p graviton-validation/raw
 # One --dry-run --report per file the deployment installs, in the deployment's order.
 # A hashed file turns on --require-hashes for everything in the same pip call, so keep it separate.
-python3 -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-locked.json \
+python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-locked.json \
   --require-hashes -r requirements-locked.txt
-python3 -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-full.json \
+python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-full.json \
   -r requirements.txt
 
 # Flat pins with provenance. Each pip call resolves on its own, so a package needed by both files
 # can resolve to two versions, and the later call installs its version as well: keep every version.
-python3 - <<'EOF'
+python3 -I - <<'EOF'
 import json
 rows = {}
 for rep, src in [("graviton-validation/raw/dependency-tree-locked.json", "requirements-locked.txt"),
@@ -480,7 +480,7 @@ probe() { # $1=requirement $2=arch ; prints the wheel filename (rc 0), the from-
           # give no verdict (rc 4). --no-input and </dev/null: pip never reads the loop's list of pins;
           # --disable-pip-version-check: the only index requests in the log are the probe's.
   local d f miss; platforms "$2"; d=$(mktemp -d "${TMPDIR:-/tmp}/probe.XXXXXX")
-  if python3 -m pip download --no-input --disable-pip-version-check --only-binary=:all: --no-deps -vv -d "$d" "${PLAT[@]}" \
+  if python3 -I -m pip download --no-input --disable-pip-version-check --only-binary=:all: --no-deps -vv -d "$d" "${PLAT[@]}" \
        --python-version "$PYVER" --implementation cp --abi "$ABI" "$1" </dev/null >"$d/log" 2>&1; then
     f=$(ls "$d" | grep '\.whl$' | head -n 1); rm -rf "$d"
     [ -n "$f" ] && { echo "$f"; return 0; }; return 3
@@ -541,7 +541,7 @@ GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKIL
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
   PYVER=3.11; ABI="cp${PYVER/./}"; TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41   # the values of the probe block
   platforms aarch64   # the same tag list as the loop above
-  python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
+  python3 -I -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
     --python-version "$PYVER" --implementation cp --abi "$ABI" --target /tmp/graviton-probe-target \
     -r requirements-locked.txt
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
@@ -685,7 +685,7 @@ done < graviton-validation/raw/images.txt
 1. Document the interpreter version and the source it was read from (§1.1). Record the implementation (CPython; PyPy and others change the wheel tags and need their own probe).
 2. Look up its support status live; do not use a remembered table, the dates move every October:
    ```bash
-   curl -sS --fail -A "graviton-skill/1.0" https://devguide.python.org/versions/ | python3 -c "
+   curl -sS --fail -A "graviton-skill/1.0" https://devguide.python.org/versions/ | python3 -I -c "
    import sys, re, html
    want = '3.11'
    for r in re.findall(r'<tr[^>]*>(.*?)</tr>', sys.stdin.read(), flags=re.S):

@@ -36,7 +36,7 @@ To read which version restore actually resolved for a package, after a restore o
 ```bash
 PROJECT=src/Fixture.Core/Fixture.Core.csproj   # the project file
 PACKAGE=SkiaSharp.NativeAssets.Linux           # the package
-python3 - "$(dotnet msbuild "$PROJECT" -getProperty:ProjectAssetsFile)" "$PACKAGE" <<'EOF'
+python3 -I - "$(dotnet msbuild "$PROJECT" -getProperty:ProjectAssetsFile)" "$PACKAGE" <<'EOF'
 import json, sys
 a = json.load(open(sys.argv[1]))
 for target, entries in sorted(a["targets"].items()):

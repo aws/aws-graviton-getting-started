@@ -202,7 +202,7 @@ while IFS= read -r t; do case $t in glibc=*|"") continue;; esac   # only the fol
     *) [ -d "$t" ] && [ -O "$t" ] && GV_MNT+=(-v "${t}:${t}:ro");; esac
 done < <(cut -f2 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u)
 for d in "$HOME/.m2" "$HOME/.gradle"; do [ -d "$d" ] && GV_MNT+=(-v "${d}:${d}:ro"); done   # §1.3 checks JARs in the local repositories too
-if python3 -c 'import sys; sys.exit(sys.version_info < (3, 6))' 2> /dev/null; then GV_PY=(python3)
+if python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 6))' 2> /dev/null; then GV_PY=(python3)
 else GV_PY=("${CONTAINER_CMD:-docker}" run --rm --network none "${GV_MNT[@]}" -w "$PWD" public.ecr.aws/docker/library/python:3-slim python3); fi
 mkdir -p graviton-validation/raw
 for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that §1.1 recorded; with none, one run named target
@@ -262,7 +262,7 @@ if case $GV_JAVA_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   
 else echo "ERROR: set GV_JAVA_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 # Without python3 3.6 or later, the program runs in a Python image with the download, the program and the targets'
 # folders mounted read-only (braces: zsh reads "$d:r" as a modifier)
-if python3 -c 'import sys; sys.exit(sys.version_info < (3, 6))' 2> /dev/null; then GV_PY=(python3)
+if python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 6))' 2> /dev/null; then GV_PY=(python3)
 else GV_PY=("${CONTAINER_CMD:-docker}" run --rm --network none -v "${d}:${d}:ro" -v "${GV_CHECK}:${GV_CHECK}:ro")
   while IFS= read -r t; do case $t in glibc=*|"") continue;; esac   # only the folders the §1.1 block made: the list is a file in the project
     case ${t#"${TMPDIR:-/tmp}/graviton-target-root."} in "$t"|""|*/*) echo "CHECK: $t not mounted: not a folder that the §1.1 block made";;

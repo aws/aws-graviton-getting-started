@@ -81,7 +81,7 @@ mkdir -p graviton-validation/raw
 probe() {
   local req="$1" arch="$2" pyver="${PYVER:-3.11}" d miss
   platforms "$arch"; d=$(mktemp -d "${TMPDIR:-/tmp}/probe.XXXXXX")
-  if python3 -m pip download --no-input --disable-pip-version-check --only-binary=:all: --no-deps -vv -d "$d" "${PLAT[@]}" \
+  if python3 -I -m pip download --no-input --disable-pip-version-check --only-binary=:all: --no-deps -vv -d "$d" "${PLAT[@]}" \
        --python-version "$pyver" --implementation cp --abi "cp${pyver/./}" \
        "$req" </dev/null >"$d/log" 2>&1; then
     ls "$d" | grep '\.whl$' || echo "nothing downloaded: an environment marker excluded the pin on this host (section 10)"
@@ -137,7 +137,7 @@ GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKIL
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
   platforms aarch64   # one --platform per tag the target's libc accepts
-  python3 -m pip install --dry-run --ignore-installed --only-binary=:all: \
+  python3 -I -m pip install --dry-run --ignore-installed --only-binary=:all: \
     --report graviton-validation/raw/wheel-availability.json -q "${PLAT[@]}" \
     --python-version 3.11 --implementation cp --abi cp311 \
     --target /tmp/graviton-probe-target -r graviton-validation/raw/requirements-resolved.txt
@@ -153,10 +153,10 @@ When the probe says `from versions: none`, or you need to establish a floor, rea
 ```bash
 # All files for one version (replace project and version):
 curl -sS --fail "https://pypi.org/pypi/pygeos/0.14/json" \
-  | python3 -c "import sys,json; [print(f['filename']) for f in json.load(sys.stdin)['urls']]"
+  | python3 -I -c "import sys,json; [print(f['filename']) for f in json.load(sys.stdin)['urls']]"
 
 # All releases, flagging which have a Linux aarch64 wheel and for which cp tags:
-curl -sS --fail "https://pypi.org/pypi/blosc2/json" | python3 -c '
+curl -sS --fail "https://pypi.org/pypi/blosc2/json" | python3 -I -c '
 import sys, json, re
 d = json.load(sys.stdin)
 for v, files in d["releases"].items():
@@ -201,7 +201,7 @@ Read the sdist from the files list (section 4) and list its members. Do not use 
 
 ```bash
 # Lists the files of one release's sdist (replace project and version); nothing is built or run.
-curl -sS --fail "https://pypi.org/pypi/docopt/0.6.2/json" | python3 -c '
+curl -sS --fail "https://pypi.org/pypi/docopt/0.6.2/json" | python3 -I -c '
 import io, json, sys, tarfile, urllib.request, zipfile
 sd = [u for u in json.load(sys.stdin)["urls"] if u["packagetype"] == "sdist"]
 if not sd:
@@ -277,7 +277,7 @@ GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKIL
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
   platforms aarch64   # one --platform per tag the target's libc accepts
-  python3 -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
+  python3 -I -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
     --python-version 3.11 --implementation cp --abi cp311 --target /tmp/graviton-probe-target \
     -r requirements-locked.txt
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi

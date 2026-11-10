@@ -32,8 +32,8 @@ $CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$PWD":/w -w /w -e HOST
 # (the .so inside the wheel is the file to vendor, if the project vendors a prebuilt copy):
 $CONTAINER_CMD run --rm --init --platform linux/arm64 -v "$PWD":/w -w /w -e HOST_IDS="$(id -u):$(id -g)" python:3.11-slim timeout 900 sh -c \
   'apt-get update && apt-get install -y gcc libc6-dev && pip wheel --no-deps -w dist . && chown -R "$HOST_IDS" dist build *.egg-info'
-python3 -m zipfile -l dist/*.whl | grep '\.so'   # the extension, e.g. _fixture_ext.cpython-311-aarch64-linux-gnu.so
-W=$(mktemp -d "${TMPDIR:-/tmp}/graviton-whl.XXXXXX") && python3 -m zipfile -e dist/*.whl "$W" && cp "$W"/_fixture_ext.*.so vendor/   # only if the project vendors the built file
+python3 -I -m zipfile -l dist/*.whl | grep '\.so'   # the extension, e.g. _fixture_ext.cpython-311-aarch64-linux-gnu.so
+W=$(mktemp -d "${TMPDIR:-/tmp}/graviton-whl.XXXXXX") && python3 -I -m zipfile -e dist/*.whl "$W" && cp "$W"/_fixture_ext.*.so vendor/   # only if the project vendors the built file
 
 # Verify
 file vendor/libfastsum-aarch64.so  # Must show "ARM aarch64"
@@ -66,7 +66,7 @@ if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.sh" 
   TARGET_PAGE_SIZE=       # the function's page size, if measured in it (getconf PAGESIZE); unset, the scan skips the page check
   PLAT=(); i=${TARGET_LIBC_VER#*.}
   while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
-  python3 -m pip install "${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: \
+  python3 -I -m pip install "${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: \
     --python-version "$PYVER" --implementation cp --target python/ -r layer-requirements.txt
   GV_TDIR=$(awk -F '\t' -v t="public.ecr.aws_lambda_python_$PYVER" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # §1.1's copy of public.ecr.aws/lambda/python:$PYVER, the runtime's OS
   if [ -n "$GV_TDIR" ]; then TARGET_ROOT=$GV_TDIR TARGET_LIBC= TARGET_LIBC_VER= native_scan python   # no FINDING line
@@ -142,9 +142,9 @@ TARGET_LIBC_VER=2.41    # Phase 1.1 (python:3.11-slim): every tag the target's g
 PLAT=(); i=${TARGET_LIBC_VER#*.}
 while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
 D=$(mktemp -d "${TMPDIR:-/tmp}/graviton-wheels.XXXXXX") || { D=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }   # a new folder no other user can write, or nothing
-[ -n "$D" ] && python3 -m pip download --only-binary=:all: --no-deps -d "$D" "${PLAT[@]}" \
+[ -n "$D" ] && python3 -I -m pip download --only-binary=:all: --no-deps -d "$D" "${PLAT[@]}" \
   --platform manylinux2014_aarch64 --python-version 3.11 --implementation cp --abi cp311 "MarkupSafe==2.1.5"
-[ -n "$D" ] && python3 -m pip hash --algorithm sha256 "$D"/MarkupSafe-2.1.5-*.whl
+[ -n "$D" ] && python3 -I -m pip hash --algorithm sha256 "$D"/MarkupSafe-2.1.5-*.whl
 # append the printed --hash=sha256:... as a second --hash on the MarkupSafe line
 # or: pip-compile --generate-hashes requirements.in   (records the hashes of all published files)
 ```
@@ -163,7 +163,7 @@ The default NumPy and SciPy wheels use OpenBLAS, so removing `mkl` leaves NumPy 
 
   ```bash
   echo 'setuptools==81.0.0' > build-constraints.txt
-  CFLAGS=-Wno-error=incompatible-pointer-types python3 -m pip install --build-constraint build-constraints.txt numpy==1.26.4 pygeos==0.14
+  CFLAGS=-Wno-error=incompatible-pointer-types python3 -I -m pip install --build-constraint build-constraints.txt numpy==1.26.4 pygeos==0.14
   ```
 
   Without the constraint the build stops at `ModuleNotFoundError: No module named 'pkg_resources'` (with pip 26.2.1, `PIP_CONSTRAINT` alone does not help), and without the `CFLAGS` at the pointer-type errors. Pin numpy to the project's own 1.x version at runtime (`numpy==1.26.4` is the last 1.x release, so it is what `numpy<2` resolves to): the build compiles against NumPy 1.x, and with numpy 2.4.6 installed next to it the import failed with `AttributeError: _ARRAY_API not found`.

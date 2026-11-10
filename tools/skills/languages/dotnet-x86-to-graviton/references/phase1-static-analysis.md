@@ -15,7 +15,7 @@ MSBuild also reads `Directory.Build.rsp` for these steps, and that file can add 
 GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 dotnet --list-sdks
 dotnet --version   # the SDK this repository selects (global.json in this folder or a parent)
-python3 -c 'import sys; assert sys.version_info >= (3, 6), sys.version; print("python3", sys.version.split()[0])'
+python3 -I -c 'import sys; assert sys.version_info >= (3, 6), sys.version; print("python3", sys.version.split()[0])'
 if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" ];; *) false;; esac; then echo "check program: $GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py"
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
@@ -115,7 +115,7 @@ P=TargetFramework,TargetFrameworks,TargetFrameworkVersion,OutputType,RuntimeIden
 find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules \) -prune -o -type f \( -name '*.csproj' -o -name '*.fsproj' -o -name '*.vbproj' \) -print | sort |
   while IFS= read -r p; do
     printf '%s: ' "$p"
-    dotnet msbuild "$p" -getProperty:"$P" < /dev/null 2>&1 | python3 -c 'import json, sys
+    dotnet msbuild "$p" -getProperty:"$P" < /dev/null 2>&1 | python3 -I -c 'import json, sys
 t = sys.stdin.read()
 try:
     print(", ".join("%s=%s" % kv for kv in sorted(json.loads(t)["Properties"].items()) if kv[1]))
@@ -277,7 +277,7 @@ if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
     edabeedb) { if command -v bsdtar > /dev/null 2>&1; then bsdtar -xf "$d/download" -C "$d/x"   # bsdtar keeps every path inside the folder
                 else (cd "$d/x" && rpm2cpio ../download | cpio -idm --quiet --no-absolute-filenames); fi; } && rm "$d/download" \
                 || echo "CHECK: $URL is an .rpm this host cannot unpack (needs bsdtar, or rpm2cpio and GNU cpio)" ;;
-    *) python3 -m zipfile -e "$d/download" "$d/x" 2>/dev/null || tar -xf "$d/download" -C "$d/x" 2>/dev/null ;;
+    *) python3 -I -m zipfile -e "$d/download" "$d/x" 2>/dev/null || tar -xf "$d/download" -C "$d/x" 2>/dev/null ;;
   esac
   for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that Phase 1.1 recorded; with none, one scan named target
   GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
@@ -402,7 +402,7 @@ Check the resolved version:
 
 ```bash
 # AWS SDK for .NET: AWSSDK.Core before 3.3.103.66 has no IMDSv2 (session token) support
-python3 - "$(ls graviton-validation/raw/dependency-tree-*.json 2> /dev/null | head -n 1)" <<'EOF'   # one target's tree: the packages are the same for each
+python3 -I - "$(ls graviton-validation/raw/dependency-tree-*.json 2> /dev/null | head -n 1)" <<'EOF'   # one target's tree: the packages are the same for each
 import json, re, sys
 seen = set()
 for proj, frameworks in json.load(open(sys.argv[1])).items():
@@ -476,7 +476,7 @@ grep -rlE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' 'Archite
   while IFS= read -r f; do grep -qE 'Architecture\.Arm64|"(arm64|aarch64)"' "$f" || echo "x64 without Arm64: $f"; done
 # x86 hardware intrinsics: a call without an IsSupported check before it throws PlatformNotSupportedException on Arm64,
 # and without an Arm64 or portable path the code runs a slower fallback. Heuristic: the check is in the 30 lines above.
-python3 - <<'EOF'
+python3 -I - <<'EOF'
 import os, re
 call = re.compile(r"\b(Sse[0-9]*|Ssse3|Avx[0-9]*|Avx512[A-Za-z]*|Bmi[12]|Fma|Lzcnt|Popcnt|Pclmulqdq|X86Base)\.([A-Z]\w*)")
 for root, dirs, files in os.walk("."):
@@ -500,7 +500,7 @@ EOF
 # Vector width assumptions (Vector<byte>.Count is 32 on x64 with AVX2, 16 on Arm64)
 grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' 'Vector256|Vector<[A-Za-z]+>\.Count' . 2>/dev/null || true
 # Project settings that pin x64 or x86, or a Windows, macOS or x64 RID (from 1.1)
-python3 - graviton-validation/raw/project-properties.txt <<'EOF'
+python3 -I - graviton-validation/raw/project-properties.txt <<'EOF'
 import re, sys
 for line in open(sys.argv[1]):
     proj, _, props = line.rstrip("\n").partition(": ")
@@ -532,7 +532,7 @@ SOLUTION=Orders.slnx   # the solution (or project) from 1.1
 mkdir -p graviton-validation/raw
 d=$(mktemp -d) || d=   # a new, empty folder, or nothing: the copy below needs it
 if [ -n "$d" ]; then
-  python3 -c 'import shutil, sys; shutil.copytree(".", sys.argv[1], symlinks=True, ignore=shutil.ignore_patterns(".git", ".vs", "bin", "obj", "node_modules", "graviton-validation"))' "$d/src"
+  python3 -I -c 'import shutil, sys; shutil.copytree(".", sys.argv[1], symlinks=True, ignore=shutil.ignore_patterns(".git", ".vs", "bin", "obj", "node_modules", "graviton-validation"))' "$d/src"
   (cd "$d/src" && dotnet build "$SOLUTION" -p:EnableWindowsTargeting=true -p:RestoreLockedMode=false > "$d/build.txt" 2>&1; echo "build exit $?")
   grep -oE '[^ ]+\.(cs|vb|fs)\([0-9]+,[0-9]+\): (warning|error) CA1416: [^[]+' "$d/build.txt" | sed "s#^$d/src/##" | sort -u | tee graviton-validation/raw/ca1416.txt
   echo "CA1416 call sites: $(wc -l < graviton-validation/raw/ca1416.txt)"
@@ -627,7 +627,7 @@ done < graviton-validation/raw/images.txt
 grep -oE 'TargetFrameworks?=[^,]+|TargetFrameworkVersion=[^,]+' graviton-validation/raw/project-properties.txt | sort | uniq -c
 find . \( -name .git -o -name node_modules \) -prune -o -name global.json -print | while IFS= read -r f; do echo "== $f"; cat "$f"; done
 # Support phase and end of support of every .NET release (Microsoft release metadata)
-curl -fsSL https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json | python3 -c 'import json, sys
+curl -fsSL https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json | python3 -I -c 'import json, sys
 for r in json.load(sys.stdin)["releases-index"]:
     print("%-5s %-3s %-12s end of support %-10s latest runtime %s" % (r["channel-version"], r.get("release-type", "-"), r["support-phase"], r.get("eol-date") or "-", r["latest-runtime"]))'
 ```

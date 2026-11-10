@@ -151,7 +151,7 @@ if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then 
 python3 "$GV_CHECK" probe SkiaSharp.NativeAssets.Linux 2.80.0
 # Versions published on nuget.org, oldest first (package ID in lower case; other feeds have their own API):
 curl -fsSL https://api.nuget.org/v3-flatcontainer/skiasharp.nativeassets.linux/index.json \
-  | python3 -c 'import json,sys; print(" ".join(v for v in json.load(sys.stdin)["versions"] if "-" not in v))'
+  | python3 -I -c 'import json,sys; print(" ".join(v for v in json.load(sys.stdin)["versions"] if "-" not in v))'
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
