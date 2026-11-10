@@ -188,6 +188,7 @@ Each skill folder contains:
 ├── SKILL.md                    # Entry point (Agent Skills format)
 ├── summaries.md                # Canonical file index for agent discovery
 ├── references/                 # Phase instructions, scope guardrails, output standards
+├── scripts/                    # Programs the skill's blocks run from the skill folder
 └── README.md                   # Human-readable overview
 ```
 
@@ -201,5 +202,7 @@ See the [skill template](_templates/SKILL.template.md) for the boilerplate struc
 4. Add a `README.md` with a human-readable overview that points at `summaries.md` for the file map
 5. Keep the main entry point under 500 lines — split detailed instructions into `references/` or `scripts/` subdirectories
 6. Link each supporting file inline from the step that needs it, so an agent reading top to bottom reaches it just in time. `summaries.md` serves agents that enter mid-skill or need the whole map at once
+7. Put code the agent runs in `scripts/`, not in a heredoc in a reference file, so the agent runs it instead of reading it and writing it out again. Start each script with the license header after its shebang line (`# SPDX-License-Identifier: MIT-0`, then `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.`). A block that runs a script names the skill folder on its first line and runs nothing unless that line is an absolute path to a folder that holds the script; it never takes a script's path from a file in the project
+8. Write the skill's reports to `graviton-validation/<skill-name>/` at the project root, so the reports of two skills run on one repository stay apart
 
 Fill in language-specific details based on the existing [Graviton documentation](../../) for each language.
