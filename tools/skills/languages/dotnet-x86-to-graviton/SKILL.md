@@ -39,13 +39,13 @@ If a `skill-config.md` exists at the project root, read it before Phase 1 and ap
 
 ## Transformation Workflow
 
-**Assessment only:** when the user asks for an assessment, or for the project to stay unchanged, skip Version Control Setup, run Phase 1 and stop. First read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) in full, then run the blocks that apply, in order: the verdicts come from the checks those blocks run, and your own inspection of binaries or package files does not replace them. A `CHECK` those blocks print stays a `CHECK` in the report, never a PASS, with the step that settles it. Phase 1 changes none of the project's existing files; it writes the reports Documentation Setup lists to a new `graviton-validation/` folder, `00-summary.md` last. Report what Phases 2 and 3 would change or run as recommendations, each with its default.
+**Assessment only:** when the user asks for an assessment, or for the project to stay unchanged, skip Version Control Setup, run Phase 1 and stop. First read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) in full, then run the blocks that apply, in order: the verdicts come from the checks those blocks run, and your own inspection of binaries or package files does not replace them. A `CHECK` those blocks print stays a `CHECK` in the report, never a PASS, with the step that settles it. Phase 1 changes none of the project's existing files; it writes the reports Documentation Setup lists to a new `graviton-validation/dotnet-x86-to-graviton/` folder, `00-summary.md` last. Report what Phases 2 and 3 would change or run as recommendations, each with its default.
 
 Copy this checklist into your response and check off each step:
 
 ```
 ARM64 migration progress:
-- [ ] Baseline commit; `graviton-validation/raw/` created; `skill-config.md` read if present
+- [ ] Baseline commit; `graviton-validation/dotnet-x86-to-graviton/raw/` created; `skill-config.md` read if present
 - [ ] 1.1 Deployment type, projects, starting point, target OS and libc, package tree (01, raw/)
 - [ ] 1.2 Native files and assemblies judged by content (02)
 - [ ] 1.3 Each package checked per RID: MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE / CHECK (03)
@@ -96,7 +96,7 @@ if [ -z "$GV_DOTNET_SKILL_DIR" ]; then   # not given: look where user-level inst
   GV_DOTNET_SKILL_DIR=$(printf '%s\n' "$GV_FOUND" | head -n 1)
   [ "$(printf '%s\n' "$GV_FOUND" | grep -c .)" -le 1 ] || echo "NOTE: other copies: $(printf '%s\n' "$GV_FOUND" | sed 1d | tr '\n' ' ')(set GV_DOTNET_SKILL_DIR if the SKILL.md you follow is in one of them)"
 fi
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
 if [ -n "$GV_DOTNET_SKILL_DIR" ] && [ -f "$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py" ] && GV_DOTNET_SKILL_DIR=$(CDPATH= cd -- "$GV_DOTNET_SKILL_DIR" && pwd -P); then
   echo "skill folder: $GV_DOTNET_SKILL_DIR"
   case $GV_DOTNET_SKILL_DIR/ in "$GV_PROJECT"/*) echo "NOTE: the skill folder is inside the repository, so the scripts it runs are files of the repository: use it only on a repository you trust";; esac
@@ -178,7 +178,7 @@ A criterion that runs on ARM64 passes only on a Graviton host or the target, suc
 10. Target frameworks and SDK unchanged, or changed only through an approved `dotnet.framework_bump`
 
 ### Documentation Criteria
-11. All files in `graviton-validation/` using canonical names from documentation-standards.md
+11. All files in `graviton-validation/dotnet-x86-to-graviton/` using canonical names from documentation-standards.md
 
 ## Test Failure Handling
 

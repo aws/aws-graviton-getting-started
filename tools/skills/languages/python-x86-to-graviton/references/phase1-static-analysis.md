@@ -1,6 +1,6 @@
 # Phase 1: Static Compatibility Analysis
 
-Analyze the project without changing its source or build files. All findings are documented in `graviton-validation/` files.
+Analyze the project without changing its source or build files. All findings are documented in `graviton-validation/python-x86-to-graviton/` files.
 
 > **Skill config:** Wherever a step below runs `pip`, `uv`, `poetry` or `conda`, use `python.package_manager` from `skill-config.md` (if defined) to skip auto-detection, `python.index_url` / `python.extra_index_url` as the index for every probe (and probe PyPI as well, see §1.3), and `python.interpreter_bump` in §1.5. See [skill-configuration.md](skill-configuration.md).
 
@@ -16,7 +16,7 @@ Phase 1 runs on any host, including x86, and installs nothing into the project o
 
 ## 1.1 Project Structure Analysis
 
-> **Output: `graviton-validation/01-project-assessment.md`**, **`graviton-validation/raw/dependency-tree-full.json`** and **`graviton-validation/raw/requirements-resolved.txt`**
+> **Output: `graviton-validation/python-x86-to-graviton/01-project-assessment.md`**, **`graviton-validation/python-x86-to-graviton/raw/dependency-tree-full.json`** and **`graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt`**
 
 ### Determine Deployment Type
 
@@ -29,7 +29,7 @@ grep -lE "AWS::Serverless::Function|AWS::Lambda::Function" template.yaml templat
 # Dockerfiles under any name: by name, plus the files a build's -f or --file, Compose dockerfile: and
 # docker/build-push-action file: name. A file is kept when it has a FROM line; a name that is no file
 # here is printed: find that file by hand and add it to the list.
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/python-x86-to-graviton/raw
 { find . \( -path ./.venv -o -path ./.git -o -name node_modules -o -name cdk.out \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' \) -print
   grep -rnoE --exclude-dir=.venv --exclude-dir=.git --exclude-dir=node_modules --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' --include='Jenkinsfile*' -- \
     "(build|bud)[[:space:]][^;|&#]*(-f[[:space:]]+|--file[[:space:]=]+)[\"']?[^[:space:];|&\"')]+|(dockerfile|file):[[:space:]]*[\"']?[^[:space:]#\"']+" . |
@@ -40,8 +40,8 @@ mkdir -p graviton-validation/raw
       else printf 'not found: %s names %s\n' "$src" "$ref" >&2; fi
     done
 } | while IFS= read -r f; do grep -qiE '^[[:space:]]*FROM[[:space:]]' "$f" && printf '%s\n' "$f"; done |
-  sort -u > graviton-validation/raw/dockerfiles.txt
-cat graviton-validation/raw/dockerfiles.txt
+  sort -u > graviton-validation/python-x86-to-graviton/raw/dockerfiles.txt
+cat graviton-validation/python-x86-to-graviton/raw/dockerfiles.txt
 ```
 
 - Dockerfile or container config present, under any name (`Dockerfile*`, `*.Dockerfile`, `Containerfile`; `docker build -f` and Compose `dockerfile:` accept any name; the block lists them all in `raw/dockerfiles.txt`): **Containerized**
@@ -191,13 +191,13 @@ if [ -n "$GV_ROOT" ] && cid=$(timeout 300 "$GV_CLI" create --platform linux/arm6
     cxx=$(grep -ao 'GLIBCXX_3\.4\.[0-9][0-9]*' "$x" | sort -u -t. -k3,3n | tail -n 1); cxx=${cxx:-"libstdc++ with no GLIBCXX_ versions"}
   else cxx="no libstdc++.so.6"; fi
   echo "$IMG: ${os:-no os-release}; $libc; $cxx; files in $GV_ROOT"
-  mkdir -p graviton-validation/raw && printf '%s\t%s\n' "$GV_TAG" "$GV_ROOT" >> graviton-validation/raw/target-roots.txt   # Phase 3 reads the folder here when this shell is gone
+  mkdir -p graviton-validation/python-x86-to-graviton/raw && printf '%s\t%s\n' "$GV_TAG" "$GV_ROOT" >> graviton-validation/python-x86-to-graviton/raw/target-roots.txt   # Phase 3 reads the folder here when this shell is gone
   # The later checks run once for each target that raw/target-roots.txt records, in this shell or a new one. Remove the
   # folder by that exact path (rm -rf "$GV_ROOT"), never by a wildcard, once the report is written.
 else [ -z "$GV_ROOT" ] || rmdir "$GV_ROOT"; echo "$IMG: no arm64 container was created (no arm64 variant of the image, or the pull failed: see the error above)"; fi   # nothing is recorded for it, so no check runs for this image
 ```
 
-§1.2.1 scans once for each target that `raw/target-roots.txt` records, with its image's folder as `TARGET_ROOT`. For a target with no image, record a name of its own (letters, digits, `.`, `_` and `-`: the name becomes part of the output file names) and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/raw/target-roots.txt` for an Amazon Linux 2023 host. The wheel probes of §1.3 still use `TARGET_LIBC` and `TARGET_LIBC_VER`.
+§1.2.1 scans once for each target that `raw/target-roots.txt` records, with its image's folder as `TARGET_ROOT`. For a target with no image, record a name of its own (letters, digits, `.`, `_` and `-`: the name becomes part of the output file names) and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/python-x86-to-graviton/raw/target-roots.txt` for an Amazon Linux 2023 host. The wheel probes of §1.3 still use `TARGET_LIBC` and `TARGET_LIBC_VER`.
 
 - **No `python3` in the base image** (the fallback line): the deployment installs Python in a later step (`apt-get install python3`, `dnf install python3.11`), so the interpreter and pip come from that package. The libc still comes from the base image; read the rest from the built image or the distribution's package before §1.3.
 - **Lambda functions deployed as .zip archives:** the runtime identifier sets the OS, as the runtimes table shows ([Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html)): Amazon Linux 2023 has glibc 2.34, Amazon Linux 2 glibc 2.26; wheel-verification.md §7 shows a `manylinux_2_28` layer that imports on `python3.12` and fails on `python3.11`. AWS publishes a base image for each runtime, listed with its OS ([AWS base images for Python](https://docs.aws.amazon.com/lambda/latest/dg/python-image.html)): read the one for the function's runtime as for a container image; if it cannot be read, set `TARGET_LIBC_VER` to that OS's version and leave `TARGET_GLIBCXX` unset. For container-image functions, run the block against the image.
@@ -220,12 +220,12 @@ The pip form:
 GV_VENV=$(mktemp -d "${TMPDIR:-/tmp}/graviton-venv.XXXXXX")   # a new, private folder
 uv venv --seed --python 3.11 "$GV_VENV"    # the project's minor version (Phase 3.0); --seed installs pip
 . "$GV_VENV/bin/activate"
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/python-x86-to-graviton/raw
 # One --dry-run --report per file the deployment installs, in the deployment's order.
 # A hashed file turns on --require-hashes for everything in the same pip call, so keep it separate.
-python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-locked.json \
+python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/python-x86-to-graviton/raw/dependency-tree-locked.json \
   --require-hashes -r requirements-locked.txt
-python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-full.json \
+python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/python-x86-to-graviton/raw/dependency-tree-full.json \
   -r requirements.txt
 
 # Flat pins with provenance. Each pip call resolves on its own, so a package needed by both files
@@ -233,19 +233,19 @@ python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-vali
 python3 -I - <<'EOF'
 import json
 rows = {}
-for rep, src in [("graviton-validation/raw/dependency-tree-locked.json", "requirements-locked.txt"),
-                 ("graviton-validation/raw/dependency-tree-full.json", "requirements.txt")]:
+for rep, src in [("graviton-validation/python-x86-to-graviton/raw/dependency-tree-locked.json", "requirements-locked.txt"),
+                 ("graviton-validation/python-x86-to-graviton/raw/dependency-tree-full.json", "requirements.txt")]:
     for i in json.load(open(rep))["install"]:
         key = (i["metadata"]["name"], i["metadata"]["version"])
         rows.setdefault(key, ("direct" if i.get("requested") else "transitive", src))
-with open("graviton-validation/raw/requirements-resolved.txt", "w") as f:
+with open("graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt", "w") as f:
     for (n, v), (kind, src) in sorted(rows.items(), key=lambda kv: (kv[0][0].lower(), kv[0][1])):
         f.write(f"{n}=={v}  # {kind} via {src}\n")
 EOF
 
 # Sanity check: the list must contain resolved pins. An empty or one-line file is a failed
 # resolution, not an all-clear.
-grep -c '==' graviton-validation/raw/requirements-resolved.txt
+grep -c '==' graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt
 ```
 
 When two install steps pin different versions of one package, keep and probe both: pip installs both into the same prefix, on any architecture (a hash-locked `charset-normalizer` 3.4.0 ended up next to the 3.5.2 that `requests` pulled in). The list also holds transitives that no requirements file names, such as the six that `mkl` pulls in. `pip install --dry-run` and `--report` require pip 22.2 or newer on the analysis host; on x86 the report lists x86 wheels, which is fine: §1.3 re-resolves for aarch64.
@@ -261,7 +261,7 @@ When two install steps pin different versions of one package, keep and probe bot
 
 ## 1.2 Native Library Validation (.so File Analysis)
 
-> **Output: `graviton-validation/02-native-library-report.md`** and **`graviton-validation/raw/site-packages-so-scan-<target>.txt`** (one per target)
+> **Output: `graviton-validation/python-x86-to-graviton/02-native-library-report.md`** and **`graviton-validation/python-x86-to-graviton/raw/site-packages-so-scan-<target>.txt`** (one per target)
 
 Native code reaches a Python deployment in three ways: **wheels** from the index (handled in §1.3 by probing the index, not by scanning), **binaries committed to the repository** (vendored `.so`, Lambda layers, pre-built modules), and **extensions the project builds itself** (`setup.py` `ext_modules`, Cython, Rust, pybind11, CMake). This section covers the last two. All three depend on the target OS as well as the CPU (libc, page size, CPU generation, OS packages; [wheel-verification.md](wheel-verification.md) §1).
 
@@ -279,12 +279,12 @@ TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41; TARGET_PAGE_SIZE=4096   # from §1.1 (A
 # and, when known, TARGET_GLIBCXX, with TARGET_PAGE_SIZE: FINDING, CHECK and NOTE lines, then "findings: N, checks: M";
 # exit status 1 on a FINDING.
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/native_scan.sh"; then   # the skill's own file only
-mkdir -p graviton-validation/raw
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that §1.1 recorded; with none, one scan named target
+mkdir -p graviton-validation/python-x86-to-graviton/raw
+for GV_TAG in $(cut -f1 graviton-validation/python-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that §1.1 recorded; with none, one scan named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/python-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
-case $GV_TDIR in "") native_scan .;; glibc=*) TARGET_ROOT= TARGET_LIBC=glibc TARGET_LIBC_VER=${GV_TDIR#glibc=} native_scan .;; *) TARGET_ROOT=$GV_TDIR native_scan .;; esac | tee "graviton-validation/raw/site-packages-so-scan-$GV_TAG.txt"
+case $GV_TDIR in "") native_scan .;; glibc=*) TARGET_ROOT= TARGET_LIBC=glibc TARGET_LIBC_VER=${GV_TDIR#glibc=} native_scan .;; *) TARGET_ROOT=$GV_TDIR native_scan .;; esac | tee "graviton-validation/python-x86-to-graviton/raw/site-packages-so-scan-$GV_TAG.txt"
 done
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
@@ -479,7 +479,7 @@ else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that
 
 ## 1.3 Dependency ARM64 Compatibility Analysis
 
-> **Output: `graviton-validation/03-dependency-compatibility-report.md`** and **`graviton-validation/raw/wheel-availability.txt`**
+> **Output: `graviton-validation/python-x86-to-graviton/03-dependency-compatibility-report.md`** and **`graviton-validation/python-x86-to-graviton/raw/wheel-availability.txt`**
 
 **IMPORTANT:** ARM64-incompatible native code is introduced through transitive dependencies as often as direct ones. The fixture's `requirements.txt` names `mkl`; the resolved tree adds six Intel-only transitives. Probe the full flat list from §1.1, never just the manifest.
 
@@ -493,7 +493,7 @@ PYVER=3.11; ABI="cp${PYVER/./}"
 TARGET_LIBC=glibc; TARGET_LIBC_VER=2.41   # from the target probe in §1.1 (Alpine: TARGET_LIBC=musl TARGET_LIBC_VER=1.2; no target named: both empty)
 # platforms ARCH (scripts/platforms.sh) sets PLAT to one --platform flag per wheel tag the target's libc accepts, newest first
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/python-x86-to-graviton/raw
 probe() { # $1=requirement $2=arch ; prints the wheel filename (rc 0), the from-versions list (rc 1),
           # nothing (rc 3) when an environment marker excluded the pin on this host, or why the indexes
           # give no verdict (rc 4). --no-input and </dev/null: pip never reads the loop's list of pins;
@@ -516,7 +516,7 @@ probe() { # $1=requirement $2=arch ; prints the wheel filename (rc 0), the from-
   fi
   echo "$(grep -oE 'from versions: [^)]*' "$d/log" | head -n 1)${miss:+; not on $miss}"; rm -rf "$d"; return 1
 }
-sed -E 's/[[:space:]]*#.*//' graviton-validation/raw/requirements-resolved.txt | grep '==' | while read -r req; do
+sed -E 's/[[:space:]]*#.*//' graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt | grep '==' | while read -r req; do
   out=$(probe "$req" aarch64); rc=$?
   if [ $rc -eq 4 ]; then echo "CHECK INDEX     $req  $out"; continue; fi
   if [ $rc -eq 0 ]; then
@@ -543,7 +543,7 @@ sed -E 's/[[:space:]]*#.*//' graviton-validation/raw/requirements-resolved.txt |
       echo "CHECK SDIST/ABI $req  no $ABI wheel for either arch: pure-Python sdist, interpreter ABI mismatch, or a libc older than every wheel (wheel-verification.md sections 5 to 7)$note"
     fi
   fi
-done | tee graviton-validation/raw/wheel-availability.txt
+done | tee graviton-validation/python-x86-to-graviton/raw/wheel-availability.txt
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
@@ -608,7 +608,7 @@ Some binaries the build or deployment needs are fetched by scripts rather than r
 
 ## 1.4 Architecture-Specific Code Detection
 
-> **Output: `graviton-validation/04-code-scan-findings.md`**
+> **Output: `graviton-validation/python-x86-to-graviton/04-code-scan-findings.md`**
 
 Scan from the project root (`.`), not a hard-coded `src/` or `app/`, and exclude the virtualenv (its site-packages contain thousands of legitimate `x86_64` strings inside wheels).
 
@@ -641,9 +641,9 @@ grep -rnE --exclude-dir=.venv --exclude-dir=.git \
 grep -rnE --exclude-dir='*-x86-to-graviton' --exclude-dir=.venv --exclude-dir=.git --include='*.py' --include='*.pyx' --include='*.c' --include='*.cc' --include='*.cpp' --include='*.cxx' --include='*.h' --include='*.hpp' -- \
   'syscall\([[:space:]]*(0x[0-9a-fA-F]+|[0-9]+)' . 2>/dev/null || true
 # Dockerfiles under any name, and deployment descriptors
-if [ -f graviton-validation/raw/dockerfiles.txt ]; then
-  while IFS= read -r f; do grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|x86_64|amd64|pip install|uv (sync|pip)|poetry install|conda env' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done < graviton-validation/raw/dockerfiles.txt
-else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt"; fi
+if [ -f graviton-validation/python-x86-to-graviton/raw/dockerfiles.txt ]; then
+  while IFS= read -r f; do grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|x86_64|amd64|pip install|uv (sync|pip)|poetry install|conda env' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done < graviton-validation/python-x86-to-graviton/raw/dockerfiles.txt
+else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/python-x86-to-graviton/raw/dockerfiles.txt"; fi
 grep -rniE --exclude-dir=.venv --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=cdk.out --include='*.y*ml' --include='*.json' --include='*.tf' \
   'architectures?"?[[:space:]]*[:=]|kubernetes\.io/arch|nodeselector|cpu_?architecture"?[[:space:]]*[:=]|ami_?type"?[[:space:]]*[:=]|instance_?types?"?[[:space:]]*[:=]|ami-[0-9a-f]{8,17}|^functions:|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?compatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"|x86_64|amd64' .
 # CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
@@ -672,34 +672,34 @@ Flag code that checks for `x86_64`/`amd64` without `aarch64`/`arm64` handling, b
 Every image the project builds from, tests with or deploys has to list `linux/arm64`, including images a library starts at run time: a test that creates `MySqlContainer("mysql:5.7")` starts `mysql:5.7`, which has no arm64 build. List the images and read each one's platforms from its registry, without pulling it:
 
 ```bash
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/python-x86-to-graviton/raw
 # Image references: FROM lines of the Dockerfiles in raw/dockerfiles.txt (§1.1; not stage names), image: keys in
 # YAML and JSON, image names in test code. A reference built from a variable is left out: resolve it by hand.
-{ if [ -f graviton-validation/raw/dockerfiles.txt ]; then
+{ if [ -f graviton-validation/python-x86-to-graviton/raw/dockerfiles.txt ]; then
     while IFS= read -r f; do
       awk 'toupper($1) == "FROM" { i = ($2 ~ /^--platform=/) ? 3 : 2; if (!($i in s)) print $i
              for (k = i + 1; k < NF; k++) if (toupper($k) == "AS") s[$(k + 1)] = 1 }' "$f"
-    done < graviton-validation/raw/dockerfiles.txt
-  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt" >&2; fi
+    done < graviton-validation/python-x86-to-graviton/raw/dockerfiles.txt
+  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/python-x86-to-graviton/raw/dockerfiles.txt" >&2; fi
   grep -rhoiE --exclude-dir=.venv --exclude-dir=.git --exclude-dir=node_modules --include='*.y*ml' --include='*.json' \
     '"?image(uri)?"?[[:space:]]*:[[:space:]]*"?[a-z0-9][^"[:space:],}]*' . |
     sed -E 's/^"?[Ii][Mm][Aa][Gg][Ee]([Uu][Rr][Ii])?"?[[:space:]]*:[[:space:]]*"?//'
   grep -rhoE --exclude-dir='*-x86-to-graviton' --exclude-dir=.venv --exclude-dir=.git --include='*.py' "Container\((image=)?[\"'][^\"']+" . |
     sed -E "s/^[^\"']*[\"']//"
-} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/raw/images.txt
+} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/python-x86-to-graviton/raw/images.txt
 # Platforms per image, from its registry (docker CLI). Without docker, or a login a private registry needs, the line is CHECK.
 while IFS= read -r img; do
   if ! out=$(docker manifest inspect -v "$img" 2>&1); then printf 'CHECK   %s: %s\n' "$img" "$(printf '%s\n' "$out" | grep -v '^errors:$' | head -n 1)"
   elif printf '%s' "$out" | grep -q '"architecture": "arm64"'; then printf 'OK      %s\n' "$img"
   else printf 'FINDING %s: no linux/arm64 build\n' "$img"; fi
-done < graviton-validation/raw/images.txt
+done < graviton-validation/python-x86-to-graviton/raw/images.txt
 ```
 
 `docker manifest inspect -v` prints every platform of a multi-architecture image and the one platform of a single-architecture image. A FINDING is fixed in Phase 2.4. On an ARM64 host a list without arm64 stops the pull (`no matching manifest for linux/arm64/v8 in the manifest list entries`), while a single amd64 manifest is pulled and its container stops with `exec format error` (`--platform linux/arm64` stops that pull: `was found but does not match the specified platform: wanted linux/arm64, actual: linux/amd64`).
 
 ## 1.5 Python Version Compatibility Check
 
-> **Output: `graviton-validation/01-project-assessment.md`** (Python Environment section)
+> **Output: `graviton-validation/python-x86-to-graviton/01-project-assessment.md`** (Python Environment section)
 
 1. Document the interpreter version and the source it was read from (§1.1). Record the implementation (CPython; PyPy and others change the wheel tags and need their own probe).
 2. Look up its support status live; do not use a remembered table, the dates move every October:

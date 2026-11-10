@@ -9,7 +9,7 @@ The skill is provided as is, for migration assessment, without warranty, under t
 - Phase 1 evaluates the projects' MSBuild files, restores a scratch copy of the solution (and builds one for a Windows starting point), and runs the target images' own tools in containers. The opening of [references/phase1-static-analysis.md](references/phase1-static-analysis.md) lists every step that runs code.
 - Phase 2 changes package versions, project files, architecture checks in the code, deployment settings, Dockerfiles and CI files.
 - Phase 3 builds and publishes the project and runs its tests and the application, on an ARM64 host or in an arm64 container. When the repository needs a .NET SDK that is not installed, it downloads one into a temporary folder with Microsoft's install script.
-- The skill writes its reports into `graviton-validation/` at the project root. After each step that changes files, it commits to the local git repository, which it creates with `git init` when there is none. It never pushes: review the commits before you push them.
+- The skill writes its reports into `graviton-validation/dotnet-x86-to-graviton/` at the project root. After each step that changes files, it commits to the local git repository, which it creates with `git init` when there is none. It never pushes: review the commits before you push them.
 
 Run it on a project whose code you would build and run yourself. For a repository you did not write or do not trust, run it in a disposable container or VM.
 
@@ -66,7 +66,7 @@ it. It steers **how** the transformation runs but never widens its scope; see
 
 ## Output
 
-The skill produces a `graviton-validation/` folder in the project root with structured reports:
+The skill produces a `graviton-validation/dotnet-x86-to-graviton/` folder in the project root with structured reports:
 
 - `00-summary.md`: Executive summary and exit criteria checklist
 - `01-project-assessment.md`: Deployment type, starting point, package management, target frameworks, SDK and target OS

@@ -56,7 +56,7 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands (e.g.
 
 ## 3.0 Build Environment Preparation
 
-> **Output: `graviton-validation/06-build-test-results.md`** (Build Environment sections)
+> **Output: `graviton-validation/java-x86-to-graviton/06-build-test-results.md`** (Build Environment sections)
 
 ### Java Runtime Alignment
 
@@ -175,7 +175,7 @@ JAVA_HOME=/path/to/java-21 ${BUILD_CMD} clean install
 
 ## 3.1 ARM64 Build Validation
 
-> **Output: `graviton-validation/06-build-test-results.md`** (Build Attempts, Test Failure Classification)
+> **Output: `graviton-validation/java-x86-to-graviton/06-build-test-results.md`** (Build Attempts, Test Failure Classification)
 
 ### Build Strategy
 
@@ -227,7 +227,7 @@ java -XshowSettings:properties -version | grep os.arch  # Must show aarch64
 
 ## 3.2 Functional Testing on ARM64
 
-> **Output: update `graviton-validation/06-build-test-results.md`**
+> **Output: update `graviton-validation/java-x86-to-graviton/06-build-test-results.md`**
 
 **Containerized:** the shippable runtime image (§2.4) is **JRE-only** — it contains `app.jar` but no `mvn`/`gradlew`, no sources, and no `pom.xml`/`build.gradle`. Running `--entrypoint mvn app:arm64 test` against it fails with `exec: "mvn": executable file not found` / `no POM in this directory`. Run the ARM64 test suite one of two ways instead:
 
@@ -276,7 +276,7 @@ A test that compares floating-point values exactly and fails by such a differenc
 
 ## 3.3 Startup Validation
 
-> **Output: update `graviton-validation/06-build-test-results.md`** (Startup Validation)
+> **Output: update `graviton-validation/java-x86-to-graviton/06-build-test-results.md`** (Startup Validation)
 
 Verify:
 1. Application starts without errors
@@ -289,8 +289,8 @@ Verify:
 # command, or its tests, the same way on the x86 baseline and on ARM64, long enough to reach the code that loads them.
 # timeout 120: a ceiling for startup, so an application that hangs fails the check
 JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Xlog:os=info" timeout 120 java -jar target/app.jar \
-  > "graviton-validation/raw/loaded-$(uname -m).txt" 2>&1
-grep -E 'shared library load of .* was successful' "graviton-validation/raw/loaded-$(uname -m).txt" |
+  > "graviton-validation/java-x86-to-graviton/raw/loaded-$(uname -m).txt" 2>&1
+grep -E 'shared library load of .* was successful' "graviton-validation/java-x86-to-graviton/raw/loaded-$(uname -m).txt" |
   sed -E 's#.* load of ##; s# was successful.*##; s#[0-9]{5,}#<n>#g' | sort -u
 ```
 
@@ -302,6 +302,6 @@ Recommend to user for independent testing: performance benchmarking, load testin
 
 ## Write Summary
 
-> **Output: `graviton-validation/00-summary.md`**
+> **Output: `graviton-validation/java-x86-to-graviton/00-summary.md`**
 
 After all phases complete, write the summary using the template from [documentation-standards.md](documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.

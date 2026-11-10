@@ -9,7 +9,7 @@ The skill is provided as is, for migration assessment, without warranty, under t
 - Phase 1 runs pip's dry run, which runs the build backend of every source distribution it resolves and, when it resolves `.`, of the project itself, and runs the base image's `python3` and the target images' package tools in containers. The opening of [references/phase1-static-analysis.md](references/phase1-static-analysis.md) lists every step that runs code.
 - Phase 2 changes dependency pins and locks, build configuration, architecture checks in the code, Dockerfiles and CI files.
 - Phase 3 installs the dependencies and the project into a new virtual environment or folder under the temporary directory, and runs the project's tests and the application, on an ARM64 host or in an arm64 container.
-- The skill writes its reports into `graviton-validation/` at the project root. After each step that changes files, it commits to the local git repository, which it creates with `git init` when there is none. It never pushes: review the commits before you push them.
+- The skill writes its reports into `graviton-validation/python-x86-to-graviton/` at the project root. After each step that changes files, it commits to the local git repository, which it creates with `git init` when there is none. It never pushes: review the commits before you push them.
 
 Run it on a project whose code you would build and run yourself. For a repository you did not write or do not trust, run it in a disposable container or VM.
 
@@ -63,7 +63,7 @@ it. It steers **how** the transformation runs but never widens its scope; see
 
 ## Output
 
-The skill produces a `graviton-validation/` folder in the project root with structured reports:
+The skill produces a `graviton-validation/python-x86-to-graviton/` folder in the project root with structured reports:
 
 - `00-summary.md`: Executive summary and exit criteria checklist
 - `01-project-assessment.md`: Project structure, package manager(s) and Python environment

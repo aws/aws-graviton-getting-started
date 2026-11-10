@@ -16,10 +16,10 @@ This file is the canonical inventory of the skill. Every file in the skill folde
 
 * "scripts/java_graviton_check.py": "The Phase 1.2 check program (Python 3.6+, read-only): every native file in JARs, WARs, EARs and on disk judged by content for the target OS. Run it, do not read it; --help prints its options and rules."
 
-* "references/documentation-standards.md": "Defines the mandatory graviton-validation/ output folder structure, canonical filenames (00-summary.md through 06-build-test-results.md plus raw/), required sections for each file. Read before Phase 1."
+* "references/documentation-standards.md": "Defines the mandatory graviton-validation/java-x86-to-graviton/ output folder structure, canonical filenames (00-summary.md through 06-build-test-results.md plus raw/), required sections for each file. Read before Phase 1."
 
 * "references/skill-configuration.md": "Optional. Defines the skill-config.md configuration teams use to steer build/validation JDK, build command, container registry, deployment vocabulary, and target hosts and images without forking the skill. Includes the field reference and precedence rules (configuration steers HOW, never widens scope; shipped JDK distribution stays unchanged), plus the shared vs per-language section layout. Read before Phase 1 only if a skill-config.md is present."
 
 * "references/skill-config.template.md": "Copyable template for the optional skill configuration. Teams copy it to skill-config.md at their own project root and fill in shared (container/deployment/CI/target) and per-language (Java) preferences. Not read during a run; it is the authoring starting point for skill-configuration.md."
 
-* "README.md": "Human-facing overview: what the skill does, install quick start, how to enable the optional skill-config.md, and the graviton-validation/ output listing. Not read during a run; it points humans at this index for the file map."
+* "README.md": "Human-facing overview: what the skill does, install quick start, how to enable the optional skill-config.md, and the graviton-validation/java-x86-to-graviton/ output listing. Not read during a run; it points humans at this index for the file map."

@@ -68,7 +68,7 @@ GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKIL
 TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34
 # pip matches each --platform value exactly: platforms ARCH (scripts/platforms.sh) offers every tag the target's libc accepts, newest first
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/python-x86-to-graviton/raw
 # Usage: probe <requirement> <arch>; prints the wheel filename on success.
 # --only-binary=:all: is mandatory: without it pip accepts the sdist and the
 # probe "passes" for a package that has no aarch64 wheel at all (false PASS).
@@ -138,9 +138,9 @@ if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
   platforms aarch64   # one --platform per tag the target's libc accepts
   python3 -I -m pip install --dry-run --ignore-installed --only-binary=:all: \
-    --report graviton-validation/raw/wheel-availability.json -q "${PLAT[@]}" \
+    --report graviton-validation/python-x86-to-graviton/raw/wheel-availability.json -q "${PLAT[@]}" \
     --python-version 3.11 --implementation cp --abi cp311 \
-    --target /tmp/graviton-probe-target -r graviton-validation/raw/requirements-resolved.txt
+    --target /tmp/graviton-probe-target -r graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 

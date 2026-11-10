@@ -9,7 +9,7 @@ The skill is provided as is, for migration assessment, without warranty, under t
 - Phase 1 runs Maven, or Gradle through the project's `./gradlew`, with the project's build files; this writes `target/deps` or `build/deps` inside the project. It also runs the target images' package tools in containers. The opening of [references/phase1-static-analysis.md](references/phase1-static-analysis.md) lists every step that runs code.
 - Phase 2 changes dependency versions in the build files, architecture checks in the code, Dockerfiles and CI files.
 - Phase 3 builds the project and runs its tests and the application, on an ARM64 host or in an arm64 container.
-- The skill writes its reports into `graviton-validation/` at the project root. After each step that changes files, it commits to the local git repository, which it creates with `git init` when there is none. It never pushes: review the commits before you push them.
+- The skill writes its reports into `graviton-validation/java-x86-to-graviton/` at the project root. After each step that changes files, it commits to the local git repository, which it creates with `git init` when there is none. It never pushes: review the commits before you push them.
 
 Run it on a project whose code you would build and run yourself. For a repository you did not write or do not trust, run it in a disposable container or VM.
 
@@ -61,7 +61,7 @@ it. It steers **how** the transformation runs but never widens its scope — see
 
 ## Output
 
-The skill produces a `graviton-validation/` folder in the project root with structured reports:
+The skill produces a `graviton-validation/java-x86-to-graviton/` folder in the project root with structured reports:
 
 - `00-summary.md` — Executive summary and exit criteria checklist
 - `01-project-assessment.md` — Project structure and Java environment

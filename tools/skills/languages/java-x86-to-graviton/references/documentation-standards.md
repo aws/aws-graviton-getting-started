@@ -12,11 +12,11 @@ This document defines the standard output folder structure, canonical filenames,
 
 ## Output Folder Structure
 
-All transformation output documents MUST be written to a single folder named `graviton-validation/` in the project root (Agent Instructions 1).
+All transformation output documents MUST be written to a single folder named `graviton-validation/java-x86-to-graviton/` in the project root (Agent Instructions 1). Each skill has its own folder under `graviton-validation/`, so two skills run on one repository (for example a Java service and a Python Lambda function) keep their own reports and their own `raw/target-roots.txt`.
 
 ```
 <project-root>/
-└── graviton-validation/
+└── graviton-validation/java-x86-to-graviton/
     ├── 00-summary.md                        # Final roll-up of all findings and exit criteria
     ├── 01-project-assessment.md             # Project structure, deployment type, Java environment
     ├── 02-native-library-report.md          # All .so / native library findings and resolutions
@@ -34,13 +34,13 @@ All transformation output documents MUST be written to a single folder named `gr
 
 ## Agent Instructions
 
-1. **Create `graviton-validation/` and `graviton-validation/raw/` at the start of Phase 1.** This is the first action before any analysis.
+1. **Create `graviton-validation/java-x86-to-graviton/` and `graviton-validation/java-x86-to-graviton/raw/` at the start of Phase 1.** This is the first action before any analysis.
 2. **Use EXACTLY these filenames.** Do not rename, renumber, or create additional top-level files.
 3. **Write to each file progressively** as the corresponding phase completes. Do not wait until the end to produce all documentation.
 4. **Raw files go in `raw/`.** Only machine-generated command output belongs in `raw/`. Do not put authored content there.
 5. **`00-summary.md` is written last**, after all other files are complete. It references (not duplicates) the detail in files 01–06.
 6. **If a section has no findings**, include the section header with an explicit "No findings" statement. Do not omit empty sections — their absence is ambiguous.
-7. **Do not create documentation files outside `graviton-validation/`.** All transformation documentation lives in this single folder.
+7. **Do not create documentation files outside `graviton-validation/java-x86-to-graviton/`.** All transformation documentation lives in this single folder.
 8. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce, is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the recommended option, the smallest change the evidence supports (an unattended run applies it and says how to reverse it), and the rest under CHECK Items with the step that settles each.
 9. **Every verdict cites its evidence and says where it was established.** A dependency row without the Phase 1.2.1 check's line (`OK`, `FINDING`, `CHECK`) is incomplete; a code finding without file:line is incomplete. The `Established` column says where the verdict comes from: `predicted` (read from files on any host, as the check does), `emulated` (observed in a `linux/arm64` environment under emulation), `other arm64` (observed on arm64 hardware that is not Graviton, such as an Apple Silicon Mac), `graviton` (observed on a Graviton host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict; only `graviton` and `target` observations pass a check or settle a CHECK. A `predicted` finding stays a finding when a Phase 3 run passes, because a run shows only the code paths it exercised.
 

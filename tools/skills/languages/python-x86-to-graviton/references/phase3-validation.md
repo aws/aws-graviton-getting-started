@@ -21,7 +21,7 @@ Before skipping validation, check for a container runtime that can run `linux/ar
 GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 # host_timeout <seconds> <command...>: a host-side time limit (GNU timeout, else gtimeout, else Python), from the skill's scripts/host_timeout.sh
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/host_timeout.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/host_timeout.sh"; then   # the skill's own file only
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/python-x86-to-graviton/raw
 # Detect a WORKING container runtime. Being on PATH is not enough: a runtime can be installed
 # but unusable (no daemon, no VM, missing permissions), so ask each one for `info`; one that has not answered in 20 seconds counts as unusable.
 CONTAINER_CMD=""
@@ -84,8 +84,8 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CON
   P=("${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: --python-version 3.11 --implementation cp --abi cp311)
   if SITE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-arm64-site.XXXXXX"); then   # a new folder no other user can write
     python3 -I -m pip install "${P[@]}" --target "$SITE" --require-hashes -r requirements-locked.txt
-    mkdir -p graviton-validation/raw && grep -v '^docopt==' requirements.txt > graviton-validation/raw/req-wheels.txt    # --platform needs wheels; pure-Python sdists go in separately
-    python3 -I -m pip install "${P[@]}" --target "$SITE" --upgrade -r graviton-validation/raw/req-wheels.txt -r requirements-dev.txt   # the project's test requirements
+    mkdir -p graviton-validation/python-x86-to-graviton/raw && grep -v '^docopt==' requirements.txt > graviton-validation/python-x86-to-graviton/raw/req-wheels.txt    # --platform needs wheels; pure-Python sdists go in separately
+    python3 -I -m pip install "${P[@]}" --target "$SITE" --upgrade -r graviton-validation/python-x86-to-graviton/raw/req-wheels.txt -r requirements-dev.txt   # the project's test requirements
     python3 -I -m pip install --no-deps --target "$SITE" --upgrade docopt==0.6.2
 
     # Emulated: run imports, startup and tests against that directory, in place on the read-only mount
@@ -99,7 +99,7 @@ The ELF scan from §3.1 needs no emulation: run it on the host against `$SITE` a
 
 ## 3.0 Build Environment Preparation
 
-> **Output: `graviton-validation/06-build-test-results.md`** (Build Environment sections)
+> **Output: `graviton-validation/python-x86-to-graviton/06-build-test-results.md`** (Build Environment sections)
 
 ### Python Runtime Alignment
 
@@ -180,7 +180,7 @@ $CONTAINER_CMD run --rm --init --platform linux/arm64 "python:$PY_TARGET-slim" t
 
 ## 3.1 ARM64 Build Validation
 
-> **Output: `graviton-validation/06-build-test-results.md`** (Build Attempts, Test Failure Classification)
+> **Output: `graviton-validation/python-x86-to-graviton/06-build-test-results.md`** (Build Attempts, Test Failure Classification)
 
 ### Build Strategy
 
@@ -230,7 +230,7 @@ $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 \
 # here, so no part of the scan runs under emulation.
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/native_scan.sh"; then   # the skill's own file only
   BASE=python:3.11-slim   # the image the Dockerfile's last FROM names (§1.1 copied it)
-  TARGET_ROOT=$(awk -F '\t' -v t="$(printf '%s' "$BASE" | tr -c 'A-Za-z0-9._-' '_')" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null); TARGET_PAGE_SIZE=4096   # its folder, recorded under its name
+  TARGET_ROOT=$(awk -F '\t' -v t="$(printf '%s' "$BASE" | tr -c 'A-Za-z0-9._-' '_')" '$1 == t {d = $2} END {print d}' graviton-validation/python-x86-to-graviton/raw/target-roots.txt 2> /dev/null); TARGET_PAGE_SIZE=4096   # its folder, recorded under its name
   case ${TARGET_ROOT#"${TMPDIR:-/tmp}/graviton-target-root."} in "$TARGET_ROOT"|""|*/*) false;; *) [ -d "$TARGET_ROOT" ] && [ -O "$TARGET_ROOT" ];; esac || { TARGET_ROOT=; echo "CHECK: no §1.1 copy of $BASE: copy it with the §1.1 block, or set TARGET_LIBC and TARGET_LIBC_VER to its values"; }
   GV_SITE=$(mktemp -d "${TMPDIR:-/tmp}/gv-site.XXXXXX") || GV_SITE=   # a new folder, or nothing: no copy runs without it
   if [ -n "$GV_SITE" ] && CID=$($CONTAINER_CMD create --platform linux/arm64 app:arm64); then
@@ -260,7 +260,7 @@ Run inside the session-scoped environment from §3.0, then run the ELF scan abov
 
 ## 3.2 Functional Testing on ARM64
 
-> **Output: update `graviton-validation/06-build-test-results.md`**
+> **Output: update `graviton-validation/python-x86-to-graviton/06-build-test-results.md`**
 
 **Import smoke test first.** Import every package that Phase 1.3 found to ship compiled code, plus the project's own extensions, before running the full suite; a missing aarch64 binary shows up here in seconds. For NumPy, also print the BLAS it uses:
 
@@ -347,7 +347,7 @@ A test that compares floating-point values exactly and fails by such a differenc
 
 ## 3.3 Startup Validation
 
-> **Output: update `graviton-validation/06-build-test-results.md`** (Startup Validation)
+> **Output: update `graviton-validation/python-x86-to-graviton/06-build-test-results.md`** (Startup Validation)
 
 Verify:
 1. The application starts without errors
@@ -372,6 +372,6 @@ Recommend to the user for independent testing: performance benchmarking, load te
 
 ## Write Summary
 
-> **Output: `graviton-validation/00-summary.md`**
+> **Output: `graviton-validation/python-x86-to-graviton/00-summary.md`**
 
 After all phases complete, write the summary using the template from [documentation-standards.md](documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.

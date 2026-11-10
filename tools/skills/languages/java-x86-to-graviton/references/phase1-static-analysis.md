@@ -1,10 +1,10 @@
 # Phase 1: Static Compatibility Analysis
 
-Analyze the project without changing its source or build files. All findings are documented in `graviton-validation/` files.
+Analyze the project without changing its source or build files. All findings are documented in `graviton-validation/java-x86-to-graviton/` files.
 
 > **Skill config:** Wherever a step below runs `mvn` or `./gradlew`, substitute `build.maven_invocation` / `build.gradle_invocation` from `skill-config.md` if defined (e.g. `./mvnw`). If it specifies a Maven wrapper (`./mvnw`) that is not present, fall back to bare `mvn`. See [skill-configuration.md](skill-configuration.md).
 
-Phase 1 runs on any host, including x86. Besides the reports in `graviton-validation/`, it writes build output inside the project: §1.2.1 copies the resolved dependency JARs into `target/deps` (Maven) or into each project's `build/deps` (Gradle). In a multi-module Maven reactor, §1.1 and §1.2.1 need `mvn install -DskipTests` first, which builds every module and installs it into the local repository, `~/.m2/repository` by default ([lifecycle](https://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html), [settings](https://maven.apache.org/settings.html)). Three kinds of step run code:
+Phase 1 runs on any host, including x86. Besides the reports in `graviton-validation/java-x86-to-graviton/`, it writes build output inside the project: §1.2.1 copies the resolved dependency JARs into `target/deps` (Maven) or into each project's `build/deps` (Gradle). In a multi-module Maven reactor, §1.1 and §1.2.1 need `mvn install -DskipTests` first, which builds every module and installs it into the local repository, `~/.m2/repository` by default ([lifecycle](https://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html), [settings](https://maven.apache.org/settings.html)). Three kinds of step run code:
 - the build tool, in §1.1, §1.2.1 and §1.3, with the project's build files and the plugins and repositories they name. Gradle evaluates the settings file and the build file of every project, which are code ([build lifecycle](https://docs.gradle.org/current/userguide/build_lifecycle.html)), and runs the init script that §1.2.1 writes; Maven loads the extensions that the project declares in `.mvn/extensions.xml` or in the POM ([extensions](https://maven.apache.org/guides/mini/guide-using-extensions.html)). `./gradlew` and `./mvnw` are scripts from the repository that download the Gradle or Maven version their wrapper properties name ([Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html), [Maven Wrapper](https://maven.apache.org/tools/wrapper/));
 - the OS package lookups of §1.2.2, which run each target image's package tools (`apt-get`, `dnf`) in a container, natively on this host;
 - on a host without Python 3.6 or later, the check program, in a `python:3-slim` container with no network.
@@ -21,7 +21,7 @@ The libc check of §1.1 copies files out of a container that it never starts; th
 
 ## 1.1 Project Structure Analysis
 
-> **Output: `graviton-validation/01-project-assessment.md`** and **`graviton-validation/raw/dependency-tree-full.txt`**
+> **Output: `graviton-validation/java-x86-to-graviton/01-project-assessment.md`** and **`graviton-validation/java-x86-to-graviton/raw/dependency-tree-full.txt`**
 
 ### Determine Deployment Type
 
@@ -33,7 +33,7 @@ find . \( -name .git -o -name .venv -o -name node_modules -o -name cdk.out \) -p
 # Dockerfiles under any name: by name, plus the files a build's -f or --file, Compose dockerfile: and
 # docker/build-push-action file: name. A file is kept when it has a FROM line; a name that is no file
 # here is printed: find that file by hand and add it to the list.
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/java-x86-to-graviton/raw
 { find . \( -name .git -o -name .venv -o -name target -o -name node_modules -o -name cdk.out \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' \) -print
   grep -rnoE --exclude-dir=.git --exclude-dir=.venv --exclude-dir=target --exclude-dir=node_modules --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' --include='Jenkinsfile*' -- \
     "(build|bud)[[:space:]][^;|&#]*(-f[[:space:]]+|--file[[:space:]=]+)[\"']?[^[:space:];|&\"')]+|(dockerfile|file):[[:space:]]*[\"']?[^[:space:]#\"']+" . |
@@ -44,8 +44,8 @@ mkdir -p graviton-validation/raw
       else printf 'not found: %s names %s\n' "$src" "$ref" >&2; fi
     done
 } | while IFS= read -r f; do grep -qiE '^[[:space:]]*FROM[[:space:]]' "$f" && printf '%s\n' "$f"; done |
-  sort -u > graviton-validation/raw/dockerfiles.txt
-cat graviton-validation/raw/dockerfiles.txt
+  sort -u > graviton-validation/java-x86-to-graviton/raw/dockerfiles.txt
+cat graviton-validation/java-x86-to-graviton/raw/dockerfiles.txt
 ```
 
 - Dockerfile or container config present, under any name (`Dockerfile*`, `*.Dockerfile`, `Containerfile`; `docker build -f` and Compose `dockerfile:` accept any name; the block lists them all in `raw/dockerfiles.txt`): **Containerized**
@@ -112,7 +112,7 @@ if [ -n "$GV_ROOT" ] && cid=$(timeout 300 "$GV_CLI" create --platform linux/arm6
     cxx=$(grep -ao 'GLIBCXX_3\.4\.[0-9][0-9]*' "$x" | sort -u -t. -k3,3n | tail -n 1); cxx=${cxx:-"libstdc++ with no GLIBCXX_ versions"}
   else cxx="no libstdc++.so.6"; fi
   echo "$IMG: ${os:-no os-release}; $libc; $cxx; files in $GV_ROOT"
-  mkdir -p graviton-validation/raw && printf '%s\t%s\n' "$GV_TAG" "$GV_ROOT" >> graviton-validation/raw/target-roots.txt   # Phase 3 reads the folder here when this shell is gone
+  mkdir -p graviton-validation/java-x86-to-graviton/raw && printf '%s\t%s\n' "$GV_TAG" "$GV_ROOT" >> graviton-validation/java-x86-to-graviton/raw/target-roots.txt   # Phase 3 reads the folder here when this shell is gone
   # The later checks run once for each target that raw/target-roots.txt records, in this shell or a new one. Remove the
   # folder by that exact path (rm -rf "$GV_ROOT"), never by a wildcard, once the report is written.
 else [ -z "$GV_ROOT" ] || rmdir "$GV_ROOT"; echo "$IMG: no arm64 container was created (no arm64 variant of the image, or the pull failed: see the error above)"; fi   # nothing is recorded for it, so no check runs for this image
@@ -123,7 +123,7 @@ else [ -z "$GV_ROOT" ] || rmdir "$GV_ROOT"; echo "$IMG: no arm64 container was c
 - **EC2 hosts:** the AMI's distribution; on the instance, `ldd --version | head -n 1` prints the glibc version.
 - **Page size:** a container uses its host's kernel, so it comes from the EC2 hosts or Kubernetes nodes: run `getconf PAGESIZE` there (AlmaLinux 8 reported 65536; AlmaLinux 9 and Amazon Linux 2023, 4096). If no host can be reached, leave it out; the check then lists the files a kernel with 64 KB pages refuses.
 
-§1.2.1 runs the check once for each target that `raw/target-roots.txt` records, and writes `raw/native-check-<target>.txt` for each. For a target with no image, record a name of its own (letters, digits, `.`, `_` and `-`: the name becomes part of the output file names) and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/raw/target-roots.txt` for an Amazon Linux 2023 host. Set `GV_PAGE=65536` to add a measured page size.
+§1.2.1 runs the check once for each target that `raw/target-roots.txt` records, and writes `raw/native-check-<target>.txt` for each. For a target with no image, record a name of its own (letters, digits, `.`, `_` and `-`: the name becomes part of the output file names) and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/java-x86-to-graviton/raw/target-roots.txt` for an Amazon Linux 2023 host. Set `GV_PAGE=65536` to add a measured page size.
 
 ### Generate Dependency Tree
 
@@ -134,16 +134,16 @@ else [ -z "$GV_ROOT" ] || rmdir "$GV_ROOT"; echo "$IMG: no arm64 container was c
 # SEPARATE tree per module, leaving the root file with only the parent-pom line — a false
 # all-clear). A redirect captures the aggregated reactor tree. Avoid `-q` (suppresses the tree).
 mvn dependency:tree -DoutputType=text --no-transfer-progress \
-  > graviton-validation/raw/dependency-tree-full.txt
+  > graviton-validation/java-x86-to-graviton/raw/dependency-tree-full.txt
 
 # Gradle
 ./gradlew dependencies --configuration runtimeClasspath --console=plain \
-  > graviton-validation/raw/dependency-tree-full.txt
+  > graviton-validation/java-x86-to-graviton/raw/dependency-tree-full.txt
 
 # Sanity check: the tree must contain real dependency lines, not just the project/parent pom.
 # A merely non-empty file is NOT sufficient (a reactor root or a failed build can produce a
 # file with no actual dependencies) — assert at least one resolved artifact coordinate.
-grep -q ':jar:\|:war:\|--- ' graviton-validation/raw/dependency-tree-full.txt \
+grep -q ':jar:\|:war:\|--- ' graviton-validation/java-x86-to-graviton/raw/dependency-tree-full.txt \
   || echo "WARNING: dependency tree has no resolved artifacts — for a multi-module reactor run 'mvn install -DskipTests' first, and confirm the build succeeded (and that you did not pass -q or -DoutputFile)."
 ```
 
@@ -156,7 +156,7 @@ grep -q ':jar:\|:war:\|--- ' graviton-validation/raw/dependency-tree-full.txt \
 
 ## 1.2 Native Library Validation (.so File Analysis)
 
-> **Output: `graviton-validation/02-native-library-report.md`**
+> **Output: `graviton-validation/java-x86-to-graviton/02-native-library-report.md`**
 
 Native libraries incompatible with ARM64 exist in two forms: **statically bundled** inside JARs and **dynamically extracted at runtime**. Both must be validated.
 
@@ -201,14 +201,14 @@ GV_MNT=(-v "${PWD}:${PWD}:ro" -v "${GV_CHECK}:${GV_CHECK}:ro")
 while IFS= read -r t; do case $t in glibc=*|"") continue;; esac   # only the folders the §1.1 block made: the list is a file in the project
   case ${t#"${TMPDIR:-/tmp}/graviton-target-root."} in "$t"|""|*/*) echo "CHECK: $t not mounted: not a folder that the §1.1 block made";;
     *) [ -d "$t" ] && [ -O "$t" ] && GV_MNT+=(-v "${t}:${t}:ro");; esac
-done < <(cut -f2 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u)
+done < <(cut -f2 graviton-validation/java-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u)
 for d in "$HOME/.m2" "$HOME/.gradle"; do [ -d "$d" ] && GV_MNT+=(-v "${d}:${d}:ro"); done   # §1.3 checks JARs in the local repositories too
 if python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 6))' 2> /dev/null; then GV_PY=(python3)
 else GV_PY=("${CONTAINER_CMD:-docker}" run --rm --network none "${GV_MNT[@]}" -w "$PWD" public.ecr.aws/docker/library/python:3-slim python3); fi
-mkdir -p graviton-validation/raw
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that §1.1 recorded; with none, one run named target
+mkdir -p graviton-validation/java-x86-to-graviton/raw
+for GV_TAG in $(cut -f1 graviton-validation/java-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that §1.1 recorded; with none, one run named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/java-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 # The check judges the files of one run as one classpath, so it runs once for each module's build output (target/ or
@@ -216,7 +216,7 @@ GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#
 { find . \( -name .git -o -name node_modules \) -prune -o -type d \( -name target -o -name build \) -prune -print | sort |
     while IFS= read -r out; do echo "== $out"; "${GV_PY[@]}" "$GV_CHECK" "${GV_T[@]}" "$out"; done
   echo "== repository files"; "${GV_PY[@]}" "$GV_CHECK" "${GV_T[@]}" --source-tree .
-} | tee "graviton-validation/raw/native-check-$GV_TAG.txt"   # one file per target, named for it
+} | tee "graviton-validation/java-x86-to-graviton/raw/native-check-$GV_TAG.txt"   # one file per target, named for it
 done
 else echo "ERROR: set GV_JAVA_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
@@ -270,7 +270,7 @@ else GV_PY=("${CONTAINER_CMD:-docker}" run --rm --network none -v "${d}:${d}:ro"
   while IFS= read -r t; do case $t in glibc=*|"") continue;; esac   # only the folders the §1.1 block made: the list is a file in the project
     case ${t#"${TMPDIR:-/tmp}/graviton-target-root."} in "$t"|""|*/*) echo "CHECK: $t not mounted: not a folder that the §1.1 block made";;
       *) [ -d "$t" ] && [ -O "$t" ] && GV_PY+=(-v "${t}:${t}:ro");; esac
-  done < <(cut -f2 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u)
+  done < <(cut -f2 graviton-validation/java-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u)
   GV_PY+=(public.ecr.aws/docker/library/python:3-slim python3); fi
 if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
   # Unpack an archive only when its files add up to at most 2 GiB (a zip: stored or deflated members only); a larger one
@@ -301,9 +301,9 @@ if n > 1 << 31:
                 || echo "CHECK: $URL is an .rpm this host cannot unpack (needs bsdtar, or rpm2cpio and GNU cpio)" ;;
     *) gv_fits "$d/download" "$URL" && tar -xf "$d/download" -C "$d/x" 2> /dev/null ;;   # a zip, such as a JAR, the check reads as it is
   esac
-  for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that §1.1 recorded; with none, one scan named target
+  for GV_TAG in $(cut -f1 graviton-validation/java-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that §1.1 recorded; with none, one scan named target
   case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-  GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+  GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/java-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
   case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
   GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
   echo "== $GV_TAG"; "${GV_PY[@]}" "$GV_CHECK" "${GV_T[@]}" "$d" | sed "s#$d/##g"
@@ -392,9 +392,9 @@ For x86-only native files: check for source in the repository, document recompil
 GV_JAVA_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 GV_CHECK=$GV_JAVA_SKILL_DIR/scripts/java_graviton_check.py
 if case $GV_JAVA_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one check per target that §1.1 recorded; with none, one check named target
+for GV_TAG in $(cut -f1 graviton-validation/java-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one check per target that §1.1 recorded; with none, one check named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/java-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 python3 "$GV_CHECK" "${GV_T[@]}" libname.so   # no FINDING line (without python3: "${GV_PY[@]}" of §1.2.1)
@@ -404,7 +404,7 @@ else echo "ERROR: set GV_JAVA_SKILL_DIR on the first line to the skill folder th
 
 ## 1.3 Dependency ARM64 Compatibility Analysis
 
-> **Output: `graviton-validation/03-dependency-compatibility-report.md`** and **`graviton-validation/raw/dependency-tree-native.txt`**
+> **Output: `graviton-validation/java-x86-to-graviton/03-dependency-compatibility-report.md`** and **`graviton-validation/java-x86-to-graviton/raw/dependency-tree-native.txt`**
 
 **IMPORTANT:** ARM64-incompatible native code can be introduced through transitive dependencies. A pure Java direct dependency may pull in a transitive with native code. Analyze the full tree.
 
@@ -417,11 +417,11 @@ The `-Dincludes` / grep filters below are a convenience view of *well-known* nat
 # (-DoutputFile writes a separate per-module file in a reactor → false all-clear).
 mvn dependency:tree -Dincludes=net.java.dev.jna,io.netty,org.xerial.snappy,org.lz4,com.github.luben,org.rocksdb,org.xerial,org.conscrypt,com.google.protobuf \
   --no-transfer-progress \
-  > graviton-validation/raw/dependency-tree-native.txt
+  > graviton-validation/java-x86-to-graviton/raw/dependency-tree-native.txt
 
 # Gradle
 ./gradlew dependencies --configuration runtimeClasspath | grep -E "jna|netty-transport-native|snappy|lz4|zstd|rocksdb|sqlite|conscrypt|protobuf|jnr|leveldbjni" \
-  > graviton-validation/raw/dependency-tree-native.txt
+  > graviton-validation/java-x86-to-graviton/raw/dependency-tree-native.txt
 ```
 
 ### Classify Each Dependency
@@ -495,7 +495,7 @@ Also check **os-maven-plugin**: older releases mis-detect aarch64 → confirm it
 
 ## 1.4 Architecture-Specific Code Detection
 
-> **Output: `graviton-validation/04-code-scan-findings.md`**
+> **Output: `graviton-validation/java-x86-to-graviton/04-code-scan-findings.md`**
 
 Scan the source tree for architecture-sensitive patterns:
 
@@ -514,9 +514,9 @@ grep -rnE 'System\.getProperty\("os\.(arch|name)"\)|Native\.load|System\.loadLib
 grep -rlE '"(amd64|x86_64)"' --include="*.java" --include="*.kt" . 2>/dev/null \
   | while IFS= read -r f; do grep -qE '"aarch64"|"arm64"' "$f" || printf '%s\n' "$f"; done   # files comparing amd64/x86_64 but NOT aarch64
 # Dockerfiles under any name, and deployment descriptors
-if [ -f graviton-validation/raw/dockerfiles.txt ]; then
-  while IFS= read -r f; do grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|x86_64|amd64' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done < graviton-validation/raw/dockerfiles.txt
-else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt"; fi
+if [ -f graviton-validation/java-x86-to-graviton/raw/dockerfiles.txt ]; then
+  while IFS= read -r f; do grep -nE -- '--platform=|@sha256:|BUILDPLATFORM|TARGETPLATFORM|TARGETARCH|x86_64|amd64' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"; done < graviton-validation/java-x86-to-graviton/raw/dockerfiles.txt
+else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/java-x86-to-graviton/raw/dockerfiles.txt"; fi
 grep -rniE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --exclude-dir=node_modules --exclude-dir=cdk.out --include='*.y*ml' --include='*.json' --include='*.tf' \
   'architectures?"?[[:space:]]*[:=]|kubernetes\.io/arch|nodeselector|cpu_?architecture"?[[:space:]]*[:=]|ami_?type"?[[:space:]]*[:=]|instance_?types?"?[[:space:]]*[:=]|ami-[0-9a-f]{8,17}|^functions:|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?compatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"|x86_64|amd64' . 2>/dev/null || true
 # CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
@@ -560,34 +560,34 @@ A Graviton instance type is a sizing decision: record it under User Decisions Pe
 Every image the project builds from, tests with or deploys has to list `linux/arm64`, including images a library starts at run time: Testcontainers for Java 1.6.0 to 1.15.1 start a Ryuk image with no arm64 build (add it to the list), and 1.15.2 starts `testcontainers/ryuk:0.3.1`, which has one. List the images and read each one's platforms from its registry, without pulling it:
 
 ```bash
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/java-x86-to-graviton/raw
 # Image references: FROM lines of the Dockerfiles in raw/dockerfiles.txt (§1.1; not stage names), image: keys in
 # YAML and JSON, image names in test code. A reference built from a variable is left out: resolve it by hand.
-{ if [ -f graviton-validation/raw/dockerfiles.txt ]; then
+{ if [ -f graviton-validation/java-x86-to-graviton/raw/dockerfiles.txt ]; then
     while IFS= read -r f; do
       awk 'toupper($1) == "FROM" { i = ($2 ~ /^--platform=/) ? 3 : 2; if (!($i in s)) print $i
              for (k = i + 1; k < NF; k++) if (toupper($k) == "AS") s[$(k + 1)] = 1 }' "$f"
-    done < graviton-validation/raw/dockerfiles.txt
-  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt" >&2; fi
+    done < graviton-validation/java-x86-to-graviton/raw/dockerfiles.txt
+  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/java-x86-to-graviton/raw/dockerfiles.txt" >&2; fi
   grep -rhoiE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --exclude-dir=node_modules --include='*.y*ml' --include='*.json' \
     '"?image(uri)?"?[[:space:]]*:[[:space:]]*"?[a-z0-9][^"[:space:],}]*' . |
     sed -E 's/^"?[Ii][Mm][Aa][Gg][Ee]([Uu][Rr][Ii])?"?[[:space:]]*:[[:space:]]*"?//'
   grep -rhoE --exclude-dir=.git --exclude-dir=target --exclude-dir=.venv --include='*.java' --include='*.kt' \
     '(DockerImageName\.parse|Container(<[^>]*>)?)\("[^"]+"' . | sed -E 's/.*\("//; s/"$//'
-} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/raw/images.txt
+} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/java-x86-to-graviton/raw/images.txt
 # Platforms per image, from its registry (docker CLI). Without docker, or a login a private registry needs, the line is CHECK.
 while IFS= read -r img; do
   if ! out=$(docker manifest inspect -v "$img" 2>&1); then printf 'CHECK   %s: %s\n' "$img" "$(printf '%s\n' "$out" | grep -v '^errors:$' | head -n 1)"
   elif printf '%s' "$out" | grep -q '"architecture": "arm64"'; then printf 'OK      %s\n' "$img"
   else printf 'FINDING %s: no linux/arm64 build\n' "$img"; fi
-done < graviton-validation/raw/images.txt
+done < graviton-validation/java-x86-to-graviton/raw/images.txt
 ```
 
 `docker manifest inspect -v` prints every platform of a multi-architecture image and the one platform of a single-architecture image. A FINDING is fixed in Phase 2.4. On an ARM64 host a list without arm64 stops the pull (`no matching manifest for linux/arm64/v8 in the manifest list entries`), while a single amd64 manifest is pulled and its container stops with `exec format error` (`--platform linux/arm64` stops that pull: `was found but does not match the specified platform: wanted linux/arm64, actual: linux/amd64`).
 
 ## 1.5 Java Version Compatibility Check
 
-> **Output: `graviton-validation/01-project-assessment.md`** (Java Environment section)
+> **Output: `graviton-validation/java-x86-to-graviton/01-project-assessment.md`** (Java Environment section)
 
 1. Document current Java version AND JDK distribution (e.g., "OpenJDK 21", "Corretto 17")
 2. JDK 8: Supported with limitations. JDK 11+: Fully supported.

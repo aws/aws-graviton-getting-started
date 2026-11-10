@@ -45,7 +45,7 @@ All commands below were executed on the fixture variants used to build this skil
 
 | Step | Command | Notes |
 |---|---|---|
-| Flat pins | the file itself. Resolve unpinned or ranged entries first: `python3 -I -m pip install --dry-run --ignore-installed --report graviton-validation/raw/requirements-report.json -r requirements.txt` then extract `name==version` from `install[].metadata` | `--dry-run --report` (pip >= 22.2) resolves without installing |
+| Flat pins | the file itself. Resolve unpinned or ranged entries first: `python3 -I -m pip install --dry-run --ignore-installed --report graviton-validation/python-x86-to-graviton/raw/requirements-report.json -r requirements.txt` then extract `name==version` from `install[].metadata` | `--dry-run --report` (pip >= 22.2) resolves without installing |
 | Dependency tree | `pip install --dry-run --report`: `install[].requested` is `true` for direct dependencies, `false` for transitives | pip has no tree command; `pipdeptree` is a third-party package and needs an installed environment |
 | aarch64 probe | `pip download --only-binary=:all: "${PLAT[@]}" --python-version 3.11 --implementation cp --abi cp311 <pin>` per pin, or the whole file at once with `pip install --dry-run --only-binary=:all: "${PLAT[@]}" --target /tmp/probe -r requirements.txt` | `PLAT` holds one `--platform` for every tag the target's libc accepts (`platforms` in wheel-verification.md section 3); pip matches each value exactly, so a shorter list misses wheels. See wheel-verification.md sections 3 and 8 |
 | Hash lock check | `pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes "${PLAT[@]}" --python-version 3.11 --implementation cp --abi cp311 --target /tmp/probe -r requirements-locked.txt` | fails with `THESE PACKAGES DO NOT MATCH THE HASHES` when only x86_64 hashes are present |
@@ -78,7 +78,7 @@ All commands below were executed on the fixture variants used to build this skil
 
 | Step | Command | Notes |
 |---|---|---|
-| Flat pins | `uv export --no-dev --format requirements.txt -o graviton-validation/raw/requirements-resolved.txt` (add `--no-hashes` for the probe input) | executed; output lists every locked package with `--hash` lines for all files |
+| Flat pins | `uv export --no-dev --format requirements.txt -o graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt` (add `--no-hashes` for the probe input) | executed; output lists every locked package with `--hash` lines for all files |
 | Tree | `uv tree --no-dev` | executed |
 | aarch64 probe | native: `uv pip compile --python-platform aarch64-manylinux_2_34 --python-version 3.11 --only-binary :all: --no-deps requirements-resolved.txt > /dev/null`; or the pip probe on the export | executed: `Because blosc2==0.6.3 has no usable wheels and you require blosc2==0.6.3, we can conclude that your requirements are unsatisfiable.` Use the highest platform value not above the target's glibc (Phase 1.1): uv 0.12.21 accepts `aarch64-manylinux_2_17`, `_2_28` and `_2_31` to `_2_40` (and `aarch64-unknown-linux-musl`), so Amazon Linux 2023 takes `_2_34` and Amazon Linux 2 `_2_17`. With `_2_17`, polars 1.0.0 (`manylinux_2_24`) and confluent-kafka 2.15.1 (`manylinux_2_28`) fail although Amazon Linux 2023 accepts both; wheels between two values (polars 1.0.0 on Amazon Linux 2) need the pip probe. Keep the output on stdout: with `-o /dev/null`, uv exits 2 with `Permission denied` whenever the resolution succeeds |
 | Pin / override | direct: edit `[project].dependencies`; transitive: `[tool.uv] override-dependencies = ["msgpack==1.1.0"]` (replaces the requirement) or `constraint-dependencies = [...]` (narrows it) | executed: override produced `msgpack 1.1.0` in the regenerated lock |
@@ -89,7 +89,7 @@ All commands below were executed on the fixture variants used to build this skil
 
 | Step | Command | Notes |
 |---|---|---|
-| Flat pins | `poetry export --format requirements.txt --without-hashes --output graviton-validation/raw/requirements-resolved.txt` | `export` is a **plugin** in Poetry 2.x: a bare install reports `The requested command export does not exist` (verified). Install it with `poetry self add poetry-plugin-export==1.10.1`, which needs Poetry 2.1 or later (or, when Poetry itself is a uv tool, `uv tool install poetry==2.5.1 --with poetry-plugin-export==1.10.1`). Exported lines carry environment markers (`; python_version >= "3.11"`); keep them and run the Phase 1.3 probe with the project's interpreter, which evaluates them (executed: the fixture's Poetry and uv exports gave the same `MUST UPGRADE` and `CHECK SDIST/ABI` verdicts as its pip variant) |
+| Flat pins | `poetry export --format requirements.txt --without-hashes --output graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt` | `export` is a **plugin** in Poetry 2.x: a bare install reports `The requested command export does not exist` (verified). Install it with `poetry self add poetry-plugin-export==1.10.1`, which needs Poetry 2.1 or later (or, when Poetry itself is a uv tool, `uv tool install poetry==2.5.1 --with poetry-plugin-export==1.10.1`). Exported lines carry environment markers (`; python_version >= "3.11"`); keep them and run the Phase 1.3 probe with the project's interpreter, which evaluates them (executed: the fixture's Poetry and uv exports gave the same `MUST UPGRADE` and `CHECK SDIST/ABI` verdicts as its pip variant) |
 | Tree | `poetry show --tree` | executed; shows `mkl` pulling `intel-openmp`, `tbb`, `onemkl-license` |
 | aarch64 probe | pip probe on the export | `poetry install` resolves for the running platform only; there is no target-platform flag |
 | Pin / override | direct: edit the dependency in `pyproject.toml`; transitive: Poetry has no override table, so add the package as an explicit dependency with the needed constraint (`poetry add --lock "msgpack==1.1.0"`) and document why | executed; `poetry add --lock` wrote `"msgpack (==1.1.0)"` to `[project].dependencies` and the lock |
@@ -113,19 +113,19 @@ conda packages and pip packages inside the same environment are different worlds
 Resolve the pip section with the conda-side pins as constraints (`-c`), so pip does not choose its own versions of packages conda already provides. Run it in the project-version environment from Phase 1.1. A constraint only applies to the PyPI project of the same name, so rename any pin whose conda package name differs from its PyPI name:
 
 ```bash
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/python-x86-to-graviton/raw
 awk '/^[[:space:]]*- pip:[[:space:]]*$/ {f=1; ind=index($0,"-"); next}
      f { if (index($0,"-") <= ind || $0 !~ /^[[:space:]]*-/) {f=0; next}
-         sub(/^[[:space:]]*-[[:space:]]*/, ""); print }' environment.yml > graviton-validation/raw/conda-pip-section.txt
+         sub(/^[[:space:]]*-[[:space:]]*/, ""); print }' environment.yml > graviton-validation/python-x86-to-graviton/raw/conda-pip-section.txt
 awk '/^dependencies:/ {f=1; next} f && /^[[:space:]]*- pip:/ {exit}
      f && /^[[:space:]]*- [A-Za-z0-9_.-]+=[0-9]/ {sub(/^[[:space:]]*- /, ""); split($0, a, "=");
-       if (a[1] != "python" && a[1] != "pip") print a[1] "==" a[2]}' environment.yml > graviton-validation/raw/conda-constraints.txt
-python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/raw/dependency-tree-pip-section.json \
-  -c graviton-validation/raw/conda-constraints.txt -r graviton-validation/raw/conda-pip-section.txt
+       if (a[1] != "python" && a[1] != "pip") print a[1] "==" a[2]}' environment.yml > graviton-validation/python-x86-to-graviton/raw/conda-constraints.txt
+python3 -I -m pip install --dry-run --ignore-installed -q --report graviton-validation/python-x86-to-graviton/raw/dependency-tree-pip-section.json \
+  -c graviton-validation/python-x86-to-graviton/raw/conda-constraints.txt -r graviton-validation/python-x86-to-graviton/raw/conda-pip-section.txt
 python3 -I - <<'EOF'
 import json
-r = json.load(open("graviton-validation/raw/dependency-tree-pip-section.json"))
-with open("graviton-validation/raw/requirements-resolved.txt", "w") as out:
+r = json.load(open("graviton-validation/python-x86-to-graviton/raw/dependency-tree-pip-section.json"))
+with open("graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt", "w") as out:
     for i in r["install"]:
         kind = "direct" if i.get("requested") else "transitive"
         out.write(f"{i['metadata']['name']}=={i['metadata']['version']}  # {kind} via environment.yml pip section\n")

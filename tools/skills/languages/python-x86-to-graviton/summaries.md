@@ -22,10 +22,10 @@ This file is the canonical inventory of the skill. Every file in the skill folde
 
 * "references/package-manager-mapping.md": "Detection markers and per-manager commands (flat-pin export, dependency tree, aarch64 probe, pin and override mechanism, lock regeneration, install and test) for pip, pip-tools, setuptools/PEP 621, uv, Poetry and conda, plus routes onto the pip path for Pipenv, PDM, Hatch, vendored site-packages and Lambda layers. Read in Phase 1.1 to identify the manager and whenever a step needs that manager's command."
 
-* "references/documentation-standards.md": "Defines the mandatory graviton-validation/ output folder structure, canonical filenames (00-summary.md through 06-build-test-results.md plus raw/), required sections for each file with the Required/Improvement/Compatible split. Read before Phase 1."
+* "references/documentation-standards.md": "Defines the mandatory graviton-validation/python-x86-to-graviton/ output folder structure, canonical filenames (00-summary.md through 06-build-test-results.md plus raw/), required sections for each file with the Required/Improvement/Compatible split. Read before Phase 1."
 
 * "references/skill-configuration.md": "Optional. Defines the skill-config.md configuration teams use to steer the package manager, package index, validation interpreter tool, test command, container registry, deployment vocabulary, and target hosts and images without forking the skill. Includes the field reference and precedence rules (configuration steers HOW, never widens scope; the declared Python version changes only through python.interpreter_bump), plus the shared vs per-language section layout. Read before Phase 1 only if a skill-config.md is present."
 
 * "references/skill-config.template.md": "Copyable template for the optional skill configuration. Teams copy it to skill-config.md at their own project root and fill in shared (container/deployment/CI/target) and per-language (Python) preferences. Not read during a run; it is the authoring starting point for skill-configuration.md."
 
-* "README.md": "Human-facing overview: what the skill does, install quick start, how to enable the optional skill-config.md, and the graviton-validation/ output listing. Not read during a run; it points humans at this index for the file map."
+* "README.md": "Human-facing overview: what the skill does, install quick start, how to enable the optional skill-config.md, and the graviton-validation/python-x86-to-graviton/ output listing. Not read during a run; it points humans at this index for the file map."

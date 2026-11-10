@@ -13,11 +13,11 @@ This document defines the output folder, canonical filenames and required conten
 
 ## Output Folder Structure
 
-All output goes into one folder, `graviton-validation/`, at the project root. Create it and its `raw/` subfolder before any analysis.
+All output goes into one folder, `graviton-validation/python-x86-to-graviton/`, at the project root. Each skill has its own folder under `graviton-validation/`, so two skills run on one repository (for example a Java service and a Python Lambda function) keep their own reports and their own `raw/target-roots.txt`. Create it and its `raw/` subfolder before any analysis.
 
 ```
 <project-root>/
-└── graviton-validation/
+└── graviton-validation/python-x86-to-graviton/
     ├── 00-summary.md                         # Roll-up of findings and exit criteria (written last)
     ├── 01-project-assessment.md              # Deployment type, package manager(s), interpreter, target OS/glibc, config overrides
     ├── 02-native-library-report.md         # In-repo extensions, vendored binaries, ctypes/cffi loads, Lambda layers
@@ -35,14 +35,14 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 
 ## Agent Instructions
 
-1. **Create `graviton-validation/` and `graviton-validation/raw/` first.** `mkdir -p graviton-validation/raw` is the first action of Phase 1.
+1. **Create `graviton-validation/python-x86-to-graviton/` and `graviton-validation/python-x86-to-graviton/raw/` first.** `mkdir -p graviton-validation/python-x86-to-graviton/raw` is the first action of Phase 1.
 2. **Use exactly these filenames.** Do not rename, renumber or add top-level files. Additional machine output goes under `raw/` with a descriptive name.
 3. **Write progressively.** Each phase step writes its section as it completes; do not batch everything at the end.
 4. **Every verdict cites its evidence and says where it was established.** A dependency row without a probe command and a wheel filename (or a `from versions:` list, or a PyPI files-list observation) is incomplete. The "validated by" and "evidence" columns below are mandatory. The `Established` column says where the verdict comes from: `predicted` (read from files or the index, on any host, as everything in Phase 1 is), `emulated` (observed in a `linux/arm64` environment under emulation), `other arm64` (observed on arm64 hardware that is not Graviton, such as an Apple Silicon Mac), `graviton` (observed on a Graviton host that is not the target), or `target` (observed on the target: its Graviton generation, OS image and page size, or the arm64 Lambda function). Phase 3 updates the column when it observes a verdict; only `graviton` and `target` observations pass a check or settle a CHECK. A `predicted` finding stays a finding when an observation passes, because a fallback can hide it in one setup (the loaded check in Phase 3.2).
 5. **Three labels, kept apart.** Findings are MUST UPGRADE, RECOMMENDED UPGRADE or COMPATIBLE (plus OUT OF SCOPE notes). Never list a recommendation among required changes, and never apply one. A finding that waits for a user decision, or for evidence Phase 1 cannot produce (a CHECK line of the Phase 1.3 loop), is CHECK until it gets one of the three labels: list user decisions under User Decisions Pending with the label each option leads to and the recommended option, the smallest change the evidence supports (an unattended run applies it and says how to reverse it), and the rest under CHECK Items with the step that settles each.
 6. **Empty sections stay, with "No findings".** Omitting a section is ambiguous (not checked, or nothing found?). Write the heading and an explicit statement.
 7. **`00-summary.md` is written last** and references the detail files rather than repeating them.
-8. **Nothing outside `graviton-validation/`.** No other documentation files are created by the transformation.
+8. **Nothing outside `graviton-validation/python-x86-to-graviton/`.** No other documentation files are created by the transformation.
 
 ## File Specifications
 
@@ -76,7 +76,7 @@ All output goes into one folder, `graviton-validation/`, at the project root. Cr
 | 8 | No ARM64-related test failures | ✅ PASS / ❌ FAIL | |
 | 9 | Application starts on ARM64 (`platform.machine()` reports aarch64) | ✅ PASS / ❌ FAIL | |
 | 10 | Python version unchanged, or changed only through an approved `python.interpreter_bump` | ✅ PASS / ❌ FAIL | |
-| 11 | All files in `graviton-validation/` use the canonical names | ✅ PASS / ❌ FAIL | |
+| 11 | All files in `graviton-validation/python-x86-to-graviton/` use the canonical names | ✅ PASS / ❌ FAIL | |
 
 A criterion that runs on ARM64 passes only on a Graviton host or the target (Phase 3, "Match the production hosts"). NOT RUN is for one that did not run there: give where it did run, or why it could not (for example an image build that does not finish under emulation), in Notes, and list it under Remaining Concerns.
 

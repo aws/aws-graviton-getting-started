@@ -12,7 +12,7 @@ Apply fixes for ARM64-blocking issues identified in Phase 1. Update ONLY what is
 
 ## 2.1 Native Library Resolution
 
-> **Output: update `graviton-validation/02-native-library-report.md`** (Resolution Details)
+> **Output: update `graviton-validation/python-x86-to-graviton/02-native-library-report.md`** (Resolution Details)
 
 For each x86-only binary and each x86-only build flag identified in Phase 1.2 and 1.4:
 
@@ -68,7 +68,7 @@ if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.sh" 
   while [ "$i" -ge 17 ]; do PLAT+=(--platform "manylinux_2_${i}_aarch64"); i=$((i - 1)); done
   python3 -I -m pip install "${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: \
     --python-version "$PYVER" --implementation cp --target python/ -r layer-requirements.txt
-  GV_TDIR=$(awk -F '\t' -v t="public.ecr.aws_lambda_python_$PYVER" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # §1.1's copy of public.ecr.aws/lambda/python:$PYVER, the runtime's OS
+  GV_TDIR=$(awk -F '\t' -v t="public.ecr.aws_lambda_python_$PYVER" '$1 == t {d = $2} END {print d}' graviton-validation/python-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # §1.1's copy of public.ecr.aws/lambda/python:$PYVER, the runtime's OS
   if case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac; then TARGET_ROOT=$GV_TDIR TARGET_LIBC= TARGET_LIBC_VER= native_scan python   # no FINDING line
   else echo "CHECK: no §1.1 copy of public.ecr.aws/lambda/python:$PYVER: the scan judges the glibc release only"; TARGET_ROOT= native_scan python; fi
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
@@ -99,7 +99,7 @@ except (OSError, RuntimeError):
 
 ## 2.2 Dependency Compatibility Updates
 
-> **Output: update `graviton-validation/03-dependency-compatibility-report.md`**
+> **Output: update `graviton-validation/python-x86-to-graviton/03-dependency-compatibility-report.md`**
 
 Update ONLY dependencies flagged as MUST UPGRADE in Phase 1.3. Do NOT upgrade compatible dependencies. Prefer the *lowest* version that publishes an aarch64 wheel the target accepts (the project's interpreter, and the target's C library and glibc, which the probe's platform tags encode), not the latest: read the candidates from the probe's `from versions:` list (Phase 1.3), pick the lowest one at or above the current pin, and **probe that exact candidate** before writing it ([wheel-verification.md](wheel-verification.md) §3). Availability is not monotonic, so a version between the pin and the candidate may have no wheel.
 
@@ -173,11 +173,11 @@ The default NumPy and SciPy wheels use OpenBLAS, so removing `mkl` leaves NumPy 
 
 **Interpreter-ABI blockers:** if a required package only ships aarch64 wheels for a different interpreter, follow `python.interpreter_bump` (Phase 1.5): `never` leaves the pin and reports it; `ask` waits for approval; `approved=<3.X>` applies the bump and records it in `01-project-assessment.md`. An approved bump is applied together with every pin change it requires (Phase 1.5, "One interpreter for the whole dependency set"): regenerate the lock through the project's manager at the new interpreter, then rerun the §1.3 loop with the new `PYVER`.
 
-After the changes, keep the Phase 1 evidence that `03-dependency-compatibility-report.md` cites (`cp graviton-validation/raw/wheel-availability.txt graviton-validation/raw/wheel-availability-phase1.txt`, and the same for `requirements-resolved.txt`), then re-run the Phase 1.1 flat-pin step, the Phase 1.3 probe and the hash-lock check.
+After the changes, keep the Phase 1 evidence that `03-dependency-compatibility-report.md` cites (`cp graviton-validation/python-x86-to-graviton/raw/wheel-availability.txt graviton-validation/python-x86-to-graviton/raw/wheel-availability-phase1.txt`, and the same for `requirements-resolved.txt`), then re-run the Phase 1.1 flat-pin step, the Phase 1.3 probe and the hash-lock check.
 
 ## 2.3 Architecture Detection Code Updates
 
-> **Output: update `graviton-validation/04-code-scan-findings.md`** (Changes Applied)
+> **Output: update `graviton-validation/python-x86-to-graviton/04-code-scan-findings.md`** (Changes Applied)
 
 Add `aarch64` handling to all architecture detection:
 
@@ -213,7 +213,7 @@ Change only the architecture handling. The fixture's deploy script keeps its URL
 
 ## 2.4 Build Configuration Updates
 
-> **Output: update `graviton-validation/04-code-scan-findings.md`** (Changes Applied)
+> **Output: update `graviton-validation/python-x86-to-graviton/04-code-scan-findings.md`** (Changes Applied)
 
 **Extension build flags:** apply x86-only flags only when building on x86:
 
@@ -286,7 +286,7 @@ Executed in us-west-2, it listed `m6g.xlarge`, `m7g.xlarge`, `m8g.xlarge` and `m
 
 ## 2.5 Graviton-Specific Runtime Recommendations
 
-> **Output: `graviton-validation/05-runtime-configuration.md`**
+> **Output: `graviton-validation/python-x86-to-graviton/05-runtime-configuration.md`**
 
 Do NOT apply runtime settings automatically. Document recommendations in the report for the team to evaluate during performance testing, each with its evidence level from the validation ladder in [agent-scope-boundaries.md](agent-scope-boundaries.md) and the exact source (Phase 2.5 for a level-A row, the link for a level-B row). Include only rows for libraries the project actually uses.
 

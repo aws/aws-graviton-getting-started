@@ -37,13 +37,13 @@ If a `skill-config.md` exists at the project root, read it before Phase 1 and ap
 
 ## Transformation Workflow
 
-**Assessment only:** when the user asks for an assessment, or for the project to stay unchanged, skip Version Control Setup, run Phase 1 and stop. First read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) in full, then run the blocks that apply, in order: the verdicts come from the checks those blocks run, and your own inspection of binaries or package files does not replace them. A `CHECK` those blocks print stays a `CHECK` in the report, never a PASS, with the step that settles it. Phase 1 changes none of the project's existing files; it writes the reports Documentation Setup lists to a new `graviton-validation/` folder, `00-summary.md` last. Report what Phases 2 and 3 would change or run as recommendations, each with its default.
+**Assessment only:** when the user asks for an assessment, or for the project to stay unchanged, skip Version Control Setup, run Phase 1 and stop. First read [references/phase1-static-analysis.md](references/phase1-static-analysis.md) in full, then run the blocks that apply, in order: the verdicts come from the checks those blocks run, and your own inspection of binaries or package files does not replace them. A `CHECK` those blocks print stays a `CHECK` in the report, never a PASS, with the step that settles it. Phase 1 changes none of the project's existing files; it writes the reports Documentation Setup lists to a new `graviton-validation/java-x86-to-graviton/` folder, `00-summary.md` last. Report what Phases 2 and 3 would change or run as recommendations, each with its default.
 
 Copy this checklist into your response and check off each step:
 
 ```
 ARM64 migration progress:
-- [ ] Baseline commit; `graviton-validation/raw/` created; `skill-config.md` read if present
+- [ ] Baseline commit; `graviton-validation/java-x86-to-graviton/raw/` created; `skill-config.md` read if present
 - [ ] 1.1 Deployment type, modules, target OS and libc, dependency tree, risk categories (01, raw/)
 - [ ] 1.2 Native files inside and outside archives, judged by content (02)
 - [ ] 1.3 Each dependency: MUST UPGRADE / RECOMMENDED UPGRADE / COMPATIBLE / CHECK (03)
@@ -94,7 +94,7 @@ if [ -z "$GV_JAVA_SKILL_DIR" ]; then   # not given: look where user-level instal
   GV_JAVA_SKILL_DIR=$(printf '%s\n' "$GV_FOUND" | head -n 1)
   [ "$(printf '%s\n' "$GV_FOUND" | grep -c .)" -le 1 ] || echo "NOTE: other copies: $(printf '%s\n' "$GV_FOUND" | sed 1d | tr '\n' ' ')(set GV_JAVA_SKILL_DIR if the SKILL.md you follow is in one of them)"
 fi
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/java-x86-to-graviton/raw
 if [ -n "$GV_JAVA_SKILL_DIR" ] && [ -f "$GV_JAVA_SKILL_DIR/scripts/java_graviton_check.py" ] && GV_JAVA_SKILL_DIR=$(CDPATH= cd -- "$GV_JAVA_SKILL_DIR" && pwd -P); then
   echo "skill folder: $GV_JAVA_SKILL_DIR"
   case $GV_JAVA_SKILL_DIR/ in "$GV_PROJECT"/*) echo "NOTE: the skill folder is inside the project, so the scripts it runs are files of the project: use it only on a project you trust";; esac
@@ -171,7 +171,7 @@ A criterion that runs on ARM64 passes only on a Graviton host or the target, suc
 10. The project's existing JVM options accepted on ARM64 without errors
 
 ### Documentation Criteria
-11. All files in `graviton-validation/` using canonical names from documentation-standards.md
+11. All files in `graviton-validation/java-x86-to-graviton/` using canonical names from documentation-standards.md
 
 ## Test Failure Handling
 

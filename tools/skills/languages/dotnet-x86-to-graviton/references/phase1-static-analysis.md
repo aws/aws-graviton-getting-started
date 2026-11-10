@@ -1,6 +1,6 @@
 # Phase 1: Static Compatibility Analysis
 
-Analyze the project without making changes. All findings are documented in `graviton-validation/` files.
+Analyze the project without making changes. All findings are documented in `graviton-validation/dotnet-x86-to-graviton/` files.
 
 > **Skill config:** Wherever a step below picks target runtime identifiers (RIDs), use `dotnet.target_rids` from `skill-config.md` (if defined) in place of the default `linux-arm64`, and use `dotnet.framework_bump` in §1.5. See [skill-configuration.md](skill-configuration.md).
 
@@ -46,7 +46,7 @@ Examples below refer to three test solutions:
 
 ## 1.1 Project Structure Analysis
 
-> **Output: `graviton-validation/01-project-assessment.md`**, **`graviton-validation/raw/project-properties.txt`**, **`graviton-validation/raw/dependency-tree-<target>.json`** and **`graviton-validation/raw/native-assets-<target>.txt`**
+> **Output: `graviton-validation/dotnet-x86-to-graviton/01-project-assessment.md`**, **`graviton-validation/dotnet-x86-to-graviton/raw/project-properties.txt`**, **`graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-<target>.json`** and **`graviton-validation/dotnet-x86-to-graviton/raw/native-assets-<target>.txt`**
 
 ### Determine Deployment Type
 
@@ -70,7 +70,7 @@ grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.template
 # Dockerfiles under any name: by name, plus the files a build's -f or --file, Compose dockerfile: and
 # docker/build-push-action file: name. A file is kept when it has a FROM line; a name that is no file
 # here is printed: find that file by hand and add it to the list.
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
 { find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules -o -name cdk.out -o -name graviton-validation \) -prune -o -type f \( -name 'Dockerfile*' -o -name '*.[Dd]ockerfile' -o -name 'Containerfile*' \) -print
   grep -rnoE "${EX[@]}" --include='*.sh' --include=Makefile --include='*.mk' --include='*.y*ml' --include='Jenkinsfile*' -- \
     "(build|bud)[[:space:]][^;|&#]*(-f[[:space:]]+|--file[[:space:]=]+)[\"']?[^[:space:];|&\"')]+|(dockerfile|file):[[:space:]]*[\"']?[^[:space:]#\"']+" . |
@@ -81,8 +81,8 @@ mkdir -p graviton-validation/raw
       else printf 'not found: %s names %s\n' "$src" "$ref" >&2; fi
     done
 } | while IFS= read -r f; do grep -qiE '^[[:space:]]*FROM[[:space:]]' "$f" && printf '%s\n' "$f"; done |
-  sort -u > graviton-validation/raw/dockerfiles.txt
-cat graviton-validation/raw/dockerfiles.txt
+  sort -u > graviton-validation/dotnet-x86-to-graviton/raw/dockerfiles.txt
+cat graviton-validation/dotnet-x86-to-graviton/raw/dockerfiles.txt
 ```
 
 ### Detect Multi-Module Structure
@@ -109,7 +109,7 @@ SDK 8.0.425 cannot read a `.slnx` solution (``Invalid solution `Orders.slnx`. Ex
 Graviton instances and arm64 Lambda functions run Linux, so the first question is how far the code is from modern .NET on Linux. Read it from the evaluated properties of every project (`Directory.Build.props` and other imports applied). `-getProperty` evaluates the project without building it; it needs MSBuild 17.8 or later ([Microsoft Learn](https://learn.microsoft.com/en-us/visualstudio/msbuild/evaluate-items-and-properties)), and was run with SDK 8.0.425 and 10.0.401:
 
 ```bash
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
 # Evaluated properties of every project file, one line each
 P=TargetFramework,TargetFrameworks,TargetFrameworkVersion,OutputType,RuntimeIdentifier,RuntimeIdentifiers,PlatformTarget,Prefer32Bit,UseWindowsForms,UseWPF,SelfContained,PublishAot,PublishReadyToRun,PublishSingleFile,InvariantGlobalization,AspNetCoreHostingModel,UsingMicrosoftNETSdk
 find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules \) -prune -o -type f \( -name '*.csproj' -o -name '*.fsproj' -o -name '*.vbproj' \) -print | sort |
@@ -121,7 +121,7 @@ try:
     print(", ".join("%s=%s" % kv for kv in sorted(json.loads(t)["Properties"].items()) if kv[1]))
 except ValueError:
     print("EVALUATION FAILED: " + " ".join(t.split())[:300])'
-  done | tee graviton-validation/raw/project-properties.txt
+  done | tee graviton-validation/dotnet-x86-to-graviton/raw/project-properties.txt
 ```
 
 | Starting point | What the properties show | Path |
@@ -156,7 +156,7 @@ Then, for each target:
 
 Record for the rest of the skill:
 - the **target RIDs**: `linux-arm64`, plus `linux-musl-arm64` when any target image is Alpine;
-- each **target** in `raw/target-roots.txt`, which the scans read, one run per target with its output files named for it: the §6 block of nuget-native-assets.md records an image's name and the folder of its files (`--target-root`). For a target with no image, record a name of its own (letters, digits, `.`, `_` and `-`: the name becomes part of the output file names) and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/raw/target-roots.txt` for an Amazon Linux 2023 host.
+- each **target** in `raw/target-roots.txt`, which the scans read, one run per target with its output files named for it: the §6 block of nuget-native-assets.md records an image's name and the folder of its files (`--target-root`). For a target with no image, record a name of its own (letters, digits, `.`, `_` and `-`: the name becomes part of the output file names) and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt` for an Amazon Linux 2023 host.
 - the **page size** when a target kernel uses 64KB pages (AlmaLinux 8 and Rocky Linux 8 aarch64), as `GV_PAGE=65536`.
 
 For a Lambda function on a managed .NET runtime, read its runtime's base image as the Lambda bullet above says. When no file names the target OS, as for an EC2 host whose AMI no file names, ask.
@@ -173,18 +173,18 @@ One scratch restore gives both the dependency tree (every resolved package with 
 GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
 # --source-rid: linux-x64 for a Linux starting point, win-x64 for Windows
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that Phase 1.1 recorded; with none, one run named target
+for GV_TAG in $(cut -f1 graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that Phase 1.1 recorded; with none, one run named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 python3 "$GV_CHECK" assets --source-rid linux-x64 "${GV_T[@]}" \
-  --tree "graviton-validation/raw/dependency-tree-$GV_TAG.json" > "graviton-validation/raw/native-assets-$GV_TAG.txt"; rc=$?   # one pair of files per target, named for it
-cat "graviton-validation/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
+  --tree "graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-$GV_TAG.json" > "graviton-validation/dotnet-x86-to-graviton/raw/native-assets-$GV_TAG.txt"; rc=$?   # one pair of files per target, named for it
+cat "graviton-validation/dotnet-x86-to-graviton/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 # Sanity check: nothing resolved is a failed restore, not an all-clear (unless the solution references no packages)
-grep -q '^packages: [1-9]' "graviton-validation/raw/native-assets-$GV_TAG.txt" || echo "WARNING: no packages resolved; read the restore errors above"
+grep -q '^packages: [1-9]' "graviton-validation/dotnet-x86-to-graviton/raw/native-assets-$GV_TAG.txt" || echo "WARNING: no packages resolved; read the restore errors above"
 done
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
@@ -200,7 +200,7 @@ A project that uses `packages.config` is not in this report: the program prints 
 
 ## 1.2 Native Library Validation (.so File Analysis)
 
-> **Output: `graviton-validation/02-native-library-report.md`**, **`graviton-validation/raw/native-assets-<target>.txt`** (from §1.1) and **`graviton-validation/raw/repo-native-scan-<target>.txt`**
+> **Output: `graviton-validation/dotnet-x86-to-graviton/02-native-library-report.md`**, **`graviton-validation/dotnet-x86-to-graviton/raw/native-assets-<target>.txt`** (from §1.1) and **`graviton-validation/dotnet-x86-to-graviton/raw/repo-native-scan-<target>.txt`**
 
 Native code reaches a .NET application in four ways ([nuget-native-assets.md §1](nuget-native-assets.md#1-managed-code-native-code-and-what-decides-each)):
 - files under `runtimes/<rid>/native/` in NuGet packages;
@@ -214,7 +214,7 @@ The per-RID report from §1.1 covers the first two. This section reads it, scans
 
 Statically bundled native code sits in two places. Judge both by content, never by name: a Linux library can be named `SQLite.Interop.dll`, and an executable has no extension.
 
-1. **NuGet packages.** Read `graviton-validation/raw/native-assets-<target>.txt` from §1.1. Its first line names the target; each package with native files for the source or target RIDs then gets one line per target RID and file:
+1. **NuGet packages.** Read `graviton-validation/dotnet-x86-to-graviton/raw/native-assets-<target>.txt` from §1.1. Its first line names the target; each package with native files for the source or target RIDs then gets one line per target RID and file:
    - `OK`: an aarch64 build the target's loader accepts;
    - `FINDING`: no file for the target RID, or one the target's loader refuses;
    - `CHECK`: a file that only a build step, a tool or a load in the target image settles;
@@ -227,14 +227,14 @@ Statically bundled native code sits in two places. Judge both by content, never 
 GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
-mkdir -p graviton-validation/raw
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that Phase 1.1 recorded; with none, one scan named target
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
+for GV_TAG in $(cut -f1 graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that Phase 1.1 recorded; with none, one scan named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
-python3 "$GV_CHECK" scan "${GV_T[@]}" --source-tree . > "graviton-validation/raw/repo-native-scan-$GV_TAG.txt"; rc=$?
-cat "graviton-validation/raw/repo-native-scan-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
+python3 "$GV_CHECK" scan "${GV_T[@]}" --source-tree . > "graviton-validation/dotnet-x86-to-graviton/raw/repo-native-scan-$GV_TAG.txt"; rc=$?
+cat "graviton-validation/dotnet-x86-to-graviton/raw/repo-native-scan-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
 done
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
@@ -300,9 +300,9 @@ if n > 1 << 31:
                 || echo "CHECK: $URL is an .rpm this host cannot unpack (needs bsdtar, or rpm2cpio and GNU cpio)" ;;
     *) gv_fits "$d/download" "$URL" && { python3 -I -m zipfile -e "$d/download" "$d/x" 2>/dev/null || tar -xf "$d/download" -C "$d/x" 2>/dev/null; } ;;
   esac
-  for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that Phase 1.1 recorded; with none, one scan named target
+  for GV_TAG in $(cut -f1 graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that Phase 1.1 recorded; with none, one scan named target
   case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-  GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+  GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
   case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
   GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
   echo "== $GV_TAG"; python3 "$GV_CHECK" scan "${GV_T[@]}" "$d"
@@ -388,7 +388,7 @@ else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder 
 
 ## 1.3 Dependency ARM64 Compatibility Analysis
 
-> **Output: `graviton-validation/03-dependency-compatibility-report.md`** and **`graviton-validation/raw/dependency-tree-native.txt`**
+> **Output: `graviton-validation/dotnet-x86-to-graviton/03-dependency-compatibility-report.md`** and **`graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-native.txt`**
 
 **IMPORTANT:** ARM64-incompatible native code can be introduced through transitive dependencies. A managed direct dependency may pull in a package with native files: System.Data.SQLite.Core brings Stub.System.Data.SQLite.Core.NetStandard, Microsoft.Data.Sqlite brings SQLitePCLRaw.lib.e_sqlite3, and Microsoft.NET.Test.Sdk brings Microsoft.CodeCoverage. Analyze the full tree.
 
@@ -397,11 +397,11 @@ else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder 
 Name filters miss packages whose names do not look native. The per-RID report from §1.1 is already the filtered view: it lists exactly the packages that have native files for these RIDs, found by content, each with its reference chain. Save it:
 
 ```bash
-grep -hE '^(FINDING|CHECK|OK|  via)' graviton-validation/raw/native-assets-*.txt > graviton-validation/raw/dependency-tree-native.txt   # every target's file
-cat graviton-validation/raw/dependency-tree-native.txt
+grep -hE '^(FINDING|CHECK|OK|  via)' graviton-validation/dotnet-x86-to-graviton/raw/native-assets-*.txt > graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-native.txt   # every target's file
+cat graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-native.txt
 ```
 
-The full graph, including managed packages, is in `graviton-validation/raw/dependency-tree-<target>.json`.
+The full graph, including managed packages, is in `graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-<target>.json`.
 
 ### Classify Each Dependency
 
@@ -425,7 +425,7 @@ Check the resolved version:
 
 ```bash
 # AWS SDK for .NET: AWSSDK.Core before 3.3.103.66 has no IMDSv2 (session token) support
-python3 -I - "$(ls graviton-validation/raw/dependency-tree-*.json 2> /dev/null | head -n 1)" <<'EOF'   # one target's tree: the packages are the same for each
+python3 -I - "$(ls graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-*.json 2> /dev/null | head -n 1)" <<'EOF'   # one target's tree: the packages are the same for each
 import json, re, sys
 seen = set()
 for proj, frameworks in json.load(open(sys.argv[1])).items():
@@ -485,7 +485,7 @@ Match the RID to the *target*, not the developer machine. **Graviton is Linux, s
 
 ## 1.4 Architecture-Specific Code Detection
 
-> **Output: `graviton-validation/04-code-scan-findings.md`** and **`graviton-validation/raw/ca1416.txt`**
+> **Output: `graviton-validation/dotnet-x86-to-graviton/04-code-scan-findings.md`** and **`graviton-validation/dotnet-x86-to-graviton/raw/ca1416.txt`**
 
 Scan the source tree for architecture-sensitive patterns. Scan from the root (`.`), not from one project folder, and include C#, VB and F# sources:
 
@@ -523,7 +523,7 @@ EOF
 # Vector width assumptions (Vector<byte>.Count is 32 on x64 with AVX2, 16 on Arm64)
 grep -rnE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' 'Vector256|Vector<[A-Za-z]+>\.Count' . 2>/dev/null || true
 # Project settings that pin x64 or x86, or a Windows, macOS or x64 RID (from 1.1)
-python3 -I - graviton-validation/raw/project-properties.txt <<'EOF'
+python3 -I - graviton-validation/dotnet-x86-to-graviton/raw/project-properties.txt <<'EOF'
 import re, sys
 for line in open(sys.argv[1]):
     proj, _, props = line.rstrip("\n").partition(": ")
@@ -552,13 +552,13 @@ Flag code that:
 
 ```bash
 SOLUTION=Orders.slnx   # the solution (or project) from 1.1
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
 d=$(mktemp -d) || d=   # a new, empty folder, or nothing: the copy below needs it
 if [ -n "$d" ]; then
   python3 -I -c 'import shutil, sys; shutil.copytree(".", sys.argv[1], symlinks=True, ignore=shutil.ignore_patterns(".git", ".vs", "bin", "obj", "node_modules", "graviton-validation"))' "$d/src"
   (cd "$d/src" && dotnet build "$SOLUTION" -p:EnableWindowsTargeting=true -p:RestoreLockedMode=false > "$d/build.txt" 2>&1; echo "build exit $?")
-  grep -oE '[^ ]+\.(cs|vb|fs)\([0-9]+,[0-9]+\): (warning|error) CA1416: [^[]+' "$d/build.txt" | sed "s#^$d/src/##" | sort -u | tee graviton-validation/raw/ca1416.txt
-  echo "CA1416 call sites: $(wc -l < graviton-validation/raw/ca1416.txt)"
+  grep -oE '[^ ]+\.(cs|vb|fs)\([0-9]+,[0-9]+\): (warning|error) CA1416: [^[]+' "$d/build.txt" | sed "s#^$d/src/##" | sort -u | tee graviton-validation/dotnet-x86-to-graviton/raw/ca1416.txt
+  echo "CA1416 call sites: $(wc -l < graviton-validation/dotnet-x86-to-graviton/raw/ca1416.txt)"
   rm -rf "$d"
 else echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; fi
 ```
@@ -585,9 +585,9 @@ find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name graviton-
 # whose architecture can be absent (functions, task definitions, node groups)
 DP='--platform[= ]linux/amd64|(-r|--runtime) (linux|win)-x64|(-a|--arch) (x64|amd64)|nanoserver|servercore|kubernetes\.io/arch: *amd64|runs-on: |x86_64|-amd64([^A-Za-z0-9]|$)|(^|[^A-Za-z0-9])amd64/|uname -m|docker build |--locked-mode|AWS::(Lambda::Function|Serverless::Function|ECS::TaskDefinition|EKS::Nodegroup)|requires_?[Cc]ompatibilities|resource "aws_(lambda_function|ecs_task_definition|eks_node_group)"'
 grep -rnE "${EX[@]}" --include='*.y*ml' --include='*.json' --include='*.tf' --include='*.sh' --include='*.ps1' --include='*.template' -- "$DP" . 2>/dev/null || true
-if [ -f graviton-validation/raw/dockerfiles.txt ]; then   # the Dockerfiles of §1.1, under any name
-  while IFS= read -r f; do grep -nE -- "$DP" "$f" | sed "s#^#$f:#"; done < graviton-validation/raw/dockerfiles.txt
-else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt"; fi
+if [ -f graviton-validation/dotnet-x86-to-graviton/raw/dockerfiles.txt ]; then   # the Dockerfiles of §1.1, under any name
+  while IFS= read -r f; do grep -nE -- "$DP" "$f" | sed "s#^#$f:#"; done < graviton-validation/dotnet-x86-to-graviton/raw/dockerfiles.txt
+else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/dotnet-x86-to-graviton/raw/dockerfiles.txt"; fi
 # CDK apps: the constructs that take an architecture, and the settings, in each folder with a cdk.json
 # (a construct that sets none gets x86_64)
 find . \( -name .git -o -name .venv -o -name bin -o -name obj -o -name node_modules -o -name cdk.out \) -prune -o -name cdk.json -print |
@@ -616,38 +616,38 @@ Every image the project builds from, tests with or deploys has to list `linux/ar
 
 ```bash
 EX=(--exclude-dir=.git --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules --exclude-dir=graviton-validation --exclude-dir=.venv)
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
 # Image references: FROM lines of the Dockerfiles in raw/dockerfiles.txt (§1.1; not stage names), image: keys in
 # YAML and JSON, image names in test code. A reference built from a variable is left out: resolve it by hand.
-{ if [ -f graviton-validation/raw/dockerfiles.txt ]; then
+{ if [ -f graviton-validation/dotnet-x86-to-graviton/raw/dockerfiles.txt ]; then
     while IFS= read -r f; do
       awk 'toupper($1) == "FROM" { i = ($2 ~ /^--platform=/) ? 3 : 2; if (!($i in s)) print $i
              for (k = i + 1; k < NF; k++) if (toupper($k) == "AS") s[$(k + 1)] = 1 }' "$f"
-    done < graviton-validation/raw/dockerfiles.txt
-  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/raw/dockerfiles.txt" >&2; fi
+    done < graviton-validation/dotnet-x86-to-graviton/raw/dockerfiles.txt
+  else echo "CHECK: run the Determine Deployment Type block (§1.1) first: it writes graviton-validation/dotnet-x86-to-graviton/raw/dockerfiles.txt" >&2; fi
   grep -rhoiE "${EX[@]}" --include='*.y*ml' --include='*.json' \
     '"?image(uri)?"?[[:space:]]*:[[:space:]]*"?[a-z0-9][^"[:space:],}]*' . |
     sed -E 's/^"?[Ii][Mm][Aa][Gg][Ee]([Uu][Rr][Ii])?"?[[:space:]]*:[[:space:]]*"?//'
   grep -rhoE "${EX[@]}" --include='*.cs' --include='*.vb' --include='*.fs' 'WithImage\("[^"]+"' . |
     sed -E 's/.*\("//; s/"$//'
-} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/raw/images.txt
+} | grep -vE '\$|^scratch$' | sort -u > graviton-validation/dotnet-x86-to-graviton/raw/images.txt
 # Platforms per image, from its registry (docker CLI). Without docker, or a login a private registry needs, the line is CHECK.
 while IFS= read -r img; do
   if ! out=$(docker manifest inspect -v "$img" 2>&1); then printf 'CHECK   %s: %s\n' "$img" "$(printf '%s\n' "$out" | grep -v '^errors:$' | head -n 1)"
   elif printf '%s' "$out" | grep -q '"architecture": "arm64"'; then printf 'OK      %s\n' "$img"
   else printf 'FINDING %s: no linux/arm64 build\n' "$img"; fi
-done < graviton-validation/raw/images.txt
+done < graviton-validation/dotnet-x86-to-graviton/raw/images.txt
 ```
 
 `docker manifest inspect -v` prints every platform of a multi-architecture image and the one platform of a single-architecture image. A FINDING is fixed in Phase 2.4. On an ARM64 host a list without arm64 stops the pull (`no matching manifest for linux/arm64/v8 in the manifest list entries`), while a single amd64 manifest is pulled and its container stops with `exec format error` (`--platform linux/arm64` stops that pull: `was found but does not match the specified platform: wanted linux/arm64, actual: linux/amd64`).
 
 ## 1.5 .NET Version Compatibility Check
 
-> **Output: `graviton-validation/01-project-assessment.md`** (.NET Environment section)
+> **Output: `graviton-validation/dotnet-x86-to-graviton/01-project-assessment.md`** (.NET Environment section)
 
 ```bash
 # Target frameworks in use (from 1.1) and the SDK the repository pins
-grep -oE 'TargetFrameworks?=[^,]+|TargetFrameworkVersion=[^,]+' graviton-validation/raw/project-properties.txt | sort | uniq -c
+grep -oE 'TargetFrameworks?=[^,]+|TargetFrameworkVersion=[^,]+' graviton-validation/dotnet-x86-to-graviton/raw/project-properties.txt | sort | uniq -c
 find . \( -name .git -o -name node_modules \) -prune -o -name global.json -print | while IFS= read -r f; do echo "== $f"; cat "$f"; done
 # Support phase and end of support of every .NET release (Microsoft release metadata)
 curl -fsSL https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json | python3 -I -c 'import json, sys

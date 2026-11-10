@@ -49,14 +49,14 @@ Run from the repository root (the folder that holds the solution or the project 
 GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
-mkdir -p graviton-validation/raw
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that §6 recorded; with none, one run named target
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
+for GV_TAG in $(cut -f1 graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that §6 recorded; with none, one run named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
-python3 "$GV_CHECK" assets --source-rid linux-x64 "${GV_T[@]}" > "graviton-validation/raw/native-assets-$GV_TAG.txt"; rc=$?   # one file per target, named for it
-cat "graviton-validation/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
+python3 "$GV_CHECK" assets --source-rid linux-x64 "${GV_T[@]}" > "graviton-validation/dotnet-x86-to-graviton/raw/native-assets-$GV_TAG.txt"; rc=$?   # one file per target, named for it
+cat "graviton-validation/dotnet-x86-to-graviton/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 done
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
@@ -120,9 +120,9 @@ The `via` line gives one chain. In a restored repository, `dotnet nuget why <pro
 GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
-mkdir -p graviton-validation/raw
-python3 "$GV_CHECK" config path/to/packages.config > graviton-validation/raw/native-assets-packages-config.txt; rc=$?
-cat graviton-validation/raw/native-assets-packages-config.txt; echo "exit status $rc"
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
+python3 "$GV_CHECK" config path/to/packages.config > graviton-validation/dotnet-x86-to-graviton/raw/native-assets-packages-config.txt; rc=$?
+cat graviton-validation/dotnet-x86-to-graviton/raw/native-assets-packages-config.txt; echo "exit status $rc"
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
@@ -243,7 +243,7 @@ No linux-arm64 build in any stable release, so a substitute is a user decision; 
       cxx=$(grep -ao 'GLIBCXX_3\.4\.[0-9][0-9]*' "$x" | sort -u -t. -k3,3n | tail -n 1); cxx=${cxx:-"libstdc++ with no GLIBCXX_ versions"}
     else cxx="no libstdc++.so.6"; fi
     echo "$IMG: ${os:-no os-release}; $libc; $cxx; files in $GV_ROOT"
-    mkdir -p graviton-validation/raw && printf '%s\t%s\n' "$GV_TAG" "$GV_ROOT" >> graviton-validation/raw/target-roots.txt   # Phase 3 reads the folder here when this shell is gone
+    mkdir -p graviton-validation/dotnet-x86-to-graviton/raw && printf '%s\t%s\n' "$GV_TAG" "$GV_ROOT" >> graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt   # Phase 3 reads the folder here when this shell is gone
     # The later checks run once for each target that raw/target-roots.txt records, in this shell or a new one. Remove the
     # folder by that exact path (rm -rf "$GV_ROOT"), never by a wildcard, once the report is written.
   else [ -z "$GV_ROOT" ] || rmdir "$GV_ROOT"; echo "$IMG: no arm64 container was created (no arm64 variant of the image, or the pull failed: see the error above)"; fi   # nothing is recorded for it, so no check runs for this image
@@ -263,16 +263,16 @@ The per-RID check covers packages. The output of `dotnet publish` (or `/app` cop
 GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
-mkdir -p graviton-validation/raw
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that §6 recorded; with none, one scan named target
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
+for GV_TAG in $(cut -f1 graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that §6 recorded; with none, one scan named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 RID=linux-arm64; [ -z "$GV_TDIR" ] || [ ! -e "$GV_TDIR/lib/ld-musl-aarch64.so.1" ] || RID=linux-musl-arm64   # the RID follows the target's C library, as in Phase 3.1
 [ -d "publish/$RID" ] || { echo "NOT SCANNED: no publish/$RID folder"; continue; }   # a missing folder keeps the record Phase 3.1 wrote
-python3 "$GV_CHECK" scan --target-rid "$RID" "${GV_T[@]}" "publish/$RID" > "graviton-validation/raw/output-scan-$GV_TAG.txt"; rc=$?
-cat "graviton-validation/raw/output-scan-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
+python3 "$GV_CHECK" scan --target-rid "$RID" "${GV_T[@]}" "publish/$RID" > "graviton-validation/dotnet-x86-to-graviton/raw/output-scan-$GV_TAG.txt"; rc=$?
+cat "graviton-validation/dotnet-x86-to-graviton/raw/output-scan-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 not a folder)"
 done
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```

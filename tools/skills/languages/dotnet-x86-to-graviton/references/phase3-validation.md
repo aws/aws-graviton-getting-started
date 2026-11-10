@@ -64,7 +64,7 @@ Throughout Phase 3, replace `docker` with `$CONTAINER_CMD` in all commands. `CON
 
 ## 3.0 Build Environment Preparation
 
-> **Output: `graviton-validation/06-build-test-results.md`** (Build Environment sections)
+> **Output: `graviton-validation/dotnet-x86-to-graviton/06-build-test-results.md`** (Build Environment sections)
 
 ### .NET SDK Alignment
 
@@ -87,7 +87,7 @@ Build-time tools may not support the newest SDK or compiler; runtime compatibili
 
 ```bash
 # The target frameworks the projects build (Phase 1.1), the SDK this repository selects, and the installed SDKs
-grep -oE 'TargetFrameworks?=[^,]+' graviton-validation/raw/project-properties.txt | sort | uniq -c
+grep -oE 'TargetFrameworks?=[^,]+' graviton-validation/dotnet-x86-to-graviton/raw/project-properties.txt | sort | uniq -c
 find . \( -name .git -o -name node_modules \) -prune -o -name global.json -print | while IFS= read -r f; do echo "== $f"; cat "$f"; echo; done
 echo "selected SDK: $(dotnet --version 2>&1 | head -n 1)"
 dotnet --list-sdks
@@ -132,7 +132,7 @@ else echo "ERROR: dotnet-install.sh not run: it runs only with gpg and a signatu
 
 ## 3.1 ARM64 Build Validation
 
-> **Output: `graviton-validation/06-build-test-results.md`** (Build Attempts, Test Failure Classification) and **`graviton-validation/raw/output-scan-<target>.txt`**
+> **Output: `graviton-validation/dotnet-x86-to-graviton/06-build-test-results.md`** (Build Attempts, Test Failure Classification) and **`graviton-validation/dotnet-x86-to-graviton/raw/output-scan-<target>.txt`**
 
 ### Build Strategy
 
@@ -149,18 +149,18 @@ else echo "ERROR: dotnet-install.sh not run: it runs only with gpg and a signatu
 GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
-mkdir -p graviton-validation/raw
+mkdir -p graviton-validation/dotnet-x86-to-graviton/raw
 # Keep tracked lock files as they are: locked mode when the repository has them (a RID they lack then fails with NU1004)
 LOCK=false; [ -n "$(find . -name packages.lock.json -not -path '*/obj/*' -print 2>/dev/null | head -n 1)" ] && LOCK=true
 GV_PUB=$(mktemp -d "${TMPDIR:-/tmp}/graviton-publish.XXXXXX") || { GV_PUB=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }   # a new folder no other user can write, or nothing
-[ -n "$GV_PUB" ] && for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one publish and scan per target that Phase 1.1 recorded; with none, one publish and scan named target
+[ -n "$GV_PUB" ] && for GV_TAG in $(cut -f1 graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one publish and scan per target that Phase 1.1 recorded; with none, one publish and scan named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 RID=linux-arm64; [ -z "$GV_TDIR" ] || [ ! -e "$GV_TDIR/lib/ld-musl-aarch64.so.1" ] || RID=linux-musl-arm64   # the RID follows the target's C library
 # Executable projects from Phase 1.1 (OutputType Exe); test projects are covered in 3.2
-grep -E 'OutputType=Exe' graviton-validation/raw/project-properties.txt | cut -d: -f1 |
+grep -E 'OutputType=Exe' graviton-validation/dotnet-x86-to-graviton/raw/project-properties.txt | cut -d: -f1 |
   while IFS= read -r p; do
     name=$(basename "$p" | sed 's/\.[a-z]*proj$//')
     out="$GV_PUB/$RID/$name"
@@ -172,7 +172,7 @@ grep -E 'OutputType=Exe' graviton-validation/raw/project-properties.txt | cut -d
       echo "NOT SCANNED: publish failed"; continue
     fi
     python3 "$GV_CHECK" scan --target-rid "$RID" "${GV_T[@]}" "$out"
-  done | tee "graviton-validation/raw/output-scan-$GV_TAG.txt"
+  done | tee "graviton-validation/dotnet-x86-to-graviton/raw/output-scan-$GV_TAG.txt"
 done
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
@@ -228,7 +228,7 @@ GV_APP=$(mktemp -d "${TMPDIR:-/tmp}/graviton-image-app.XXXXXX") || GV_APP=   # a
 $CONTAINER_CMD rm -f "$cid" > /dev/null
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 BASE=mcr.microsoft.com/dotnet/aspnet:8.0   # the image the Dockerfile's last FROM names (Phase 1.1 copied it)
-GV_TDIR=$(awk -F '\t' -v t="$(printf '%s' "$BASE" | tr -c 'A-Za-z0-9._-' '_')" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its folder, recorded under its name
+GV_TDIR=$(awk -F '\t' -v t="$(printf '%s' "$BASE" | tr -c 'A-Za-z0-9._-' '_')" '$1 == t {d = $2} END {print d}' graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its folder, recorded under its name
 GV_T=(); if case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac; then GV_T=(--target-root "$GV_TDIR"); else echo "CHECK: no Phase 1.1 copy of $BASE: copy it with the §6 block of nuget-native-assets.md, or give the scan its --target-rid and --glibc"; fi
 if [ -z "$GV_APP" ]; then echo "CHECK: the image's files were not copied (mktemp made no folder)"
 elif case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then python3 "$GV_CHECK" scan "${GV_T[@]}" "$GV_APP"   # only the skill's own program; the application files, from the path the Dockerfile copies them to (/app)
@@ -253,7 +253,7 @@ then the §3.1 build, publish and scan, and the tests in §3.2. The `dotnet --in
 
 ## 3.2 Functional Testing on ARM64
 
-> **Output: update `graviton-validation/06-build-test-results.md`**
+> **Output: update `graviton-validation/dotnet-x86-to-graviton/06-build-test-results.md`**
 
 **ARM64 host:** run the repository's tests as they are (`dotnet test <solution>`, or `dotnet.test_command` from `skill-config.md`).
 
@@ -300,7 +300,7 @@ A test that compares floating-point values exactly and fails by such a differenc
 
 ## 3.3 Startup Validation
 
-> **Output: update `graviton-validation/06-build-test-results.md`** (Startup Validation)
+> **Output: update `graviton-validation/dotnet-x86-to-graviton/06-build-test-results.md`** (Startup Validation)
 
 Verify:
 1. Application starts without errors on linux/arm64 (`RuntimeInformation.ProcessArchitecture` reports `Arm64`)
@@ -316,6 +316,6 @@ Recommend to user for independent testing: performance benchmarking, load testin
 
 ## Write Summary
 
-> **Output: `graviton-validation/00-summary.md`**
+> **Output: `graviton-validation/dotnet-x86-to-graviton/00-summary.md`**
 
 After all phases complete, write the summary using the template from [documentation-standards.md](documentation-standards.md). This file consolidates exit criteria status and references (not duplicates) detail in files 01-06.

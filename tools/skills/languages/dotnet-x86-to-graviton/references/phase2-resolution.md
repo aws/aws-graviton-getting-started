@@ -14,7 +14,7 @@ For a .NET Framework or Windows starting point (Phase 1.1), the approved move to
 
 ## 2.1 Native Library Resolution
 
-> **Output: update `graviton-validation/02-native-library-report.md`** (Resolution Details)
+> **Output: update `graviton-validation/dotnet-x86-to-graviton/02-native-library-report.md`** (Resolution Details)
 
 For each x86-only native file committed to the repository (Phase 1.2.1):
 
@@ -69,7 +69,7 @@ return NativeLibrary.Load(Path.Combine(AppContext.BaseDirectory, "native", arch,
 
 ## 2.2 Dependency Compatibility Updates
 
-> **Output: update `graviton-validation/03-dependency-compatibility-report.md`**
+> **Output: update `graviton-validation/dotnet-x86-to-graviton/03-dependency-compatibility-report.md`**
 
 Update ONLY dependencies flagged as MUST UPGRADE in Phase 1.3. Do NOT upgrade compatible dependencies. Prefer the *lowest* version whose native files probe clean for every target RID, not the latest: probe the candidates upward from the version in use and **probe the exact candidate** before writing it ([nuget-native-assets.md](nuget-native-assets.md) §5). Floors are not always monotonic.
 
@@ -144,26 +144,26 @@ After the changes, keep the Phase 1 evidence that `03-dependency-compatibility-r
 
 ```bash
 GV_DOTNET_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKILL.md printed
-for f in graviton-validation/raw/native-assets-*.txt graviton-validation/raw/dependency-tree-*.json; do   # keep every target's Phase 1 files
+for f in graviton-validation/dotnet-x86-to-graviton/raw/native-assets-*.txt graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-*.json; do   # keep every target's Phase 1 files
   case $f in *-phase1.*) ;; *) [ -e "$f" ] && [ ! -e "${f%.*}-phase1.${f##*.}" ] && cp "$f" "${f%.*}-phase1.${f##*.}";; esac   # once: a rerun keeps the first copy
 done
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 if case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
-for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that Phase 1.1 recorded; with none, one run named target
+for GV_TAG in $(cut -f1 graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that Phase 1.1 recorded; with none, one run named target
 case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
-GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/dotnet-x86-to-graviton/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
 case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 python3 "$GV_CHECK" assets --source-rid linux-x64 "${GV_T[@]}" \
-  --tree "graviton-validation/raw/dependency-tree-$GV_TAG.json" > "graviton-validation/raw/native-assets-$GV_TAG.txt"; rc=$?   # one pair of files per target, named for it
-cat "graviton-validation/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
+  --tree "graviton-validation/dotnet-x86-to-graviton/raw/dependency-tree-$GV_TAG.json" > "graviton-validation/dotnet-x86-to-graviton/raw/native-assets-$GV_TAG.txt"; rc=$?   # one pair of files per target, named for it
+cat "graviton-validation/dotnet-x86-to-graviton/raw/native-assets-$GV_TAG.txt"; echo "exit status $rc (0 no findings, 1 findings, 2 restore failed or wrote no project.assets.json)"
 done
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
 ## 2.3 Architecture Detection Code Updates
 
-> **Output: update `graviton-validation/04-code-scan-findings.md`** (Changes Applied)
+> **Output: update `graviton-validation/dotnet-x86-to-graviton/04-code-scan-findings.md`** (Changes Applied)
 
 Add Arm64 handling to all architecture detection (the resolver in §2.1 is one case). For x86 hardware intrinsics, check `IsSupported` before every call and keep a portable path; `Vector128` is accelerated on Arm64:
 
@@ -237,7 +237,7 @@ For Windows-only APIs, apply the replacements in [windows-to-linux.md](windows-t
 
 ## 2.4 Build Configuration Updates
 
-> **Output: update `graviton-validation/04-code-scan-findings.md`** (Changes Applied)
+> **Output: update `graviton-validation/dotnet-x86-to-graviton/04-code-scan-findings.md`** (Changes Applied)
 
 **Project settings:**
 - Remove `<PlatformTarget>x64</PlatformTarget>` (and `x86`) where a file sets it: the default AnyCPU runs on both architectures. An evaluated `x64` with no such element comes from `RuntimeIdentifier` (next item). With it, `publish -r linux-arm64` stops at `NETSDK1032: The RuntimeIdentifier platform 'linux-arm64' and the PlatformTarget 'x64' must be compatible.`, and a build without a RID runs until arm64 fails to load the assembly.
@@ -328,7 +328,7 @@ Executed in us-west-2, it listed `m6g.xlarge`, `m7g.xlarge`, `m8g.xlarge` and `m
 
 ## 2.5 Graviton-Specific Runtime Recommendations
 
-> **Output: `graviton-validation/05-runtime-configuration.md`**
+> **Output: `graviton-validation/dotnet-x86-to-graviton/05-runtime-configuration.md`**
 
 Do NOT apply runtime settings automatically. Document recommendations in the report for the team to evaluate during performance testing, each with its evidence level from the validation ladder in [agent-scope-boundaries.md](agent-scope-boundaries.md) and the exact source. Include only rows that apply to the project.
 
