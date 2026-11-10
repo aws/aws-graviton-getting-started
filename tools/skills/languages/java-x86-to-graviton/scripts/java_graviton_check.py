@@ -39,6 +39,13 @@ import zipfile
 import zlib
 
 MAX_DEPTH = 8  # archives nested deeper than this are reported as CHECK, not read
+MAX_MEMBER = 1 << 30  # an archive member declared larger than this (1 GiB) is a CHECK, not read
+MAX_HELD = 1 << 31  # the most archive data this check keeps in memory at once (2 GiB): a nested archive is read
+# from its parent's bytes, so the archives that hold a member stay in memory while it is read, and a member that
+# would take them past this limit is a CHECK, not read. No member is read past its declared size, and only stored
+# and deflated members are read (some zipfile versions do not bound bzip2 or LZMA output while decompressing), so
+# however an archive is crafted, its members take at most about 2 GiB. A file outside an archive takes no more
+# memory than its size on disk.
 SKIP_DIRS = (".git", "node_modules")
 SOURCE_TREE_SKIP = ("target", "build", ".gradle", "graviton-validation", ".venv")  # --source-tree: build outputs
 ELF_MACHINE = {2: "sparc", 3: "i386", 8: "mips", 18: "sparc32plus", 20: "ppc", 21: "ppc64", 22: "s390", 40: "arm",
@@ -619,6 +626,24 @@ def sniff(h):
     return None
 
 
+def read_member(zf, info):
+    """An archive member's bytes, never past the size the archive declares. From Python 3.10 on, one read makes zlib
+    hold the whole output twice while it decompresses, so the member is read in parts of 1 MiB there; before 3.10, one
+    read holds it once and is the faster of the two."""
+    with zf.open(info) as f:
+        if sys.version_info < (3, 10):
+            return f.read(info.file_size)
+        out = io.BytesIO()
+        left = info.file_size
+        while left > 0:
+            b = f.read(min(left, 1 << 20))
+            if not b:
+                break
+            out.write(b)
+            left -= len(b)
+        return out.getvalue()
+
+
 def why(ex):
     return "%s: %s" % (type(ex).__name__, ex)
 
@@ -669,7 +694,7 @@ class Scan(object):
             return
         self.native(data, kind, label, None)
 
-    def archive(self, src, label, depth):
+    def archive(self, src, label, depth, held=0):
         if depth > MAX_DEPTH:
             self.unread.append((label, "archive nested more than %d levels deep, not read" % MAX_DEPTH))
             return
@@ -679,27 +704,43 @@ class Scan(object):
             self.unread.append((label, "could not read this archive (%s)" % why(ex)))
             return
         self.archives += 1
+        other = {}  # compression method -> members not read
         with zf:
             for info in zf.infolist():
                 if info.filename.endswith("/"):
                     continue
                 path = label + "!" + info.filename
+                if info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                    other[info.compress_type] = other.get(info.compress_type, 0) + 1
+                    continue
                 try:
                     with zf.open(info) as f:
-                        h = f.read(64)
-                        kind = sniff(h)
-                        if kind is None:
-                            continue
-                        data = h + f.read()
+                        kind = sniff(f.read(64))
+                    if kind is None:
+                        continue
+                    if info.file_size > MAX_MEMBER:
+                        self.unread.append((path, "archive member of %d bytes, larger than the %d MiB this check reads, "
+                                            "not read" % (info.file_size, MAX_MEMBER >> 20)))
+                        continue
+                    if held + info.file_size > MAX_HELD:
+                        self.unread.append((path, "archive member of %d bytes: with the %d bytes of the archives that "
+                                            "hold it, more than the %d MiB this check keeps in memory at once, not read"
+                                            % (info.file_size, held, MAX_HELD >> 20)))
+                        continue
+                    data = None  # the previous member's bytes go before this one is read
+                    data = read_member(zf, info)
                 except (RuntimeError, NotImplementedError, zipfile.BadZipFile, OSError, EOFError, zlib.error,
                         ValueError) as ex:  # RuntimeError: an encrypted member
                     self.unread.append((path, "could not read this archive member (%s)" % why(ex)))
                     continue
                 if kind in ("zip", "script"):
                     if kind == "zip" or zipfile.is_zipfile(io.BytesIO(data)):
-                        self.archive(io.BytesIO(data), path, depth + 1)
+                        self.archive(io.BytesIO(data), path, depth + 1, held + len(data))
                     continue
                 self.native(data, kind, path, label)
+            if other:
+                self.unread.append((label, "%d archive member(s) compressed with method %s, not read: only stored and "
+                                    "deflated members are read" % (sum(other.values()), ", ".join(str(k) for k in sorted(other)))))
 
     def native(self, data, kind, path, archive):
         e = {"path": path, "archive": archive, "kind": kind, "sha": hashlib.sha256(data).hexdigest(), "info": None,

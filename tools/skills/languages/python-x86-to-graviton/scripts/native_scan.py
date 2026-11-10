@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT-0
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-import collections, hashlib, io, os, re, struct, sys, zipfile
+import collections, hashlib, io, os, re, struct, sys, zipfile, zlib
 ARCH = {3: "i386", 40: "arm", 62: "x86-64", 183: "aarch64", 243: "riscv"}
 OS_ABI = {1: "HP-UX", 2: "NetBSD", 6: "Solaris", 7: "AIX", 9: "FreeBSD", 12: "OpenBSD"}  # EI_OSABI of other systems
 GLIBC_LIBS = re.compile(r"(libc\.so\.6|libm\.so\.6|libpthread\.so\.0|libdl\.so\.2|librt\.so\.1|libresolv\.so\.2"
@@ -544,6 +544,35 @@ def archive(name, box, data):  # static library: the object files it holds
         e["checks"].append("static library with no aarch64 code (%s); a native arm64 build that links it fails" % (
             ", ".join("e_machine %d (%s)" % (k, ARCH.get(k, "other")) for k in sorted(m))))
 
+MAX_DEPTH = 8  # archives nested deeper than this are reported as CHECK, not read
+MAX_MEMBER = 1 << 30  # an archive member declared larger than this (1 GiB) is a CHECK, not read
+MAX_HELD = 1 << 31  # the most archive data this scan keeps in memory at once (2 GiB): a nested archive is read
+# from its parent's bytes, so the archives that hold a member stay in memory while it is read, and a member that
+# would take them past this limit is a CHECK, not read. No member is read past its declared size, and only stored
+# and deflated members are read (some zipfile versions do not bound bzip2 or LZMA output while decompressing), so
+# however an archive is crafted, its members take at most about 2 GiB. A file outside an archive takes no more
+# memory than its size on disk.
+
+def read_member(zf, info):
+    """An archive member's bytes, never past the size the archive declares. From Python 3.10 on, one read makes zlib
+    hold the whole output twice while it decompresses, so the member is read in parts of 1 MiB there; before 3.10, one
+    read holds it once and is the faster of the two."""
+    with zf.open(info) as f:
+        if sys.version_info < (3, 10):
+            return f.read(info.file_size)
+        out = io.BytesIO()
+        left = info.file_size
+        while left > 0:
+            b = f.read(min(left, 1 << 20))
+            if not b:
+                break
+            out.write(b)
+            left -= len(b)
+        return out.getvalue()
+
+def unread(name, box, why):  # what the scan does not read is a CHECK, not a pass
+    add(name, box, why)["checks"].append(why)
+
 def digest(src):  # SHA-256 of a member's bytes or of a loose file, read in parts: copies of one file are one build
     if isinstance(src, bytes):
         return hashlib.sha256(src).hexdigest()
@@ -554,14 +583,28 @@ def digest(src):  # SHA-256 of a member's bytes or of a loose file, read in part
     src.seek(pos)
     return s.hexdigest()
 
-def check(name, box, h, load):
+def check(name, box, h, load, depth=1, held=0, size=0):  # size: an archive member's declared size, 0 for a loose file
+    def fits():  # an archive member is read whole only within the limits; otherwise it is a CHECK
+        if size > MAX_MEMBER:
+            unread(name, box, "archive member of %d bytes, larger than the %d MiB this scan reads, not read"
+                   % (size, MAX_MEMBER >> 20))
+        elif held + size > MAX_HELD:
+            unread(name, box, "archive member of %d bytes: with the %d bytes of the archives that hold it, more than "
+                   "the %d MiB this scan keeps in memory at once, not read" % (size, held, MAX_HELD >> 20))
+        else:
+            return True
+        return False
     try:
         if h[:4] == b"\x7fELF":
+            if not fits():
+                return
             src, n = load(), len(entries)
             elf(name, box, reader(src))
             for e in entries[n:]:
                 e["sha"] = digest(src)
         elif h[:8] == b"!<arch>\n":
+            if not fits():
+                return
             src = load()
             archive(name, box, src if isinstance(src, bytes) else reader(src)(0, os.fstat(src.fileno()).st_size))
         elif h[:4] in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce") or \
@@ -570,15 +613,33 @@ def check(name, box, h, load):
         elif h[:2] == b"MZ" and len(h) >= 64 and h[struct.unpack("<I", h[60:64])[0]:][:4] == b"PE\0\0":
             add(name, box, "PE (a Windows build; Linux does not load it)")
         elif h[:4] == b"PK\x03\x04":
-            src = load()
+            if depth > MAX_DEPTH:
+                return unread(name, box, "archive nested more than %d levels deep, not read" % MAX_DEPTH)
+            if not fits():
+                return
+            src, other = load(), collections.Counter()  # compression methods of the members not read
             with zipfile.ZipFile(io.BytesIO(src) if isinstance(src, bytes) else src) as z:
                 for m in z.infolist():
-                    if not m.filename.endswith("/"):
+                    if m.filename.endswith("/"):
+                        continue
+                    if m.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                        other[m.compress_type] += 1
+                        continue
+                    try:
                         with z.open(m) as f:
                             mh = f.read(4096)
-                        check(name + "!" + m.filename, name, mh, lambda m=m, z=z: z.read(m))
-    except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, struct.error, ValueError) as e:
-        print("could not read: %s (%s)" % (name, e))
+                    except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, EOFError, zlib.error,
+                            ValueError) as e:  # one member that cannot be read: the others are still read
+                        unread(name + "!" + m.filename, name, "could not read (%s)" % e)
+                        continue
+                    check(name + "!" + m.filename, name, mh, lambda m=m, z=z: read_member(z, m), depth + 1,
+                          held + size, m.file_size)
+            if other:
+                unread(name, box, "%d archive member(s) compressed with method %s, not read: only stored and deflated "
+                       "members are read" % (sum(other.values()), ", ".join(str(k) for k in sorted(other))))
+    except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, EOFError, zlib.error, struct.error,
+            ValueError) as e:  # RuntimeError: an encrypted member
+        unread(name, box, "could not read (%s)" % e)
 
 def library(name):  # the builds of one library share this name
     n = name.rsplit("!", 1)[-1].rsplit("/", 1)[-1].lower()
