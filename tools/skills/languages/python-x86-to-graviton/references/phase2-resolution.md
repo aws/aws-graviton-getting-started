@@ -159,15 +159,15 @@ The default NumPy and SciPy wheels use OpenBLAS, so removing `mkl` leaves NumPy 
 
 **Packages whose aarch64 wheels stopped:** present the options and record the user's choice in the "User Decisions Pending" table. Example from the fixture, `pygeos==0.14` (no aarch64 wheel, no later release, and 0.13 has wheels only up to cp310). Its PyPI description says "PyGEOS was merged with Shapely (https://shapely.readthedocs.io) in December 2021 and will be released as part of Shapely 2.0". The options are:
 
-- (a) Build the 0.14 sdist on Graviton against the distribution's GEOS (`libgeos-dev`). On current toolchains it needs two workarounds, on any architecture: its `setup.py` imports `pkg_resources`, which setuptools removed in 82.0.0, so the build environment needs `setuptools<82`; and gcc 14 rejects its code (`incompatible-pointer-types` errors in `src/ufuncs.c`). Pass the setuptools limit with `--build-constraint` (pip 25.3 and later): since pip 26.2, `-c` and `PIP_CONSTRAINT` no longer reach isolated build environments.
+- (a) Build the 0.14 sdist on Graviton against the distribution's GEOS (`libgeos-dev`). On current toolchains it needs two workarounds, on any architecture: its `setup.py` imports `pkg_resources`, which setuptools removed in 82.0.0, so the build environment needs a setuptools below 82 (`setuptools==81.0.0` is the last one; every setuptools below 82 carries CVE-2026-59890, fixed in 83.0.0, and GHSA-xmj3-9gf7-h52w, fixed in 84.1.0, both in sdist and legacy-wheel handling, so this build-only constraint is a workaround for a legacy sdist that option (b) avoids); and gcc 14 rejects its code (`incompatible-pointer-types` errors in `src/ufuncs.c`). Pass the setuptools pin with `--build-constraint` (pip 25.3 and later): since pip 26.2, `-c` and `PIP_CONSTRAINT` no longer reach isolated build environments.
 
   ```bash
-  echo 'setuptools<82' > build-constraints.txt
-  CFLAGS=-Wno-error=incompatible-pointer-types python3 -m pip install --build-constraint build-constraints.txt "numpy<2" pygeos==0.14
+  echo 'setuptools==81.0.0' > build-constraints.txt
+  CFLAGS=-Wno-error=incompatible-pointer-types python3 -m pip install --build-constraint build-constraints.txt numpy==1.26.4 pygeos==0.14
   ```
 
-  Without the constraint the build stops at `ModuleNotFoundError: No module named 'pkg_resources'` (with pip 26.2.1, `PIP_CONSTRAINT` alone does not help), and without the `CFLAGS` at the pointer-type errors. Keep numpy below 2 at runtime (the project's own numpy pin): the build compiles against NumPy 1.x, and with numpy 2.4.6 installed next to it the import failed with `AttributeError: _ARRAY_API not found`.
-- (b) Move to `shapely>=2.0` (2.0.0 is the first Shapely release with cp311 Linux aarch64 wheels). This changes the API, so the code changes are outside this skill.
+  Without the constraint the build stops at `ModuleNotFoundError: No module named 'pkg_resources'` (with pip 26.2.1, `PIP_CONSTRAINT` alone does not help), and without the `CFLAGS` at the pointer-type errors. Pin numpy to the project's own 1.x version at runtime (`numpy==1.26.4` is the last 1.x release, so it is what `numpy<2` resolves to): the build compiles against NumPy 1.x, and with numpy 2.4.6 installed next to it the import failed with `AttributeError: _ARRAY_API not found`.
+- (b) Move to Shapely 2 and pin the release the project tests (2.0.0 is the first Shapely release with cp311 Linux aarch64 wheels). This changes the API, so the code changes are outside this skill.
 
 **Documented aarch64 correctness floors:** a `numpy` pin below 1.21.1 or a `scipy` pin below 1.7.2 is flagged MUST UPGRADE even when it installs, because those releases carry an older OpenBLAS with aarch64 correctness fixes missing. Target the floor, or the lowest version that also ships a wheel for the project's interpreter if that is higher (for cp311, numpy 1.23.2).
 
