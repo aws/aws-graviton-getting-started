@@ -69,7 +69,7 @@ if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.sh" 
   python3 -I -m pip install "${PLAT[@]}" --platform manylinux2014_aarch64 --only-binary=:all: \
     --python-version "$PYVER" --implementation cp --target python/ -r layer-requirements.txt
   GV_TDIR=$(awk -F '\t' -v t="public.ecr.aws_lambda_python_$PYVER" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # §1.1's copy of public.ecr.aws/lambda/python:$PYVER, the runtime's OS
-  if [ -n "$GV_TDIR" ]; then TARGET_ROOT=$GV_TDIR TARGET_LIBC= TARGET_LIBC_VER= native_scan python   # no FINDING line
+  if case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac; then TARGET_ROOT=$GV_TDIR TARGET_LIBC= TARGET_LIBC_VER= native_scan python   # no FINDING line
   else echo "CHECK: no §1.1 copy of public.ecr.aws/lambda/python:$PYVER: the scan judges the glibc release only"; TARGET_ROOT= native_scan python; fi
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```

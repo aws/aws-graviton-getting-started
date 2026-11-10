@@ -145,7 +145,9 @@ mkdir -p graviton-validation/raw
 LOCK=false; [ -n "$(find . -name packages.lock.json -not -path '*/obj/*' -print 2>/dev/null | head -n 1)" ] && LOCK=true
 GV_PUB=$(mktemp -d "${TMPDIR:-/tmp}/graviton-publish.XXXXXX") || { GV_PUB=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }   # a new folder no other user can write, or nothing
 [ -n "$GV_PUB" ] && for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one publish and scan per target that Phase 1.1 recorded; with none, one publish and scan named target
+case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
 GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 RID=linux-arm64; [ -z "$GV_TDIR" ] || [ ! -e "$GV_TDIR/lib/ld-musl-aarch64.so.1" ] || RID=linux-musl-arm64   # the RID follows the target's C library
 # Executable projects from Phase 1.1 (OutputType Exe); test projects are covered in 3.2
@@ -218,7 +220,7 @@ $CONTAINER_CMD rm -f "$cid" > /dev/null
 GV_CHECK=$GV_DOTNET_SKILL_DIR/scripts/dotnet_graviton_check.py
 BASE=mcr.microsoft.com/dotnet/aspnet:8.0   # the image the Dockerfile's last FROM names (Phase 1.1 copied it)
 GV_TDIR=$(awk -F '\t' -v t="$(printf '%s' "$BASE" | tr -c 'A-Za-z0-9._-' '_')" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its folder, recorded under its name
-GV_T=(); if [ -d "$GV_TDIR" ]; then GV_T=(--target-root "$GV_TDIR"); else echo "CHECK: no Phase 1.1 copy of $BASE: copy it with the §6 block of nuget-native-assets.md, or give the scan its --target-rid and --glibc"; fi
+GV_T=(); if case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac; then GV_T=(--target-root "$GV_TDIR"); else echo "CHECK: no Phase 1.1 copy of $BASE: copy it with the §6 block of nuget-native-assets.md, or give the scan its --target-rid and --glibc"; fi
 if [ -z "$GV_APP" ]; then echo "CHECK: the image's files were not copied (mktemp made no folder)"
 elif case $GV_DOTNET_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then python3 "$GV_CHECK" scan "${GV_T[@]}" "$GV_APP"   # only the skill's own program; the application files, from the path the Dockerfile copies them to (/app)
 else echo "ERROR: set GV_DOTNET_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi

@@ -123,7 +123,7 @@ else [ -z "$GV_ROOT" ] || rmdir "$GV_ROOT"; echo "$IMG: no arm64 container was c
 - **EC2 hosts:** the AMI's distribution; on the instance, `ldd --version | head -n 1` prints the glibc version.
 - **Page size:** a container uses its host's kernel, so it comes from the EC2 hosts or Kubernetes nodes: run `getconf PAGESIZE` there (AlmaLinux 8 reported 65536; AlmaLinux 9 and Amazon Linux 2023, 4096). If no host can be reached, leave it out; the check then lists the files a kernel with 64 KB pages refuses.
 
-§1.2.1 runs the check once for each target that `raw/target-roots.txt` records, and writes `raw/native-check-<target>.txt` for each. For a target with no image, record a name of its own and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/raw/target-roots.txt` for an Amazon Linux 2023 host. Set `GV_PAGE=65536` to add a measured page size.
+§1.2.1 runs the check once for each target that `raw/target-roots.txt` records, and writes `raw/native-check-<target>.txt` for each. For a target with no image, record a name of its own (letters, digits, `.`, `_` and `-`: the name becomes part of the output file names) and its lowest glibc version, such as `printf '%s\tglibc=%s\n' al2023-host 2.34 >> graviton-validation/raw/target-roots.txt` for an Amazon Linux 2023 host. Set `GV_PAGE=65536` to add a measured page size.
 
 ### Generate Dependency Tree
 
@@ -206,7 +206,9 @@ if python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 6))' 2> /dev/null;
 else GV_PY=("${CONTAINER_CMD:-docker}" run --rm --network none "${GV_MNT[@]}" -w "$PWD" public.ecr.aws/docker/library/python:3-slim python3); fi
 mkdir -p graviton-validation/raw
 for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one run per target that §1.1 recorded; with none, one run named target
+case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
 GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 # The check judges the files of one run as one classpath, so it runs once for each module's build output (target/ or
 # build/: its resolved dependencies and its JAR, WAR or EAR), then once for the repository's own files
@@ -282,7 +284,9 @@ if [ -n "$d" ] && curl -fsSL --max-time 300 -o "$d/download" "$URL"; then
     *) tar -xf "$d/download" -C "$d/x" 2> /dev/null ;;   # a zip, such as a JAR, the check reads as it is
   esac
   for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one scan per target that §1.1 recorded; with none, one scan named target
+  case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
   GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+  case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
   GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
   echo "== $GV_TAG"; "${GV_PY[@]}" "$GV_CHECK" "${GV_T[@]}" "$d" | sed "s#$d/##g"
   done
@@ -371,7 +375,9 @@ GV_JAVA_SKILL_DIR=   # the skill folder that the Documentation Setup block in SK
 GV_CHECK=$GV_JAVA_SKILL_DIR/scripts/java_graviton_check.py
 if case $GV_JAVA_SKILL_DIR in /?*) [ -f "$GV_CHECK" ];; *) false;; esac; then   # only the skill's own program: never a path read from the project
 for GV_TAG in $(cut -f1 graviton-validation/raw/target-roots.txt 2> /dev/null | sort -u | grep . || echo target); do   # one check per target that §1.1 recorded; with none, one check named target
+case $GV_TAG in *[!A-Za-z0-9._-]*) echo "CHECK: target $GV_TAG skipped: a name in raw/target-roots.txt names output files, so it holds only letters, digits, '.', '_' and '-'"; continue;; esac
 GV_TDIR=$(awk -F '\t' -v t="$GV_TAG" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null)   # its image's folder, or glibc=VERSION for a target with no image
+case $GV_TDIR in ""|glibc=*) ;; *) case ${GV_TDIR#"${TMPDIR:-/tmp}/graviton-target-root."} in "$GV_TDIR"|""|*/*) false;; *) [ -d "$GV_TDIR" ] && [ -O "$GV_TDIR" ];; esac || { echo "CHECK: target $GV_TAG skipped: $GV_TDIR is not a folder that the skill made for a target image"; continue; };; esac   # only a folder from the image-copy block (mktemp in ${TMPDIR:-/tmp}, yours): the list is a file in the project
 GV_T=(); case $GV_TDIR in "") ;; glibc=*) GV_T=(--libc glibc --glibc "${GV_TDIR#glibc=}");; *) GV_T=(--target-root "$GV_TDIR");; esac; GV_T+=(${GV_PAGE:+--page-size} ${GV_PAGE:+"$GV_PAGE"})
 python3 "$GV_CHECK" "${GV_T[@]}" libname.so   # no FINDING line (without python3: "${GV_PY[@]}" of §1.2.1)
 done

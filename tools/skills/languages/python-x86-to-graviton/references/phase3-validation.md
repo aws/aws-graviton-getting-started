@@ -231,7 +231,7 @@ $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 \
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/native_scan.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/native_scan.sh"; then   # the skill's own file only
   BASE=python:3.11-slim   # the image the Dockerfile's last FROM names (§1.1 copied it)
   TARGET_ROOT=$(awk -F '\t' -v t="$(printf '%s' "$BASE" | tr -c 'A-Za-z0-9._-' '_')" '$1 == t {d = $2} END {print d}' graviton-validation/raw/target-roots.txt 2> /dev/null); TARGET_PAGE_SIZE=4096   # its folder, recorded under its name
-  [ -d "$TARGET_ROOT" ] || { TARGET_ROOT=; echo "CHECK: no §1.1 copy of $BASE: copy it with the §1.1 block, or set TARGET_LIBC and TARGET_LIBC_VER to its values"; }
+  case ${TARGET_ROOT#"${TMPDIR:-/tmp}/graviton-target-root."} in "$TARGET_ROOT"|""|*/*) false;; *) [ -d "$TARGET_ROOT" ] && [ -O "$TARGET_ROOT" ];; esac || { TARGET_ROOT=; echo "CHECK: no §1.1 copy of $BASE: copy it with the §1.1 block, or set TARGET_LIBC and TARGET_LIBC_VER to its values"; }
   GV_SITE=$(mktemp -d "${TMPDIR:-/tmp}/gv-site.XXXXXX") || GV_SITE=   # a new folder, or nothing: no copy runs without it
   if [ -n "$GV_SITE" ] && CID=$($CONTAINER_CMD create --platform linux/arm64 app:arm64); then
     $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint python3 app:arm64 -c \
