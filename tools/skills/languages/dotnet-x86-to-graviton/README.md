@@ -37,6 +37,8 @@ mkdir -p /path/to/your/project/.skills && \
   cp -r tools/skills/languages/dotnet-x86-to-graviton /path/to/your/project/.skills/
 ```
 
+Run it from a clone of this repository; `git rev-parse HEAD` in the clone shows the commit you copied. Read the skill's files before its first run.
+
 Then ask your AI assistant:
 
 > Run the dotnet-x86-to-graviton skill on this project

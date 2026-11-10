@@ -175,8 +175,8 @@ mvn -q dependency:copy-dependencies -DoutputDirectory=target/deps
 # Gradle — resolve the runtime classpath into build/deps.
 # Write the init script to a real temp FILE first — Gradle rejects `-I /dev/stdin`
 # ("The specified initialization script /dev/stdin is not a file") on 8.x.
-init=$(mktemp /tmp/graviton-init.XXXXXX.gradle)
-cat > "$init" <<'EOF'
+if GV_INIT=$(mktemp -d "${TMPDIR:-/tmp}/graviton-init.XXXXXX"); then   # a new folder no other user can write
+cat > "$GV_INIT/init.gradle" <<'EOF'
 allprojects {
   tasks.register('copyGravitonDeps', Copy) {
     from configurations.findByName('runtimeClasspath')
@@ -184,8 +184,9 @@ allprojects {
   }
 }
 EOF
-./gradlew -q --console=plain -I "$init" copyGravitonDeps
-rm -f "$init"
+./gradlew -q --console=plain -I "$GV_INIT/init.gradle" copyGravitonDeps
+rm -rf "$GV_INIT"
+else echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; fi
 ```
 
 Then judge every native file by its content with the check program, `scripts/java_graviton_check.py`, which the block runs from the skill folder on its first line (the folder that Documentation Setup in SKILL.md printed). It reads JARs, WARs and EARs in memory, with the archives nested in them (Spring Boot `BOOT-INF/lib`, WAR `WEB-INF/lib`, EARs of WARs, shaded JARs), and native files on disk, whatever their names, and judges each for the target of §1.1. Without Python 3.6 or later (`maven:3-eclipse-temurin-21` and `eclipse-temurin:21` ship no `python3`) the block runs it in a Python image, with the project and the target folder mounted read-only:

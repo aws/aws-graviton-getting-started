@@ -33,7 +33,7 @@ Each skill follows the [Agent Skills specification](https://agentskills.io/speci
 
 ## How to Install
 
-Each skill installs on its own. The commands below install the Java skill; set `SKILL` to another folder name from [Available Skills](#available-skills) (for example `python-x86-to-graviton`) to install that skill instead. Run the project-level commands (GitHub Copilot, Windsurf, Roo Code, Any platform) from your project's root directory.
+Each skill installs on its own. The commands below install the Java skill; set `SKILL` to another folder name from [Available Skills](#available-skills) (for example `python-x86-to-graviton`) to install that skill instead. Run the project-level commands (GitHub Copilot, Windsurf, Roo Code, Any platform) from your project's root directory. Each command prints the commit it installs from. Read the skill's files (`SKILL.md`, `references/`, `scripts/`) before its first run, and again after an update.
 
 ### Kiro
 
@@ -60,12 +60,14 @@ https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/langu
 ```bash
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  GV_CLONE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-skill.XXXXXX") && \
+  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git "$GV_CLONE" && \
+  git -C "$GV_CLONE" sparse-checkout set "tools/skills/languages/$SKILL" && \
+  echo "installing $SKILL from commit $(git -C "$GV_CLONE" rev-parse HEAD)" && \
   mkdir -p ~/.claude/skills && \
   rm -rf ~/.claude/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.claude/skills/ && \
-  rm -rf /tmp/graviton-skill
+  cp -r "$GV_CLONE/tools/skills/languages/$SKILL" ~/.claude/skills/; \
+  [ -z "${GV_CLONE-}" ] || rm -rf "$GV_CLONE"
 ```
 
 ### GitHub Copilot / VS Code
@@ -73,12 +75,14 @@ SKILL=java-x86-to-graviton
 ```bash
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  GV_CLONE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-skill.XXXXXX") && \
+  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git "$GV_CLONE" && \
+  git -C "$GV_CLONE" sparse-checkout set "tools/skills/languages/$SKILL" && \
+  echo "installing $SKILL from commit $(git -C "$GV_CLONE" rev-parse HEAD)" && \
   mkdir -p .github/skills && \
   rm -rf .github/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .github/skills/ && \
-  rm -rf /tmp/graviton-skill
+  cp -r "$GV_CLONE/tools/skills/languages/$SKILL" .github/skills/; \
+  [ -z "${GV_CLONE-}" ] || rm -rf "$GV_CLONE"
 ```
 
 ### OpenAI Codex
@@ -86,12 +90,14 @@ SKILL=java-x86-to-graviton
 ```bash
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  GV_CLONE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-skill.XXXXXX") && \
+  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git "$GV_CLONE" && \
+  git -C "$GV_CLONE" sparse-checkout set "tools/skills/languages/$SKILL" && \
+  echo "installing $SKILL from commit $(git -C "$GV_CLONE" rev-parse HEAD)" && \
   mkdir -p ~/.codex/skills && \
   rm -rf ~/.codex/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.codex/skills/ && \
-  rm -rf /tmp/graviton-skill
+  cp -r "$GV_CLONE/tools/skills/languages/$SKILL" ~/.codex/skills/; \
+  [ -z "${GV_CLONE-}" ] || rm -rf "$GV_CLONE"
 ```
 
 ### Windsurf
@@ -99,12 +105,14 @@ SKILL=java-x86-to-graviton
 ```bash
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  GV_CLONE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-skill.XXXXXX") && \
+  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git "$GV_CLONE" && \
+  git -C "$GV_CLONE" sparse-checkout set "tools/skills/languages/$SKILL" && \
+  echo "installing $SKILL from commit $(git -C "$GV_CLONE" rev-parse HEAD)" && \
   mkdir -p .windsurf/skills && \
   rm -rf .windsurf/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .windsurf/skills/ && \
-  rm -rf /tmp/graviton-skill
+  cp -r "$GV_CLONE/tools/skills/languages/$SKILL" .windsurf/skills/; \
+  [ -z "${GV_CLONE-}" ] || rm -rf "$GV_CLONE"
 ```
 
 ### Gemini CLI
@@ -112,12 +120,14 @@ SKILL=java-x86-to-graviton
 ```bash
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  GV_CLONE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-skill.XXXXXX") && \
+  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git "$GV_CLONE" && \
+  git -C "$GV_CLONE" sparse-checkout set "tools/skills/languages/$SKILL" && \
+  echo "installing $SKILL from commit $(git -C "$GV_CLONE" rev-parse HEAD)" && \
   mkdir -p ~/.gemini/skills && \
   rm -rf ~/.gemini/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.gemini/skills/ && \
-  rm -rf /tmp/graviton-skill
+  cp -r "$GV_CLONE/tools/skills/languages/$SKILL" ~/.gemini/skills/; \
+  [ -z "${GV_CLONE-}" ] || rm -rf "$GV_CLONE"
 ```
 
 ### Roo Code
@@ -125,12 +135,14 @@ SKILL=java-x86-to-graviton
 ```bash
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  GV_CLONE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-skill.XXXXXX") && \
+  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git "$GV_CLONE" && \
+  git -C "$GV_CLONE" sparse-checkout set "tools/skills/languages/$SKILL" && \
+  echo "installing $SKILL from commit $(git -C "$GV_CLONE" rev-parse HEAD)" && \
   mkdir -p .roo/skills && \
   rm -rf .roo/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .roo/skills/ && \
-  rm -rf /tmp/graviton-skill
+  cp -r "$GV_CLONE/tools/skills/languages/$SKILL" .roo/skills/; \
+  [ -z "${GV_CLONE-}" ] || rm -rf "$GV_CLONE"
 ```
 
 ### Goose
@@ -138,12 +150,14 @@ SKILL=java-x86-to-graviton
 ```bash
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  GV_CLONE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-skill.XXXXXX") && \
+  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git "$GV_CLONE" && \
+  git -C "$GV_CLONE" sparse-checkout set "tools/skills/languages/$SKILL" && \
+  echo "installing $SKILL from commit $(git -C "$GV_CLONE" rev-parse HEAD)" && \
   mkdir -p ~/.config/goose/skills && \
   rm -rf ~/.config/goose/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.config/goose/skills/ && \
-  rm -rf /tmp/graviton-skill
+  cp -r "$GV_CLONE/tools/skills/languages/$SKILL" ~/.config/goose/skills/; \
+  [ -z "${GV_CLONE-}" ] || rm -rf "$GV_CLONE"
 ```
 
 ### Any platform (project-level)
@@ -153,12 +167,14 @@ Copy the skill folder into the cross-platform standard path:
 ```bash
 SKILL=java-x86-to-graviton
 : "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
+  GV_CLONE=$(mktemp -d "${TMPDIR:-/tmp}/graviton-skill.XXXXXX") && \
+  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git "$GV_CLONE" && \
+  git -C "$GV_CLONE" sparse-checkout set "tools/skills/languages/$SKILL" && \
+  echo "installing $SKILL from commit $(git -C "$GV_CLONE" rev-parse HEAD)" && \
   mkdir -p .agents/skills && \
   rm -rf .agents/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .agents/skills/ && \
-  rm -rf /tmp/graviton-skill
+  cp -r "$GV_CLONE/tools/skills/languages/$SKILL" .agents/skills/; \
+  [ -z "${GV_CLONE-}" ] || rm -rf "$GV_CLONE"
 ```
 
 Not every platform reads `.agents/skills/`. For Kiro CLI copy the folder to `.kiro/skills/`, and for Claude Code to `.claude/skills/`.
