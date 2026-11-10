@@ -32,7 +32,8 @@ import struct
 import subprocess
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
+# packages.config is the only XML this program reads; packages_config_entries() refuses DTDs and entities before parsing
+import xml.parsers.expat as expat  # nosemgrep: python.lang.security.use-defused-xml
 
 ELF_ARCH = {3: "i386", 40: "arm", 62: "x86-64", 183: "aarch64", 243: "riscv"}
 OS_ABI = {1: "HP-UX", 2: "NetBSD", 6: "Solaris", 7: "AIX", 9: "FreeBSD", 12: "OpenBSD"}  # EI_OSABI of other systems
@@ -753,8 +754,9 @@ def restore(work, rids, timeout):
         print("restore %s for %s (scratch copy)" % (p, ";".join(rids)))
         cmd = ["dotnet", "restore", p, "-p:RuntimeIdentifiers=\"%s\"" % ";".join(rids),
                "-p:RestoreLockedMode=false", "-p:EnableWindowsTargeting=true"]
+        # argument list, no shell: `dotnet restore`, a project file found in the tree being analyzed, and the operator's RIDs
         try:
-            r = subprocess.run(cmd, cwd=work, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, timeout=timeout)
+            r = subprocess.run(cmd, cwd=work, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, timeout=timeout)  # nosec B603  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         except subprocess.TimeoutExpired:
             print("restore of %s timed out after %d s" % (p, timeout))
             return False
@@ -1061,8 +1063,39 @@ def cmd_probe(args):
         return report_assets(tmp, args)
 
 
+def packages_config_entries(path):
+    """(id, version) of every <package> element of a packages.config, in file order.
+
+    A packages.config is a short, flat list of elements and never carries a DTD. The file is parsed with Expat directly,
+    and a DOCTYPE or entity declaration stops the parse before any expansion (the entity expansion attacks the xml
+    module's documentation warns about); external entities cannot be declared without a DTD, so none is resolved. Files
+    over 1 MiB are refused before they are read."""
+    if os.path.getsize(path) > 1 << 20:
+        raise ValueError("%s is larger than 1 MiB; a packages.config is a short list of package elements" % path)
+    entries = []
+
+    def refuse(*_):
+        raise ValueError("%s declares a DTD or an entity, which a packages.config never needs; not parsed" % path)
+
+    def start(name, attrs):
+        if name == "package":
+            entries.append((attrs.get("id"), attrs.get("version")))
+
+    parser = expat.ParserCreate()
+    parser.StartDoctypeDeclHandler = refuse
+    parser.EntityDeclHandler = refuse
+    parser.StartElementHandler = start
+    with open(path, "rb") as f:
+        parser.ParseFile(f)
+    return entries
+
+
 def cmd_config(args):
-    entries = [(p.get("id"), p.get("version")) for p in ET.parse(args.file).getroot().iter("package")]
+    try:
+        entries = packages_config_entries(args.file)
+    except (ValueError, expat.ExpatError) as e:
+        print("ERROR: %s" % e)
+        return 2
     errors = 0
     for pid, ver in entries:
         print("--- %s %s" % (pid, ver))
