@@ -157,7 +157,7 @@ uv venv --seed --python "$PY_TARGET" "$GV_VENV" && . "$GV_VENV/bin/activate"
 
 # A specific installed interpreter
 GV_VENV=$(mktemp -d "${TMPDIR:-/tmp}/graviton-venv.XXXXXX")
-"python$PY_TARGET" -m venv "$GV_VENV" && . "$GV_VENV/bin/activate"
+"python$PY_TARGET" -I -m venv "$GV_VENV" && . "$GV_VENV/bin/activate"
 
 # pyenv: current shell session only
 pyenv shell "$PY_TARGET"
