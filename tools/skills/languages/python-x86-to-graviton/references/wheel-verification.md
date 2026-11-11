@@ -137,10 +137,11 @@ GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKIL
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
   platforms aarch64   # one --platform per tag the target's libc accepts
-  python3 -I -m pip install --dry-run --ignore-installed --only-binary=:all: \
+  GV_PT=$(mktemp -d "${TMPDIR:-/tmp}/graviton-probe-target.XXXXXX") || { GV_PT=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }   # a new, empty folder: the dry run writes nothing to it
+  [ -n "$GV_PT" ] && { python3 -I -m pip install --dry-run --ignore-installed --only-binary=:all: \
     --report graviton-validation/python-x86-to-graviton/raw/wheel-availability.json -q "${PLAT[@]}" \
     --python-version 3.11 --implementation cp --abi cp311 \
-    --target /tmp/graviton-probe-target -r graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt
+    --target "$GV_PT" -r graviton-validation/python-x86-to-graviton/raw/requirements-resolved.txt; rc=$?; rmdir "$GV_PT"; (exit $rc); }
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
@@ -277,9 +278,10 @@ GV_PY_SKILL_DIR=   # the skill folder that the Documentation Setup block in SKIL
 if case $GV_PY_SKILL_DIR in /?*) [ -f "$GV_PY_SKILL_DIR/scripts/platforms.sh" ];; *) false;; esac && . "$GV_PY_SKILL_DIR/scripts/platforms.sh"; then   # the skill's own file only
   TARGET_LIBC=glibc; TARGET_LIBC_VER=2.34   # as in section 3
   platforms aarch64   # one --platform per tag the target's libc accepts
-  python3 -I -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
-    --python-version 3.11 --implementation cp --abi cp311 --target /tmp/graviton-probe-target \
-    -r requirements-locked.txt
+  GV_PT=$(mktemp -d "${TMPDIR:-/tmp}/graviton-probe-target.XXXXXX") || { GV_PT=; echo "ERROR: mktemp -d made no folder under ${TMPDIR:-/tmp}; set TMPDIR to a writable folder and rerun"; }   # a new, empty folder: the dry run writes nothing to it
+  [ -n "$GV_PT" ] && { python3 -I -m pip install --dry-run --ignore-installed --only-binary=:all: --require-hashes -q "${PLAT[@]}" \
+    --python-version 3.11 --implementation cp --abi cp311 --target "$GV_PT" \
+    -r requirements-locked.txt; rc=$?; rmdir "$GV_PT"; (exit $rc); }
 else echo "ERROR: set GV_PY_SKILL_DIR on the first line to the skill folder that the Documentation Setup block in SKILL.md printed"; fi
 ```
 
