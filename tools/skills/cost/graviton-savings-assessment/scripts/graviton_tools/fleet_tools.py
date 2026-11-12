@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT-0
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 """Fleet scoring, target selection, migration planning, and engine readiness.
@@ -342,13 +343,15 @@ def _build_graviton_options(
     target_strategy:
         "latest": Pick the n+1 Graviton generation matching graviton_upgrade from
                   instance_classifier (gen<=5->g2, gen6->g3, gen7->g4, gen>=8->g5 where
-                  it exists). If that generation has no pricing, fall back to the next
-                  available generation.
+                  it exists). If that generation has no priced option, take the
+                  newest one that has (G5, then G4, G3, G2).
         "cheapest": Pick the option with highest savings_pct (legacy behavior).
-        "same_gen": Pick the Graviton option matching the source instance's x86 generation.
+        "same_gen": Pick the Graviton option matching the source instance's x86
+                  generation, else the highest savings_pct.
         "graviton2"/"graviton3"/"graviton4"/"graviton5": Force every instance to that
-                  generation, falling back to the newest available older generation when
-                  the forced target isn't offered or priced.
+                  generation. When the forced target isn't offered or priced, take the
+                  nearest older generation first (a missing G5 lands on G4), then the
+                  newer ones nearest first, and mark the row generation_fallback.
 
     region: when provided, targets not offered in that region are excluded via
         DescribeInstanceTypeOfferings. Availability lookup failures are non-fatal
@@ -770,6 +773,12 @@ def _best_savings(r: Dict, od_prices: Dict, target_strategy: str = "latest") -> 
     cost = r.get("cost", 0)
     current_od = od_prices.get(raw)
 
+    # Enrichment found no target rate at this row's own coordinates. The plain
+    # keys here hold the default engine/deployment and Linux, so re-pricing
+    # from them would book someone else's ratio; the row is unpriced instead.
+    if r.get("savings_unmatched") and r.get("est_savings") is None:
+        return 0.0, r.get("graviton_upgrade", "") or "", "estimate_20pct"
+
     # Use _build_graviton_options for consistent target selection
     options, best = _build_graviton_options(
         r, od_prices, target_strategy, region=r.get("region", "")
@@ -821,15 +830,18 @@ def _best_savings(r: Dict, od_prices: Dict, target_strategy: str = "latest") -> 
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _dedup_already_optimized(entries: list) -> list:
-    """De-duplicate already_optimized by (instance_type, region), keeping highest cost.
+    """De-duplicate already_optimized by (instance_type, region, platform), keeping highest cost.
 
-    When multiple CE dimensions produce the same instance_type+region entry,
-    retain only the one with the highest cost value to avoid inflating the list.
+    When multiple CE dimensions produce the same row, retain only the one with
+    the highest cost value to avoid inflating the list. Platform is part of the
+    key because rows are per platform: a Linux and a RHEL row of one type and
+    region are different rows with different rates, not duplicates.
     All fields from the retained entry are preserved unchanged.
     """
     seen: Dict[tuple, dict] = {}
     for entry in entries:
-        key = (entry.get("instance_type", ""), entry.get("region", ""))
+        key = (entry.get("instance_type", ""), entry.get("region", ""),
+               entry.get("platform", ""))
         existing = seen.get(key)
         if existing is None or entry.get("cost", 0) > existing.get("cost", 0):
             seen[key] = entry
@@ -1034,7 +1046,11 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
         # payment option and offering class. The on-demand ratio remains the
         # fallback for rows enrichment could not price.
         row_savings = r.get("est_savings")
-        if row_savings is None:
+        if row_savings is None and r.get("savings_unmatched"):
+            # See _best_savings: no rate at the row's coordinates, so unpriced.
+            row_savings = 0.0
+            pricing_source = "estimate_20pct"
+        elif row_savings is None:
             row_savings = est_monthly_savings
         elif pricing_source in ("estimate_20pct", "no_equivalent"):
             # Enrichment priced this row at its own coordinates even though the
@@ -1055,6 +1071,7 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
             "est_monthly_savings": row_savings,
             "pricing_source": pricing_source,
             "region": r.get("region", ""),
+            "platform": r.get("platform", ""),
             "service": r.get("service", "ec2"),
             "gen_bucket": r.get("gen_bucket", ""),
             "category": r.get("category", ""),
@@ -1096,11 +1113,19 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
             no_equivalent["count"] += 1
             no_equivalent["cost"] += r.get("cost", 0)
 
+    def _book(r, amount, source):
+        # The exact figure this row put in the headline, and why. The HTML
+        # report rebuilds its headline from rows, so it reads these rather than
+        # re-deriving a saving the scorer may have declined to book.
+        r["booked_savings"] = round(amount or 0.0, 2)
+        r["booked_source"] = source
+
     for idx, r in enumerate(opps):
         if idx < 15:
             entry = _opp_entry(r)
             total_est_savings += entry["est_monthly_savings"]
             _tally(r, entry["pricing_source"])
+            _book(r, entry["est_monthly_savings"], entry["pricing_source"])
             top_opps.append(entry)
         else:
             # Rows beyond the top 15 contribute to the total on the same basis
@@ -1110,9 +1135,11 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
             # Cost-Optimized section reflects the WHOLE fleet rather than just the
             # top 15; these rows are netted into the headline either way.
             row_savings = r.get("est_savings")
+            src = "enriched"
             if row_savings is None:
                 row_savings, _, src = _best_savings(r, _map_for(r), target_strategy)
                 _tally(r, src)
+            _book(r, row_savings, src)
             total_est_savings += row_savings
             if row_savings is not None and row_savings < 0:
                 tail_already_optimized.append(_opp_entry(r))
@@ -1195,7 +1222,7 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
         processor_gen_breakdown[proc][gen]["cost"] += r.get("cost", 0)
         processor_gen_breakdown[proc][gen]["hours"] += r.get("hours", 0)
 
-    # De-duplicate already_optimized by (instance_type, region) (Req 7.1, 7.2, 7.3)
+    # De-duplicate already_optimized by (instance_type, region, platform)
     already_optimized = _dedup_already_optimized(already_optimized)
 
     return {
@@ -1267,9 +1294,8 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
 # A release line missing from a family's map is not supported on that family,
 # and an engine missing for a family means the engine is not offered on it.
 #
-# Kept in step with references/engine-compatibility.md by
-# tests/test_engine_readiness.py.
-ENGINE_SUPPORT_REVIEWED = "2026-11-04"
+# Mirrored in references/engine-compatibility.md; update both together.
+ENGINE_SUPPORT_REVIEWED = "2026-11-12"
 ENGINE_SUPPORT_SOURCES = {
     "rds": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.Support.html",
     "aurora": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.DBInstanceClass.SupportAurora.html",
@@ -1298,7 +1324,7 @@ GRAVITON_ENGINE_SUPPORT: Dict[str, Dict[str, Dict]] = {
                     {"13": "13.4", "14": "14.5", "15": "15", "16": "16", "17": "17"}),
         **_families("m8g, r8g",
                     {"13": "13.11", "14": "14.9", "15": "15.4", "16": "16.1", "17": "17.1"}),
-        **_families("m8gd, r8gd",
+        **_families("m8gd, r8gd, m9g",
                     {"13": "13.18", "14": "14.17", "15": "15.10", "16": "16.6", "17": "17.2",
                      "18": "18.1"}),
     },
@@ -1306,14 +1332,14 @@ GRAVITON_ENGINE_SUPPORT: Dict[str, Dict[str, Dict]] = {
         **_families("m6g, r6g, t4g, x2g, m6gd, r6gd, c6gd, m7g, r7g",
                     {"8.0": "8.0", "8.4": "8.4"}),
         **_families("m8g, r8g", {"8.0": "8.0.32", "8.4": "8.4"}),
-        **_families("m8gd, r8gd", {"8.0": "8.0.40", "8.4": "8.4.3"}),
+        **_families("m8gd, r8gd, m9g", {"8.0": "8.0.40", "8.4": "8.4.3"}),
     },
     "mariadb": {
         **_families("m6g, r6g, t4g, x2g, m6gd, r6gd, m7g, r7g", _MARIADB_ALL),
         **_families("m8g, r8g",
                     {"10.4": "10.4.29", "10.5": "10.5.20", "10.6": "10.6.13",
                      "10.11": "10.11.7", "11.4": "11.4.3", "11.8": "11.8.3", "12.3": "12.3.2"}),
-        **_families("m8gd, r8gd",
+        **_families("m8gd, r8gd, m9g",
                     {"10.5": "10.5.27", "10.6": "10.6.19", "10.11": "10.11.9",
                      "11.4": "11.4.3", "11.8": "11.8.3", "12.3": "12.3.2"}),
     },
@@ -1452,13 +1478,6 @@ def _plain_version(engine: str, version: str) -> Tuple[str, str]:
     if engine in ("mysql", "mariadb"):
         return ".".join(parts[:2]), v
     return parts[0], v
-
-
-def _line_of(engine: str, minimum: str) -> str:
-    """Release line a minimum version string belongs to (for table checks)."""
-    if engine == "opensearch":
-        return minimum.split(" ")[0]
-    return _plain_version(engine, minimum)[0]
 
 
 def _rule(rules: Dict, line: str) -> Tuple[Optional[str], List[str]]:

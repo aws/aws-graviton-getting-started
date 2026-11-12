@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT-0
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 """Price lookup over pre-fetched on-demand rates.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT-0
 """
 Intel-equivalent mapping for Graviton instance types.
 

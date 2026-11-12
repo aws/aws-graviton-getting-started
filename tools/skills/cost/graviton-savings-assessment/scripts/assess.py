@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT-0
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 """Graviton Savings Assessment CLI.
@@ -399,8 +400,14 @@ def _check_date_range(start_date: str, end_date: str) -> None:
     opaque Cost Explorer ValidationException, after the credential preflight has
     already made a network round trip.
     """
-    if not (start_date and end_date):
+    if not start_date:
+        # A defaulted start is the month before the end, which is always valid.
         return
+    if not end_date:
+        # The pipeline defaults the end to the 1st of this month. Check against
+        # that here: a lone --start-date after it once skipped this check and
+        # the inverted range scaled every monthly figure about 30x.
+        end_date = datetime.now().date().replace(day=1).strftime("%Y-%m-%d")
 
     start = datetime.strptime(start_date, "%Y-%m-%d").date()
     end = datetime.strptime(end_date, "%Y-%m-%d").date()
@@ -670,6 +677,8 @@ def cmd_assess(args: argparse.Namespace) -> None:
         "pricing_warning": pricing_warning,
         "data_complete": data_complete,
         "failed_pulls": failed_pulls,
+        "split_estimated_cost": (summary.get("data_quality") or {}).get(
+            "split_estimated_cost", 0),
         "output_dir": str(output_dir),
         "report_md": os.path.basename(report_result.get("markdown_path", "")),
         "report_html": os.path.basename(report_result.get("html_path", "")),

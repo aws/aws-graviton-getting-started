@@ -9,7 +9,7 @@ Redis OSS runs on `cache.r6g` from 5.0.6, needs 6.2 on `cache.r7g`, and is not
 offered on `cache.r8g` at all. RDS PostgreSQL 13 runs on `db.r7g` from 13.4 but
 needs 13.11 on `db.r8g`. Check the family your target actually is.
 
-**Last reviewed:** 2026-11-04, against:
+**Last reviewed:** 2026-11-12, against:
 
 - RDS: [Supported DB engines for DB instance classes](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.Support.html)
 - Aurora: [Supported DB engines for DB instance classes (Aurora)](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.DBInstanceClass.SupportAurora.html)
@@ -17,8 +17,8 @@ needs 13.11 on `db.r8g`. Check the family your target actually is.
 - OpenSearch Service: [Supported instance types](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-instance-types.html)
 
 The assessment's readiness check (`check_engine_graviton_readiness` in
-`scripts/graviton_tools/fleet_tools.py`) uses the same table. A test keeps the
-two in step, so update both together.
+`scripts/graviton_tools/fleet_tools.py`) uses the same table, so update both
+together.
 
 ## Minimum versions by target family
 
@@ -38,13 +38,13 @@ How to read the last column:
 | postgres | r6gd, c6gd | 13.4 only, 13.7+, 14.5+, 15+, 16+, 17+ |
 | postgres | m7g, r7g | 13.4+, 14.5+, 15+, 16+, 17+ |
 | postgres | m8g, r8g | 13.11+, 14.9+, 15.4+, 16.1+, 17.1+ |
-| postgres | m8gd, r8gd | 13.18+, 14.17+, 15.10+, 16.6+, 17.2+, 18.1+ |
+| postgres | m8gd, r8gd, m9g | 13.18+, 14.17+, 15.10+, 16.6+, 17.2+, 18.1+ |
 | mysql | m6g, r6g, t4g, x2g, m6gd, r6gd, c6gd, m7g, r7g | 8.0+, 8.4+ |
 | mysql | m8g, r8g | 8.0.32+, 8.4+ |
-| mysql | m8gd, r8gd | 8.0.40+, 8.4.3+ |
+| mysql | m8gd, r8gd, m9g | 8.0.40+, 8.4.3+ |
 | mariadb | m6g, r6g, t4g, x2g, m6gd, r6gd, m7g, r7g | 10.4+, 10.5+, 10.6+, 10.11+, 11.4+, 11.8+, 12.3+ |
 | mariadb | m8g, r8g | 10.4.29+, 10.5.20+, 10.6.13+, 10.11.7+, 11.4.3+, 11.8.3+, 12.3.2+ |
-| mariadb | m8gd, r8gd | 10.5.27+, 10.6.19+, 10.11.9+, 11.4.3+, 11.8.3+, 12.3.2+ |
+| mariadb | m8gd, r8gd, m9g | 10.5.27+, 10.6.19+, 10.11.9+, 11.4.3+, 11.8.3+, 12.3.2+ |
 | aurora-mysql | r6g, x2g, t4g | 2+, 3+ |
 | aurora-mysql | r7g | 2.12.0+, 3.03.1+ |
 | aurora-mysql | r8g | 3.08.0+ |

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT-0
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 """Graviton assessment pipeline — full fleet assessment via direct boto3 CE calls.
 
@@ -1186,12 +1187,16 @@ def _savings_ratio_for_target(item: Dict, target_type: str, target_od: float,
     # Single-AZ db.m9g.4xlarge (1.465) reported 48.6% savings on a target that is
     # actually 2.9% more expensive. Both sides must come from the same place.
     if current_tier:
+        # No fallback to the plain keys when the target has no rate at the
+        # row's tier: plain keys hold the default engine/deployment and Linux,
+        # so a PostgreSQL Multi-AZ or RHEL row would be booked at a MySQL
+        # Single-AZ or Linux ratio. The row goes to unpriced instead. The one
+        # exception is EC2 Linux, whose coordinates ARE the plain key's.
         matched = _od_at_tier(od_prices, target_type, current_tier, od_key, coord[0])
-        if not matched and current_tier != "plain":
-            src_plain = od_prices.get(item.get("raw", ""))
-            tgt_plain = od_prices.get(target_type)
-            if src_plain and tgt_plain:
-                current_od, matched = src_plain, tgt_plain
+        if (not matched and current_tier == "coord"
+                and od_key == _coord_key(("ec2", "", ""))
+                and coord[0] in ("Linux", "")):
+            matched = od_prices.get(target_type)
         if not matched or not current_od:
             return None
         target_od = matched
@@ -1543,6 +1548,11 @@ def _enrich_classified_with_pricing(
 
                     if row_savings is not None:
                         item["est_savings"] = round(row_savings, 2)
+                    else:
+                        # No matched rate pair at the row's coordinates. Flag
+                        # it so the scorer reports it unpriced instead of
+                        # re-pricing it from default-coordinate plain keys.
+                        item["savings_unmatched"] = True
 
             # Store per-gen savings for what-if columns. Commitment-matched via
             # the same helper as the default target, so switching generations in
@@ -1737,8 +1747,19 @@ def _compute_realized_savings(
             pricing_source = "unpriced"
             unpriced_count += 1
 
+        # Rows are per (type, region, coordinates), so a lookup by type alone
+        # gave every row of a multi-region type the last row's figures. Stamp
+        # the result on its own row; the CSV reads it from there.
+        item["realized"] = {
+            "savings": round(savings, 2),
+            "intel_equivalent": intel_eq,
+            "intel_price_per_hr": round(intel_rate, 6) if intel_rate else 0,
+        }
+
         results.append({
             "graviton_type": raw,
+            "region": region,
+            "platform": item.get("platform", ""),
             "intel_equivalent": intel_eq,
             "service": service,
             "hours": hours,
@@ -1935,7 +1956,7 @@ _PT_COST_FIELD = {"OD": "cost_od", "RI": "cost_ri", "SP": "cost_sp", "Spot": "co
 _ADDITIVE_FIELDS = (
     "cost", "hours", "cost_od", "cost_ri", "cost_sp", "cost_spot",
     "od_cost", "ri_cost", "sp_cost", "spot_cost", "ri_savings",
-    "ri_unused_hours", "od_hours", "reserved_hours",
+    "ri_unused_hours", "od_hours", "reserved_hours", "split_estimated_cost",
 )
 
 
@@ -2224,7 +2245,12 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
                     platform_cells.add((region, coords))
                     cell = cells.setdefault((region, coords), {})
                     cell[pt] = {"cost": cost_cells.get(key, 0.0),
-                                "hours": hour_cells.get(key, 0.0)}
+                                "hours": hour_cells.get(key, 0.0),
+                                # SP and Spot have no per-cell evidence: with
+                                # several regions AND platforms the split is
+                                # fitted to the two margins, not measured.
+                                "est": (not seed_field and len(region_tot) > 1
+                                        and len(plat_tot) > 1)}
             else:
                 for region, tot in region_tot.items():
                     sub = cov.get((it, region), {}) or {_coverage_coords(svc, {}): None}
@@ -2283,6 +2309,10 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
                 effective_rate=round(cost / hours, 4) if hours > 0 else 0,
                 **{_PT_COST_FIELD[pt]: cost_by_pt.get(pt, 0.0) for pt in _PURCHASE_TYPES},
             )
+            # Spend on this row whose region x platform split was estimated
+            # (see "est" above). Reported, so the reader knows it is modelled.
+            d["split_estimated_cost"] = sum(
+                pts[pt]["cost"] for pt in pts if pts[pt].get("est"))
             d["od_cost"] = d["cost_od"]
             d["sp_cost"] = d["cost_sp"]
             d["spot_cost"] = d["cost_spot"]
@@ -2337,6 +2367,11 @@ def _months_in_period(start_date: str, end_date: str) -> float:
     """Length of [start, end) in months: whole calendar months when both are the 1st."""
     from datetime import date
     s, e = date.fromisoformat(start_date), date.fromisoformat(end_date)
+    if e <= s:
+        # Clamping this to a day once turned an inverted range into a divisor
+        # of ~0.033, scaling every "monthly" figure about 30x.
+        raise ValueError(f"empty or inverted period: {start_date} to {end_date} "
+                         "(start is inclusive, end exclusive)")
     if s.day == 1 and e.day == 1:
         months = (e.year - s.year) * 12 + (e.month - s.month)
         if months > 0:
@@ -2482,10 +2517,7 @@ def _fetch_reservation_coverage(start_date: str, end_date: str,
                     break
         except Exception as e:
             _pricing_errors.append(f"coverage/{svc_key}: {type(e).__name__}: {e}")
-            if any(k in str(e) for k in (
-                "ExpiredToken", "NoCredentials", "AccessDenied",
-                "Unauthorized", "InvalidClientToken",
-            )):
+            if _is_auth_error(e):
                 _pricing_errors.append("FATAL: Credential error on getReservationCoverage")
                 break
     return rows
@@ -2778,6 +2810,11 @@ def estimate_graviton_savings(
             start_date = end_dt.replace(
                 month=end_dt.month - 1, day=1
             ).strftime("%Y-%m-%d")
+    # Validated after the defaults are filled in, not before: a lone start date
+    # after the defaulted end is otherwise never compared with it.
+    if start_date >= end_date:
+        raise ValueError(f"--start-date ({start_date}) must be before the end "
+                         f"date ({end_date}); the end is exclusive")
 
     _pricing_errors.clear()
     # Module-level, so a second assessment in one process would otherwise report
@@ -3233,6 +3270,8 @@ def estimate_graviton_savings(
                 },
                 "usage_summary_total": round(summary_total, 2),
                 "unclassified_types": unclassified_types,
+                "split_estimated_cost": round(sum(
+                    c.get("split_estimated_cost", 0) or 0 for c in classified), 2),
                 "classified_totals": {
                     "od": round(classified_od, 2),
                     "ri": round(classified_ri, 2),
