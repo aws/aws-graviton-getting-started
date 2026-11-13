@@ -57,134 +57,127 @@ https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/cost/
 ### Claude Code
 
 ```bash
-CATEGORY=languages
-SKILL=java-x86-to-graviton
-SRC="tools/skills/$CATEGORY/$SKILL"
-DEST=~/.claude/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=~/.claude/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 ### GitHub Copilot / VS Code
 
 ```bash
-CATEGORY=languages
-SKILL=java-x86-to-graviton
-SRC="tools/skills/$CATEGORY/$SKILL"
-DEST=.github/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=.github/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 ### OpenAI Codex
 
 ```bash
-CATEGORY=languages
-SKILL=java-x86-to-graviton
-SRC="tools/skills/$CATEGORY/$SKILL"
-DEST=~/.codex/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=~/.codex/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 ### Windsurf
 
 ```bash
-CATEGORY=languages
-SKILL=java-x86-to-graviton
-SRC="tools/skills/$CATEGORY/$SKILL"
-DEST=.windsurf/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=.windsurf/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 ### Gemini CLI
 
 ```bash
-CATEGORY=languages
-SKILL=java-x86-to-graviton
-SRC="tools/skills/$CATEGORY/$SKILL"
-DEST=~/.gemini/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=~/.gemini/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 ### Roo Code
 
 ```bash
-CATEGORY=languages
-SKILL=java-x86-to-graviton
-SRC="tools/skills/$CATEGORY/$SKILL"
-DEST=.roo/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=.roo/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 ### Goose
 
 ```bash
-CATEGORY=languages
-SKILL=java-x86-to-graviton
-SRC="tools/skills/$CATEGORY/$SKILL"
-DEST=~/.config/goose/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=~/.config/goose/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 ### Any platform (project-level)
@@ -192,20 +185,19 @@ rm -rf "$TMP"
 Copy the skill folder into the cross-platform standard path:
 
 ```bash
-CATEGORY=languages
-SKILL=java-x86-to-graviton
-SRC="tools/skills/$CATEGORY/$SKILL"
-DEST=.agents/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=.agents/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 Not every platform reads `.agents/skills/`. For Kiro CLI copy the folder to `.kiro/skills/`, and for Claude Code to `.claude/skills/`.
