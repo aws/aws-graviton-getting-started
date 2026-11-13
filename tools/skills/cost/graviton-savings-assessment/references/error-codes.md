@@ -44,12 +44,13 @@ Running `assess.py` with no subcommand prints the help to stderr and also exits 
 
 | stderr message | Remediation |
 |----------------|-------------|
-| `Error: Assessment failed: No coverage data. Check credentials and date range.` | Cost Explorer returned no instance usage for the period. Check that the credentials can read Cost Explorer for the intended account and that the period has usage. |
+| `Error: Assessment failed: No coverage data: every Cost Explorer request failed. First failures: <errors>` | Every Cost Explorer request failed; the first errors name the cause (often `AccessDeniedException` for a missing `ce:*` permission). |
+| `Error: Assessment failed: No coverage data: Cost Explorer returned no usage for <start>..<end>. ...` | The requests succeeded but the period had no instance usage. Check the date range (the end date is exclusive) and that the account had compute usage. |
 | `Error: Assessment failed: No classifiable instances in data.` | Usage exists but none of it is an instance type the skill assesses. |
 | `Error: Assessment failed: CE data pull failed: <error>` | A Cost Explorer call failed outright; the error names it (often `AccessDeniedException` for a missing `ce:*` permission). |
-| `Error: Assessment failed: <details>` | Any other pipeline failure; check `assessment.log` in `--output-dir`. |
+| `Error: Assessment failed: <details>` | Any other pipeline failure; check the run's `assessment-<timestamp>.log` in `--output-dir`. |
 | `Error: Failed to write assessment result: <details>` | Check free space and permissions in `--output-dir`. |
-| `Error: Report generation failed: <details>` | The JSON result was written; the reports were not. Check `assessment.log`. |
+| `Error: Report generation failed: <details>` | The JSON result was written; the reports were not. Check `assessment-<timestamp>.log`. |
 
 ## Exit 5 — missing dependency
 
@@ -79,9 +80,9 @@ understated or less accurate, so read them before quoting a result.
 | `--services` | string (comma-separated) | All services | Filter: `ec2`, `rds`, `elasticache`, `opensearch` |
 | `--output-dir` | string (path) | **Required** | Directory for assessment JSON and reports. Created if absent, including parent directories; `~` is expanded |
 | `--customer` | string | Empty | Customer name for the report header: at most 128 characters, no line breaks or control characters. Pass it in single quotes |
-| `--log-file` | string (path) | `<output-dir>/assessment.log` | Log destination; must sit inside `--output-dir` |
+| `--log-file` | string (path) | `<output-dir>/assessment-<timestamp>.log` | Log destination; must sit inside `--output-dir` |
 | `--graviton-generation` | string | `next-gen` | Generation the savings are computed for and the HTML opens on: `next-gen` (n+1 from current) or `graviton2`–`graviton5` for the whole fleet |
-| `--nih-reduction` | float | `0` | Where the HTML performance-uplift slider opens, clamped to [0, 40]. Applied flat to the HTML headline; stdout and Markdown stay price-only (`--perf-per-gen` is an alias) |
+| `--nih-reduction` | float | `10` | Where the HTML performance-uplift slider opens, clamped to [0, 40]; 10 is the Graviton Savings Dashboard's default. Applied flat to the HTML headline only, so by default the HTML headline is higher than stdout and Markdown, which stay price-only. `0` makes all three match (`--perf-per-gen` is an alias) |
 
 ### `classify` Subcommand
 

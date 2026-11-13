@@ -59,10 +59,7 @@ def _size_variants(key: str) -> List[str]:
     return variants
 
 
-def _expand_size(instance_type: str) -> str:
-    """Expand abbreviated size suffixes: 12xl -> 12xlarge, 2xl -> 2xlarge, etc."""
-    # Match patterns like .12xl, .2xl, .xl at the end (but not .xlarge already)
-    return re.sub(r'\.(\d*)xl$', r'.\1xlarge', instance_type)
+from .instance_classifier import expand_size as _expand_size  # one definition
 
 
 def _abbreviate_size(instance_type: str) -> str:

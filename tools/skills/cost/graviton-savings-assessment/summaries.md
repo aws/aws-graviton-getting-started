@@ -14,7 +14,7 @@ This file is the canonical inventory of the skill. Every file in the skill folde
 
 * "references/error-codes.md": "Exit codes and the stderr messages the CLI prints, with the remediation for each. Read when assess.py exits non-zero and stderr is not enough."
 
-* "scripts/assess.py": "CLI entry point with two subcommands: `assess` (full fleet assessment, writes reports to --output-dir and prints a JSON summary) and `classify` (single instance type, no AWS credentials needed). Run, do not read, during a normal assessment."
+* "scripts/assess.py": "CLI entry point with two subcommands: `assess` (full fleet assessment, writes the reports, the full JSON result and the run log to --output-dir, each name carrying the run's timestamp, and prints a JSON summary) and `classify` (single instance type, no AWS credentials needed). Run, do not read, during a normal assessment."
 
 * "scripts/requirements.txt": "The only external dependency (boto3). Installed with `<python> -m pip install -r scripts/requirements.txt`."
 
@@ -36,6 +36,6 @@ This file is the canonical inventory of the skill. Every file in the skill folde
 
 * "scripts/graviton_tools/realized_savings.py": "Finds the x86 equivalent of a Graviton instance, for savings already realized."
 
-* "scripts/graviton_tools/report_generator.py": "Writes the Markdown, HTML, CSV, and JSON deliverables with escaping, owner-only file modes, and symlink-safe file creation."
+* "scripts/graviton_tools/report_generator.py": "Writes the Markdown, HTML and CSV deliverables with escaping, owner-only file modes, and symlink-safe file creation (open_private, which assess.py also uses for the JSON result and the run log)."
 
 * "README.md": "Human-facing overview: what the skill does, install quick start, outputs, IAM permissions, cost of running, security posture, and data privacy. Not read during a run; it points humans at this index for the file map."

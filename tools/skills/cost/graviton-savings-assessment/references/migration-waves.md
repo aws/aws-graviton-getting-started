@@ -30,33 +30,22 @@ This document describes the 4-wave phased migration plan used by the Graviton Sa
 
 ---
 
-## Wave 2: Containers (EKS/ECS/Fargate)
+## Wave 2: Managed Services, engine upgrade first
 
-**Scope:** EC2 instances running containerized workloads on EKS or ECS.
+**Scope:** RDS, ElastiCache and OpenSearch rows whose engine version is below the minimum for their Graviton target family (Engine Readiness status "upgrade required"), for example MySQL 5.7, which no Graviton RDS class supports.
 
-**Not auto-detected.** EKS/ECS nodes bill as ordinary EC2 instance hours and cannot be told apart from other instances in Cost Explorer data without resource tags; Fargate bills as vCPU/GB-hours and is outside this assessment's instance-hours scope entirely. Any container nodes in the fleet are therefore counted in Wave 3, where the effort estimate assumes an AMI swap rather than the multi-arch image rebuild described below — size that work separately using your own knowledge of which instances are cluster nodes.
-
-**Timeline:** Week 2–3
+**Timeline:** Week 3–8
 
 **Effort Level:** Medium
 
 **Required Migration Actions:**
-1. Build multi-architecture (amd64 + arm64) container images using Docker buildx
-2. Push multi-arch manifests to ECR or your container registry
-3. Update Karpenter NodePool or Auto Scaling Group configurations to include Graviton instance types (e.g., `m6g`, `c6g` families)
-4. Deploy updated task definitions or pod specs that support arm64 scheduling
-5. Validate workload performance on Graviton nodes
-6. Gradually shift traffic from x86 to arm64 nodes
+1. Upgrade the engine to at least the version the Engine Readiness table gives for the target family
+2. Validate the application on the upgraded engine
+3. Change the instance class to the Graviton target, as in Wave 1
 
-**Example Instance Types:**
+The savings are real but arrive after the upgrade. Rows whose version could not be read (another account, or no describe permission) stay in Wave 1 and show "verify version" in Engine Readiness.
 
-| Current | Graviton Target | Context |
-|---------|----------------|---------|
-| m5.xlarge | m6g.xlarge | EKS worker node |
-| c5.2xlarge | c6g.2xlarge | ECS container instance |
-| m5.4xlarge | m6g.4xlarge | EKS node group |
-
-**Why Wave 2 is second:** Container workloads are already abstracted from the underlying hardware. Multi-arch builds are a one-time setup, and Kubernetes/ECS schedulers handle placement automatically. The main effort is building arm64 images and validating compatibility — more work than the AMI swap Wave 3 costs those instances at, which is why identifying your container nodes yourself matters.
+**Containers (EKS/ECS):** not auto-detected. Their nodes bill as ordinary EC2 instance hours and cannot be told apart without resource tags, so they are counted in Wave 3, whose effort estimate assumes an AMI swap. For container nodes, the work is a multi-arch image build (Docker buildx, multi-arch manifests in ECR), Graviton types in the Karpenter NodePool or Auto Scaling Group, and arm64 scheduling in task definitions or pod specs. Fargate bills as vCPU/GB-hours and is outside this assessment's scope.
 
 ---
 
@@ -121,7 +110,7 @@ This document describes the 4-wave phased migration plan used by the Graviton Sa
 | Wave | Scope | Timeline | Effort | Savings Included |
 |------|-------|----------|--------|-----------------|
 | Wave 1 | Managed Services (RDS, ElastiCache, OpenSearch) | Week 1–2 | Low | Yes |
-| Wave 2 | Containers (EKS/ECS) — not auto-detected, counted in Wave 3 | Week 2–3 | Medium | (in Wave 3) |
+| Wave 2 | Managed services needing an engine upgrade first | Week 3–8 | Medium | Yes |
 | Wave 3 | EC2 Instances (including any container nodes) | Week 3–6 | Medium | Yes |
 | Wave 4 | Blocked/Deferred | Deferred | N/A | No ($0) |
 

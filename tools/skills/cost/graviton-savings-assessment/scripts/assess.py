@@ -37,6 +37,13 @@ from typing import Optional
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
+# No __pycache__ inside the installed skill folder: the skill is copied into
+# agent config directories, and the first run wrote bytecode there.
+sys.dont_write_bytecode = True
+
+# One timestamp per run, shared with the report file names, so a second run in
+# the same --output-dir no longer replaces the first run's JSON and log.
+_RUN_STAMP = datetime.now().strftime("%Y-%m-%d-%H%M")
 
 
 # ---------------------------------------------------------------------------
@@ -176,18 +183,10 @@ def _sanitize_error(error: Exception) -> str:
     Returns:
         A sanitized string safe for user display.
     """
-    msg = str(error)
-    # Strip anything that looks like an AWS account ID (12 digits)
-    import re
-    msg = re.sub(r'\b\d{12}\b', '***', msg)
-    # Strip anything that looks like an access key
-    msg = re.sub(r'AKIA[A-Z0-9]{16}', '***', msg)
-    # Strip ARNs. botocore's AccessDenied text reads "User:
-    # arn:aws:sts::123456789012:assumed-role/Admin/alice is not authorized to
-    # perform: pricing:GetProducts", so without this the operator's account and
-    # role name land in stderr, assessment.log and summary.pricing_errors — the
-    # last of which is written beside the customer deliverables.
-    msg = re.sub(r'arn:aws[a-z\-]*:[^\s"\']+', '<redacted-arn>', msg)
+    # The same rules as the log file and summary.pricing_errors: ARNs (an
+    # AccessDenied names the caller's role), account ids, access key ids.
+    from graviton_tools.report_generator import _redact_sensitive
+    msg = _redact_sensitive(error)
     # Truncate overly long messages
     if len(msg) > 200:
         msg = msg[:200] + "..."
@@ -332,7 +331,9 @@ def validate_output_dir(path: str) -> Path:
         SystemExit: If the path cannot be created, is not a directory, or is
             not writable.
     """
-    dir_path = Path(path).expanduser().resolve()
+    # expandvars as well as ~: an agent on Windows may pass %USERPROFILE% or
+    # $HOME, which PowerShell does not expand inside an argument.
+    dir_path = Path(os.path.expandvars(path)).expanduser().resolve()
 
     try:
         dir_path.mkdir(parents=True, exist_ok=True)
@@ -489,7 +490,16 @@ def cmd_assess(args: argparse.Namespace) -> None:
     # skill the agent composes this flag, so the value is not necessarily a
     # careful human's.
     if args.log_file:
-        requested = Path(args.log_file).expanduser().resolve()
+        requested = Path(os.path.expandvars(args.log_file)).expanduser()
+        # A bare name (run.log) means a file in --output-dir, not in the
+        # current directory, which the check below would then reject.
+        if not requested.is_absolute() and len(requested.parts) == 1:
+            requested = output_dir / requested
+        # Resolve the directory only. Resolving the whole path follows a
+        # symlink planted under the log's name, and the log would then be
+        # opened (and truncated) at its target; left unresolved, open_private
+        # refuses the link.
+        requested = requested.parent.resolve() / requested.name
         if requested.parent != output_dir.resolve():
             _error_exit(
                 f"--log-file must sit inside --output-dir ({output_dir}); "
@@ -498,7 +508,7 @@ def cmd_assess(args: argparse.Namespace) -> None:
             )
         log_file = str(requested)
     else:
-        log_file = str(output_dir / "assessment.log")
+        log_file = str(output_dir / f"assessment-{_RUN_STAMP}.log")
     # Owner-only, like the reports: the log records the operator's activity and
     # sits beside the customer deliverables, so it travels with them if the
     # directory is zipped or shared. Opened through open_private rather than
@@ -610,7 +620,7 @@ def cmd_assess(args: argparse.Namespace) -> None:
         )
 
     # Write full assessment JSON to output directory
-    assessment_path = output_dir / "graviton_assessment_result.json"
+    assessment_path = output_dir / f"graviton_assessment_result-{_RUN_STAMP}.json"
     try:
         # Holds the entire result — every instance type, cost, region, and the
         # account id — so it gets the deliverables' treatment: UTF-8, 0600 at
@@ -679,7 +689,11 @@ def cmd_assess(args: argparse.Namespace) -> None:
         "failed_pulls": failed_pulls,
         "split_estimated_cost": (summary.get("data_quality") or {}).get(
             "split_estimated_cost", 0),
+        "isp_check": (summary.get("data_quality") or {}).get("isp_check", ""),
+        "isp_locked_cost": (summary.get("data_quality") or {}).get("isp_locked_cost", 0),
         "output_dir": str(output_dir),
+        "result_json": assessment_path.name,
+        "log_file": os.path.basename(log_file),
         "report_md": os.path.basename(report_result.get("markdown_path", "")),
         "report_html": os.path.basename(report_result.get("html_path", "")),
     }
@@ -763,7 +777,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--log-file",
         type=str,
         default=None,
-        help="Path to write detailed log file. If omitted, logs go to <output-dir>/assessment.log.",
+        help="Log file name, inside --output-dir. If omitted, logs go to <output-dir>/assessment-<timestamp>.log.",
     )
     assess_parser.add_argument(
         "--nih-reduction",

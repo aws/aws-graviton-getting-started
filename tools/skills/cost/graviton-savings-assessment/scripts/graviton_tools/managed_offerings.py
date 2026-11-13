@@ -159,9 +159,12 @@ def get_rds_offered_classes(region: str, engine_display: str) -> Optional[Set[st
         # One query per pinned version, unioned; falls back to a single unpinned
         # query (slow but complete) when the versions could not be listed.
         version_filters = [{"EngineVersion": v} for v in _recent_engine_versions(client, engine)] or [{}]
+        failed = 0
         for extra in version_filters:
             try:
-                for page in paginator.paginate(Engine=engine, **extra):
+                # 1000 is the API's maximum page size; the default 100 made a
+                # large engine's unpinned query take ten times the calls.
+                for page in paginator.paginate(Engine=engine, MaxRecords=1000, **extra):
                     for opt in page.get("OrderableDBInstanceOptions", []):
                         cls = opt.get("DBInstanceClass", "")
                         if cls:
@@ -170,8 +173,17 @@ def get_rds_offered_classes(region: str, engine_display: str) -> Optional[Set[st
                 # A single version being unorderable in this region is normal and
                 # not fatal — the other versions still contribute. Only a total
                 # failure falls through to the outer handler.
+                failed += 1
                 logger.debug("Orderable options unavailable for %s/%s %s (%s).",
                              region, engine, extra or "unpinned", type(e).__name__)
+        if failed and version_filters == [{}]:
+            # The single unpinned query failed part way: the pages read so far
+            # are not the full class list, and caching them as if they were
+            # would reject real classes. Treat availability as unknown.
+            logger.warning("Orderable options for %s/%s were only partly read; "
+                           "availability treated as unknown.", region, engine)
+            _rds_cache[key] = None
+            return None
 
         if not offered:
             logger.warning(

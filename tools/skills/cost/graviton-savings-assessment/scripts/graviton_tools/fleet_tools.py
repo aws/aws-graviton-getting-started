@@ -13,7 +13,7 @@ target family supports.
 import re, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional, Tuple
-from .instance_classifier import classify_and_upgrade, full_type
+from .instance_classifier import classify_and_upgrade, full_type, graviton_generation
 from .pricing_comparison import fetch_prices
 
 # Instance size -> NIH (normalized instance hours) factor, roughly vCPU count.
@@ -27,6 +27,7 @@ from .pricing_comparison import fetch_prices
 # Ordered largest-first in the literal so ties (metal and 24xlarge are both 192)
 # resolve to the more specific size, since sorted() is stable.
 SIZE_NIH_FACTORS = {
+    "112xlarge": 896, "96xlarge": 768, "56xlarge": 448,
     "48xlarge": 384, "32xlarge": 256, "24xlarge": 192, "metal": 192,
     "18xlarge": 144, "16xlarge": 128, "12xlarge": 96, "10xlarge": 80,
     "9xlarge": 72, "8xlarge": 64, "6xlarge": 48, "4xlarge": 32,
@@ -41,9 +42,50 @@ SIZE_NIH_FACTORS = {
 SIZE_LADDER = sorted(SIZE_NIH_FACTORS, key=lambda s: -SIZE_NIH_FACTORS[s])
 
 
-def nih_factor(size: str) -> float:
-    """NIH normalization factor for a size string; "large" if unrecognised."""
+# A .metal size is the family's largest size, which differs by family. The
+# table's single "metal" = 192 (24xlarge) counted Graviton2/3 metal (16xlarge,
+# 128) 1.5x too high. Sized variants carry their size in the name.
+_METAL_VARIANT_FACTORS = {"metal-16xl": 128, "metal-24xl": 192,
+                          "metal-32xl": 256, "metal-48xl": 384}
+_METAL_BY_FAMILY = (
+    (re.compile(r"^(?:db\.|cache\.)?[a-z]+[67]g[a-z]*$"), 128),   # Graviton2/3 metal = 16xlarge
+    (re.compile(r"^[a-z]+6i[a-z]*$"), 256),                        # 6th-gen Intel = 32xlarge
+    (re.compile(r"^[a-z]+6a[a-z]*$"), 384),                        # 6th-gen AMD = 48xlarge
+)
+
+
+def nih_factor(size: str, instance_type: str = "") -> float:
+    """NIH normalization factor for a size; "large" (4) if unrecognised.
+
+    `instance_type` refines "metal", whose size is the family's largest.
+    """
+    if size in _METAL_VARIANT_FACTORS:
+        return _METAL_VARIANT_FACTORS[size]
+    if size == "metal" and instance_type:
+        fam = instance_type.lower().rsplit(".", 1)[0]
+        for pattern, factor in _METAL_BY_FAMILY:
+            if pattern.match(fam):
+                return factor
     return SIZE_NIH_FACTORS.get(size, 4)
+
+
+def months_in_period(start_date: str, end_date: str) -> Optional[float]:
+    """Months in the end-exclusive range [start, end); None if invalid or empty.
+
+    Whole calendar months when both dates are the 1st, else days / 30.4375.
+    The one definition: the pipeline normalises by it and the reports describe
+    the period with it, and two copies had drifted (one rounded, one did not).
+    """
+    from datetime import date
+    try:
+        s, e = date.fromisoformat(start_date), date.fromisoformat(end_date)
+    except (TypeError, ValueError):
+        return None
+    if e <= s:
+        return None
+    if s.day == 1 and e.day == 1:
+        return float((e.year - s.year) * 12 + (e.month - s.month))
+    return (e - s).days / (365.25 / 12)
 
 
 def sizes_at_or_below(size: str) -> List[str]:
@@ -280,15 +322,7 @@ def target_type(r: Dict, base: str, size: Optional[str] = None) -> str:
     return full_type(r.get("prefix", ""), base, size, r.get("type_suffix", ""))
 
 
-def _expand_size(name: str) -> str:
-    """Expand abbreviated instance type sizes for customer-facing output.
-
-    CE returns abbreviated RDS sizes: db.m5.12xl, db.r5.2xl, db.m5.4xl, db.r5.xl.
-    Customers expect full names: db.m5.12xlarge, db.r5.2xlarge, db.m5.4xlarge, db.r5.xlarge.
-    """
-    if name and name.endswith('xl') and not name.endswith('xlarge'):
-        return re.sub(r'\.(\d*)xl$', r'.\1xlarge', name)
-    return name
+from .instance_classifier import expand_size as _expand_size  # one definition
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -345,9 +379,6 @@ def _build_graviton_options(
                   instance_classifier (gen<=5->g2, gen6->g3, gen7->g4, gen>=8->g5 where
                   it exists). If that generation has no priced option, take the
                   newest one that has (G5, then G4, G3, G2).
-        "cheapest": Pick the option with highest savings_pct (legacy behavior).
-        "same_gen": Pick the Graviton option matching the source instance's x86
-                  generation, else the highest savings_pct.
         "graviton2"/"graviton3"/"graviton4"/"graviton5": Force every instance to that
                   generation. When the forced target isn't offered or priced, take the
                   nearest older generation first (a missing G5 lands on G4), then the
@@ -495,8 +526,9 @@ def _build_graviton_options(
             return full, None, False, False
 
         # Catalog unavailable — degrade to the price-driven heuristic rather
-        # than dropping every target. One step down only, and still flagged
-        # capacity-adjusted so it stays out of headline savings.
+        # than dropping every target. One step down only, flagged
+        # capacity-adjusted: it counts in the headline at equal capacity (see
+        # _capacity_factor) and the report marks it for workload validation.
         price = od_prices.get(full)
         if price:
             return full, price, False, None
@@ -696,32 +728,24 @@ def _build_graviton_options(
                     return chosen
             return max(pool, key=lambda o: o["savings_pct"])
 
-        if target_strategy == "cheapest":
-            # Legacy behavior: pick highest savings_pct (cheapest/oldest)
-            return max(pool, key=lambda o: o["savings_pct"])
-
-        if target_strategy == "same_gen":
-            # Pick the Graviton option matching the source instance's x86 generation
-            generation = r.get("generation", 5)
-            gen_label_map = {5: "Graviton2", 6: "Graviton2", 7: "Graviton3",
-                             8: "Graviton4", 9: "Graviton5"}
-            target_gen_label = gen_label_map.get(generation, "Graviton2")
-            matching = [o for o in pool if o["generation"] == target_gen_label]
-            return matching[0] if matching else max(pool, key=lambda o: o["savings_pct"])
-
         # "latest" (default, the dashboard's "Default next-gen"): pick the n+1
         # Graviton generation matching graviton_upgrade from instance_classifier
         # (gen<=5->g2, gen6->g3, gen7->g4, gen>=8->g5 where a 9g type exists).
         # If that generation has no pricing, fall back to next available.
-        generation = r.get("generation", 5)
-        if generation <= 5:
-            expected_gen_label = "Graviton2"
-        elif generation == 6:
-            expected_gen_label = "Graviton3"
-        elif generation == 7:
-            expected_gen_label = "Graviton4"
-        else:  # generation >= 8 — Graviton5 only where the family has a 9g type
-            expected_gen_label = "Graviton5" if r.get("graviton5") else "Graviton4"
+        # The classifier's graviton_upgrade is the default target; its
+        # generation is read, not re-derived, so a static override (r5b -> r7g,
+        # m5zn -> m7g) is priced as the type the reports name.
+        expected_gen_label = graviton_generation(r.get("graviton_upgrade") or "")
+        if not expected_gen_label:
+            generation = r.get("generation", 5)
+            if generation <= 5:
+                expected_gen_label = "Graviton2"
+            elif generation == 6:
+                expected_gen_label = "Graviton3"
+            elif generation == 7:
+                expected_gen_label = "Graviton4"
+            else:  # generation >= 8 — Graviton5 only where the family has a 9g type
+                expected_gen_label = "Graviton5" if r.get("graviton5") else "Graviton4"
 
         matching = [o for o in pool if o["generation"] == expected_gen_label]
         if matching:
@@ -732,6 +756,17 @@ def _build_graviton_options(
             if candidates:
                 return candidates[0]
         return max(pool, key=lambda o: o["savings_pct"])
+
+    # A forced generation is honoured at any size before falling back to a
+    # different generation: the same-size pool alone made a priced smaller
+    # target of the requested generation lose to another generation's
+    # same-size one, and the note then said the requested one was unavailable.
+    if target_strategy in ("graviton2", "graviton3", "graviton4", "graviton5"):
+        wanted = "Graviton" + target_strategy[-1]
+        for _pool in _pools:
+            hit = [o for o in _pool if o["generation"] == wanted]
+            if hit:
+                return options, hit[0]
 
     best = None
     for _pool in _pools:
@@ -803,7 +838,8 @@ def _best_savings(r: Dict, od_prices: Dict, target_strategy: str = "latest") -> 
         if src == "pricing_api" and r.get("purchase_type") == "Spot":
             src = "od_ratio_proxy"
         factor = best.get("capacity_factor", 1.0) or 1.0
-        return cost * (1 - target_od * factor / current_od), target_type, src
+        return (cost * _movable_share(r) * (1 - target_od * factor / current_od),
+                target_type, src)
 
     # An unpriced capacity-adjusted option is the one remaining case with no
     # figure to report: a real Graviton family exists but the nearest smaller
@@ -812,7 +848,8 @@ def _best_savings(r: Dict, od_prices: Dict, target_strategy: str = "latest") -> 
         (o for o in options if o.get("pricing_source") == "capacity_adjusted"), None
     )
     if capacity_opt:
-        return 0.0, capacity_opt.get("instance_type", ""), "capacity_adjusted"
+        # Unpriced, not a priced zero: _tally counts it beside the headline.
+        return 0.0, capacity_opt.get("instance_type", ""), "capacity_unpriced"
 
     # Every candidate was rejected by the service's own catalog: there is no
     # Graviton equivalent for this row in its region, so nothing is saved.
@@ -877,9 +914,28 @@ def _is_sql_server_platform(r: Dict) -> bool:
     return "sql server" in (r.get("platform") or "").lower()
 
 
+def is_isp_locked(r: Dict) -> bool:
+    """True when an EC2 Instance Savings Plan holds all of the row's spend.
+
+    That plan applies only to its instance family until it expires, so the row
+    cannot move to Graviton without paying for both. Partly covered rows stay
+    eligible; only their uncovered spend earns a saving (cost_sp_isp).
+    """
+    cost = r.get("cost") or 0
+    return cost > 0 and (r.get("cost_sp_isp") or 0) >= cost * 0.995
+
+
+def _movable_share(r: Dict) -> float:
+    """Fraction of the row's spend not held in place by an EC2 Instance SP."""
+    cost = r.get("cost") or 0
+    isp = r.get("cost_sp_isp") or 0
+    return max(cost - isp, 0.0) / cost if cost > 0 else 1.0
+
+
 def is_ineligible(r: Dict) -> bool:
-    """Rows with no Graviton path whatever the instance type: Windows, SQL Server, commercial engines."""
-    return _is_windows(r) or _is_sql_server_platform(r) or is_commercial_engine(r)
+    """Rows with no Graviton path: Windows, SQL Server, commercial engines, ISP-held spend."""
+    return (_is_windows(r) or _is_sql_server_platform(r) or is_commercial_engine(r)
+            or is_isp_locked(r))
 
 
 # EC2 platforms whose Graviton price the pipeline can look up, as Cost
@@ -892,9 +948,23 @@ _PRICEABLE_EC2_PLATFORMS = frozenset({
 
 
 def platform_priceable(r: Dict) -> bool:
-    """True when the row's OS can be priced on both sides of a savings ratio."""
-    if (r.get("service") or "ec2") != "ec2":
+    """True when the row's OS and tenancy can be priced on both sides of a savings ratio.
+
+    On-demand EC2 prices are read at shared tenancy only, so a Dedicated
+    Instance or Dedicated Host row would be divided by shared-tenancy rates;
+    such rows are left unpriced and reported beside the headline instead.
+    """
+    svc = r.get("service") or "ec2"
+    if svc == "rds" and not (r.get("database_engine") or "").strip():
+        # No engine (a failed coverage pull leaves it empty): an Oracle or SQL
+        # Server row cannot be told from an open-source one, and is_ineligible
+        # would pass it, so its savings would count. Leave it unpriced.
+        return False
+    if svc != "ec2":
         return True
+    ten = (r.get("tenancy") or "").strip().lower()
+    if ten.startswith(("dedicated", "host")):
+        return False
     plat = re.sub(r"\s*\(amazon vpc\)$", "", (r.get("platform") or "").strip().lower())
     return plat in _PRICEABLE_EC2_PLATFORMS
 
@@ -930,7 +1000,7 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
         region: AWS region (for metadata only)
         od_prices: RegionalPrices from assessment_pipeline, or a plain
             {instance_type: $/hr} dict that applies to every row
-        target_strategy: "latest", "cheapest", "same_gen" or "graviton2".."graviton5"
+        target_strategy: "latest" or "graviton2".."graviton5"
 
     Returns:
         Executive summary with KPIs, top opportunities with multi-gen options,
@@ -978,6 +1048,7 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
         options, best = _build_graviton_options(
             r, od_price_map, target_strategy, region=r.get("region", "")
         )
+        capacity_unpriced = False
 
         # Use best validated option for the primary recommendation
         if best and current_od and current_od > 0:
@@ -987,7 +1058,8 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
             gen_hops = best.get("gen_hops", 0)
             factor = best.get("capacity_factor", 1.0) or 1.0
             est_graviton_rate = round(eff * (target_od * factor / current_od), 4) if eff > 0 else 0
-            est_monthly_savings = round(cost * (1 - target_od * factor / current_od), 2)
+            est_monthly_savings = round(
+                cost * _movable_share(r) * (1 - target_od * factor / current_od), 2)
             # Capacity-adjusted targets now contribute real savings; the source
             # is what tells the report to mark them for workload validation.
             pricing_source = ("capacity_adjusted"
@@ -1014,6 +1086,7 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
                 est_graviton_rate = 0
                 est_monthly_savings = 0.0
                 pricing_source = "capacity_adjusted"
+                capacity_unpriced = True
             elif options and all(o.get("pricing_source") == "not_offered_in_region"
                                  for o in options):
                 # The catalog rejected every candidate: no equivalent here.
@@ -1081,11 +1154,18 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
             "est_savings_g4": r.get("est_savings_g4"),
             "est_savings_g5": r.get("est_savings_g5"),
         }
-        if pricing_source == "estimate_20pct" and r.get("est_savings") is None:
+        if capacity_unpriced and r.get("est_savings") is None:
+            # Only an unpriced smaller-size target exists: nothing is booked, so
+            # the row is unpriced spend, not a priced zero. It once counted in
+            # neither the headline nor the unpriced total.
+            opp_entry["capacity_unpriced"] = True
+        if ((pricing_source == "estimate_20pct" or opp_entry.get("capacity_unpriced"))
+                and r.get("est_savings") is None):
             opp_entry["unpriced_estimate"] = round(cost * ESTIMATE_FALLBACK_RATIO, 2)
-        # Include multi-gen options: real-priced targets plus capacity-adjusted
-        # review suggestions (savings_pct=None). The report renders the latter as
-        # review-only so they are visible without entering headline savings.
+        # Include multi-gen options: same-size targets and capacity-adjusted
+        # (smaller) ones. A priced capacity-adjusted option counts like any
+        # other, at equal capacity, and is marked for workload validation; an
+        # unpriced one (savings_pct=None) is shown but books nothing.
         shown_options = [
             o for o in options
             if o["pricing_source"] in ("pricing_api", "capacity_adjusted")
@@ -1105,7 +1185,7 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
     def _tally(r, source):
         if r.get("est_savings") is not None:
             return
-        if source == "estimate_20pct":
+        if source in ("estimate_20pct", "capacity_unpriced"):
             unpriced["count"] += 1
             unpriced["cost"] += r.get("cost", 0)
             unpriced["indicative_savings"] += r.get("cost", 0) * ESTIMATE_FALLBACK_RATIO
@@ -1124,8 +1204,10 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
         if idx < 15:
             entry = _opp_entry(r)
             total_est_savings += entry["est_monthly_savings"]
-            _tally(r, entry["pricing_source"])
-            _book(r, entry["est_monthly_savings"], entry["pricing_source"])
+            src = ("capacity_unpriced" if entry.get("capacity_unpriced")
+                   else entry["pricing_source"])
+            _tally(r, src)
+            _book(r, entry["est_monthly_savings"], src)
             top_opps.append(entry)
         else:
             # Rows beyond the top 15 contribute to the total on the same basis
@@ -1714,17 +1796,16 @@ def generate_migration_plan(classified_instances: List[Dict], region: str = "us-
         region: AWS region (for metadata only)
         od_prices: RegionalPrices from assessment_pipeline, or a plain
             {instance_type: $/hr} dict that applies to every row
-        target_strategy: "latest", "cheapest", "same_gen" or "graviton2".."graviton5"
+        target_strategy: "latest" or "graviton2".."graviton5"
 
     Returns:
         4-wave migration plan with instances, savings, and timeline per wave.
     """
     wave1_easy = []  # Managed services (RDS, ElastiCache) — instance class change
-    # Containers (EKS/ECS) cannot be identified from this data — see the comment
-    # at the bucketing branch below. The wave is kept so the four-wave contract
-    # the report and the JSON schema depend on is stable, and carries a note
-    # saying why it is empty rather than implying the fleet has no containers.
-    wave2_containers = []
+    # Managed services whose engine version is below the target family's
+    # minimum (engine_readiness == "upgrade_required"): the engine upgrade comes
+    # first, so they are not a Week 1-2, low-effort move.
+    wave2_engine_upgrade = []
     wave3_ec2 = []  # EC2 — AMI + launch template change
     wave4_blocked = []  # Windows, no Graviton equivalent
 
@@ -1747,18 +1828,14 @@ def generate_migration_plan(classified_instances: List[Dict], region: str = "us-
 
         svc = r.get("service", "ec2")
         if svc in ("rds", "elasticache", "opensearch"):
-            wave1_easy.append(r)
+            if r.get("engine_readiness") == "upgrade_required":
+                wave2_engine_upgrade.append(r)
+            else:
+                wave1_easy.append(r)
         else:
-            # Everything else is EC2, INCLUDING container nodes.
-            #
-            # Container nodes cannot be detected here: the instance type string
-            # never names EKS/ECS/Fargate, so a string match would leave Wave 2
-            # empty while silently costing container nodes as AMI swaps. EKS/ECS
-            # nodes bill as ordinary EC2 instance hours and
-            # are indistinguishable from any other instance without resource tags
-            # or a per-cluster describe; Fargate bills as vCPU/GB-hours and is
-            # excluded by the USAGE_TYPE_GROUP filter before it ever reaches here.
-            # Attributing containers needs tag data this assessment does not read.
+            # Everything else is EC2, including EKS/ECS container nodes, which
+            # bill as ordinary instance hours and cannot be told apart without
+            # resource tags this assessment does not read.
             wave3_ec2.append(r)
 
     # Per-region price maps: each row is priced from its own region's book.
@@ -1817,23 +1894,24 @@ def generate_migration_plan(classified_instances: List[Dict], region: str = "us-
     waves = [
         wave_summary(
             "Wave 1: Managed Services", wave1_easy,
-            "Week 1-2", "Low - instance class change, blue/green deploy"),
+            "Week 1-2", "Low - instance class change, blue/green deploy",
+            note=("Rows whose engine version could not be read (other accounts, "
+                  "or no describe permission) are here; check their version "
+                  "against the Engine Readiness table before moving them.")),
         wave_summary(
-            "Wave 2: Containers (EKS/ECS)", wave2_containers,
-            "Week 2-3", "Medium - multi-arch Docker builds, Karpenter config",
-            note=("Not auto-detected. EKS/ECS nodes bill as ordinary EC2 "
-                  "instance hours and cannot be told apart from other instances "
-                  "without resource tags; Fargate bills as vCPU/GB-hours and is "
-                  "outside this assessment's instance-hours scope. Any container "
-                  "nodes in this fleet are counted in Wave 3, where the effort "
-                  "estimate assumes an AMI swap rather than a multi-arch "
-                  "rebuild — size that work separately.")),
+            "Wave 2: Managed Services, engine upgrade first", wave2_engine_upgrade,
+            "Week 3-8", "Medium - engine version upgrade, then instance class change",
+            note=("The engine version is below the minimum for the Graviton "
+                  "target family. Savings arrive after the engine upgrade; see "
+                  "Engine Readiness for the version each row needs.")),
         wave_summary(
             "Wave 3: EC2 Instances", wave3_ec2,
             "Week 3-6", "Medium - AMI rebuild, launch template update, testing",
-            note=("Includes any EKS/ECS container nodes, which this data cannot "
-                  "separate out — see Wave 2. Their real effort is a multi-arch "
-                  "image rebuild, above the AMI swap costed here.")),
+            note=("Includes any EKS/ECS container nodes, which bill as ordinary "
+                  "EC2 instance hours and cannot be separated without resource "
+                  "tags. Their real effort is a multi-arch image rebuild, above "
+                  "the AMI swap costed here; Fargate is outside this "
+                  "assessment's instance-hours scope.")),
         wave_summary(
             "Wave 4: Blocked/Deferred", wave4_blocked,
             "Deferred",

@@ -105,6 +105,9 @@ STATIC_OVERRIDES: Dict[str, tuple] = {
     "x1":     ("",          "Intel",    "",     "x2gd",  "x2gd", "",    "x8g"),
     "x1e":    ("",          "Intel",    "",     "x2gd",  "x2gd", "",    "x8g"),
     "x2gd":   ("Graviton2", "Graviton", "x1",  "x8g",   "x2gd", "",    "x8g"),
+    # RDS memory-optimized Graviton2 (db.x2g). Without an entry it had no
+    # previous_intel, so its realized savings were skipped without a count.
+    "x2g":    ("Graviton2", "Graviton", "x1",  "x2g",   "x2g",  "",    ""),
     "x2idn":  ("",          "Intel",    "",     "x8g",   "x2gd", "",    "x8g"),
     "x2iedn": ("",          "Intel",    "",     "x8g",   "x2gd", "",    "x8g"),
     "x2iezn": ("",          "Intel",    "",     "x8g",   "x2gd", "",    "x8g"),
@@ -176,7 +179,10 @@ _DOUBLE_SIZE = {
 # Families with NO Graviton equivalent at all
 # Note: g5g (Graviton GPU) is handled via static override, so "g" stays blocked here
 NO_GRAVITON = {"p", "dl", "trn", "inf", "vt", "f", "g", "d", "h", "z", "u", "mac",
-               "cc", "cc1", "cc2", "cg1", "cr", "cr1"}
+               # Previous-generation cluster types. The parsed family has no
+               # digits (cg1.4xlarge -> "cg"), so "cg1"-style keys never matched
+               # and cg1 got an Intel upgrade (cg6i) instead of being blocked.
+               "cc", "cg", "cr"}
 
 # ── Graviton5 (9g) launch lineup ───────────────────────────────────────────
 # Derived from GRAVITON_FAMILIES rather than kept as a second list. Maps family
@@ -271,6 +277,41 @@ def service_for_type(instance_type: str) -> str:
     if t.endswith(_OPENSEARCH_SUFFIX):
         return "opensearch"
     return "ec2"
+
+
+def expand_size(name: str) -> str:
+    """Abbreviated Cost Explorer sizes to full ones: db.m5.12xl -> db.m5.12xlarge.
+
+    The one definition; four modules each had a copy. Full names pass through.
+    """
+    if name and name.endswith("xl"):
+        return re.sub(r"\.(\d*)xl$", r".\1xlarge", name)
+    return name
+
+
+_GEN_DIGIT_LABEL = {2: "Graviton2", 4: "Graviton2", 6: "Graviton2",
+                    7: "Graviton3", 8: "Graviton4", 9: "Graviton5"}
+
+
+def graviton_generation(instance_type: str) -> Optional[str]:
+    """"Graviton2".."Graviton5" for a Graviton type or family, else None.
+
+    The one place a Graviton type's generation is read from its name: x2gd,
+    t4g, i4g, im4gn and m6g are Graviton2, m7g and hpc7g Graviton3, and so on.
+    The default ("latest") target IS the classifier's graviton_upgrade; the
+    scorer and the report read its generation from here rather than re-deriving
+    "gen <=5 -> Graviton2" themselves, which disagreed with the classifier for
+    the static overrides (r5b -> r7g was priced as r6g).
+    """
+    t = (instance_type or "").lower()
+    for prefix in ("db.", "cache."):
+        if t.startswith(prefix):
+            t = t[len(prefix):]
+    fam = t.split(".")[0]
+    m = re.match(r"[a-z]+(\d+)[a-z-]*$", fam)
+    if not m or "g" not in fam[m.end(1):]:
+        return None
+    return _GEN_DIGIT_LABEL.get(int(m.group(1)))
 
 
 def full_type(prefix: str, family: str, size: str, type_suffix: str = "") -> str:
@@ -412,6 +453,14 @@ def _resolve_static_override(info: InstanceInfo) -> bool:
     info.graviton2 = _service_family(prefix, g2) if g2 else None
     info.graviton3 = _service_family(prefix, g3) if g3 else None
     info.graviton4 = _service_family(prefix, g4) if g4 else None
+    # The table has no Graviton5 column; derive it from the Graviton4 family
+    # (m8g -> m9g) where a 9g family is sold. Without this m5n, m5zn, r5b and
+    # c5n had no Graviton5 target, and a --graviton-generation graviton5 run
+    # said the target was unavailable in the region.
+    m = re.fullmatch(r"([a-z]+)8g([a-z]*)", g4 or "")
+    g5 = f"{m.group(1)}9g{m.group(2)}" if m else ""
+    info.graviton5 = (_service_family(prefix, g5)
+                      if g5 and g5 in GRAVITON_FAMILIES else None)
     info.previous_intel = prev_intel or None
 
     # Best Graviton upgrade = latest_arm at the target size
@@ -514,6 +563,11 @@ def generate_upgrades(info: InstanceInfo) -> InstanceInfo:
             info.previous_intel = _real_family(f"{family}6i{{}}", base_options, X86_FAMILIES)
         elif gen == 8:
             info.previous_intel = _real_family(f"{family}7i{{}}", base_options, X86_FAMILIES)
+        elif gen == 9:
+            # Graviton5 against 8th-gen Intel where that family is sold, else 7i.
+            info.previous_intel = (
+                _real_family(f"{family}8i{{}}", base_options, X86_FAMILIES)
+                or _real_family(f"{family}7i{{}}", base_options, X86_FAMILIES))
 
     return info
 

@@ -89,15 +89,7 @@ def _engine_badge(status: str) -> tuple:
         return "upgrade", "", "Unknown"
 
 
-def _expand_size(name: str) -> str:
-    """Expand abbreviated instance type sizes for customer-facing output.
-    
-    CE returns abbreviated RDS sizes: db.m5.12xl, db.r5.2xl, db.m5.4xl, db.r5.xl.
-    Customers expect full names: db.m5.12xlarge, db.r5.2xlarge, db.m5.4xlarge, db.r5.xlarge.
-    """
-    if name and name.endswith('xl') and not name.endswith('xlarge'):
-        return re.sub(r'\.(\d*)xl$', r'.\1xlarge', name)
-    return name
+from .instance_classifier import expand_size as _expand_size  # one definition
 
 
 def _build_engine_grouped_html(engine_checks: list) -> str:
@@ -122,16 +114,18 @@ def _build_engine_grouped_html(engine_checks: list) -> str:
     # Group by status category
     groups = {"Blocked": [], "Needs Upgrade": [], "Ready": [], "Verify": []}
     for check in deduped:
-        status = check.get("status", "")
-        _, _, status_text = _engine_badge(status)
+        _, _, status_text = _engine_badge(check.get("status", ""))
+        # Only a positive "ready" is Ready. "unknown" (engine not in the table)
+        # was once grouped as Ready by an else branch, under a green header,
+        # and the "Verify version" text was filed under Needs Upgrade.
         if status_text == "Blocked":
             groups["Blocked"].append(check)
-        elif status == "verify_version":
-            groups["Verify"].append(check)
-        elif status_text in ("Upgrade needed", "Verify version"):
+        elif status_text == "Upgrade needed":
             groups["Needs Upgrade"].append(check)
-        else:
+        elif status_text == "Ready":
             groups["Ready"].append(check)
+        else:
+            groups["Verify"].append(check)
 
     rows = ""
     # Brand tokens, not raw hex — see the :root block in the HTML template.
@@ -171,8 +165,6 @@ def _sort_engines_for_md(engine_checks: list) -> list:
 
 _STRATEGY_LABELS = {
     "latest": "Default next-gen (n+1)",
-    "cheapest": "Max Savings",
-    "same_gen": "Same Generation",
     "graviton2": "Graviton2 (whole fleet)",
     "graviton3": "Graviton3 (whole fleet)",
     "graviton4": "Graviton4 (whole fleet)",
@@ -186,21 +178,9 @@ _STRATEGY_RADIO = {"graviton2": "g2", "graviton3": "g3",
 
 
 def _months_between(start: str, end: str):
-    """Months in the end-exclusive range [start, end), or None if unparseable.
-
-    Whole calendar months when both dates are the 1st (the CLI default and the
-    usual case); otherwise days / 30.4375. Matches the pipeline's normalisation.
-    """
-    try:
-        s = datetime.strptime(start, "%Y-%m-%d").date()
-        e = datetime.strptime(end, "%Y-%m-%d").date()
-    except (TypeError, ValueError):
-        return None
-    if e <= s:
-        return None
-    if s.day == 1 and e.day == 1:
-        return float((e.year - s.year) * 12 + (e.month - s.month))
-    return round((e - s).days / (365.25 / 12), 2)
+    """Months in [start, end), or None; fleet_tools.months_in_period is the rule."""
+    from .fleet_tools import months_in_period
+    return months_in_period(start, end)
 
 
 def _period_info(summary: dict) -> dict:
@@ -280,20 +260,20 @@ def _completeness(summary: dict):
 def _nextgen_key(c: dict):
     """The generation key ("g2".."g5") of a row's default next-gen target.
 
-    Mirrors the classifier's rule: gen <=5 -> Graviton2, 6 -> Graviton3,
-    7 -> Graviton4, 8+ -> Graviton5 where the family has a 9g type, else
-    Graviton4. Newer generations are tried before older ones when the wanted
-    one has no figure, as the classifier does.
+    The generation of the classifier's graviton_upgrade (the default target),
+    read by instance_classifier.graviton_generation. The generation-number rule
+    is only the fallback for rows without one. Newer generations are tried
+    before older ones when the wanted one has no figure, as the classifier does.
     """
-    gen = c.get("generation") or 5
-    if gen <= 5:
-        want = 0
-    elif gen == 6:
-        want = 1
-    elif gen == 7:
-        want = 2
+    from .instance_classifier import graviton_generation
+    label = graviton_generation(c.get("graviton_upgrade") or "")
+    labels = [g.label for g in GENERATIONS]
+    if label in labels:
+        want = labels.index(label)
     else:
-        want = 3 if c.get("graviton5") else 2
+        gen = c.get("generation") or 5
+        want = (0 if gen <= 5 else 1 if gen == 6 else 2 if gen == 7
+                else 3 if c.get("graviton5") else 2)
     keys = [g.key for g in GENERATIONS]
     order = [want] + list(range(want + 1, len(keys))) + list(range(want - 1, -1, -1))
     for i in order:
@@ -308,7 +288,7 @@ def _not_eligible_reason(c: dict):
     The same rule score_graviton_fleet uses (fleet_tools.is_ineligible), so a
     row the headline excludes can never add savings to any report total.
     """
-    from .fleet_tools import is_commercial_engine, is_ineligible, _is_windows
+    from .fleet_tools import is_commercial_engine, is_ineligible, is_isp_locked, _is_windows
     if c.get("is_graviton"):
         return None
     if c.get("unclassified"):
@@ -317,6 +297,10 @@ def _not_eligible_reason(c: dict):
         return "Windows (no Graviton path)"
     if is_commercial_engine(c):
         return f"{c.get('database_engine') or 'Commercial engine'} (no Graviton instance classes)"
+    if is_isp_locked(c):
+        fam = (c.get("raw") or "").split(".")[0]
+        until = f" until {c['isp_end']}" if c.get("isp_end") else " until it expires"
+        return f"EC2 Instance Savings Plan holds the {fam} family{until}"
     if is_ineligible(c):
         # Any other platform fleet_tools rules out (e.g. "Linux with SQL Server
         # Standard": SQL Server has no arm64 build).
@@ -717,7 +701,10 @@ def open_private(path, newline=None):
 
     Raises OSError (ELOOP) when path is a symlink.
     """
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _O_NOFOLLOW, 0o600)
+    # O_BINARY (Windows only, as CPython's tempfile adds): text mode on the fd
+    # plus the io wrapper's newline translation wrote \r\r\n line ends.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _O_NOFOLLOW
+                 | getattr(os, "O_BINARY", 0), 0o600)
     try:
         os.fchmod(fd, 0o600)
     except (AttributeError, OSError):
@@ -811,9 +798,16 @@ def _csv_safe(value):
 # Anything matching these is redacted from error text before it is logged or
 # written into a report. botocore's AccessDenied messages embed the caller's full
 # ARN, which names the operator's account and role.
+# The one set of redaction rules: the log filter, summary.pricing_errors and
+# the CLI's stderr messages (assess._sanitize_error) all apply it. The two used
+# to differ: only the CLI masked access key ids.
 _REDACT_PATTERNS = (
     (re.compile(r"arn:aws[a-z\-]*:[^\s\"']+"), "<redacted-arn>"),
     (re.compile(r"\b\d{12}\b"), "<redacted-account-id>"),
+    (re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"), "<redacted-access-key>"),
+    # botocore logs "Found credentials from IAM Role: <role name>" on EC2
+    # instances with an instance profile.
+    (re.compile(r"(IAM Role:\s*)\S+"), r"\1<redacted-role>"),
 )
 
 
@@ -1059,18 +1053,36 @@ def _build_data_quality_html(assessment: dict) -> str:
         realized_note += (f" {realized['unpriced_count']} Graviton type(s) had no rate for "
                           f"one side and are listed as unpriced, outside the total.")
     rows.append(f"<tr><td>Realized savings</td><td>{realized_note}</td></tr>")
-    rows.append('<tr><td>Default (n+1) logic</td><td>Gen ≤5 → Graviton2, Gen 6 → Graviton3, Gen 7 → Graviton4, Gen 8+ → Graviton5 where a 9g type exists (c9g/c9gd, m9g/m9gd, r9g/r9gd), otherwise Graviton4</td></tr>')
+    rows.append('<tr><td>Default (n+1) logic</td><td>Gen ≤5 → Graviton2, Gen 6 → Graviton3, Gen 7 → Graviton4, Gen 8+ → Graviton5 where a 9g type exists (c9g/c9gd, m9g/m9gd, r9g/r9gd), otherwise Graviton4. Families with no regular counterpart use a fixed mapping instead (for example r5b → r7g, m5zn → m7g, x2idn → x8g).</td></tr>')
     rows.append('<tr><td>Potential savings basis</td><td>Net figure: instances already priced below their Graviton target carry a negative per-item saving and are netted into every total (Service Summary, Full Fleet Detail, headline KPI and CSV all agree). Per-instance savings — including the negatives — appear in Full Fleet Detail, and already-optimized instances are listed under Already Cost-Optimized.</td></tr>')
+
+    isp_check = data_quality.get("isp_check") or ""
+    isp_locked = data_quality.get("isp_locked_cost") or 0
+    if isp_check == "checked" and isp_locked > 0:
+        rows.append(
+            f"<tr><td>EC2 Instance Savings Plans</td><td>{_fmt_cost(isp_locked)}/mo of "
+            f"Savings Plan spend is held by EC2 Instance Savings Plans, which apply only "
+            f"to their instance family until they expire. That spend books no saving; "
+            f"rows it fully covers are listed under Not Eligible. Compute Savings Plans "
+            f"follow the usage to Graviton, so their spend keeps its saving.</td></tr>")
+    elif isp_check.startswith("not_checked"):
+        rows.append(
+            f"<tr><td>EC2 Instance Savings Plans</td><td><strong>Not checked</strong> "
+            f"({_esc(isp_check.split(':', 1)[-1].strip())}). Savings Plan spend is treated "
+            f"as Compute Savings Plan spend, which moves to Graviton. Spend held by an EC2 "
+            f"Instance Savings Plan would save nothing until the plan expires, so the "
+            f"savings may be overstated.</td></tr>")
 
     split_est = data_quality.get("split_estimated_cost") or 0
     if split_est > 0:
         rows.append(
-            f"<tr><td>Region and platform split</td><td>Cost Explorer reports Savings "
-            f"Plan and Spot spend by region and by platform, but not by both. Where an "
-            f"instance type runs in several regions on several platforms, "
-            f"{_fmt_cost(split_est)}/mo of that spend was apportioned between them by "
-            f"iterative proportional fitting to the two totals: an estimate, not a "
-            f"measurement. Totals per region and per platform are exact.</td></tr>")
+            f"<tr><td>Estimated cost splits</td><td>{_fmt_cost(split_est)}/mo of spend "
+            f"was apportioned by estimate rather than measured: Savings Plan and Spot "
+            f"spend of a type that runs in several regions on several platforms "
+            f"(Cost Explorer reports it by region and by platform, not by both; split "
+            f"by iterative proportional fitting), and managed-service spend of an "
+            f"engine or deployment group with no on-demand hours to price it by (split "
+            f"by running hours). Totals per type and region are exact.</td></tr>")
 
     unclassified_types = data_quality.get("unclassified_types") or []
     if unclassified_types:
@@ -1194,6 +1206,34 @@ def _service_savings(classified: list, assessment: dict):
         svc = rd.get("service", "ec2")
         svc_realized[svc] = svc_realized.get(svc, 0) + (rd.get("savings") or 0)
     return svc_savings, svc_realized, bool(realized_detail)
+
+
+def _service_purchase_costs(classified: list) -> dict:
+    """{service: {"od", "ri", "sp", "spot"}} spend, shared by both reports.
+
+    Spot has its own bucket: it was added into "sp", so the SP column showed
+    Spot spend as Savings Plan spend.
+    """
+    out = {}
+    for c in classified:
+        b = out.setdefault(c.get("service", "ec2"), {"od": 0, "ri": 0, "sp": 0, "spot": 0})
+        if any(c.get(f) is not None for f in ("cost_od", "cost_ri", "cost_sp", "cost_spot")):
+            b["od"] += c.get("cost_od", 0) or 0
+            b["ri"] += c.get("cost_ri", 0) or 0
+            b["sp"] += c.get("cost_sp", 0) or 0
+            b["spot"] += c.get("cost_spot", 0) or 0
+            continue
+        pt = (c.get("purchase_type") or "").lower()
+        cost = c.get("cost", 0) or 0
+        if pt == "spot":
+            b["spot"] += cost
+        elif "reserved" in pt or pt == "ri":
+            b["ri"] += cost
+        elif "savings" in pt or pt == "sp":
+            b["sp"] += cost
+        else:
+            b["od"] += cost
+    return out
 
 
 def generate_markdown(assessment: dict, customer: str = "", account_id: str = "",
@@ -1330,33 +1370,11 @@ def generate_markdown(assessment: dict, customer: str = "", account_id: str = ""
         # helper). The Est. Savings column shows the recommended/default (n+1)
         # potential savings, net of already-cost-optimized rows.
         svc_savings, _svc_realized, _has_realized = _service_savings(classified, assessment)
-        # Aggregate purchase-type costs per service from classified instances
-        # Use cost_od/cost_ri/cost_sp fields (from usage summary) when available
-        svc_purchase = {}  # {service: {"od": 0, "ri": 0, "sp": 0}}
-        for c in classified:
-            svc = c.get("service", "ec2")
-            svc_purchase.setdefault(svc, {"od": 0, "ri": 0, "sp": 0})
-            # Prefer per-PT breakdown fields from usage summary
-            if c.get("cost_od") is not None or c.get("cost_ri") is not None or c.get("cost_sp") is not None:
-                svc_purchase[svc]["od"] += c.get("cost_od", 0)
-                svc_purchase[svc]["ri"] += c.get("cost_ri", 0)
-                svc_purchase[svc]["sp"] += c.get("cost_sp", 0) + c.get("cost_spot", 0)
-            else:
-                # Fallback: use purchase_type field
-                pt = (c.get("purchase_type") or "Unknown").lower()
-                cost = c.get("cost", 0)
-                if "on" in pt or "od" in pt:
-                    svc_purchase[svc]["od"] += cost
-                elif "reserved" in pt or "ri" in pt:
-                    svc_purchase[svc]["ri"] += cost
-                elif "savings" in pt or "sp" in pt:
-                    svc_purchase[svc]["sp"] += cost
-                else:
-                    svc_purchase[svc]["od"] += cost
+        svc_purchase = _service_purchase_costs(classified)
 
         lines.append("## Service Summary\n\n")
-        lines.append("| Service | Types | Monthly Cost | Graviton Types | Graviton % | OD Cost | RI Cost | SP Cost | Est. Savings |\n")
-        lines.append("|---------|-------|-------------|----------------|------------|---------|---------|---------|-------------|\n")
+        lines.append("| Service | Types | Monthly Cost | Graviton Types | Graviton % | OD Cost | RI Cost | SP Cost | Spot Cost | Est. Savings |\n")
+        lines.append("|---------|-------|-------------|----------------|------------|---------|---------|---------|-----------|-------------|\n")
         for svc, data in service_breakdown.items():
             if isinstance(data, dict):
                 grav_count = data.get(
@@ -1365,10 +1383,11 @@ def generate_markdown(assessment: dict, customer: str = "", account_id: str = ""
                     'graviton_pct',
                     round(grav_count / max(data.get('count', 1), 1) * 100, 1)
                 )
-                pt_data = svc_purchase.get(svc, {"od": 0, "ri": 0, "sp": 0})
+                pt_data = svc_purchase.get(svc, {"od": 0, "ri": 0, "sp": 0, "spot": 0})
                 od_cost = _fmt_cost(pt_data["od"]) if pt_data["od"] > 0 else "$0"
                 ri_cost = _fmt_cost(pt_data["ri"]) if pt_data["ri"] > 0 else "$0"
                 sp_cost = _fmt_cost(pt_data["sp"]) if pt_data["sp"] > 0 else "$0"
+                spot_cost = _fmt_cost(pt_data["spot"]) if pt_data["spot"] > 0 else "$0"
                 # Net potential savings; a value rounding to zero shows a dash,
                 # a negative (already-optimized) value renders with its sign.
                 svc_rec = svc_savings.get(svc, {}).get("recommended", 0)
@@ -1377,7 +1396,7 @@ def generate_markdown(assessment: dict, customer: str = "", account_id: str = ""
                     f"| {svc} | {data.get('count', 0)} "
                     f"| {_fmt_cost(data.get('cost', 0))} "
                     f"| {grav_count} | {grav_pct:.1f}% "
-                    f"| {od_cost} | {ri_cost} | {sp_cost} "
+                    f"| {od_cost} | {ri_cost} | {sp_cost} | {spot_cost} "
                     f"| {savings_str} |\n"
                 )
         # Total row
@@ -1388,6 +1407,7 @@ def generate_markdown(assessment: dict, customer: str = "", account_id: str = ""
         total_od = sum(v["od"] for v in svc_purchase.values())
         total_ri = sum(v["ri"] for v in svc_purchase.values())
         total_sp = sum(v["sp"] for v in svc_purchase.values())
+        total_spot = sum(v["spot"] for v in svc_purchase.values())
         total_rec = sum(s.get("recommended", 0) for s in svc_savings.values())
         total_rec_str = _fmt_cost(total_rec) if round(total_rec, 2) != 0 else "—"
         lines.append(
@@ -1395,6 +1415,7 @@ def generate_markdown(assessment: dict, customer: str = "", account_id: str = ""
             f"| **{_fmt_cost(total_svc_cost)}** "
             f"| **{total_grav}** | **{total_grav_pct:.1f}%** "
             f"| **{_fmt_cost(total_od)}** | **{_fmt_cost(total_ri)}** | **{_fmt_cost(total_sp)}** "
+            f"| **{_fmt_cost(total_spot)}** "
             f"| **{total_rec_str}** |\n"
         )
         lines.append("\n---\n\n")
@@ -1816,29 +1837,7 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
         already_opt_section += already_opt_rows
         already_opt_section += '</table>\n</section>'
 
-    # Aggregate purchase-type costs per service from classified instances
-    # Use cost_od/cost_ri/cost_sp fields (from usage summary) when available
-    svc_purchase = {}  # {service: {"od": 0, "ri": 0, "sp": 0}}
-    for c in classified:
-        svc = c.get("service", "ec2")
-        svc_purchase.setdefault(svc, {"od": 0, "ri": 0, "sp": 0})
-        # Prefer per-PT breakdown fields from usage summary
-        if c.get("cost_od") is not None or c.get("cost_ri") is not None or c.get("cost_sp") is not None:
-            svc_purchase[svc]["od"] += c.get("cost_od", 0)
-            svc_purchase[svc]["ri"] += c.get("cost_ri", 0)
-            svc_purchase[svc]["sp"] += c.get("cost_sp", 0) + c.get("cost_spot", 0)
-        else:
-            # Fallback: use purchase_type field
-            pt = (c.get("purchase_type") or "Unknown").lower()
-            cost = c.get("cost", 0)
-            if "on" in pt or "od" in pt:
-                svc_purchase[svc]["od"] += cost
-            elif "reserved" in pt or "ri" in pt:
-                svc_purchase[svc]["ri"] += cost
-            elif "savings" in pt or "sp" in pt:
-                svc_purchase[svc]["sp"] += cost
-            else:
-                svc_purchase[svc]["od"] += cost
+    svc_purchase = _service_purchase_costs(classified)
 
     # Per-service savings (potential, net of already-optimized; and realized).
     # Shared with generate_markdown so both renderers show identical figures.
@@ -1876,7 +1875,11 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
     # extra column), so adding a generation needed four coordinated edits here
     # and in both row builders. Now the span is computed.
     _adoption_span = len(GENERATIONS) + 1      # generations + "Graviton %"
-    _potential_span = len(GENERATIONS) + 1     # generations + "Default (n+1)"
+    _potential_span = len(GENERATIONS) + 1     # generations + the selected target
+    # With --graviton-generation the selected figure is that generation's, so
+    # it must not be headed "Default (n+1)".
+    _sel_col = ("Default (n+1)" if target_strategy == "latest"
+                else f"Selected ({_STRATEGY_LABELS.get(target_strategy, target_strategy).split(' (')[0]})")
     _GREEN = "text-align:center;background:var(--green-700);color:var(--white)"
     _BLUE = "text-align:center;background:var(--blue-700);color:var(--white)"
     svc_table = Table(
@@ -1884,17 +1887,18 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
          ("Current Graviton Adoption", _adoption_span, 1, _GREEN),
          ("Realized Savings", 1, 2),
          ("Potential Graviton Savings", _potential_span, 1, _BLUE)],
-        [g.short for g in GENERATIONS] + ["Graviton %", "Default (n+1)"]
+        [g.short for g in GENERATIONS] + ["Graviton %", _sel_col]
         + [f"If All→{g.short}" for g in GENERATIONS],
         css_class="sortable", name="Service Summary",
     )
     for svc, data in service_breakdown.items():
         if isinstance(data, dict):
-            pt_data = svc_purchase.get(svc, {"od": 0, "ri": 0, "sp": 0})
+            pt_data = svc_purchase.get(svc, {"od": 0, "ri": 0, "sp": 0, "spot": 0})
             savings_data = svc_savings.get(svc, {"recommended": 0, **gen_zeroes()})
             od_cost = _fmt_cost(pt_data["od"]) if pt_data["od"] > 0 else "$0"
             ri_cost = _fmt_cost(pt_data["ri"]) if pt_data["ri"] > 0 else "$0"
             sp_cost = _fmt_cost(pt_data["sp"]) if pt_data["sp"] > 0 else "$0"
+            spot_cost = _fmt_cost(pt_data["spot"]) if pt_data["spot"] > 0 else "$0"
             # Realized savings. Shown signed: a service that realized a net loss
             # (its per-service total is negative) must render that value, not a
             # "—", so the column sums to the netted TOTAL and the realized KPI.
@@ -1921,7 +1925,8 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
             svc_table.row(
                 Raw(f"<strong>{_esc(svc.upper())}</strong>"),
                 (Raw(f"OD: {_esc(od_cost)}<br>RI: {_esc(ri_cost)}<br>"
-                     f"SP: {_esc(sp_cost)}"), 1, 1, "font-size:11px"),
+                     f"SP: {_esc(sp_cost)}<br>Spot: {_esc(spot_cost)}"), 1, 1,
+                 "font-size:11px"),
                 _fmt_cost(svc_cost),
                 *[_money(grav_data.get(g.key)) for g in GENERATIONS],
                 f"{grav_pct}%",
@@ -2116,7 +2121,11 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
         # and can be a type the region's catalog rejected.
         _sel = GEN_BY_LABEL.get(c.get("graviton_target_generation", ""))
         _sel_info = targets_by_gen.get(_sel.key) if _sel else None
-        if _sel_info and _sel_info.get("type") and not _sel_info.get("not_offered"):
+        if c.get("graviton_target_priced"):
+            # The type est_savings was priced against, so the cell beside it
+            # cannot name a different one.
+            default_target = _expand_size(c["graviton_target_priced"])
+        elif _sel_info and _sel_info.get("type") and not _sel_info.get("not_offered"):
             default_target = _expand_size(_sel_info["type"])
         elif targets_by_gen and all(not i.get("type") or i.get("not_offered")
                                     for i in targets_by_gen.values()):
@@ -2146,7 +2155,8 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
     # Header derived from GENERATIONS, exactly as _fleet_row's cells are. Adding a
     # generation widens both or neither; there is no edit that widens one.
     _SVC_HEADER = (
-        ["Instance", "Region", "Purchase", "Cost", "Default Target", "Default (n+1)"]
+        ["Instance", "Region", "Purchase", "Cost",
+         "Default Target" if target_strategy == "latest" else "Selected Target", _sel_col]
         + [part for g in GENERATIONS
            for part in (f"{g.short} Target", f"{g.short} Savings")]
         + ["Source"]
@@ -2364,7 +2374,7 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
     # Baseline price-only savings at the opening selection, so the slider's 0%
     # position reconciles with the headline KPI.
     perf_baseline_savings = round(sum(r["sav"] for r in perf_rows), 2)
-    # Rows that fell back to an older generation because the requested one
+    # Rows that fell back to another generation because the requested one
     # isn't offered/priced in their region — surfaced so it isn't silent.
     gen_fallback_count = sum(
         1 for c in classified if c.get("graviton_generation_fallback")
@@ -2635,7 +2645,7 @@ def _write_validation_csv(assessment: dict, output_dir: str, timestamp: str) -> 
         writer.writerow([
             "instance_type", "service", "region", "platform", "purchase_type",
             "processor", "gen_bucket", "monthly_cost", "hours",
-            "cost_od", "cost_ri", "cost_sp",
+            "cost_od", "cost_ri", "cost_sp", "cost_spot", "cost_sp_isp",
             "graviton_target", "od_rate_current", "od_rate_graviton",
             # Generation columns from GENERATIONS, matching the row below. Width
             # parity alone could not catch a generation missing from both.
@@ -2696,7 +2706,8 @@ def _write_validation_csv(assessment: dict, output_dir: str, timestamp: str) -> 
             # Using graviton_upgrade alone printed types AWS does not offer
             # (c7g.24xlarge, db.r7g.32xlarge) into a customer deliverable.
             graviton_target = _expand_size(
-                item.get("graviton_target", "") or item.get("graviton_upgrade", "")
+                item.get("graviton_target_priced", "") or item.get("graviton_target", "")
+                or item.get("graviton_upgrade", "")
             )
 
             # Realized savings (for Graviton items)
@@ -2715,6 +2726,8 @@ def _write_validation_csv(assessment: dict, output_dir: str, timestamp: str) -> 
             cost_od = item.get("cost_od", "")
             cost_ri = item.get("cost_ri", "")
             cost_sp = item.get("cost_sp", "")
+            cost_spot = item.get("cost_spot", "")
+            cost_sp_isp = item.get("cost_sp_isp", "")
 
             # Pricing source. "capacity_adjusted" must surface here: those rows
             # carry a different-size target, so a bare "actual" would present
@@ -2732,7 +2745,7 @@ def _write_validation_csv(assessment: dict, output_dir: str, timestamp: str) -> 
             writer.writerow([_csv_safe(v) for v in (
                 raw, service, region, platform, purchase_type,
                 processor, gen_bucket, round(cost, 2), round(hours, 2),
-                cost_od, cost_ri, cost_sp,
+                cost_od, cost_ri, cost_sp, cost_spot, cost_sp_isp,
                 graviton_target, od_rate, od_grav,
                 est_savings, *gen_savings,
                 realized_savings, intel_equivalent, intel_rate,
@@ -3225,11 +3238,12 @@ _REPORT_JS = """\
       if (fellBack > 0) {
         parts.push(fellBack + ' type' + (fellBack === 1 ? '' : 's') +
           ' had no priced ' + (GEN_LABELS[gen] || gen) +
-          ' target and kept their default next-gen target.');
+          ' target and kept the target the report opened on.');
       }
       if (GEN_FALLBACK_COUNT > 0) {
-        parts.push(GEN_FALLBACK_COUNT + ' row(s) fell back to an older generation ' +
-          'because the requested one is not offered in their region.');
+        parts.push(GEN_FALLBACK_COUNT + ' row(s) fell back to another generation ' +
+          '(the nearest older one, else the nearest newer) because the requested ' +
+          'one is not offered or priced in their region.');
       }
       note.textContent = parts.join(' ');
     }

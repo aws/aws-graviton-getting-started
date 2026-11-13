@@ -60,7 +60,7 @@ This document lists instance families and workload categories that cannot be mig
 
 | Category | Blocking Reason | Alternative Path |
 |----------|-----------------|------------------|
-| .NET Framework (not .NET Core/.NET 5+) | .NET Framework runs only on Windows, which has limited Graviton support and higher licensing costs. | Port to .NET 6+ which supports Linux ARM64 natively, then migrate to Graviton. |
+| .NET Framework (not .NET Core/.NET 5+) | .NET Framework runs only on Windows, and EC2 offers no ARM64 Windows, so it has no Graviton path. | Port to .NET 6+ which supports Linux ARM64 natively, then migrate to Graviton. |
 | Windows-specific services (Active Directory, IIS, MSMQ) | Tightly coupled to Windows OS; no Linux ARM64 equivalent. | Evaluate AWS Managed AD, ALB, or Amazon MQ as managed replacements where feasible. |
 | Windows desktop applications | Require Windows GUI stack, no ARM64 Windows on EC2. | Keep on x86 Windows instances. Consider Amazon WorkSpaces for end-user desktops. |
 

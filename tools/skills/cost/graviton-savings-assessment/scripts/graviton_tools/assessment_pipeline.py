@@ -32,6 +32,7 @@ from .fleet_tools import (
     _build_graviton_options,
     fetch_engine_versions,
     sizes_at_or_below,
+    months_in_period,
     SIZE_NIH_FACTORS,
     nih_factor,
 )
@@ -342,18 +343,7 @@ def normalize_instance_type(instance_type: str, service: str = "") -> str:
     return t
 
 
-def _expand_size(instance_type: str) -> str:
-    """Expand abbreviated instance type sizes for Pricing API compatibility.
-
-    CE returns abbreviated forms like db.m5.12xl, db.r5.2xl, db.m5.4xl, db.r5.xl.
-    The Pricing API requires full forms: db.m5.12xlarge, db.r5.2xlarge, db.m5.4xlarge, db.r5.xlarge.
-    Types already in full form (db.m5.large, cache.r4.2xlarge) pass through unchanged.
-    """
-    import re
-    # Match sizes ending in .xl, .2xl, .12xl etc but NOT .xlarge
-    if instance_type.endswith('xl') and not instance_type.endswith('xlarge'):
-        return re.sub(r'\.(\d*)xl$', r'.\1xlarge', instance_type)
-    return instance_type
+from .instance_classifier import expand_size as _expand_size  # one definition
 
 
 # ── AWS error classification ───────────────────────────────────────────────
@@ -403,6 +393,47 @@ def _is_auth_error(exc: BaseException) -> bool:
         "ExpiredToken", "InvalidIdentityToken", "InvalidClientToken",
         "AccessDenied",
     ))
+
+
+_CONNECTION_ERRORS = ("EndpointConnectionError", "ConnectTimeoutError",
+                      "ReadTimeoutError", "ConnectionClosedError", "ProxyConnectionError",
+                      "SSLError", "ConnectionError")
+
+# Consecutive connection failures after which an endpoint is treated as down
+# for the rest of the run. Each _fetch_od_prices_boto3 call builds a new client
+# with a fresh retry quota, so without a run-wide breaker an unreachable
+# endpoint cost ~11 attempts x 60s per type, for hundreds of types.
+_CONNECTION_FAILURE_LIMIT = 3
+_endpoint_failures: Dict[str, int] = {}
+
+
+def _is_connection_error(exc: BaseException) -> bool:
+    """True when the endpoint could not be reached (not throttled, not denied)."""
+    return any(n in type(exc).__name__ for n in _CONNECTION_ERRORS)
+
+
+def _endpoint_down(name: str) -> bool:
+    return _endpoint_failures.get(name, 0) >= _CONNECTION_FAILURE_LIMIT
+
+
+def _note_endpoint(name: str, exc: Optional[BaseException]) -> None:
+    """Count consecutive connection failures for `name`; any other outcome resets."""
+    if exc is not None and _is_connection_error(exc):
+        _endpoint_failures[name] = _endpoint_failures.get(name, 0) + 1
+        if _endpoint_failures[name] == _CONNECTION_FAILURE_LIMIT:
+            _pricing_errors.append(
+                f"FATAL: {name} endpoint unreachable ({type(exc).__name__}) after "
+                f"{_CONNECTION_FAILURE_LIMIT} attempts; remaining {name} lookups skipped")
+    else:
+        _endpoint_failures[name] = 0
+
+
+def _client_config():
+    """Bounded timeouts: botocore's 60s default per attempt made a dropped
+    network cost hours. Adaptive retries stay for throttling."""
+    from botocore.config import Config
+    return Config(connect_timeout=10, read_timeout=30,
+                  retries={"max_attempts": 10, "mode": "adaptive"})
 
 
 def _is_throttle(exc: BaseException) -> bool:
@@ -690,12 +721,10 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
     # fleets with hundreds of types — especially with concurrent assessments —
     # and each throttled type is silently dropped from savings. Adaptive mode
     # adds client-side rate limiting on top of more retries.
+    if _endpoint_down("pricing"):
+        return prices
     try:
-        from botocore.config import Config
-        client = boto3.client(
-            "pricing", region_name="us-east-1",
-            config=Config(retries={"max_attempts": 10, "mode": "adaptive"}),
-        )
+        client = boto3.client("pricing", region_name="us-east-1", config=_client_config())
     except ImportError:
         client = boto3.client("pricing", region_name="us-east-1")
 
@@ -750,11 +779,13 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
         if not types or _fatal_error:
             continue
         for instance_type in types:
-            if _fatal_error:
+            if _fatal_error or _endpoint_down("pricing"):
                 break
             try:
                 _price_one(svc, instance_type)
+                _note_endpoint("pricing", None)
             except Exception as e:
+                _note_endpoint("pricing", e)
                 err_name = type(e).__name__
                 # Throttling means the price wasn't retrieved, NOT that the
                 # instance doesn't exist. Queue it for a retry sweep rather
@@ -784,7 +815,7 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
     # savings for instances that genuinely exist. Retry serially with a pause
     # to let the rate limiter recover. Only after this do we report a type as
     # unpriced.
-    if _throttled and not _fatal_error:
+    if _throttled and not _fatal_error and not _endpoint_down("pricing"):
         logger.info(
             "Retrying %d throttled pricing lookup(s) after backoff...", len(_throttled)
         )
@@ -883,7 +914,10 @@ def _fetch_sp_offering_rates(instance_types: set, region: str = "us-east-1",
     try:
         import boto3
         from .instance_classifier import service_for_type
-        sp_client = boto3.client("savingsplans", region_name="us-east-1")
+        if _endpoint_down("savingsplans"):
+            return sp_prices
+        sp_client = boto3.client("savingsplans", region_name="us-east-1",
+                                 config=_client_config())
 
         for instance_type in sorted(types_to_fetch):
             api_type = _expand_size(instance_type)
@@ -943,8 +977,14 @@ def _fetch_sp_offering_rates(instance_types: set, region: str = "us-east-1",
                         break
             except Exception as e:
                 err_name = type(e).__name__
+                _note_endpoint("savingsplans", e)
                 if _is_auth_error(e):
                     _pricing_errors.append(f"SP_RATES: Auth error, skipping: {err_name}")
+                    break
+                # Recorded, not dropped: a type whose SP rate failed falls back
+                # to the on-demand ratio, and the report should be able to say so.
+                _pricing_errors.append(f"SP_RATES/{instance_type}@{region}: {err_name}: {e}")
+                if _endpoint_down("savingsplans"):
                     break
                 continue
 
@@ -1140,6 +1180,67 @@ def _ensure_target_rates(book: Dict[str, float], item: Dict, target_type: str,
                      target_type, region, type(e).__name__, e)
 
 
+def _intel_equivalent(item: Dict) -> str:
+    """The Intel type a Graviton row's realized savings are measured against."""
+    from .realized_savings import get_intel_equivalent
+    return item.get("intel_equivalent") or get_intel_equivalent(item.get("raw", "")) or ""
+
+
+def _row_price_group(item: Dict) -> set:
+    """Every type one row's ratios read: the row, its Graviton targets, its Intel equivalent.
+
+    The one definition of a row's price group. Each pricing pass (full fleet,
+    RHEL/SUSE, managed coordinates, Savings Plans) used its own loop, and they
+    drifted: one did not expand abbreviated sizes, one left out the Intel
+    equivalent realized savings divide by.
+    """
+    out = set()
+    raw = item.get("raw", "")
+    if raw:
+        out.add(raw)
+    if not item.get("is_graviton"):
+        for gkey in ("graviton_upgrade", "graviton2", "graviton3", "graviton4", "graviton5"):
+            val = item.get(gkey)
+            if val:
+                out.add(_expand_size(target_type(item, val) if "." not in val else val))
+    else:
+        intel_eq = _intel_equivalent(item)
+        if intel_eq:
+            out.add(intel_eq)
+    return out
+
+
+def _blended_ri_rate(item: Dict, target_type: str, region: str,
+                     od_prices: Dict[str, float], coord, od_key: str) -> Optional[float]:
+    """Target RI rate weighted by the row's own mix of subscription terms.
+
+    The source rate (ri_effective_hourly_rate) is the blend of every
+    subscription of the type: amortized cost over purchased hours. When those
+    subscriptions mix terms, the target must be blended the same way; reading
+    it at one term compared, say, equal 1yr No Upfront and 3yr All Upfront
+    subscriptions against a 3yr rate and reported ~3% where both terms save
+    20%. None when the row has one term (the caller's exact-term lookup is
+    then right) or when any term in the mix has no target rate.
+    """
+    mix = item.get("ri_terms_mix") or []
+    terms = {_normalize_ri_terms(m[:3]) for m in mix}
+    if len(terms) < 2:
+        return None
+    total_h = sum(m[3] for m in mix)
+    if total_h <= 0:
+        return None
+    od_here = _od_at(od_prices, target_type, od_key, coord[0])
+    blended = 0.0
+    for lease, payment, cls, hours in mix:
+        rate = _lookup_rate_for_type(target_type, region, "RI", od_prices,
+                                     ri_terms=(lease, payment, cls),
+                                     coord=coord, od_key=od_key)
+        if not rate or rate == od_here:
+            return None
+        blended += rate * hours / total_h
+    return blended
+
+
 def _savings_ratio_for_target(item: Dict, target_type: str, target_od: float,
                               current_od: float, purchase_type: str,
                               ri_rate: Optional[float], sp_rate: Optional[float],
@@ -1212,12 +1313,15 @@ def _savings_ratio_for_target(item: Dict, target_type: str, target_od: float,
     ratio = 1 - target_od * factor / current_od
 
     if purchase_type == "RI":
-        graviton_ri = _lookup_rate_for_type(
-            target_type, region, "RI", od_prices,
-            ri_offering=item.get("ri_offering_type", ""),
-            ri_terms=_ri_terms(item),
-            coord=coord, od_key=od_key,
-        )
+        graviton_ri = _blended_ri_rate(item, target_type, region, od_prices,
+                                       coord, od_key)
+        if graviton_ri is None:
+            graviton_ri = _lookup_rate_for_type(
+                target_type, region, "RI", od_prices,
+                ri_offering=item.get("ri_offering_type", ""),
+                ri_terms=_ri_terms(item),
+                coord=coord, od_key=od_key,
+            )
         # Only trust it if it came from the RI cache rather than the OD fallback.
         if graviton_ri and graviton_ri != _od_at(od_prices, target_type, od_key, coord[0]):
             ri_effective = item.get("ri_effective_hourly_rate", 0)
@@ -1325,6 +1429,144 @@ def _ri_terms(item: Dict) -> Tuple[str, str, str]:
             item.get("ri_offering_class", "") or "")
 
 
+_HOURS_PER_MONTH = 730.0
+
+
+def _check_engines(classified: List[Dict], engine_version_map: Dict) -> List[Dict]:
+    """Engine readiness per managed row, stamped on the row; unique checks returned.
+
+    A row is matched only to a version of its OWN engine; without one its
+    version is unknown and the check says to verify it.
+    """
+    engine_checks = []
+    seen_engines = set()
+    # Normalize CE engine names to what check_engine_graviton_readiness expects
+    _ENGINE_NORMALIZE = {
+        "postgresql": "postgres",
+        "aurora postgresql": "aurora-postgresql",
+        "aurora mysql": "aurora-mysql",
+        "sql server": "sqlserver",
+        "mariadb": "mariadb",
+        "mysql": "mysql",
+        "redis": "redis",
+        "memcached": "memcached",
+        "valkey": "valkey",
+        "opensearch": "opensearch",
+    }
+
+    for r in classified:
+        svc = r.get("service", "ec2")
+        if svc not in ("rds", "elasticache", "opensearch") or r.get("is_graviton"):
+            continue
+        engine = (r.get("database_engine") or r.get("cache_engine")
+                  or ("opensearch" if svc == "opensearch" else ""))
+        if not engine:
+            continue
+        engine_lower = engine.lower().strip()
+        normalized = _ENGINE_NORMALIZE.get(engine_lower, engine_lower)
+        instance_type = r.get("raw", "")
+        region = r.get("region", "us-east-1")
+
+        # Look up actual version from describe APIs
+        version = ""
+        version_entries = engine_version_map.get((svc, instance_type, region), [])
+        for entry in version_entries:
+            # Match by normalized engine name
+            entry_engine = entry["engine"].lower().strip()
+            entry_normalized = _ENGINE_NORMALIZE.get(entry_engine, entry_engine)
+            if entry_normalized == normalized:
+                version = entry["version"]
+                break
+        # No entry for this row's own engine means its version is unknown. Taking
+        # another engine's version (the first entry for the type) once checked a
+        # PostgreSQL row against a MySQL version.
+
+        # The engine minimum depends on the target family, so check against the
+        # target this row was actually given (which follows
+        # --graviton-generation), not the classifier's default.
+        chosen = ""
+        gen_field = {"Graviton2": "g2", "Graviton3": "g3", "Graviton4": "g4",
+                     "Graviton5": "g5"}.get(r.get("graviton_target_generation", ""))
+        if gen_field:
+            chosen = ((r.get("graviton_targets_by_gen") or {}).get(gen_field) or {}).get("type", "")
+        check = check_engine_graviton_readiness(normalized, version, instance_type,
+                                                target_class=chosen)
+        # Stamped on the row so the migration plan can act on it: a row whose
+        # engine must be upgraded first is not a Week 1-2, low-effort move.
+        r["engine_readiness"] = check.get("status", "")
+        r["engine_version"] = version
+        key = f"{normalized}:{version}:{instance_type}:{chosen}"
+        if key not in seen_engines:
+            seen_engines.add(key)
+            engine_checks.append(check)
+
+    return engine_checks
+
+
+def _fetch_instance_savings_plans() -> List[Dict]:
+    """Active EC2 Instance Savings Plans owned by the calling account.
+
+    DescribeSavingsPlans lists only the caller's own plans: plans bought in
+    other accounts of an organization are not returned, though they apply to
+    its usage. Raises on any failure so the caller can report the check as not
+    done rather than as "no plans found".
+    """
+    import boto3
+    client = boto3.client("savingsplans", region_name="us-east-1", config=_client_config())
+    plans, token = [], None
+    while True:
+        kw = {"states": ["active"], "maxResults": 1000}
+        if token:
+            kw["nextToken"] = token
+        resp = client.describe_savings_plans(**kw)
+        plans.extend(p for p in resp.get("savingsPlans", [])
+                     if p.get("savingsPlanType") == "EC2Instance")
+        token = resp.get("nextToken")
+        if not token:
+            return plans
+
+
+def _apply_instance_savings_plans(classified: List[Dict], plans: List[Dict]) -> float:
+    """Mark the Savings Plan spend an EC2 Instance Savings Plan locks in place.
+
+    An EC2 Instance Savings Plan applies only to its instance family in its
+    region until it expires, so moving that usage to Graviton saves nothing
+    while the plan runs. (A Compute Savings Plan follows the usage to any
+    family, so its spend keeps its saving.) Per family and region, up to the
+    plans' monthly commitment of the rows' Savings Plan spend is recorded as
+    cost_sp_isp, shared out by each row's Savings Plan spend. Returns the
+    total locked spend per month.
+    """
+    caps: Dict[Tuple[str, str], float] = {}
+    ends: Dict[Tuple[str, str], str] = {}
+    for p in plans:
+        key = ((p.get("ec2InstanceFamily") or "").lower(), p.get("region") or "")
+        try:
+            hourly = float(p.get("commitment") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not key[0] or hourly <= 0:
+            continue
+        caps[key] = caps.get(key, 0.0) + hourly * _HOURS_PER_MONTH
+        ends[key] = max(ends.get(key, ""), (p.get("end") or "")[:10])
+    groups: Dict[Tuple[str, str], List[Dict]] = {}
+    for r in classified:
+        if (r.get("service") or "ec2") != "ec2" or not (r.get("cost_sp") or 0) > 0:
+            continue
+        key = ((r.get("raw") or "").split(".")[0].lower(), r.get("region") or "")
+        if key in caps:
+            groups.setdefault(key, []).append(r)
+    locked_total = 0.0
+    for key, rows in groups.items():
+        sp_total = sum(r["cost_sp"] for r in rows)
+        locked = min(caps[key], sp_total)
+        for r in rows:
+            r["cost_sp_isp"] = round(r["cost_sp"] * locked / sp_total, 2)
+            r["isp_end"] = ends.get(key, "")
+        locked_total += locked
+    return round(locked_total, 2)
+
+
 def _savings_by_purchase_type(item: Dict, target_type: str, target_od: float,
                               current_od: float, ri_rate: Optional[float],
                               sp_rate: Optional[float], region: str,
@@ -1339,6 +1581,11 @@ def _savings_by_purchase_type(item: Dict, target_type: str, target_od: float,
     slices = {pt: item.get(field) or 0 for pt, field in _PT_COST_FIELD.items()}
     if not any(slices.values()):
         slices = {(item.get("purchase_type") or "OD"): item.get("cost", 0)}
+    # Spend an EC2 Instance Savings Plan holds on this family books no saving
+    # (see _apply_instance_savings_plans); only the rest of the SP slice moves.
+    isp = item.get("cost_sp_isp") or 0
+    if isp and "SP" in slices:
+        slices["SP"] = max(slices["SP"] - isp, 0.0)
     total = 0.0
     for pt, slice_cost in slices.items():
         if slice_cost:
@@ -1385,7 +1632,7 @@ def _enrich_classified_with_pricing(
     Args:
         classified: List of classified instance dicts from the fleet classification step.
         od_prices: Dict of {instance_type: od_price_per_hour} from full-fleet pricing.
-        target_strategy: Graviton generation targeting strategy ("latest", "cheapest", "same_gen").
+        target_strategy: "latest" or a forced "graviton2".."graviton5".
     """
     for item in classified:
         # This row's own region's price book; see RegionalPrices.
@@ -1476,6 +1723,11 @@ def _enrich_classified_with_pricing(
                 # Generational hops (source gen -> target gen); drives price-performance uplift.
                 item["gen_hops"] = best.get("gen_hops", 0)
                 item["graviton_target_generation"] = best.get("generation", "")
+                # The exact type est_savings was priced against. Every report
+                # names this one; graviton_upgrade is the classifier's guess and
+                # graviton_target was only set for each wave's top five rows, so
+                # the CSV named r7g.xlarge for an r5b.xlarge priced as r6g.xlarge.
+                item["graviton_target_priced"] = best.get("instance_type", "")
                 # Surface a forced-generation fallback (e.g. G5 requested but not
                 # offered here) so the report can label it instead of silently
                 # reporting a different generation than the one requested.
@@ -1683,6 +1935,9 @@ def _compute_realized_savings(
 
         intel_eq = item.get("intel_equivalent") or get_intel_equivalent(raw)
         if not intel_eq:
+            # No Intel type to compare against: no realized saving, but counted,
+            # since the report says such types are listed as unpriced.
+            unpriced_count += 1
             continue
 
         # Realized savings on ONE pricing basis.
@@ -2057,7 +2312,7 @@ def _classify_row(itype: str, svc: str) -> Optional[dict]:
     if d.get("graviton_upgrade"):
         d["graviton_upgrade"] = _expand_size(d["graviton_upgrade"])
     d["gen_bucket"] = generation_bucket(info.generation, info.is_graviton)
-    d["nih_factor"] = _nih_factor(d.get("size", ""))
+    d["nih_factor"] = _nih_factor(d.get("size", ""), d.get("raw", "") or itype)
     return d
 
 
@@ -2147,6 +2402,13 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
         pentry["hours"] += ri.get("actual_hours", 0) or 0
         pentry["unused_hours"] += ri.get("unused_hours", 0) or 0
         for e in (entry, pentry):
+            # Purchased hours per (lease, payment, class): a type's subscriptions
+            # can mix terms, and pricing the target at the largest one's terms
+            # compared a blended source rate with a single-term target.
+            tkey = (ri.get("lease", ""), ri.get("payment_option", ""),
+                    ri.get("offering_class", ""))
+            mix = e.setdefault("mix", {})
+            mix[tkey] = mix.get(tkey, 0.0) + (ri.get("purchased_hours", 0) or 0)
             # Term metadata from the largest subscription, as the most representative.
             if (ri.get("total_amortized", 0) or 0) > e["_max"]:
                 e["_max"] = ri.get("total_amortized", 0) or 0
@@ -2274,12 +2536,18 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
                     cost_w = {k: hour_w[k] * rates.get(k, mean_rate) for k in sub}
                     h_total, c_total = sum(hour_w.values()), sum(cost_w.values())
                     n = len(sub)
+                    # A group with no on-demand hours has no measured rate, so
+                    # its share of the cost is weighted by hours at the mean
+                    # (or, with no rates at all, by hours alone): an estimate,
+                    # disclosed with the other estimated splits.
+                    est = n > 1 and any(k not in rates for k in sub)
                     for coords in sub:
                         h_share = hour_w[coords] / h_total if h_total > 0 else 1.0 / n
                         c_share = cost_w[coords] / c_total if c_total > 0 else 1.0 / n
                         cell = cells.setdefault((region, coords), {})
                         cell[pt] = {"cost": tot["cost"] * c_share,
-                                    "hours": tot["hours"] * h_share}
+                                    "hours": tot["hours"] * h_share,
+                                    "est": est}
 
         base = _classify_row(it, svc)
         # RI cost per region across this type's cells, to share RI metadata out.
@@ -2359,24 +2627,23 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
                     d["ri_lease"] = ri.get("lease", "")
                     d["ri_payment_option"] = ri.get("payment_option", "")
                     d["ri_offering_class"] = ri.get("offering_class", "")
+                    d["ri_terms_mix"] = [[*k, h] for k, h in (ri.get("mix") or {}).items()
+                                         if h > 0]
             rows.append(d)
     return rows
 
 
 def _months_in_period(start_date: str, end_date: str) -> float:
-    """Length of [start, end) in months: whole calendar months when both are the 1st."""
-    from datetime import date
-    s, e = date.fromisoformat(start_date), date.fromisoformat(end_date)
-    if e <= s:
-        # Clamping this to a day once turned an inverted range into a divisor
-        # of ~0.033, scaling every "monthly" figure about 30x.
+    """Length of [start, end) in months (fleet_tools.months_in_period); raises if empty.
+
+    Clamping an inverted range to a day once made the divisor ~0.033, scaling
+    every "monthly" figure about 30x.
+    """
+    months = months_in_period(start_date, end_date)
+    if months is None:
         raise ValueError(f"empty or inverted period: {start_date} to {end_date} "
                          "(start is inclusive, end exclusive)")
-    if s.day == 1 and e.day == 1:
-        months = (e.year - s.year) * 12 + (e.month - s.month)
-        if months > 0:
-            return float(months)
-    return max((e - s).days, 1) / (365.25 / 12)
+    return months
 
 
 def _normalize_to_monthly(rows: List[Dict], months: float) -> None:
@@ -2785,9 +3052,9 @@ def estimate_graviton_savings(
         end_date: YYYY-MM-DD. Default: first of current month.
         services: Optional filter. Default: all 4 services.
         target_strategy: Graviton target selection strategy. Valid values:
-            "latest" (default) — target n+1 generation Graviton.
-            "cheapest" — picks cheapest Graviton generation.
-            "same_gen" — match source x86 generation.
+            "latest" (default) — the classifier's next-generation target.
+            "graviton2".."graviton5" — that generation for every row, with a
+            marked fallback where it is not offered or priced.
             Omit for direct credentials.
 
     Returns:
@@ -2817,6 +3084,7 @@ def estimate_graviton_savings(
                          f"date ({end_date}); the end is exclusive")
 
     _pricing_errors.clear()
+    _endpoint_failures.clear()
     # Module-level, so a second assessment in one process would otherwise report
     # the first run's phases alongside its own.
     _phase_timings.clear()
@@ -2959,16 +3227,10 @@ def estimate_graviton_savings(
             os_val, _ = _sp_coords(item)
             if os_val in ("Linux", "Windows"):
                 continue  # Linux already priced, Windows not eligible for Graviton
-            raw = item.get("raw", "")
             region = item.get("region", "us-east-1")
-            if raw:
-                os_types.setdefault(os_val, {}).setdefault(region, set()).add(raw)
-                # Also add targets
-                for gkey in ("graviton_upgrade", "graviton2", "graviton3", "graviton4", "graviton5"):
-                    target = item.get(gkey)
-                    if target:
-                        full = target_type(item, target) if "." not in target else target
-                        os_types[os_val][region].add(full)
+            if item.get("raw"):
+                os_types.setdefault(os_val, {}).setdefault(region, set()).update(
+                    _row_price_group(item))
 
         with _phase("od-pricing-non-linux"):
             for os_val, regions_dict in os_types.items():
@@ -2999,19 +3261,13 @@ def estimate_graviton_savings(
             svc, eng, depl = _pricing_coords(item)
             if svc not in ("rds", "elasticache"):
                 continue
-            raw = item.get("raw", "")
-            if not raw:
+            if not item.get("raw"):
                 continue
             region = item.get("region", "us-east-1")
-            group = managed.setdefault((region, svc, eng, depl), set())
-            group.add(raw)
-            # Targets go in the SAME group, which is the entire point.
-            for gkey in ("graviton_upgrade", "graviton2", "graviton3",
-                         "graviton4", "graviton5"):
-                target = item.get(gkey)
-                if target:
-                    full = target_type(item, target) if "." not in target else target
-                    group.add(_expand_size(full))
+            # The row, its targets and its Intel equivalent in the SAME group,
+            # which is the entire point (see _row_price_group).
+            managed.setdefault((region, svc, eng, depl), set()).update(
+                _row_price_group(item))
 
         if managed:
             with _phase("od-pricing-managed"):
@@ -3053,25 +3309,8 @@ def estimate_graviton_savings(
         os_val, sp_ten = _sp_coords(r)
         if os_val == "Windows":
             continue  # No Graviton equivalent — never priced.
-        group = sp_groups.setdefault((region, os_val, sp_ten), set())
-
-        raw = r.get("raw", "")
-        if raw:
-            group.add(raw)
-
-        # Non-Graviton SP items: add their Graviton targets
-        if not r.get("is_graviton") and r.get("graviton_upgrade"):
-            for gkey in ("graviton_upgrade", "graviton2", "graviton3", "graviton4", "graviton5"):
-                val = r.get(gkey)
-                if val:
-                    full = target_type(r, val) if "." not in val else val
-                    group.add(_expand_size(full))
-
-        # Graviton SP items: add their Intel equivalent
-        if r.get("is_graviton") and raw:
-            intel_eq = get_intel_equivalent(raw)
-            if intel_eq:
-                group.add(intel_eq)
+        sp_groups.setdefault((region, os_val, sp_ten), set()).update(
+            _row_price_group(r))
 
     if sp_groups:
         try:
@@ -3088,6 +3327,22 @@ def estimate_graviton_savings(
             logger.debug("Savings Plan offering rates unavailable: %s: %s",
                          type(e).__name__, e)
 
+    # --- Step 4b2: EC2 Instance Savings Plans hold their family in place ---
+    isp_check, isp_locked_cost = "not_needed", 0.0
+    if any((r.get("cost_sp") or 0) > 0 and (r.get("service") or "ec2") == "ec2"
+           for r in classified):
+        if False:
+            isp_check = "not_checked: Savings Plans inventory is not available through FROC"
+        else:
+            try:
+                with _phase("instance-savings-plans"):
+                    isp_locked_cost = _apply_instance_savings_plans(
+                        classified, _fetch_instance_savings_plans())
+                isp_check = "checked"
+            except Exception as e:
+                isp_check = f"not_checked: {type(e).__name__}"
+                _pricing_errors.append(f"savings-plans inventory: {type(e).__name__}: {e}")
+
     # --- Step 4c: Enrich classified items with per-item pricing ---
     # Also where instance_offerings and managed_offerings availability lookups
     # happen, via _build_graviton_options.
@@ -3103,6 +3358,11 @@ def estimate_graviton_savings(
                 "yes" if realized_savings_result else "no")
 
     # --- Step 5: Score + migrate + engine readiness ---
+    # Engine readiness runs BEFORE scoring and the plan, which read it per row.
+    # It used to run after both, so it changed neither the waves nor anything
+    # the headline said about them.
+    engine_checks = _check_engines(classified, _resolve_engine_versions(classified))
+
     with _phase("score-fleet"):
         score_result = score_graviton_fleet(
             classified, region="us-east-1", od_prices=od_prices if od_prices.type_count() else None,
@@ -3113,68 +3373,6 @@ def estimate_graviton_savings(
             classified, region="us-east-1", od_prices=od_prices if od_prices.type_count() else None,
             target_strategy=target_strategy,
         )
-
-    engine_checks = []
-    seen_engines = set()
-    # Normalize CE engine names to what check_engine_graviton_readiness expects
-    _ENGINE_NORMALIZE = {
-        "postgresql": "postgres",
-        "aurora postgresql": "aurora-postgresql",
-        "aurora mysql": "aurora-mysql",
-        "sql server": "sqlserver",
-        "mariadb": "mariadb",
-        "mysql": "mysql",
-        "redis": "redis",
-        "memcached": "memcached",
-        "valkey": "valkey",
-        "opensearch": "opensearch",
-    }
-
-    # Resolve actual engine versions from AWS describe APIs
-    engine_version_map = _resolve_engine_versions(classified)
-
-    for r in classified:
-        svc = r.get("service", "ec2")
-        if svc not in ("rds", "elasticache", "opensearch") or r.get("is_graviton"):
-            continue
-        engine = (r.get("database_engine") or r.get("cache_engine")
-                  or ("opensearch" if svc == "opensearch" else ""))
-        if not engine:
-            continue
-        engine_lower = engine.lower().strip()
-        normalized = _ENGINE_NORMALIZE.get(engine_lower, engine_lower)
-        instance_type = r.get("raw", "")
-        region = r.get("region", "us-east-1")
-
-        # Look up actual version from describe APIs
-        version = ""
-        version_entries = engine_version_map.get((svc, instance_type, region), [])
-        for entry in version_entries:
-            # Match by normalized engine name
-            entry_engine = entry["engine"].lower().strip()
-            entry_normalized = _ENGINE_NORMALIZE.get(entry_engine, entry_engine)
-            if entry_normalized == normalized:
-                version = entry["version"]
-                break
-        # If no exact engine match, use first available version for this instance type
-        if not version and version_entries:
-            version = version_entries[0]["version"]
-
-        # The engine minimum depends on the target family, so check against the
-        # target this row was actually given (which follows
-        # --graviton-generation), not the classifier's default.
-        chosen = ""
-        gen_field = {"Graviton2": "g2", "Graviton3": "g3", "Graviton4": "g4",
-                     "Graviton5": "g5"}.get(r.get("graviton_target_generation", ""))
-        if gen_field:
-            chosen = ((r.get("graviton_targets_by_gen") or {}).get(gen_field) or {}).get("type", "")
-        key = f"{normalized}:{version}:{instance_type}:{chosen}"
-        if key not in seen_engines:
-            seen_engines.add(key)
-            engine_checks.append(
-                check_engine_graviton_readiness(normalized, version, instance_type,
-                                                target_class=chosen)
-            )
 
     # --- Build summary ---
     total_cost = sum(r.get("cost", 0) for r in classified)
@@ -3270,6 +3468,10 @@ def estimate_graviton_savings(
                 },
                 "usage_summary_total": round(summary_total, 2),
                 "unclassified_types": unclassified_types,
+                # Savings Plan spend held by EC2 Instance Savings Plans, and
+                # whether the inventory could be read at all.
+                "isp_check": isp_check,
+                "isp_locked_cost": isp_locked_cost,
                 "split_estimated_cost": round(sum(
                     c.get("split_estimated_cost", 0) or 0 for c in classified), 2),
                 "classified_totals": {
