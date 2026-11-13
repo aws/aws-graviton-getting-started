@@ -722,8 +722,8 @@ def _build_graviton_options(
                     chosen["requested_generation"] = forced_label
                     chosen["generation_fallback"] = True
                     chosen["note"] = (
-                        f"{forced_label} target unavailable in "
-                        f"{region or 'this region'} — using {fallback_label}"
+                        f"{forced_label} target not offered or not priced in "
+                        f"{region or 'this region'} at any size — using {fallback_label}"
                     )
                     return chosen
             return max(pool, key=lambda o: o["savings_pct"])
@@ -1164,8 +1164,7 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
         }
         if capacity_unpriced and r.get("est_savings") is None:
             # Only an unpriced smaller-size target exists: nothing is booked, so
-            # the row is unpriced spend, not a priced zero. It once counted in
-            # neither the headline nor the unpriced total.
+            # the row is unpriced spend, not a priced zero.
             opp_entry["capacity_unpriced"] = True
         if ((pricing_source == "estimate_20pct" or opp_entry.get("capacity_unpriced"))
                 and r.get("est_savings") is None):
@@ -1289,15 +1288,15 @@ def score_graviton_fleet(classified_instances: List[Dict], region: str = "us-eas
         if r.get("is_graviton"):
             svc_buckets[s]["graviton"] += 1
 
-    # Hours-based Graviton adoption percentage (Req 1.2)
+    # Hours-based Graviton adoption percentage
     graviton_hours = sum(r.get("hours", 0) for r in graviton)
     if total_hours > 0:
         graviton_pct = round(graviton_hours / total_hours * 100, 1)
     else:
-        # Fallback: count-based when all hours are zero (Req 1.4)
+        # Fallback: count-based when all hours are zero
         graviton_pct = round(len(graviton) / max(total_instances, 1) * 100, 1)
 
-    # Processor generation breakdown (Req 2.5)
+    # Processor generation breakdown
     processor_gen_breakdown: Dict[str, Dict[str, Dict[str, float]]] = {}
     for r in classified_instances:
         if r.get("is_graviton"):

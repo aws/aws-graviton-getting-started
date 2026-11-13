@@ -1074,8 +1074,16 @@ def _build_data_quality_html(assessment: dict) -> str:
             f"<tr><td>EC2 Instance Savings Plans</td><td>{_fmt_cost(isp_locked)}/mo of "
             f"Savings Plan spend is held by EC2 Instance Savings Plans, which apply only "
             f"to their instance family until they expire. That spend books no saving; "
-            f"rows it fully covers are listed under Not Eligible. Compute Savings Plans "
-            f"follow the usage to Graviton, so their spend keeps its saving.</td></tr>")
+            f"rows it fully covers are listed under Not Eligible.</td></tr>")
+    sp_movable = sum(max((c.get("cost_sp") or 0) - (c.get("cost_sp_isp") or 0), 0)
+                     for c in classified if _earns_savings(c))
+    if sp_movable > 0:
+        rows.append(
+            f"<tr><td>Savings Plan spend</td><td>{_fmt_cost(sp_movable)}/mo of Savings Plan "
+            f"spend keeps its saving on the assumption that the plan's hourly commitment "
+            f"is absorbed by other eligible usage. The commitment is paid after the "
+            f"migration too, so with no other usage to take it that saving arrives at "
+            f"the plan's renewal.</td></tr>")
     isp_unmatched = data_quality.get("isp_unmatched_regions") or []
     if isp_check == "checked" and isp_unmatched:
         rows.append(
@@ -1117,7 +1125,7 @@ def _build_data_quality_html(assessment: dict) -> str:
             f"(Cost Explorer reports it by region and by platform, not by both; split "
             f"by iterative proportional fitting), and managed-service spend of an "
             f"engine or deployment group with no on-demand hours to price it by (split "
-            f"by running hours). Totals per type and region are exact.</td></tr>")
+            f"by running hours, with a Multi-AZ hour counted as two, as RDS bills it). Totals per type and region are exact.</td></tr>")
 
     unclassified_types = data_quality.get("unclassified_types") or []
     if unclassified_types:
@@ -1467,7 +1475,7 @@ def generate_markdown(assessment: dict, customer: str = "", account_id: str = ""
             current = _expand_size(
                 o.get('current', '') or o.get('instance_type', ''))
             region = o.get('region', '')
-            # Multi-target rendering (Req 4.1–4.4)
+            # Multi-target rendering
             options = o.get("graviton_options", [])
             if len(options) > 1:
                 parts = []

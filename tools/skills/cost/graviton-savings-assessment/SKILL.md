@@ -189,9 +189,12 @@ the stdout summary; drop a bullet only when its condition does not apply.
 > - **Pricing basis:** amortized spend from Cost Explorer, counting usage
 >   charges only (credits, refunds, other billing adjustments and Marketplace
 >   are excluded); Graviton prices are public rates at the same purchase terms
->   (Spot rows use the on-demand price ratio). Compute Savings Plans follow the
->   usage to Graviton, so their spend keeps its saving, as does EC2 Convertible
->   Reserved Instance spend, which can be exchanged for Graviton.
+>   (Spot rows use the on-demand price ratio). Compute Savings Plan spend keeps
+>   its saving on the assumption that the plan's hourly commitment is absorbed by
+>   other eligible usage: the commitment is paid after the migration too, so if
+>   the fleet has no other usage to take it, that saving arrives at renewal.
+>   EC2 Convertible Reserved Instance spend keeps its saving: it can be
+>   exchanged for Graviton.
 > - **Performance:** stdout and the Markdown report assume a same-size Graviton
 >   instance does the same work (1:1), with no performance uplift. [If
 >   `nih_reduction` is above 0 — it is 10 by default — add that the HTML

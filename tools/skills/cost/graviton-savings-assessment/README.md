@@ -31,19 +31,18 @@ Install the skill into your assistant's skills folder. See the
 (set `CATEGORY=cost` and `SKILL=graviton-savings-assessment`). For Claude Code:
 
 ```bash
-SKILL=graviton-savings-assessment
-SRC="tools/skills/cost/$SKILL"
-DEST=~/.claude/skills
-TMP="$(mktemp -d)"
-if git clone --quiet --depth 1 --filter=blob:none --sparse \
-       https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
-   git -C "$TMP" sparse-checkout set "$SRC" &&
-   [ -f "$TMP/$SRC/SKILL.md" ]; then
+(
+  SKILL=graviton-savings-assessment
+  SRC="tools/skills/cost/$SKILL"
+  DEST=~/.claude/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
   mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
-else
-  echo "Could not fetch $SRC; nothing was installed or removed." >&2
-fi
-rm -rf "$TMP"
+)
 ```
 
 Then install the Python dependency through the interpreter that will run the skill:
@@ -56,6 +55,14 @@ python3 -m pip install -r requirements.txt   # Windows: py -3 -m pip install -r 
 Use `<python> -m pip`, not a bare `pip`: on a machine with several Pythons, `pip` often
 installs into a different one. The skill's first step also checks this and tells the agent
 how to fix it.
+
+If pip refuses with `externally-managed-environment` (PEP 668: recent Homebrew and Linux
+distribution Pythons), use a virtual environment and run the skill with its Python:
+
+```bash
+python3 -m venv ~/.venvs/graviton-assessment
+~/.venvs/graviton-assessment/bin/python -m pip install -r requirements.txt   # Windows: ~\.venvs\graviton-assessment\Scripts\python.exe
+```
 
 Sign in with temporary AWS credentials (`aws sso login`, or an `AWS_PROFILE` that assumes a
 read-only role with the [permissions below](#iam-permissions-required)), then ask your AI assistant:

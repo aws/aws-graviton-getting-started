@@ -107,9 +107,9 @@ def _sp_tenancy(tenancy: str) -> str:
 
 # Cost Explorer platform string -> Pricing API operatingSystem value.
 #
-# Module-level because three call sites need it and each used to carry its own
-# copy. A row's SP rate is keyed on this value, so two copies drifting apart
-# would silently move rows to a different pricing product.
+# Module-level so every call site shares one copy: a row's SP rate is keyed on
+# this value, so two copies drifting apart would silently move rows to a
+# different pricing product.
 _PLATFORM_TO_OS = {
     "linux/unix": "Linux", "linux": "Linux",
     "windows (amazon vpc)": "Windows", "windows": "Windows",
@@ -238,11 +238,8 @@ def _od_usage_type_ok(service: str, usage_type: str) -> bool:
 # Module-level error collector — surfaces pricing failures in assessment summary.
 _pricing_errors: List[str] = []
 
-# Per-phase wall time, in call order. Step 3-4 used to be a single logged number
-# covering pricing, enrichment, scoring and migration planning — 99% of the run
-# in one opaque bucket. Locating a 745s regression inside it meant correlating
-# log timestamps by hand, and only worked because two unrelated modules happened
-# to log per-call INFO lines.
+# Per-phase wall time, in call order, so a slow run can be located from the
+# summary instead of by correlating log timestamps.
 _phase_timings: List[Tuple[str, float]] = []
 
 
@@ -352,11 +349,10 @@ from .instance_classifier import expand_size as _expand_size  # one definition
 
 
 # ── AWS error classification ───────────────────────────────────────────────
-# Decided from the botocore error code where the exception carries one. These
-# used to be substring tests on the exception's class name, which for a
-# ClientError is always "ClientError" — so an AccessDenied from the Pricing API
-# was not recognised as a credential failure and every remaining type was tried
-# (and failed) anyway.
+# Decided from the botocore error code where the exception carries one. A
+# ClientError's class name is always "ClientError", so the name cannot tell an
+# AccessDenied from the Pricing API (a credential failure, after which no
+# further lookup can succeed) from any other error.
 _AUTH_ERROR_CODES = frozenset({
     "AccessDenied", "AccessDeniedException", "UnauthorizedOperation",
     "UnauthorizedException", "AuthFailure", "ExpiredToken",
@@ -433,6 +429,19 @@ def _note_endpoint(name: str, exc: Optional[BaseException]) -> None:
         _endpoint_failures[name] = 0
 
 
+def _ce_client_config():
+    """Cost Explorer client settings: bounded timeouts and retries.
+
+    The botocore defaults (60s to connect, five attempts) let one unreachable
+    network cost minutes per request, across the ~24 requests of a run. Read
+    stays at 60s because large group-bys can legitimately take that long.
+    Standard retry mode, not adaptive: every Cost Explorer request is billed.
+    """
+    from botocore.config import Config
+    return Config(connect_timeout=10, read_timeout=60,
+                  retries={"max_attempts": 3, "mode": "standard"})
+
+
 def _client_config():
     """Bounded timeouts: botocore's 60s default per attempt made a dropped
     network cost hours. Adaptive retries stay for throttling."""
@@ -492,8 +501,7 @@ def _usd(dim: Dict) -> float:
 # parsed. Cost Explorer reports a Savings Plan's region by display name ("US
 # West (Oregon)") but usage by code, and every region the fleet runs in is
 # priced before the Savings Plan step, so this covers the regions that matter
-# without a hand-maintained table (one of those once priced 20 regions as
-# N. Virginia).
+# without a hand-maintained table.
 _REGION_BY_NAME: Dict[str, str] = {}
 
 
@@ -721,17 +729,12 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
     # The region is passed to the Pricing API as `regionCode`, not as a
     # `location` display name.
     #
-    # This used to be a hand-maintained region -> display-name map with
-    # `.get(region, "US East (N. Virginia)")` as the fallback. It listed 14 of
-    # the 34 commercial regions, so a fleet in any of the other 20 — Seoul,
-    # Stockholm, Zurich, Hong Kong, Cape Town, Tel Aviv, Jakarta, Mexico,
-    # Calgary, the Middle East regions — was priced at N. Virginia rates with no
-    # warning. N. Virginia is the cheapest region, so every one of those rates
-    # was understated (Cape Town and Zurich by ~24%, Seoul by ~19%).
-    #
+    # A display-name map needs maintaining as regions launch, and a region
+    # missing from it that falls back to N. Virginia (the cheapest region) is
+    # priced too low with no warning, by up to ~24% (Cape Town, Zurich).
     # `regionCode` is the region string itself, so there is nothing to maintain
-    # and a new region cannot silently fall back. Verified against AmazonEC2,
-    # AmazonRDS, AmazonElastiCache and AmazonES.
+    # and no fallback. Verified against AmazonEC2, AmazonRDS, AmazonElastiCache
+    # and AmazonES.
 
     # Service configs: (service_code, extra_filters)
     service_configs = {
@@ -760,12 +763,11 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
         "opensearch": ("AmazonES", []),
     }
 
-    # NOTE: `prices` is NOT re-initialised here. It was, which silently discarded
-    # every cache hit collected above: cached types are excluded from
-    # types_to_fetch, so once wiped they were never re-added and came back absent
-    # from the return value. Masked only when EVERY type was cached, because that
-    # path returns early — so the bug appeared when a fleet was partly cached,
-    # which is the normal case on the second and later calls in a process.
+    # NOTE: `prices` must NOT be re-initialised here. It already holds the cache
+    # hits collected above, and cached types are excluded from types_to_fetch,
+    # so wiping it would drop them from the return value. That goes unnoticed
+    # when every type is cached (that path returns early) and shows when a
+    # fleet is partly cached, the normal case after the first call in a process.
     _fatal_error = None  # Track credential/auth errors to fail fast
     # Adaptive retries: the default (4 attempts, legacy mode) throttles on
     # fleets with hundreds of types — especially with concurrent assessments —
@@ -862,20 +864,17 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
     # Types throttled on the first pass, retried before we give up on them.
     _throttled: List[tuple] = []
 
-    # Deliberately serial. Each type is an independent get_products call, so this
-    # looks like the obvious thing to parallelise, and it is the second-largest
-    # cost in a run (~173s). It was tried and measured slower: on 384 types in
-    # us-west-2, warmed and with serial run first to remove order effects,
-    # 1 worker took 42.1s against 53.6-54.7s for 4, 8 and 16 workers — flat
-    # across the three, which is the signature of the client's `mode="adaptive"`
-    # rate limiter clamping the global request rate once it observes throttling
-    # under concurrency. Extra workers only add queueing behind that clamp.
+    # Deliberately serial. Each type is an independent get_products call, but
+    # parallel workers measured slower: on 384 types in us-west-2, warmed and
+    # with the serial run first to remove order effects, 1 worker took 42.1s
+    # against 53.6-54.7s for 4, 8 and 16, flat across the three, which is the
+    # signature of the client's `mode="adaptive"` rate limiter clamping the
+    # global request rate once it sees throttling under concurrency.
     #
-    # Switching to `mode="standard"` would remove the clamp, but the whole point
-    # of adaptive mode here is that a throttled type which also fails its retry
-    # sweep is dropped from savings silently. Trading ~40s for that risk is a bad
-    # deal, especially now the RDS offerings lookup accounts for the bulk of the
-    # runtime. Do not re-parallelise this without re-measuring both together.
+    # `mode="standard"` would remove the clamp, but adaptive mode is what keeps
+    # a throttled type that also fails its retry sweep from being dropped from
+    # savings silently; ~40s is a bad price for that risk. Re-measure both
+    # together before changing either.
     for svc, types in by_service.items():
         if not types or _fatal_error:
             continue
@@ -1457,10 +1456,9 @@ def _savings_ratio_for_target(item: Dict, target_type: str, target_od: float,
     # Re-resolve the target's on-demand rate at the SOURCE's coordinates before
     # forming the ratio. The caller takes target_od from _build_graviton_options,
     # which reads od_prices by plain instance type and therefore gets the default
-    # coordinates. Once the source side became coordinate-correct, that mismatch
-    # showed up immediately: a Multi-AZ db.m5.4xlarge (2.848) divided by a
-    # Single-AZ db.m9g.4xlarge (1.465) reported 48.6% savings on a target that is
-    # actually 2.9% more expensive. Both sides must come from the same place.
+    # coordinates. Both sides of a ratio must come from the same place: a
+    # Multi-AZ db.m5.4xlarge (2.848) divided by a Single-AZ db.m9g.4xlarge
+    # (1.465) reads as 48.6% savings on a target that is 2.9% more expensive.
     if current_tier:
         # No fallback to the plain keys when the target has no rate at the
         # row's tier: plain keys hold the default engine/deployment and Linux,
@@ -1606,6 +1604,16 @@ def _ri_terms(item: Dict) -> Tuple[str, str, str]:
 _HOURS_PER_MONTH = 730.0
 
 
+def _engine_version_sort_key(version: str):
+    """Order version strings by their numeric parts ("5.7.44" < "8.0.36" < "10.2").
+
+    Non-numeric parts (Aurora's "8.0.mysql_aurora.3.05.2", OpenSearch's
+    "OpenSearch_2.11") sort by the numbers they contain, so the oldest of
+    several versions is found by number, not as text.
+    """
+    return [int(n) for n in re.findall(r"\d+", version or "")] or [-1]
+
+
 def _check_engines(classified: List[Dict], engine_version_map: Dict) -> List[Dict]:
     """Engine readiness per managed row, stamped on the row; unique checks returned.
 
@@ -1641,19 +1649,23 @@ def _check_engines(classified: List[Dict], engine_version_map: Dict) -> List[Dic
         instance_type = r.get("raw", "")
         region = r.get("region", "us-east-1")
 
-        # Look up actual version from describe APIs
+        # Look up actual version from describe APIs. A row is every instance of
+        # this type and engine in the region, so it may run several versions;
+        # it is only as ready as its OLDEST one. Taking the first entry made a
+        # row with many 5.7 instances and one 8.0 instance ready or not
+        # depending on the order the API listed them.
+        #
+        # No entry for this row's own engine means its version is unknown.
+        # Taking another engine's version (the first entry for the type) once
+        # checked a PostgreSQL row against a MySQL version.
         version = ""
-        version_entries = engine_version_map.get((svc, instance_type, region), [])
-        for entry in version_entries:
-            # Match by normalized engine name
+        own = []
+        for entry in engine_version_map.get((svc, instance_type, region), []):
             entry_engine = entry["engine"].lower().strip()
-            entry_normalized = _ENGINE_NORMALIZE.get(entry_engine, entry_engine)
-            if entry_normalized == normalized:
-                version = entry["version"]
-                break
-        # No entry for this row's own engine means its version is unknown. Taking
-        # another engine's version (the first entry for the type) once checked a
-        # PostgreSQL row against a MySQL version.
+            if _ENGINE_NORMALIZE.get(entry_engine, entry_engine) == normalized:
+                own.append(entry["version"])
+        if own:
+            version = min(own, key=_engine_version_sort_key)
 
         # The engine minimum depends on the target family, so check against the
         # target this row was actually given (which follows
@@ -1913,7 +1925,7 @@ def _enrich_classified_with_pricing(
 
         # This row's full pricing coordinates. For EC2 that is the OS; for the
         # managed services it is the engine and deployment option, which the
-        # price genuinely varies by and which used to be unpinned.
+        # price genuinely varies by.
         _svc, _eng, _depl = _pricing_coords(item)
         coord = ((os_val, "", "", "") if _svc == "ec2"
                  else (os_val, _eng, _depl, "") if _svc == "rds"
@@ -2114,7 +2126,7 @@ def _enrich_classified_with_pricing(
                 # savings scale actual cost by intel_rate/graviton_rate, so both
                 # sides must come from this one helper at the same purchase_type
                 # (OD/SP/RI/Spot) or the ratio stops being a pure architectural
-                # delta and reabsorbs the customer's discount (the GSA-2 bug).
+                # delta and reabsorbs the customer's discount (a ~10x overstatement).
                 graviton_rate_equiv = _lookup_rate_for_type(
                     raw, region, purchase_type, book,
                     ri_offering=item.get("ri_offering_type", ""),
@@ -2263,7 +2275,7 @@ def _compute_realized_savings(
         # their effective committed Savings Plan / Reserved Instance rates. The
         # Intel-equivalent "before" must be derived on that SAME basis, or the figure
         # silently absorbs the whole discount on top of the architectural Graviton delta
-        # (the GSA-2 ~10x overstatement). We hold both sides on one basis by
+        # (a ~10x overstatement). We hold both sides on one basis by
         # scaling actual cost by the ratio of catalog rates looked up at the SAME
         # purchase coordinates for the Intel equivalent and this Graviton type:
         #
@@ -2535,6 +2547,22 @@ _ADDITIVE_FIELDS = (
 def _canon_platform(platform: str) -> str:
     """Comparable form of a CE platform string ("Windows (Amazon VPC)" -> "windows")."""
     return re.sub(r"\s*\(amazon vpc\)$", "", (platform or "").strip().lower())
+
+
+def _deployment_units(svc: str, coords: tuple) -> float:
+    """Billing units of one coverage group's instance-hour.
+
+    RDS bills a Multi-AZ instance-hour as two (the reserved DB instance
+    normalized units: Single-AZ 1, Multi-AZ DB instance 2, Multi-AZ DB cluster
+    3), so a group's price per hour scales with its deployment. Everything
+    else is 1.
+    """
+    if svc != "rds" or len(coords) < 2:
+        return 1.0
+    d = (coords[1] or "").lower()
+    if "readable" in d or "cluster" in d:
+        return 3.0
+    return 2.0 if d.startswith("multi-az") else 1.0
 
 
 def _coverage_coords(svc: str, row: Dict) -> tuple:
@@ -2846,17 +2874,24 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
                     # hours, so they follow the on-demand hours.
                     rates = {k: c["od_cost"] / c["od_hours"]
                              for k, c in sub.items() if c and c["od_hours"] > 0 and c["od_cost"] > 0}
-                    mean_rate = sum(rates.values()) / len(rates) if rates else 1.0
+                    # A group with no on-demand hours has no measured rate. Its
+                    # rate is the other groups' mean rate PER BILLING UNIT times
+                    # its own units, so a Multi-AZ group priced from Single-AZ
+                    # neighbours is estimated at twice their rate, as RDS bills
+                    # it. With no measured rate at all, the units alone weight
+                    # the hours.
+                    units = {k: _deployment_units(svc, k) for k in sub}
+                    unit_rates = [rates[k] / units[k] for k in rates]
+                    mean_unit_rate = sum(unit_rates) / len(unit_rates) if unit_rates else 1.0
                     basis = "reserved_hours" if pt == "RI" else "od_hours"
                     hour_w = {k: (c[basis] if c else 1.0) for k, c in sub.items()}
                     if not any(hour_w.values()):
                         hour_w = {k: (c["hours"] if c else 1.0) for k, c in sub.items()}
-                    cost_w = {k: hour_w[k] * rates.get(k, mean_rate) for k in sub}
+                    cost_w = {k: hour_w[k] * rates.get(k, mean_unit_rate * units[k]) for k in sub}
                     h_total, c_total = sum(hour_w.values()), sum(cost_w.values())
                     n = len(sub)
-                    # A group with no on-demand hours has no measured rate, so
-                    # its share of the cost is weighted by hours at the mean
-                    # (or, with no rates at all, by hours alone): an estimate,
+                    # A group with no on-demand hours has an estimated rate
+                    # (above), so its share of the cost is an estimate,
                     # disclosed with the other estimated splits.
                     est = n > 1 and any(k not in rates for k in sub)
                     for coords in sub:
@@ -3035,7 +3070,7 @@ def _ce_client():
         boto3 CE client.
     """
     import boto3
-    return boto3.client("ce", region_name="us-east-1")
+    return boto3.client("ce", region_name="us-east-1", config=_ce_client_config())
 
 
 def _fetch_reservation_coverage(start_date: str, end_date: str,
@@ -3698,9 +3733,9 @@ def estimate_graviton_savings(
                 "yes" if realized_savings_result else "no")
 
     # --- Step 5: Score + migrate + engine readiness ---
-    # Engine readiness runs BEFORE scoring and the plan, which read it per row.
-    # It used to run after both, so it changed neither the waves nor anything
-    # the headline said about them.
+    # Engine readiness runs BEFORE scoring and the plan, which read it per row
+    # (engine_readiness): a row whose engine must be upgraded first is not a
+    # Week 1-2 move.
     engine_checks = _check_engines(classified, _resolve_engine_versions(classified))
 
     with _phase("score-fleet"):
