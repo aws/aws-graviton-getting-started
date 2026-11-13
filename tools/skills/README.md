@@ -1,6 +1,6 @@
 # Graviton Agent Skills
 
-Portable Agent Skills that help developers migrate codebases to AWS Graviton (ARM64) processors.
+Portable Agent Skills that help developers migrate codebases to AWS Graviton (ARM64) processors and estimate the savings of doing so.
 
 ## What are Agent Skills?
 
@@ -14,15 +14,23 @@ Each skill follows the [Agent Skills specification](https://agentskills.io/speci
 
 ## Available Skills
 
+### Languages
+
 | Skill | Language | Status | Description |
 |-------|----------|--------|-------------|
 | [java-x86-to-graviton](languages/java-x86-to-graviton/) | Java | Stable | Full x86-to-Graviton migration: dependency audit, native library validation, JVM optimization, ARM64 build validation |
 | [python-x86-to-graviton](languages/python-x86-to-graviton/) | Python | Beta | Full x86-to-Graviton migration: aarch64 wheel verification for every pinned dependency (including transitives), native extension and vendored binary validation, runtime recommendations, ARM64 install and test validation |
 | [dotnet-x86-to-graviton](languages/dotnet-x86-to-graviton/) | .NET | Beta | Full x86-to-Graviton migration: per-RID native file verification for every resolved NuGet package (including transitives), committed native file and Windows-only API validation, the move to Linux for Windows and .NET Framework starting points, runtime recommendations, ARM64 build, publish and test validation |
 
+### Cost
+
+| Skill | Status | Description |
+|-------|--------|-------------|
+| [graviton-savings-assessment](cost/graviton-savings-assessment/) | Beta | Fleet-wide Graviton savings estimate from Cost Explorer usage and real AWS pricing across EC2, RDS, ElastiCache, and OpenSearch: instance classification, Graviton target selection, engine readiness, phased migration waves, and Markdown/HTML/CSV/JSON reports. Read-only; needs Python 3.10+, boto3, and AWS credentials |
+
 ## How to Install
 
-Each skill installs on its own. The commands below install the Java skill; set `SKILL` to another folder name from [Available Skills](#available-skills) (for example `python-x86-to-graviton`) to install that skill instead. Run the project-level commands (GitHub Copilot, Windsurf, Roo Code, Any platform) from your project's root directory.
+Each skill installs on its own. The commands below install the Java skill; set `SKILL` to another folder name from [Available Skills](#available-skills) (for example `python-x86-to-graviton`) to install that skill instead, and set `CATEGORY` to the folder it sits in (`languages` or `cost`). Run the project-level commands (GitHub Copilot, Windsurf, Roo Code, Any platform) from your project's root directory.
 
 ### Kiro
 
@@ -32,6 +40,7 @@ Open the **Agent Steering & Skills** panel, click **+** > **Import a skill** > *
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/java-x86-to-graviton
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/python-x86-to-graviton
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/dotnet-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/cost/graviton-savings-assessment
 ```
 
 ### Cursor
@@ -42,97 +51,133 @@ Open **Settings** (`Cmd+Shift+J` / `Ctrl+Shift+J`) > **Rules** > **Add Rule** > 
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/java-x86-to-graviton
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/python-x86-to-graviton
 https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/languages/dotnet-x86-to-graviton
+https://github.com/aws/aws-graviton-getting-started/tree/main/tools/skills/cost/graviton-savings-assessment
 ```
 
 ### Claude Code
 
 ```bash
-SKILL=java-x86-to-graviton
-: "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
-  mkdir -p ~/.claude/skills && \
-  rm -rf ~/.claude/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.claude/skills/ && \
-  rm -rf /tmp/graviton-skill
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=~/.claude/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
+  mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
+)
 ```
 
 ### GitHub Copilot / VS Code
 
 ```bash
-SKILL=java-x86-to-graviton
-: "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
-  mkdir -p .github/skills && \
-  rm -rf .github/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .github/skills/ && \
-  rm -rf /tmp/graviton-skill
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=.github/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
+  mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
+)
 ```
 
 ### OpenAI Codex
 
 ```bash
-SKILL=java-x86-to-graviton
-: "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
-  mkdir -p ~/.codex/skills && \
-  rm -rf ~/.codex/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.codex/skills/ && \
-  rm -rf /tmp/graviton-skill
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=~/.codex/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
+  mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
+)
 ```
 
 ### Windsurf
 
 ```bash
-SKILL=java-x86-to-graviton
-: "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
-  mkdir -p .windsurf/skills && \
-  rm -rf .windsurf/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .windsurf/skills/ && \
-  rm -rf /tmp/graviton-skill
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=.windsurf/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
+  mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
+)
 ```
 
 ### Gemini CLI
 
 ```bash
-SKILL=java-x86-to-graviton
-: "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
-  mkdir -p ~/.gemini/skills && \
-  rm -rf ~/.gemini/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.gemini/skills/ && \
-  rm -rf /tmp/graviton-skill
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=~/.gemini/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
+  mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
+)
 ```
 
 ### Roo Code
 
 ```bash
-SKILL=java-x86-to-graviton
-: "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
-  mkdir -p .roo/skills && \
-  rm -rf .roo/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .roo/skills/ && \
-  rm -rf /tmp/graviton-skill
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=.roo/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
+  mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
+)
 ```
 
 ### Goose
 
 ```bash
-SKILL=java-x86-to-graviton
-: "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
-  mkdir -p ~/.config/goose/skills && \
-  rm -rf ~/.config/goose/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" ~/.config/goose/skills/ && \
-  rm -rf /tmp/graviton-skill
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=~/.config/goose/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
+  mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
+)
 ```
 
 ### Any platform (project-level)
@@ -140,17 +185,24 @@ SKILL=java-x86-to-graviton
 Copy the skill folder into the cross-platform standard path:
 
 ```bash
-SKILL=java-x86-to-graviton
-: "${SKILL:?set SKILL first}" && \
-  git clone --filter=blob:none --sparse https://github.com/aws/aws-graviton-getting-started.git /tmp/graviton-skill && \
-  git -C /tmp/graviton-skill sparse-checkout set "tools/skills/languages/$SKILL" && \
-  mkdir -p .agents/skills && \
-  rm -rf .agents/skills/"$SKILL" && \
-  cp -r "/tmp/graviton-skill/tools/skills/languages/$SKILL" .agents/skills/ && \
-  rm -rf /tmp/graviton-skill
+(
+  CATEGORY=languages
+  SKILL=java-x86-to-graviton
+  SRC="tools/skills/$CATEGORY/$SKILL"
+  DEST=.agents/skills
+  TMP="$(mktemp -d)" && trap 'rm -rf "$TMP"' EXIT || exit 1
+  git clone --quiet --depth 1 --filter=blob:none --sparse \
+      https://github.com/aws/aws-graviton-getting-started.git "$TMP" &&
+    git -C "$TMP" sparse-checkout set "$SRC" &&
+    [ -f "$TMP/$SRC/SKILL.md" ] ||
+    { echo "Could not fetch $SRC; nothing was installed or removed." >&2; exit 1; }
+  mkdir -p "$DEST" && rm -rf "$DEST/$SKILL" && cp -R "$TMP/$SRC" "$DEST/"
+)
 ```
 
 Not every platform reads `.agents/skills/`. For Kiro CLI copy the folder to `.kiro/skills/`, and for Claude Code to `.claude/skills/`.
+
+`graviton-savings-assessment` also runs a Python script: after copying it, install its one dependency with `python3 -m pip install -r <skills-dir>/graviton-savings-assessment/scripts/requirements.txt` (Windows: `py -3 -m pip ...`). See its [README](cost/graviton-savings-assessment/README.md) for the AWS permissions it needs.
 
 ## Skill Folder Structure
 
@@ -161,6 +213,7 @@ Each skill folder contains:
 ├── SKILL.md                    # Entry point (Agent Skills format)
 ├── summaries.md                # Canonical file index for agent discovery
 ├── references/                 # Phase instructions, scope guardrails, output standards
+├── scripts/                    # Optional executable helpers the skill runs
 └── README.md                   # Human-readable overview
 ```
 
@@ -168,7 +221,7 @@ Each skill folder contains:
 
 See the [skill template](_templates/SKILL.template.md) for the boilerplate structure. When creating a new skill:
 
-1. Create a folder under `languages/` named to match the skill's `name` field
+1. Create a folder under the matching category (`languages/` for a language migration, `cost/` for savings and cost analysis) named to match the skill's `name` field
 2. Create `SKILL.md` with Agent Skills frontmatter (`name`, `description`, optional `metadata`)
 3. Add a `summaries.md` listing every file in the skill, each with its purpose and when it is read. This is the **canonical** inventory — link it from `SKILL.md`, and do not duplicate the file list elsewhere in the skill
 4. Add a `README.md` with a human-readable overview that points at `summaries.md` for the file map

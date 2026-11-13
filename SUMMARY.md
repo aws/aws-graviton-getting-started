@@ -67,6 +67,7 @@
     * [Java x86-to-Graviton Migration](tools/skills/languages/java-x86-to-graviton/README.md)
     * [Python x86-to-Graviton Migration](tools/skills/languages/python-x86-to-graviton/README.md)
     * [.NET x86-to-Graviton Migration](tools/skills/languages/dotnet-x86-to-graviton/README.md)
+    * [Graviton Savings Assessment](tools/skills/cost/graviton-savings-assessment/README.md)
 
 -----------
 
