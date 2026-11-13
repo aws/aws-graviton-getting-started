@@ -691,6 +691,9 @@ def cmd_assess(args: argparse.Namespace) -> None:
             "split_estimated_cost", 0),
         "isp_check": (summary.get("data_quality") or {}).get("isp_check", ""),
         "isp_locked_cost": (summary.get("data_quality") or {}).get("isp_locked_cost", 0),
+        "ri_locked_cost": (summary.get("data_quality") or {}).get("ri_locked_cost", 0),
+        "ri_class_unknown_cost": (summary.get("data_quality") or {}).get(
+            "ri_class_unknown_cost", 0),
         "output_dir": str(output_dir),
         "result_json": assessment_path.name,
         "log_file": os.path.basename(log_file),

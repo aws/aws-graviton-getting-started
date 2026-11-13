@@ -190,7 +190,8 @@ the stdout summary; drop a bullet only when its condition does not apply.
 >   charges only (credits, refunds, other billing adjustments and Marketplace
 >   are excluded); Graviton prices are public rates at the same purchase terms
 >   (Spot rows use the on-demand price ratio). Compute Savings Plans follow the
->   usage to Graviton, so their spend keeps its saving.
+>   usage to Graviton, so their spend keeps its saving, as does EC2 Convertible
+>   Reserved Instance spend, which can be exchanged for Graviton.
 > - **Performance:** stdout and the Markdown report assume a same-size Graviton
 >   instance does the same work (1:1), with no performance uplift. [If
 >   `nih_reduction` is above 0 — it is 10 by default — add that the HTML
@@ -208,6 +209,12 @@ the stdout summary; drop a bullet only when its condition does not apply.
 >   family until they expire, so it books no saving. If `isp_check` starts with
 >   `not_checked`: say EC2 Instance Savings Plans could not be checked, so
 >   savings on Savings Plan spend may be overstated.]
+> - [If `ri_locked_cost` is above 0: [ri_locked_cost]/mo of Reserved Instance
+>   spend is held by reservations that cannot change instance family (EC2
+>   Standard RIs, and RDS, ElastiCache and OpenSearch reservations), so it books
+>   no saving until they end. If `ri_class_unknown_cost` is above 0: that much
+>   EC2 RI spend had no standard/convertible class and was treated as able to
+>   move.]
 > - [If `split_estimated_cost` is above 0: [split_estimated_cost]/mo of spend
 >   was split across regions, platforms or engine groups by estimate rather
 >   than measured; per-type totals are exact.]

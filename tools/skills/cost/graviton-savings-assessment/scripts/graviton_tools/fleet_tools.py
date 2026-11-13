@@ -914,28 +914,36 @@ def _is_sql_server_platform(r: Dict) -> bool:
     return "sql server" in (r.get("platform") or "").lower()
 
 
-def is_isp_locked(r: Dict) -> bool:
-    """True when an EC2 Instance Savings Plan holds all of the row's spend.
+def _locked_cost(r: Dict) -> float:
+    """Spend a family-locked commitment holds: an EC2 Instance Savings Plan
+    (cost_sp_isp) or a reservation that cannot change family (cost_ri_locked)."""
+    return (r.get("cost_sp_isp") or 0) + (r.get("cost_ri_locked") or 0)
 
-    That plan applies only to its instance family until it expires, so the row
-    cannot move to Graviton without paying for both. Partly covered rows stay
-    eligible; only their uncovered spend earns a saving (cost_sp_isp).
+
+def is_commitment_locked(r: Dict) -> bool:
+    """True when family-locked commitments hold all of the row's spend.
+
+    Such a row cannot move to Graviton without paying for both until the
+    commitment ends. Partly held rows stay eligible; only the rest of their
+    spend earns a saving.
     """
     cost = r.get("cost") or 0
-    return cost > 0 and (r.get("cost_sp_isp") or 0) >= cost * 0.995
+    return cost > 0 and _locked_cost(r) >= cost * 0.995
+
+
+is_isp_locked = is_commitment_locked  # former name
 
 
 def _movable_share(r: Dict) -> float:
-    """Fraction of the row's spend not held in place by an EC2 Instance SP."""
+    """Fraction of the row's spend no family-locked commitment holds."""
     cost = r.get("cost") or 0
-    isp = r.get("cost_sp_isp") or 0
-    return max(cost - isp, 0.0) / cost if cost > 0 else 1.0
+    return max(cost - _locked_cost(r), 0.0) / cost if cost > 0 else 1.0
 
 
 def is_ineligible(r: Dict) -> bool:
-    """Rows with no Graviton path: Windows, SQL Server, commercial engines, ISP-held spend."""
+    """Rows with no Graviton path: Windows, SQL Server, commercial engines, locked spend."""
     return (_is_windows(r) or _is_sql_server_platform(r) or is_commercial_engine(r)
-            or is_isp_locked(r))
+            or is_commitment_locked(r))
 
 
 # EC2 platforms whose Graviton price the pipeline can look up, as Cost

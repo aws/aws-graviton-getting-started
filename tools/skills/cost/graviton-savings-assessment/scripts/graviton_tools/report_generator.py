@@ -288,7 +288,7 @@ def _not_eligible_reason(c: dict):
     The same rule score_graviton_fleet uses (fleet_tools.is_ineligible), so a
     row the headline excludes can never add savings to any report total.
     """
-    from .fleet_tools import is_commercial_engine, is_ineligible, is_isp_locked, _is_windows
+    from .fleet_tools import is_commercial_engine, is_ineligible, is_commitment_locked, _is_windows
     if c.get("is_graviton"):
         return None
     if c.get("unclassified"):
@@ -297,10 +297,21 @@ def _not_eligible_reason(c: dict):
         return "Windows (no Graviton path)"
     if is_commercial_engine(c):
         return f"{c.get('database_engine') or 'Commercial engine'} (no Graviton instance classes)"
-    if is_isp_locked(c):
-        fam = (c.get("raw") or "").split(".")[0]
-        until = f" until {c['isp_end']}" if c.get("isp_end") else " until it expires"
-        return f"EC2 Instance Savings Plan holds the {fam} family{until}"
+    if is_commitment_locked(c):
+        fam = (c.get("raw") or "").rsplit(".", 1)[0]
+        isp, ri = c.get("cost_sp_isp") or 0, c.get("cost_ri_locked") or 0
+        if isp and ri:
+            what, end = "EC2 Instance Savings Plan and Reserved Instances hold", ""
+        elif isp:
+            what, end = "EC2 Instance Savings Plan holds", c.get("isp_end", "")
+        else:
+            svc = c.get("service") or "ec2"
+            what = {"rds": "Reserved DB instances hold", "elasticache": "Reserved nodes hold",
+                    "opensearch": "Reserved Instances hold"}.get(
+                        svc, "Standard Reserved Instances hold")
+            end = c.get("ri_end", "")
+        until = f" until {end}" if end else " until they expire"
+        return f"{what} the {fam} family{until}"
     if is_ineligible(c):
         # Any other platform fleet_tools rules out (e.g. "Linux with SQL Server
         # Standard": SQL Server has no arm64 build).
@@ -1072,6 +1083,23 @@ def _build_data_quality_html(assessment: dict) -> str:
             f"as Compute Savings Plan spend, which moves to Graviton. Spend held by an EC2 "
             f"Instance Savings Plan would save nothing until the plan expires, so the "
             f"savings may be overstated.</td></tr>")
+
+    ri_locked = data_quality.get("ri_locked_cost") or 0
+    if ri_locked > 0:
+        rows.append(
+            f"<tr><td>Family-locked reservations</td><td>{_fmt_cost(ri_locked)}/mo of "
+            f"Reserved Instance spend is held by reservations that cannot change instance "
+            f"family: EC2 Standard Reserved Instances, and RDS, ElastiCache and OpenSearch "
+            f"reservations. It books no saving until they end; rows they fully cover are "
+            f"listed under Not Eligible. EC2 Convertible Reserved Instances can be "
+            f"exchanged for Graviton, so their spend keeps its saving.</td></tr>")
+    ri_unknown = data_quality.get("ri_class_unknown_cost") or 0
+    if ri_unknown > 0:
+        rows.append(
+            f"<tr><td>Reservation class unknown</td><td>{_fmt_cost(ri_unknown)}/mo of EC2 "
+            f"Reserved Instance spend has no offering class (standard or convertible) in "
+            f"Cost Explorer. It is treated as able to move; if it is Standard, it would "
+            f"save nothing until the reservation ends.</td></tr>")
 
     split_est = data_quality.get("split_estimated_cost") or 0
     if split_est > 0:
@@ -2645,7 +2673,7 @@ def _write_validation_csv(assessment: dict, output_dir: str, timestamp: str) -> 
         writer.writerow([
             "instance_type", "service", "region", "platform", "purchase_type",
             "processor", "gen_bucket", "monthly_cost", "hours",
-            "cost_od", "cost_ri", "cost_sp", "cost_spot", "cost_sp_isp",
+            "cost_od", "cost_ri", "cost_sp", "cost_spot", "cost_sp_isp", "cost_ri_locked",
             "graviton_target", "od_rate_current", "od_rate_graviton",
             # Generation columns from GENERATIONS, matching the row below. Width
             # parity alone could not catch a generation missing from both.
@@ -2728,6 +2756,7 @@ def _write_validation_csv(assessment: dict, output_dir: str, timestamp: str) -> 
             cost_sp = item.get("cost_sp", "")
             cost_spot = item.get("cost_spot", "")
             cost_sp_isp = item.get("cost_sp_isp", "")
+            cost_ri_locked = item.get("cost_ri_locked", "")
 
             # Pricing source. "capacity_adjusted" must surface here: those rows
             # carry a different-size target, so a bare "actual" would present
@@ -2745,7 +2774,7 @@ def _write_validation_csv(assessment: dict, output_dir: str, timestamp: str) -> 
             writer.writerow([_csv_safe(v) for v in (
                 raw, service, region, platform, purchase_type,
                 processor, gen_bucket, round(cost, 2), round(hours, 2),
-                cost_od, cost_ri, cost_sp, cost_spot, cost_sp_isp,
+                cost_od, cost_ri, cost_sp, cost_spot, cost_sp_isp, cost_ri_locked,
                 graviton_target, od_rate, od_grav,
                 est_savings, *gen_savings,
                 realized_savings, intel_equivalent, intel_rate,

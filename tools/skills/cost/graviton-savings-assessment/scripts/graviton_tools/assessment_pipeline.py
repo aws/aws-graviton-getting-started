@@ -1567,6 +1567,49 @@ def _apply_instance_savings_plans(classified: List[Dict], plans: List[Dict]) -> 
     return round(locked_total, 2)
 
 
+def _apply_reservation_locks(classified: List[Dict]) -> Tuple[float, float]:
+    """Mark the RI spend a family-locked reservation holds in place.
+
+    From the AWS docs: an EC2 Standard Reserved Instance cannot be exchanged
+    (only modified within its family), while a Convertible one can be
+    exchanged for another family, including Graviton. RDS reserved DB
+    instances apply only within their instance class type (db.r6i, not
+    db.r7g), ElastiCache reserved nodes within their node family, and
+    OpenSearch reservations only to the exact instance type. Locked spend
+    saves nothing until the reservation ends, so it is recorded as
+    cost_ri_locked and books no saving.
+
+    An EC2 row whose offering class is unknown cannot be shown to be locked;
+    it keeps its saving and its spend is returned as the second total, so the
+    report can say so. Returns (locked, class_unknown) per month.
+    """
+    locked_total = unknown_total = 0.0
+    for r in classified:
+        ri_cost = r.get("cost_ri") or 0
+        if ri_cost <= 0 or r.get("is_graviton"):
+            continue
+        if (r.get("service") or "ec2") != "ec2":
+            share = 1.0
+        else:
+            mix = r.get("ri_terms_mix") or []
+            total_h = sum(m[3] for m in mix)
+            if total_h > 0:
+                std = sum(m[3] for m in mix if (m[2] or "").lower() == "standard")
+                unknown = sum(m[3] for m in mix if (m[2] or "").lower()
+                              not in ("standard", "convertible"))
+                share = std / total_h
+                unknown_total += ri_cost * unknown / total_h
+            else:
+                cls = (r.get("ri_offering_class") or "").lower()
+                share = 1.0 if cls == "standard" else 0.0
+                if cls not in ("standard", "convertible"):
+                    unknown_total += ri_cost
+        if share > 0:
+            r["cost_ri_locked"] = round(ri_cost * share, 2)
+            locked_total += r["cost_ri_locked"]
+    return round(locked_total, 2), round(unknown_total, 2)
+
+
 def _savings_by_purchase_type(item: Dict, target_type: str, target_od: float,
                               current_od: float, ri_rate: Optional[float],
                               sp_rate: Optional[float], region: str,
@@ -1586,6 +1629,10 @@ def _savings_by_purchase_type(item: Dict, target_type: str, target_od: float,
     isp = item.get("cost_sp_isp") or 0
     if isp and "SP" in slices:
         slices["SP"] = max(slices["SP"] - isp, 0.0)
+    # Likewise RI spend a family-locked reservation holds (_apply_reservation_locks).
+    ri_locked = item.get("cost_ri_locked") or 0
+    if ri_locked and "RI" in slices:
+        slices["RI"] = max(slices["RI"] - ri_locked, 0.0)
     total = 0.0
     for pt, slice_cost in slices.items():
         if slice_cost:
@@ -2409,6 +2456,7 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
                     ri.get("offering_class", ""))
             mix = e.setdefault("mix", {})
             mix[tkey] = mix.get(tkey, 0.0) + (ri.get("purchased_hours", 0) or 0)
+            e["end"] = max(e.get("end", ""), ri.get("end", "") or "")
             # Term metadata from the largest subscription, as the most representative.
             if (ri.get("total_amortized", 0) or 0) > e["_max"]:
                 e["_max"] = ri.get("total_amortized", 0) or 0
@@ -2629,6 +2677,7 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
                     d["ri_offering_class"] = ri.get("offering_class", "")
                     d["ri_terms_mix"] = [[*k, h] for k, h in (ri.get("mix") or {}).items()
                                          if h > 0]
+                    d["ri_end"] = ri.get("end", "")
             rows.append(d)
     return rows
 
@@ -2930,6 +2979,7 @@ def _fetch_reservation_utilization(start_date: str, end_date: str,
                             "lease": lease,
                             "payment_option": payment_option,
                             "offering_class": offering_class,
+                            "end": (a.get("endDateTime") or "")[:10],
                             "platform": a.get("platform", ""),
                             "utilization_pct": _safe_float(u.get("UtilizationPercentage")),
                             "purchased_hours": _safe_float(u.get("PurchasedHours")),
@@ -3327,7 +3377,10 @@ def estimate_graviton_savings(
             logger.debug("Savings Plan offering rates unavailable: %s: %s",
                          type(e).__name__, e)
 
-    # --- Step 4b2: EC2 Instance Savings Plans hold their family in place ---
+    # --- Step 4b2: family-locked commitments hold their spend in place ---
+    # Reservations need no extra call: the class and service say whether they
+    # can move. EC2 Instance Savings Plans need the Savings Plans inventory.
+    ri_locked_cost, ri_class_unknown_cost = _apply_reservation_locks(classified)
     isp_check, isp_locked_cost = "not_needed", 0.0
     if any((r.get("cost_sp") or 0) > 0 and (r.get("service") or "ec2") == "ec2"
            for r in classified):
@@ -3472,6 +3525,10 @@ def estimate_graviton_savings(
                 # whether the inventory could be read at all.
                 "isp_check": isp_check,
                 "isp_locked_cost": isp_locked_cost,
+                # RI spend held by reservations that cannot change family, and
+                # EC2 RI spend whose class (standard/convertible) was not known.
+                "ri_locked_cost": ri_locked_cost,
+                "ri_class_unknown_cost": ri_class_unknown_cost,
                 "split_estimated_cost": round(sum(
                     c.get("split_estimated_cost", 0) or 0 for c in classified), 2),
                 "classified_totals": {
