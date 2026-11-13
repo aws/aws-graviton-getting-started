@@ -75,6 +75,11 @@ _sp_pricing_cache: Dict[tuple, float] = {}
 # customer's. Rows are labelled by pricing_source so the basis stays visible.
 _SP_DURATION_SECONDS = 31536000
 
+# Instance types per batched DescribeSavingsPlansOfferingRates call, and the
+# pages read per batch.
+_SP_BATCH_SIZE = 20
+_SP_BATCH_PAGE_CAP = 20
+
 # Pricing API operatingSystem -> SP offering-rate productDescription. The two
 # APIs name the same products differently, and the SP filter only matches its
 # own spelling.
@@ -462,6 +467,18 @@ _COMMERCIAL_ENGINE_TOKENS = ("oracle", "sql server", "db2")
 _PRICE_LIST_PAGE_CAP = 10
 _PRICE_LIST_PAGE_SIZE = 100
 
+# From this many types in one (service, region, coordinates) group, the region's
+# whole price list is paged instead of querying each type. The Pricing API's own
+# rate limit is what bounds a run (more client threads only throttle it), so the
+# saving comes from making fewer calls: a region's EC2 Linux list is ~10 pages of
+# 100 against several hundred one-type lookups. Any type the listing does not
+# yield is looked up on its own only when the listing was cut short; a complete
+# listing that lacks a type means the type is not sold at those coordinates.
+_BULK_PRICE_MIN_TYPES = 8
+# Pages read from one listing before falling back to per-type lookups for the
+# rest. An unpinned RDS listing (every engine) is the largest, at ~30 pages.
+_BULK_PRICE_PAGE_CAP = 80
+
 
 def _usd(dim: Dict) -> float:
     """A price dimension's USD amount, 0.0 if absent or malformed."""
@@ -469,6 +486,37 @@ def _usd(dim: Dict) -> float:
         return float((dim.get("pricePerUnit") or {}).get("USD", "0") or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+# Price List "location" display name -> region code, recorded as prices are
+# parsed. Cost Explorer reports a Savings Plan's region by display name ("US
+# West (Oregon)") but usage by code, and every region the fleet runs in is
+# priced before the Savings Plan step, so this covers the regions that matter
+# without a hand-maintained table (one of those once priced 20 regions as
+# N. Virginia).
+_REGION_BY_NAME: Dict[str, str] = {}
+
+
+def _region_code(name: str) -> str:
+    """Region code for a display name (or a code); "" when it cannot be matched."""
+    if not name:
+        return ""
+    if re.fullmatch(r"[a-z]{2}(-[a-z]+)+-\d", name):
+        return name
+    for n in (name, name.replace("EU (", "Europe ("), name.replace("Europe (", "EU (")):
+        if n in _REGION_BY_NAME:
+            return _REGION_BY_NAME[n]
+    try:  # older regions, when this run read no price list for that one
+        import boto3
+        data = boto3.session.Session()._loader.load_data("endpoints")
+        for part in data.get("partitions", []):
+            for code, info in (part.get("regions") or {}).items():
+                desc = info.get("description", "")
+                if desc in (name, name.replace("EU (", "Europe (")):
+                    return code
+    except Exception:  # nosec B110 - an unmatched name is reported by the caller
+        pass
+    return ""
 
 
 def _parse_price_list_item(pl, service: str) -> Optional[Dict]:
@@ -495,6 +543,8 @@ def _parse_price_list_item(pl, service: str) -> Optional[Dict]:
     if isinstance(pl, str):
         pl = json.loads(pl)
     attrs = (pl.get("product") or {}).get("attributes") or {}
+    if attrs.get("location") and attrs.get("regionCode"):
+        _REGION_BY_NAME.setdefault(attrs["location"], attrs["regionCode"])
     # vCPU count, for capacity comparisons the size table cannot make (metal).
     _vcpu, _itype = str(attrs.get("vcpu") or ""), (attrs.get("instanceType") or "").lower()
     if _itype and _vcpu.isdigit():
@@ -749,6 +799,57 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
         _store_price_item(item, instance_type, api_type, region, _coord, prices)
         return True
 
+    def _price_bulk(svc: str, types: List[str]) -> set:
+        """Price `types` from one paged listing of the region's price list.
+
+        The same filters as a per-type lookup, minus instanceType, and the same
+        parser and chooser per type, so each type gets the SKU it would have
+        got on its own. Returns (types priced, whether the listing was read to
+        the end); raises on API errors. A type missing from a complete listing
+        does not exist at these coordinates, so it is not looked up again — the
+        collector asks for every smaller size of each target family, and most
+        of those sizes do not exist.
+        """
+        svc_code, extra_filters = service_configs[svc]
+        filters = [
+            {"Type": "TERM_MATCH", "Field": "regionCode", "Value": region},
+            {"Type": "TERM_MATCH", "Field": "locationType", "Value": "AWS Region"},
+        ] + extra_filters
+        wanted = {_expand_size(t).lower(): t for t in types}
+        candidates: Dict[str, List[Dict]] = {}
+        token, complete = None, False
+        for _ in range(_BULK_PRICE_PAGE_CAP):
+            kwargs = {"ServiceCode": svc_code, "Filters": filters,
+                      "MaxResults": _PRICE_LIST_PAGE_SIZE}
+            if token:
+                kwargs["NextToken"] = token
+            resp = client.get_products(**kwargs)
+            for pl in resp.get("PriceList", []):
+                pl = json.loads(pl) if isinstance(pl, str) else pl
+                itype = ((pl.get("product") or {}).get("attributes") or {}).get(
+                    "instanceType", "").lower()
+                if itype not in wanted:
+                    continue
+                parsed = _parse_price_list_item(pl, svc)
+                if parsed and parsed["od"]:
+                    candidates.setdefault(itype, []).append(parsed)
+            token = resp.get("NextToken")
+            if not token:
+                complete = True
+                break
+        if not complete:
+            logger.info("Price list for %s@%s longer than %d pages; the rest is looked up per type.",
+                        svc, region, _BULK_PRICE_PAGE_CAP)
+        done = set()
+        for api_lower, instance_type in wanted.items():
+            item = _choose_price_item(candidates.get(api_lower, []), svc,
+                                      engine_pinned=(svc != "rds" or bool(db_engine)))
+            if item:
+                _store_price_item(item, instance_type, _expand_size(instance_type),
+                                  region, _coord, prices)
+                done.add(instance_type)
+        return done, complete
+
     def _record_fatal(e: BaseException) -> None:
         nonlocal _fatal_error
         _fatal_error = f"{type(e).__name__}: {e}"
@@ -778,6 +879,19 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
     for svc, types in by_service.items():
         if not types or _fatal_error:
             continue
+        if len(types) >= _BULK_PRICE_MIN_TYPES:
+            try:
+                priced, complete = _price_bulk(svc, types)
+                types = [] if complete else [t for t in types if t not in priced]
+            except Exception as e:
+                # Not fatal: every type is then looked up on its own below,
+                # where throttling is retried and errors are recorded per type.
+                if _is_auth_error(e):
+                    _pricing_errors.append(f"{svc}@{region}: {type(e).__name__}: {e}")
+                    _record_fatal(e)
+                    continue
+                logger.info("Bulk price listing for %s@%s failed (%s); looking types up one by one.",
+                            svc, region, type(e).__name__)
         for instance_type in types:
             if _fatal_error or _endpoint_down("pricing"):
                 break
@@ -911,6 +1025,12 @@ def _fetch_sp_offering_rates(instance_types: set, region: str = "us-east-1",
     if not types_to_fetch:
         return sp_prices
 
+    def _store_sp(instance_type: str, rate: float) -> None:
+        sp_prices[instance_type] = rate
+        for k in {instance_type.lower(), _expand_size(instance_type).lower()}:
+            _sp_pricing_cache[(k, region, product_description, tenancy,
+                               _SP_DURATION_SECONDS)] = rate
+
     try:
         import boto3
         from .instance_classifier import service_for_type
@@ -918,6 +1038,60 @@ def _fetch_sp_offering_rates(instance_types: set, region: str = "us-east-1",
             return sp_prices
         sp_client = boto3.client("savingsplans", region_name="us-east-1",
                                  config=_client_config())
+
+        # EC2 types are asked for in batches: the API filters on a list of
+        # instance types and names each result's type in its properties, so one
+        # call (and its pages) covers many types instead of one call each. The
+        # per-type selection is unchanged: the first running-instance rate at the
+        # requested term. A batch that cannot be read that way falls back to the
+        # per-type lookups below.
+        ec2_types = sorted(t for t in types_to_fetch if service_for_type(t) == "ec2")
+        for i in range(0, len(ec2_types), _SP_BATCH_SIZE):
+            batch = ec2_types[i:i + _SP_BATCH_SIZE]
+            if len(batch) < 2:
+                continue
+            by_api = {_expand_size(t).lower(): t for t in batch}
+            try:
+                found: Dict[str, float] = {}
+                token = None
+                for _ in range(_SP_BATCH_PAGE_CAP):
+                    kwargs = dict(
+                        savingsPlanPaymentOptions=[sp_payment],
+                        savingsPlanTypes=[sp_type], products=["EC2"],
+                        filters=[{"name": "instanceType", "values": sorted(by_api)},
+                                 {"name": "region", "values": [region]},
+                                 {"name": "productDescription", "values": [product_description]},
+                                 {"name": "tenancy", "values": [tenancy]}],
+                        maxResults=1000)
+                    if token:
+                        kwargs["nextToken"] = token
+                    resp = sp_client.describe_savings_plans_offering_rates(**kwargs)
+                    for rate_entry in resp.get("searchResults", []):
+                        props = {pr.get("name"): pr.get("value")
+                                 for pr in rate_entry.get("properties", [])}
+                        itype = (props.get("instanceType") or "").lower()
+                        if itype not in by_api or itype in found:
+                            continue
+                        if rate_entry.get("savingsPlanOffering", {}).get(
+                                "durationSeconds") != _SP_DURATION_SECONDS:
+                            continue
+                        if not _sp_usage_type_matches(rate_entry.get("usageType", ""), tenancy):
+                            continue
+                        rate = float(rate_entry.get("rate", "0") or 0)
+                        if rate > 0:
+                            found[itype] = rate
+                    token = resp.get("nextToken")
+                    if not token:
+                        break
+                for itype, rate in found.items():
+                    _store_sp(by_api[itype], rate)
+                    types_to_fetch.discard(by_api[itype])
+            except Exception as e:
+                if _is_auth_error(e):
+                    _pricing_errors.append(f"SP_RATES: Auth error, skipping: {type(e).__name__}")
+                    return sp_prices
+                logger.info("Batched SP rate lookup failed (%s); looking types up one by one.",
+                            type(e).__name__)
 
         for instance_type in sorted(types_to_fetch):
             api_type = _expand_size(instance_type)
@@ -1503,6 +1677,41 @@ def _check_engines(classified: List[Dict], engine_version_map: Dict) -> List[Dic
     return engine_checks
 
 
+def _fetch_isp_utilization(start_date: str, end_date: str) -> List[Dict]:
+    """Active EC2 Instance Savings Plans for the period, from Cost Explorer.
+
+    GetSavingsPlansUtilizationDetails lists every plan that applied in the
+    period, including those bought in other accounts of an organization when
+    run from the management account, which DescribeSavingsPlans (the caller's
+    own plans only) misses. Each plan's UsedCommitment is the spend it covered
+    in the period. Plans whose region cannot be matched keep region "".
+    """
+    client = _ce_client()
+    plans: List[Dict] = []
+    token = None
+    while True:
+        kw = {"TimePeriod": {"Start": start_date, "End": end_date},
+              "DataType": ["ATTRIBUTES", "UTILIZATION"], "MaxResults": 100}
+        if token:
+            kw["NextToken"] = token
+        resp = client.get_savings_plans_utilization_details(**kw)
+        for d in resp.get("SavingsPlansUtilizationDetails", []):
+            a = d.get("Attributes") or {}
+            if a.get("SavingsPlansType") != "EC2InstanceSavingsPlans":
+                continue
+            plans.append({
+                "savingsPlanType": "EC2Instance",
+                "ec2InstanceFamily": a.get("InstanceFamily", ""),
+                "region": _region_code(a.get("Region", "")),
+                "region_name": a.get("Region", ""),
+                "used_commitment": _safe_float((d.get("Utilization") or {}).get("UsedCommitment")),
+                "end": (a.get("EndDateTime") or "")[:10],
+            })
+        token = resp.get("NextToken")
+        if not token:
+            return plans
+
+
 def _fetch_instance_savings_plans() -> List[Dict]:
     """Active EC2 Instance Savings Plans owned by the calling account.
 
@@ -1526,7 +1735,8 @@ def _fetch_instance_savings_plans() -> List[Dict]:
             return plans
 
 
-def _apply_instance_savings_plans(classified: List[Dict], plans: List[Dict]) -> float:
+def _apply_instance_savings_plans(classified: List[Dict], plans: List[Dict],
+                                  months: float = 1.0) -> float:
     """Mark the Savings Plan spend an EC2 Instance Savings Plan locks in place.
 
     An EC2 Instance Savings Plan applies only to its instance family in its
@@ -1542,12 +1752,17 @@ def _apply_instance_savings_plans(classified: List[Dict], plans: List[Dict]) -> 
     for p in plans:
         key = ((p.get("ec2InstanceFamily") or "").lower(), p.get("region") or "")
         try:
-            hourly = float(p.get("commitment") or 0)
+            if p.get("used_commitment") is not None:
+                # Cost Explorer: spend the plan covered in the period.
+                monthly = float(p["used_commitment"]) / (months or 1.0)
+            else:
+                # DescribeSavingsPlans: the hourly commitment.
+                monthly = float(p.get("commitment") or 0) * _HOURS_PER_MONTH
         except (TypeError, ValueError):
             continue
-        if not key[0] or hourly <= 0:
+        if not key[0] or not key[1] or monthly <= 0:
             continue
-        caps[key] = caps.get(key, 0.0) + hourly * _HOURS_PER_MONTH
+        caps[key] = caps.get(key, 0.0) + monthly
         ends[key] = max(ends.get(key, ""), (p.get("end") or "")[:10])
     groups: Dict[Tuple[str, str], List[Dict]] = {}
     for r in classified:
@@ -1909,6 +2124,61 @@ def _enrich_classified_with_pricing(
                 )
                 if graviton_rate_equiv:
                     item["rate_graviton_equiv"] = round(graviton_rate_equiv, 6)
+
+
+def _start_offerings_prefetch(classified: List[Dict]):
+    """Warm the offerings caches for every region and engine, in the background.
+
+    _build_graviton_options asks the offerings catalogs once per region (EC2,
+    ElastiCache) and once per region and engine (RDS), serially, during
+    enrichment, and those calls were the slowest phase of a run. They go to each
+    region's own endpoints, so they can run in parallel with each other and with
+    the Pricing API calls, which have a separate rate limit. Started before
+    pricing and joined before enrichment; the catalogs cache their answers, so
+    enrichment then reads them for free. Failures are left to enrichment, which
+    already treats an unavailable catalog as unknown.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from .instance_offerings import get_offered_types
+    from .managed_offerings import get_elasticache_offered_classes, get_rds_offered_classes
+    jobs = set()
+    for r in classified:
+        region = r.get("region")
+        if not region or r.get("is_graviton") or is_ineligible(r):
+            continue
+        jobs.add(("ec2", region, ""))
+        svc = r.get("service")
+        if svc == "rds":
+            jobs.add(("rds", region, r.get("database_engine") or ""))
+        elif svc == "elasticache":
+            jobs.add(("elasticache", region, ""))
+
+    def run(job):
+        kind, region, engine = job
+        try:
+            if kind == "ec2":
+                get_offered_types(region)
+            elif kind == "rds":
+                get_rds_offered_classes(region, engine)
+            else:
+                get_elasticache_offered_classes(region)
+        except Exception as e:  # enrichment handles an unavailable catalog
+            logger.debug("Offerings prefetch %s failed: %s: %s", job, type(e).__name__, e)
+
+    if not jobs:
+        return None
+    pool = ThreadPoolExecutor(max_workers=min(8, len(jobs)))
+    futures = [pool.submit(run, j) for j in sorted(jobs)]
+    return pool, futures
+
+
+def _finish_offerings_prefetch(handle) -> None:
+    if not handle:
+        return
+    pool, futures = handle
+    for f in futures:
+        f.result()
+    pool.shutdown()
 
 
 def _resolve_engine_versions(classified: List[Dict]) -> Dict[tuple, list]:
@@ -3240,6 +3510,9 @@ def estimate_graviton_savings(
                 len(classified), len({r.get("region", "") for r in classified}),
                 sum(r.get("cost", 0) for r in classified), len(unclassified_types))
 
+    # Offerings lookups run alongside pricing; joined before enrichment.
+    offerings_prefetch = _start_offerings_prefetch(classified)
+
     # --- Step 4: Fetch OD prices for full fleet ---
     types_by_region = _collect_all_fleet_types(classified)
     od_prices = RegionalPrices()
@@ -3381,24 +3654,38 @@ def estimate_graviton_savings(
     # Reservations need no extra call: the class and service say whether they
     # can move. EC2 Instance Savings Plans need the Savings Plans inventory.
     ri_locked_cost, ri_class_unknown_cost = _apply_reservation_locks(classified)
-    isp_check, isp_locked_cost = "not_needed", 0.0
+    isp_check, isp_locked_cost, isp_unmatched_regions = "not_needed", 0.0, []
     if any((r.get("cost_sp") or 0) > 0 and (r.get("service") or "ec2") == "ec2"
            for r in classified):
-        if False:
-            isp_check = "not_checked: Savings Plans inventory is not available through FROC"
-        else:
+        isp_plans, isp_errors = None, []
+        with _phase("instance-savings-plans"):
             try:
-                with _phase("instance-savings-plans"):
-                    isp_locked_cost = _apply_instance_savings_plans(
-                        classified, _fetch_instance_savings_plans())
-                isp_check = "checked"
+                isp_plans = _fetch_isp_utilization(start_date, end_date)
             except Exception as e:
-                isp_check = f"not_checked: {type(e).__name__}"
-                _pricing_errors.append(f"savings-plans inventory: {type(e).__name__}: {e}")
+                isp_errors.append(f"cost explorer: {type(e).__name__}")
+                _pricing_errors.append(
+                    f"savings-plans utilization: {type(e).__name__}: {e}")
+            if isp_plans is None:
+                try:
+                    isp_plans = _fetch_instance_savings_plans()
+                except Exception as e:
+                    isp_errors.append(f"savingsplans: {type(e).__name__}")
+                    _pricing_errors.append(
+                        f"savings-plans inventory: {type(e).__name__}: {e}")
+        if isp_plans is None:
+            isp_check = "not_checked: " + "; ".join(isp_errors)
+        else:
+            isp_locked_cost = _apply_instance_savings_plans(
+                classified, isp_plans, months=period_months)
+            isp_unmatched_regions = sorted({p.get("region_name") or "?"
+                                            for p in isp_plans if not p.get("region")})
+            isp_check = "checked"
 
     # --- Step 4c: Enrich classified items with per-item pricing ---
     # Also where instance_offerings and managed_offerings availability lookups
     # happen, via _build_graviton_options.
+    with _phase("offerings-wait"):
+        _finish_offerings_prefetch(offerings_prefetch)
     with _phase("enrich+offerings"):
         _enrich_classified_with_pricing(classified, od_prices, target_strategy)
 
@@ -3525,6 +3812,9 @@ def estimate_graviton_savings(
                 # whether the inventory could be read at all.
                 "isp_check": isp_check,
                 "isp_locked_cost": isp_locked_cost,
+                # EC2 Instance SP regions no price list or botocore name matched;
+                # those plans could not be applied to any row.
+                "isp_unmatched_regions": isp_unmatched_regions,
                 # RI spend held by reservations that cannot change family, and
                 # EC2 RI spend whose class (standard/convertible) was not known.
                 "ri_locked_cost": ri_locked_cost,

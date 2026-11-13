@@ -1076,6 +1076,13 @@ def _build_data_quality_html(assessment: dict) -> str:
             f"to their instance family until they expire. That spend books no saving; "
             f"rows it fully covers are listed under Not Eligible. Compute Savings Plans "
             f"follow the usage to Graviton, so their spend keeps its saving.</td></tr>")
+    isp_unmatched = data_quality.get("isp_unmatched_regions") or []
+    if isp_check == "checked" and isp_unmatched:
+        rows.append(
+            f"<tr><td>EC2 Instance Savings Plans, unmatched</td><td>Plans in "
+            f"{_esc(', '.join(isp_unmatched))} could not be matched to a region code, so "
+            f"they were not applied to any row; savings on that Savings Plan spend may be "
+            f"overstated.</td></tr>")
     elif isp_check.startswith("not_checked"):
         rows.append(
             f"<tr><td>EC2 Instance Savings Plans</td><td><strong>Not checked</strong> "

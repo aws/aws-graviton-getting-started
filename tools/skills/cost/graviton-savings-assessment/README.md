@@ -64,8 +64,8 @@ read-only role with the [permissions below](#iam-permissions-required)), then as
 
 ## Skill Files
 
-[summaries.md](summaries.md) is the canonical index of every file in this skill, with its
-purpose and when it is read. Start at [SKILL.md](SKILL.md): it routes to everything else at
+[summaries.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/cost/graviton-savings-assessment/summaries.md) is the canonical index of every file in this skill, with its
+purpose and when it is read. Start at [SKILL.md](https://github.com/aws/aws-graviton-getting-started/blob/main/tools/skills/cost/graviton-savings-assessment/SKILL.md): it routes to everything else at
 the step that needs it.
 
 ## Compatibility
@@ -112,7 +112,8 @@ The skill performs exclusively **read-only** operations. Required actions:
 | `ce:GetReservationUtilization` | RI utilization for purchase-type attribution |
 | `pricing:GetProducts` | On-Demand pricing for savings calculations |
 | `savingsplans:DescribeSavingsPlansOfferingRates` | SP rates for SP-covered instances |
-| `savingsplans:DescribeSavingsPlans` | Finds EC2 Instance Savings Plans, whose spend stays on its family until the plan expires (lists only the caller's own plans; without it the report says the check was not done) |
+| `ce:GetSavingsPlansUtilizationDetails` | Finds EC2 Instance Savings Plans, whose spend stays on its family until the plan expires (every plan in the organization when run from the management account) |
+| `savingsplans:DescribeSavingsPlans` | Fallback for the same check if the call above fails (lists only the caller's own plans; without either, the report says the check was not done) |
 | `sts:GetCallerIdentity` | Credential verification (fail-fast) |
 
 **Optional** (enables precise engine readiness checks and region-accurate targets):
@@ -146,6 +147,7 @@ Without the optional permissions, engine readiness checks fall back to "verify_v
         "pricing:GetProducts",
         "savingsplans:DescribeSavingsPlansOfferingRates",
         "savingsplans:DescribeSavingsPlans",
+        "ce:GetSavingsPlansUtilizationDetails",
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"

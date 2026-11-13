@@ -207,8 +207,9 @@ the stdout summary; drop a bullet only when its condition does not apply.
 > - [If `isp_locked_cost` is above 0: [isp_locked_cost]/mo of Savings Plan
 >   spend is held by EC2 Instance Savings Plans, which stay on their instance
 >   family until they expire, so it books no saving. If `isp_check` starts with
->   `not_checked`: say EC2 Instance Savings Plans could not be checked, so
->   savings on Savings Plan spend may be overstated.]
+>   `not_checked`, or `isp_unmatched_regions` is not empty: say EC2 Instance
+>   Savings Plans could not be checked (or not in those regions), so savings on
+>   Savings Plan spend may be overstated.]
 > - [If `ri_locked_cost` is above 0: [ri_locked_cost]/mo of Reserved Instance
 >   spend is held by reservations that cannot change instance family (EC2
 >   Standard RIs, and RDS, ElastiCache and OpenSearch reservations), so it books
