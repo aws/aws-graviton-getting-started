@@ -116,8 +116,8 @@ def _build_engine_grouped_html(engine_checks: list) -> str:
     for check in deduped:
         _, _, status_text = _engine_badge(check.get("status", ""))
         # Only a positive "ready" is Ready. "unknown" (engine not in the table)
-        # was once grouped as Ready by an else branch, under a green header,
-        # and the "Verify version" text was filed under Needs Upgrade.
+        # and "verify version" are listed for verification under their own
+        # header, never under the green Ready header or under Needs Upgrade.
         if status_text == "Blocked":
             groups["Blocked"].append(check)
         elif status_text == "Upgrade needed":
@@ -995,6 +995,79 @@ def _build_additional_resources_md() -> str:
     return "".join(lines)
 
 
+def _commitment_notes(assessment: dict, esc) -> list:
+    """(title, text) notes on committed and estimated spend, for every report.
+
+    One source for the HTML Data Quality table and the Markdown notes, so the
+    two cannot state different facts. `esc` escapes the few values that come
+    from the account (a region name, an error type); the rest is fixed text.
+    """
+    summary = assessment.get("summary", {}) or {}
+    dq = summary.get("data_quality", {}) or {}
+    classified = assessment.get("classified_detail", []) or []
+    notes = []
+
+    isp_check = dq.get("isp_check") or ""
+    isp_locked = dq.get("isp_locked_cost") or 0
+    if isp_check == "checked" and isp_locked > 0:
+        notes.append((
+            "EC2 Instance Savings Plans",
+            f"{_fmt_cost(isp_locked)}/mo of Savings Plan spend is held by EC2 Instance "
+            f"Savings Plans, which apply only to their instance family until they expire. "
+            f"That spend books no saving; rows it fully covers are listed under Not Eligible."))
+    sp_movable = sum(max((c.get("cost_sp") or 0) - (c.get("cost_sp_isp") or 0), 0)
+                     for c in classified if _earns_savings(c))
+    if sp_movable > 0:
+        notes.append((
+            "Savings Plan spend",
+            f"{_fmt_cost(sp_movable)}/mo of Savings Plan spend keeps its saving on the "
+            f"assumption that the plan's hourly commitment is absorbed by other eligible "
+            f"usage. The commitment is paid after the migration too, so with no other usage "
+            f"to take it that saving arrives at the plan's renewal."))
+    isp_unmatched = dq.get("isp_unmatched_regions") or []
+    if isp_check == "checked" and isp_unmatched:
+        notes.append((
+            "EC2 Instance Savings Plans, unmatched",
+            f"Plans in {esc(', '.join(isp_unmatched))} could not be matched to a region "
+            f"code, so they were not applied to any row; savings on that Savings Plan "
+            f"spend may be overstated."))
+    elif isp_check.startswith("not_checked"):
+        notes.append((
+            "EC2 Instance Savings Plans",
+            f"Not checked ({esc(isp_check.split(':', 1)[-1].strip())}). Savings Plan spend "
+            f"is treated as Compute Savings Plan spend, which moves to Graviton. Spend held "
+            f"by an EC2 Instance Savings Plan would save nothing until the plan expires, so "
+            f"the savings may be overstated."))
+    ri_locked = dq.get("ri_locked_cost") or 0
+    if ri_locked > 0:
+        notes.append((
+            "Family-locked reservations",
+            f"{_fmt_cost(ri_locked)}/mo of Reserved Instance spend is held by reservations "
+            f"that cannot change instance family: EC2 Standard Reserved Instances, and RDS, "
+            f"ElastiCache and OpenSearch reservations. It books no saving until they end; "
+            f"rows they fully cover are listed under Not Eligible. EC2 Convertible Reserved "
+            f"Instances can be exchanged for Graviton, so their spend keeps its saving."))
+    ri_unknown = dq.get("ri_class_unknown_cost") or 0
+    if ri_unknown > 0:
+        notes.append((
+            "Reservation class unknown",
+            f"{_fmt_cost(ri_unknown)}/mo of EC2 Reserved Instance spend has no offering "
+            f"class (standard or convertible) in Cost Explorer. It is treated as able to "
+            f"move; if it is Standard, it would save nothing until the reservation ends."))
+    split_est = dq.get("split_estimated_cost") or 0
+    if split_est > 0:
+        notes.append((
+            "Estimated cost splits",
+            f"{_fmt_cost(split_est)}/mo of spend was apportioned by estimate rather than "
+            f"measured: Savings Plan and Spot spend of a type that runs in several regions "
+            f"on several platforms (Cost Explorer reports it by region and by platform, not "
+            f"by both; split by iterative proportional fitting), and managed-service spend "
+            f"of an engine or deployment group with no on-demand hours to price it by "
+            f"(split by running hours, with a Multi-AZ hour counted as two, as RDS bills "
+            f"it). Totals per type and region are exact."))
+    return notes
+
+
 def _build_data_quality_html(assessment: dict) -> str:
     """Build HTML 'Data Quality Notes' section showing methodology and limitations."""
     summary = assessment.get("summary", {})
@@ -1067,65 +1140,8 @@ def _build_data_quality_html(assessment: dict) -> str:
     rows.append('<tr><td>Default (n+1) logic</td><td>Gen ≤5 → Graviton2, Gen 6 → Graviton3, Gen 7 → Graviton4, Gen 8+ → Graviton5 where a 9g type exists (c9g/c9gd, m9g/m9gd, r9g/r9gd), otherwise Graviton4. Families with no regular counterpart use a fixed mapping instead (for example r5b → r7g, m5zn → m7g, x2idn → x8g).</td></tr>')
     rows.append('<tr><td>Potential savings basis</td><td>Net figure: instances already priced below their Graviton target carry a negative per-item saving and are netted into every total (Service Summary, Full Fleet Detail, headline KPI and CSV all agree). Per-instance savings — including the negatives — appear in Full Fleet Detail, and already-optimized instances are listed under Already Cost-Optimized.</td></tr>')
 
-    isp_check = data_quality.get("isp_check") or ""
-    isp_locked = data_quality.get("isp_locked_cost") or 0
-    if isp_check == "checked" and isp_locked > 0:
-        rows.append(
-            f"<tr><td>EC2 Instance Savings Plans</td><td>{_fmt_cost(isp_locked)}/mo of "
-            f"Savings Plan spend is held by EC2 Instance Savings Plans, which apply only "
-            f"to their instance family until they expire. That spend books no saving; "
-            f"rows it fully covers are listed under Not Eligible.</td></tr>")
-    sp_movable = sum(max((c.get("cost_sp") or 0) - (c.get("cost_sp_isp") or 0), 0)
-                     for c in classified if _earns_savings(c))
-    if sp_movable > 0:
-        rows.append(
-            f"<tr><td>Savings Plan spend</td><td>{_fmt_cost(sp_movable)}/mo of Savings Plan "
-            f"spend keeps its saving on the assumption that the plan's hourly commitment "
-            f"is absorbed by other eligible usage. The commitment is paid after the "
-            f"migration too, so with no other usage to take it that saving arrives at "
-            f"the plan's renewal.</td></tr>")
-    isp_unmatched = data_quality.get("isp_unmatched_regions") or []
-    if isp_check == "checked" and isp_unmatched:
-        rows.append(
-            f"<tr><td>EC2 Instance Savings Plans, unmatched</td><td>Plans in "
-            f"{_esc(', '.join(isp_unmatched))} could not be matched to a region code, so "
-            f"they were not applied to any row; savings on that Savings Plan spend may be "
-            f"overstated.</td></tr>")
-    elif isp_check.startswith("not_checked"):
-        rows.append(
-            f"<tr><td>EC2 Instance Savings Plans</td><td><strong>Not checked</strong> "
-            f"({_esc(isp_check.split(':', 1)[-1].strip())}). Savings Plan spend is treated "
-            f"as Compute Savings Plan spend, which moves to Graviton. Spend held by an EC2 "
-            f"Instance Savings Plan would save nothing until the plan expires, so the "
-            f"savings may be overstated.</td></tr>")
-
-    ri_locked = data_quality.get("ri_locked_cost") or 0
-    if ri_locked > 0:
-        rows.append(
-            f"<tr><td>Family-locked reservations</td><td>{_fmt_cost(ri_locked)}/mo of "
-            f"Reserved Instance spend is held by reservations that cannot change instance "
-            f"family: EC2 Standard Reserved Instances, and RDS, ElastiCache and OpenSearch "
-            f"reservations. It books no saving until they end; rows they fully cover are "
-            f"listed under Not Eligible. EC2 Convertible Reserved Instances can be "
-            f"exchanged for Graviton, so their spend keeps its saving.</td></tr>")
-    ri_unknown = data_quality.get("ri_class_unknown_cost") or 0
-    if ri_unknown > 0:
-        rows.append(
-            f"<tr><td>Reservation class unknown</td><td>{_fmt_cost(ri_unknown)}/mo of EC2 "
-            f"Reserved Instance spend has no offering class (standard or convertible) in "
-            f"Cost Explorer. It is treated as able to move; if it is Standard, it would "
-            f"save nothing until the reservation ends.</td></tr>")
-
-    split_est = data_quality.get("split_estimated_cost") or 0
-    if split_est > 0:
-        rows.append(
-            f"<tr><td>Estimated cost splits</td><td>{_fmt_cost(split_est)}/mo of spend "
-            f"was apportioned by estimate rather than measured: Savings Plan and Spot "
-            f"spend of a type that runs in several regions on several platforms "
-            f"(Cost Explorer reports it by region and by platform, not by both; split "
-            f"by iterative proportional fitting), and managed-service spend of an "
-            f"engine or deployment group with no on-demand hours to price it by (split "
-            f"by running hours, with a Multi-AZ hour counted as two, as RDS bills it). Totals per type and region are exact.</td></tr>")
+    for title, text in _commitment_notes(assessment, _esc):
+        rows.append(f"<tr><td>{_esc(title)}</td><td>{text}</td></tr>")
 
     unclassified_types = data_quality.get("unclassified_types") or []
     if unclassified_types:
@@ -1385,7 +1401,7 @@ def generate_markdown(assessment: dict, customer: str = "", account_id: str = ""
             f"{_fmt_cost(kpis.get('no_equivalent_cost') or 0)} spend, no savings |\n")
     lines.append("\n")
 
-    # Purchase type breakdown (v3 only — shows OD/RI/SP/Spot split)
+    # Purchase type breakdown (OD/RI/SP/Spot split)
     pt_summary = summary.get("purchase_type_summary")
     if pt_summary:
         lines.append("### Cost by Purchase Type\n\n")
@@ -1400,10 +1416,17 @@ def generate_markdown(assessment: dict, customer: str = "", account_id: str = ""
             lines.append(f"| RI Net Savings | {_fmt_cost(ri_sav)} |\n")
         lines.append("\n")
 
-    # Coverage summary (v3 only)
+    # Coverage summary
     cov_summary = summary.get("coverage_summary")
     if cov_summary and cov_summary.get("overall_coverage_pct", 0) > 0:
         lines.append(f"*RI/SP Coverage: {cov_summary['overall_coverage_pct']:.1f}% of running hours*\n\n")
+
+    notes = _commitment_notes(assessment, _md_text)
+    if notes:
+        lines.append("**Notes on the savings figures**\n\n")
+        for title, text in notes:
+            lines.append(f"- **{title}:** {text}\n")
+        lines.append("\n")
 
     lines.append("---\n\n")
 
@@ -1986,8 +2009,9 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
                             for g in GENERATIONS}
     total_adoption_by_gen = {g.key: sum(a.get(g.key, 0) for a in svc_graviton.values())
                              for g in GENERATIONS}
-    # Sum "total", not the generation buckets: identical now that every dollar is
-    # bucketed, and it stays correct if an unrecognised gen_bucket appears again.
+    # Sum "total", not the generation buckets: they are identical while every
+    # dollar is bucketed, and "total" stays correct if an unrecognised gen_bucket
+    # ever appears.
     total_grav = sum(g.get("total", 0) for g in svc_graviton.values())
     total_grav_pct = round(total_grav / max(total_svc_cost, 1) * 100) if total_svc_cost > 0 else 0
     def _total_money(value):
@@ -2258,8 +2282,8 @@ def generate_html(assessment: dict, customer: str = "", account_id: str = "",
 
     # "Not Eligible" section: every non-Graviton row with no Graviton path,
     # built once from the classified rows. Wave 4 holds the same rows, but only
-    # its top five, so adding Wave 4 to a separate Windows list (as this
-    # section once did) counted Windows twice.
+    # its top five, so adding Wave 4 to a separate Windows list would count
+    # Windows twice.
     no_equivalent_section = ""
     not_eligible = _not_eligible_rows(classified)
     if not_eligible:

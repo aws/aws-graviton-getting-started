@@ -41,8 +41,9 @@ if _SCRIPT_DIR not in sys.path:
 # agent config directories, and the first run wrote bytecode there.
 sys.dont_write_bytecode = True
 
-# One timestamp per run, shared with the report file names, so a second run in
-# the same --output-dir no longer replaces the first run's JSON and log.
+# One timestamp per run, shared by the result JSON, the log and the report file
+# names, so a second run in the same --output-dir does not replace the first
+# run's files.
 _RUN_STAMP = datetime.now().strftime("%Y-%m-%d-%H%M")
 
 
@@ -406,8 +407,8 @@ def _check_date_range(start_date: str, end_date: str) -> None:
         return
     if not end_date:
         # The pipeline defaults the end to the 1st of this month. Check against
-        # that here: a lone --start-date after it once skipped this check and
-        # the inverted range scaled every monthly figure about 30x.
+        # that here: a lone --start-date after it has to be rejected, or the
+        # inverted range would scale every monthly figure about 30x.
         end_date = datetime.now().date().replace(day=1).strftime("%Y-%m-%d")
 
     start = datetime.strptime(start_date, "%Y-%m-%d").date()

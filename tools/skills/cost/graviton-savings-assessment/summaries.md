@@ -32,6 +32,7 @@ This file is the canonical inventory of the skill. Every file in the skill folde
 
 * "scripts/graviton_tools/pricing_comparison.py": "Resolves prices for a list of instance types from a price book, including abbreviated size spellings."
 
+* "scripts/graviton_tools/aws_config.py": "One bounded botocore Config (10s connect, bounded retries) that every AWS client takes, so an unreachable network cannot stall a run."
 * "scripts/graviton_tools/bulk_pricing.py": "Fallback pricing from a local cache of public AWS price lists, kept in the user cache directory and refreshed per region."
 
 * "scripts/graviton_tools/realized_savings.py": "Finds the x86 equivalent of a Graviton instance, for savings already realized."

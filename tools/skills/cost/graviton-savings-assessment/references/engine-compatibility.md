@@ -9,6 +9,10 @@ Redis OSS runs on `cache.r6g` from 5.0.6, needs 6.2 on `cache.r7g`, and is not
 offered on `cache.r8g` at all. RDS PostgreSQL 13 runs on `db.r7g` from 13.4 but
 needs 13.11 on `db.r8g`. Check the family your target actually is.
 
+**A row can run several versions.** The assessment groups instances by type, engine and
+region, so one row may include, say, MySQL 5.7 and 8.0. Each version is checked against
+the table below and the row takes the worst result; Engine Readiness lists every version.
+
 **Last reviewed:** 2026-11-12, against:
 
 - RDS: [Supported DB engines for DB instance classes](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.Support.html)

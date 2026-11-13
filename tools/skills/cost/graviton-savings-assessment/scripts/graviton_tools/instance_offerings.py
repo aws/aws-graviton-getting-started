@@ -33,6 +33,8 @@ that this API does not enumerate; those keep price-only validation.
 import logging
 from typing import Dict, Optional, Set
 
+from .aws_config import bounded_client_config
+
 logger = logging.getLogger(__name__)
 
 # region -> set of offered EC2 instance types (or None if the lookup failed).
@@ -56,7 +58,7 @@ def get_offered_types(region: str) -> Optional[Set[str]]:
         return None
 
     try:
-        client = boto3.client("ec2", region_name=region)
+        client = boto3.client("ec2", region_name=region, config=bounded_client_config())
         offered: Set[str] = set()
         paginator = client.get_paginator("describe_instance_type_offerings")
         for page in paginator.paginate(

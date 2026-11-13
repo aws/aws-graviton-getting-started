@@ -268,7 +268,7 @@ check that the interpreter from Step 0 is good:
   report's Source column). Spot market prices move hourly and are not pulled,
   so this assumes equal discount depth on the current and Graviton sides —
   treat spot-heavy fleets' savings as directional.
-- **Engine readiness reads versions** via the RDS, ElastiCache and OpenSearch describe APIs, for the calling account only: resources in other accounts of an organization show as "verify version". It falls back the same way if describe permissions are missing. A row whose engine must be upgraded before it can move goes to Wave 2, not Wave 1.
+- **Engine readiness reads versions** via the RDS, ElastiCache and OpenSearch describe APIs, for the calling account only: resources in other accounts of an organization show as "verify version". It falls back the same way if describe permissions are missing. A row whose engine must be upgraded before it can move goes to Wave 2, not Wave 1. A row that runs several versions is judged by its worst one, and Engine Readiness lists each version.
 
 ## References
 

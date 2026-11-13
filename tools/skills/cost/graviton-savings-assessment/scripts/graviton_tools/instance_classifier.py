@@ -225,8 +225,8 @@ class InstanceInfo:
     is_intel: bool = False
     category: str = ""      # general, compute, memory, storage, accelerated
     gen_label: str = ""     # "Gen 5 Intel", "Graviton3", etc.
-    # "flex" for m7i-flex.xlarge. Kept out of `size`, which once read
-    # "xlarge-flex" and broke every target string and size lookup built from it.
+    # "flex" for m7i-flex.xlarge. Kept out of `size`, where it would read
+    # "xlarge-flex" and break every target string and size lookup built from it.
     variant: str = ""
     # ".search" for OpenSearch types, kept out of `size` for the same reason.
     # Every full type string built from prefix + family + size appends it.

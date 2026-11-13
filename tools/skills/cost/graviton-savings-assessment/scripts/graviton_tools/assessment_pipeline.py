@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 from .instance_classifier import classify_usage_type, generation_bucket, service_for_type
+from .aws_config import bounded_client_config
 from .fleet_tools import (
     RegionalPrices,
     MEMORY_GIB_BY_TYPE,
@@ -430,24 +431,14 @@ def _note_endpoint(name: str, exc: Optional[BaseException]) -> None:
 
 
 def _ce_client_config():
-    """Cost Explorer client settings: bounded timeouts and retries.
-
-    The botocore defaults (60s to connect, five attempts) let one unreachable
-    network cost minutes per request, across the ~24 requests of a run. Read
-    stays at 60s because large group-bys can legitimately take that long.
-    Standard retry mode, not adaptive: every Cost Explorer request is billed.
-    """
-    from botocore.config import Config
-    return Config(connect_timeout=10, read_timeout=60,
-                  retries={"max_attempts": 3, "mode": "standard"})
+    """Cost Explorer client: 10s connect, 60s read (large group-bys can take that
+    long), three standard-mode retries. Not adaptive: every request is billed."""
+    return bounded_client_config(read_timeout=60)
 
 
 def _client_config():
-    """Bounded timeouts: botocore's 60s default per attempt made a dropped
-    network cost hours. Adaptive retries stay for throttling."""
-    from botocore.config import Config
-    return Config(connect_timeout=10, read_timeout=30,
-                  retries={"max_attempts": 10, "mode": "adaptive"})
+    """Pricing and Savings Plans clients: 10s connect, 30s read, adaptive retries."""
+    return bounded_client_config(read_timeout=30, adaptive=True)
 
 
 def _is_throttle(exc: BaseException) -> bool:
@@ -704,10 +695,11 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
     import boto3  # Let ImportError propagate — caller handles it
     from .instance_classifier import service_for_type
 
-    # Cache key carries every coordinate that changes the price. It was
-    # (type, region, OS), which is right for EC2 but collided for the managed
-    # services: one db.m5.4xlarge entry had to serve PostgreSQL and MySQL,
-    # Single-AZ and Multi-AZ, so whichever was fetched first won for all of them.
+    # Cache key carries every coordinate that changes the price: the OS for EC2,
+    # and for the managed services the engine and deployment option as well.
+    # (type, region, OS) alone would make one db.m5.4xlarge entry serve
+    # PostgreSQL and MySQL, Single-AZ and Multi-AZ, and whichever was fetched
+    # first would win for all of them.
     _coord = (operating_system, db_engine, deployment_option, cache_engine)
     prices = {}
     types_to_fetch = set()
@@ -775,10 +767,7 @@ def _fetch_od_prices_boto3(instance_types: set, region: str = "us-east-1",
     # adds client-side rate limiting on top of more retries.
     if _endpoint_down("pricing"):
         return prices
-    try:
-        client = boto3.client("pricing", region_name="us-east-1", config=_client_config())
-    except ImportError:
-        client = boto3.client("pricing", region_name="us-east-1")
+    client = boto3.client("pricing", region_name="us-east-1", config=_client_config())
 
     def _price_one(svc: str, instance_type: str) -> bool:
         """Look one type up and store its rates. True if an on-demand rate was found.
@@ -1604,12 +1593,18 @@ def _ri_terms(item: Dict) -> Tuple[str, str, str]:
 _HOURS_PER_MONTH = 730.0
 
 
+# How bad a readiness status is for the row, worst highest.
+_READINESS_RANK = {"ready": 0, "unknown": 1, "verify_version": 2,
+                   "upgrade_required": 3, "blocked": 4}
+
+
 def _engine_version_sort_key(version: str):
     """Order version strings by their numeric parts ("5.7.44" < "8.0.36" < "10.2").
 
     Non-numeric parts (Aurora's "8.0.mysql_aurora.3.05.2", OpenSearch's
-    "OpenSearch_2.11") sort by the numbers they contain, so the oldest of
-    several versions is found by number, not as text.
+    "OpenSearch_2.11") sort by the numbers they contain, so versions order by
+    number, not as text. Only meaningful within one release line; across
+    lines (Elasticsearch vs OpenSearch) the status decides, not this order.
     """
     return [int(n) for n in re.findall(r"\d+", version or "")] or [-1]
 
@@ -1649,23 +1644,22 @@ def _check_engines(classified: List[Dict], engine_version_map: Dict) -> List[Dic
         instance_type = r.get("raw", "")
         region = r.get("region", "us-east-1")
 
-        # Look up actual version from describe APIs. A row is every instance of
-        # this type and engine in the region, so it may run several versions;
-        # it is only as ready as its OLDEST one. Taking the first entry made a
-        # row with many 5.7 instances and one 8.0 instance ready or not
-        # depending on the order the API listed them.
+        # A row is every instance of one type and engine in a region, so it may
+        # run several versions, and it is only as ready as its WORST one. Each
+        # distinct version is checked and the worst status decides the row.
+        # Ordering the versions by number and taking the lowest is not enough:
+        # OpenSearch and Elasticsearch are two release lines under one engine,
+        # and a domain on Elasticsearch 5.6 would be hidden behind OpenSearch
+        # 2.11, whose digits sort lower.
         #
         # No entry for this row's own engine means its version is unknown.
-        # Taking another engine's version (the first entry for the type) once
-        # checked a PostgreSQL row against a MySQL version.
-        version = ""
-        own = []
-        for entry in engine_version_map.get((svc, instance_type, region), []):
-            entry_engine = entry["engine"].lower().strip()
-            if _ENGINE_NORMALIZE.get(entry_engine, entry_engine) == normalized:
-                own.append(entry["version"])
-        if own:
-            version = min(own, key=_engine_version_sort_key)
+        # Another engine's version (the first entry for the type) must never
+        # stand in for it.
+        own = sorted({entry["version"]
+                      for entry in engine_version_map.get((svc, instance_type, region), [])
+                      if _ENGINE_NORMALIZE.get(entry["engine"].lower().strip(),
+                                               entry["engine"].lower().strip()) == normalized},
+                     key=_engine_version_sort_key)
 
         # The engine minimum depends on the target family, so check against the
         # target this row was actually given (which follows
@@ -1675,16 +1669,22 @@ def _check_engines(classified: List[Dict], engine_version_map: Dict) -> List[Dic
                      "Graviton5": "g5"}.get(r.get("graviton_target_generation", ""))
         if gen_field:
             chosen = ((r.get("graviton_targets_by_gen") or {}).get(gen_field) or {}).get("type", "")
-        check = check_engine_graviton_readiness(normalized, version, instance_type,
-                                                target_class=chosen)
+        checks = [(v, check_engine_graviton_readiness(normalized, v, instance_type,
+                                                      target_class=chosen))
+                  for v in (own or [""])]
+        # max() keeps the first of equal ranks, and `own` is oldest-first.
+        version, check = max(checks, key=lambda vc: _READINESS_RANK.get(vc[1].get("status", ""), 0))
         # Stamped on the row so the migration plan can act on it: a row whose
         # engine must be upgraded first is not a Week 1-2, low-effort move.
         r["engine_readiness"] = check.get("status", "")
         r["engine_version"] = version
-        key = f"{normalized}:{version}:{instance_type}:{chosen}"
-        if key not in seen_engines:
-            seen_engines.add(key)
-            engine_checks.append(check)
+        # Every version the row runs is listed in Engine Readiness, not only
+        # the one that decided it.
+        for v, c in checks:
+            key = f"{normalized}:{v}:{instance_type}:{chosen}"
+            if key not in seen_engines:
+                seen_engines.add(key)
+                engine_checks.append(c)
 
     return engine_checks
 

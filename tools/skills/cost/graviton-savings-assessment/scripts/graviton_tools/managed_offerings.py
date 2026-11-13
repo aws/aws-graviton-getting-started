@@ -35,6 +35,8 @@ IAM (optional; missing perms degrade gracefully to price-only validation):
 import logging
 from typing import Dict, Optional, Set
 
+from .aws_config import bounded_client_config
+
 logger = logging.getLogger(__name__)
 
 # (region, engine) -> set of offered "db.<family>.<size>" (or None if lookup failed).
@@ -153,7 +155,7 @@ def get_rds_offered_classes(region: str, engine_display: str) -> Optional[Set[st
         return None
 
     try:
-        client = boto3.client("rds", region_name=region)
+        client = boto3.client("rds", region_name=region, config=bounded_client_config())
         offered: Set[str] = set()
         paginator = client.get_paginator("describe_orderable_db_instance_options")
         # One query per pinned version, unioned; falls back to a single unpinned
@@ -227,7 +229,7 @@ def get_elasticache_offered_classes(region: str) -> Optional[Set[str]]:
         return None
 
     try:
-        client = boto3.client("elasticache", region_name=region)
+        client = boto3.client("elasticache", region_name=region, config=bounded_client_config())
         offered: Set[str] = set()
         # Reserved-node offerings enumerate the full node-type catalog per region
         # without needing an engine or an existing cluster.

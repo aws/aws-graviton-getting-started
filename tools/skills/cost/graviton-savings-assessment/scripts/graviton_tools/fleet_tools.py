@@ -13,6 +13,7 @@ target family supports.
 import re, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional, Tuple
+from .aws_config import bounded_client_config
 from .instance_classifier import classify_and_upgrade, full_type, graviton_generation
 from .pricing_comparison import fetch_prices
 
@@ -137,7 +138,7 @@ def fetch_engine_versions(
     def _fetch_rds_region(region: str):
         try:
             import boto3
-            rds = boto3.client("rds", region_name=region)
+            rds = boto3.client("rds", region_name=region, config=bounded_client_config())
             # Describe instances (covers standalone + Aurora instances)
             paginator = rds.get_paginator("describe_db_instances")
             for page in paginator.paginate():
@@ -153,7 +154,7 @@ def fetch_engine_versions(
     def _fetch_elasticache_region(region: str):
         try:
             import boto3
-            ec = boto3.client("elasticache", region_name=region)
+            ec = boto3.client("elasticache", region_name=region, config=bounded_client_config())
             paginator = ec.get_paginator("describe_cache_clusters")
             for page in paginator.paginate(ShowCacheNodeInfo=True):
                 for cluster in page["CacheClusters"]:
@@ -168,7 +169,7 @@ def fetch_engine_versions(
     def _fetch_opensearch_region(region: str):
         try:
             import boto3
-            client = boto3.client("opensearch", region_name=region)
+            client = boto3.client("opensearch", region_name=region, config=bounded_client_config())
             domains = client.list_domain_names().get("DomainNames", [])
             if not domains:
                 return
@@ -678,8 +679,8 @@ def _build_graviton_options(
     if not priced:
         return options, None
 
-    # Capacity-adjusted (downsized) options are priced and eligible now that
-    # their savings count toward the headline. But a downsize must never
+    # Capacity-adjusted (downsized) options are priced and eligible: their
+    # savings count toward the headline. But a downsize must never
     # displace a like-for-like target that exists — its price delta mixes the
     # Graviton saving with a hardware reduction, and it is always the cheaper
     # rate, so on savings alone it would win every time.
