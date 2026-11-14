@@ -64,9 +64,31 @@ Reference: https://github.com/aws/aws-graviton-getting-started
 
 ### 6. Generate migration report
 
-Produce a summary with:
+Write every report to `graviton-validation/{{SKILL_NAME}}/` at the project root, so the reports of two skills run on one repository stay apart. Produce a summary, `00-summary.md`, with:
 - Compatible dependencies
 - Dependencies requiring updates
 - Blockers (no ARM64 support)
 - Recommended Graviton instance type (c8g, m8g, r8g, etc.)
 - Estimated performance delta (if benchmarks were run)
+
+## Available Scripts
+
+Code this skill runs lives in `scripts/` ([Agent Skills specification](https://agentskills.io/specification), "scripts/"): the agent runs it and does not read it into context.
+
+- `scripts/{{SCRIPT}}`: {{WHAT_THE_SCRIPT_DOES}}
+
+A block that runs a script names the skill folder on its first line and runs nothing unless that line is an absolute path to a folder that holds the script:
+
+```bash
+GV_SKILL_DIR=   # the folder that holds this SKILL.md
+if case $GV_SKILL_DIR in /?*) [ -f "$GV_SKILL_DIR/scripts/{{SCRIPT}}" ];; *) false;; esac; then
+  python3 "$GV_SKILL_DIR/scripts/{{SCRIPT}}" {{ARGUMENTS}}
+else echo "ERROR: set GV_SKILL_DIR on the first line to the folder that holds this SKILL.md"; fi
+```
+
+Each script starts with the license header, after its shebang line:
+
+```
+# SPDX-License-Identifier: MIT-0
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+```
