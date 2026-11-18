@@ -2955,15 +2955,16 @@ def _attach_ri_metadata(rows: List[Dict], ri_exact: Dict[tuple, Dict]) -> None:
         keyed[id(d)] = k
         if k:
             demand[k] = demand.get(k, 0.0) + d["cost_ri"]
-    spare: Dict[tuple, float] = {k: e["cost"] for k, e in ri_exact.items()}
+    # Capacity is the used fee: idle hours cover no row (see _build_fleet_rows).
+    spare: Dict[tuple, float] = {k: e["used"] for k, e in ri_exact.items()}
     for d in ri_rows:
         k = keyed[id(d)]
-        frac = min(1.0, ri_exact[k]["cost"] / demand[k]) if k and demand.get(k) else 0.0
+        frac = min(1.0, ri_exact[k]["used"] / demand[k]) if k and demand.get(k) else 0.0
         if frac > 0:
             draws[id(d)].append((k, d["cost_ri"] * frac))
         own_full[id(d)] = frac >= 0.999
     for k, dem in demand.items():
-        spare[k] = max(0.0, ri_exact[k]["cost"] - dem)
+        spare[k] = max(0.0, ri_exact[k]["used"] - dem)
 
     # 2. The rest from other sizes' spare reservations, where size-flexible.
     pools: Dict[tuple, List[tuple]] = {}
@@ -3094,6 +3095,11 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
     # is cost, used only when the summary's RI pull failed; ri_exact (per
     # bought type, platform and tenancy) carries the class, terms and savings that
     # _attach_ri_metadata gives the rows the reservations covered.
+    #
+    # TotalAmortizedFee includes the fee of unused hours (RICostForUnusedHours),
+    # but the RI cost on a row is used hours only. So capacity, spare, term
+    # shares and the tenancy split use the used fee; idle hours are not spare
+    # spend another row can draw. The full fee is kept for the per-hour rate.
     ri_agg: Dict[tuple, Dict] = {}
     ri_exact: Dict[tuple, Dict] = {}
     for ri in ri_rows:
@@ -3104,28 +3110,30 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
         svc_of.setdefault(it, svc)
         region = ri.get("region", "")
         agg = ri_agg.setdefault((it, region), {"cost": 0.0, "hours": 0.0})
-        agg["cost"] += ri.get("total_amortized", 0) or 0
+        total = ri.get("total_amortized", 0) or 0
+        used = max(0.0, total - (ri.get("ri_cost_unused", 0) or 0))
+        agg["cost"] += used
         agg["hours"] += ri.get("actual_hours", 0) or 0
         e = ri_exact.setdefault((it, region, _canon_platform(ri.get("platform", "")),
                                  _ri_tenancy(svc, ri.get("tenancy", ""))), {
-            "service": svc, "cost": 0.0, "purchased": 0.0, "savings": 0.0,
+            "service": svc, "cost": 0.0, "used": 0.0, "purchased": 0.0, "savings": 0.0,
             "unused_hours": 0.0, "mix": {}, "end": "", "_max": -1.0})
-        cost = ri.get("total_amortized", 0) or 0
-        e["cost"] += cost
+        e["cost"] += total
+        e["used"] += used
         e["purchased"] += ri.get("purchased_hours", 0) or 0
         e["savings"] += ri.get("net_ri_savings", 0) or 0
         e["unused_hours"] += ri.get("unused_hours", 0) or 0
-        # Term mix as [amortized cost, normalized purchased hours] per term: cost shares
+        # Term mix as [used amortized cost, normalized purchased hours] per term: cost shares
         # lock the commitment, hours blend the target rate (_blended_ri_rate).
         tkey = (ri.get("lease", ""), ri.get("payment_option", ""), ri.get("offering_class", ""))
         ch = e["mix"].setdefault(tkey, [0.0, 0.0])
-        ch[0] += cost
+        ch[0] += used
         # Hours in normalized units, so one m5.4xlarge hour weighs as four
         # m5.xlarge hours when both cover the same rows.
         ch[1] += (ri.get("purchased_hours", 0) or 0) * nih_factor(it.rsplit(".", 1)[-1], it)
         e["end"] = max(e["end"], ri.get("end", "") or "")
-        if cost > e["_max"]:
-            e["_max"] = cost
+        if used > e["_max"]:
+            e["_max"] = used
             e["offering_type"] = ri.get("offering_type", "")
             e["od_hourly_rate"] = ri.get("od_hourly_rate", 0)
 
@@ -3231,7 +3239,7 @@ def _build_fleet_rows(coverage_rows: List[Dict], ri_rows: List[Dict],
                     # every tenancy has some: on-demand rates say nothing
                     # about a fully reserved cell.
                     ri_cost = ({ten: (ri_exact.get((it, region, canon, _ri_tenancy(svc, ten)))
-                                      or {}).get("cost", 0.0)
+                                      or {}).get("used", 0.0)
                                 for ten in (tenancies.get(key) or {})}
                                if pt == "RI" else None)
                     for tenancy, h_share, c_share, est in _tenancy_split(tenancies.get(key),
@@ -3483,11 +3491,12 @@ def _ri_lease_from_dates(start: str, end: str) -> str:
 
     The dates, not the offering type, which never names the term. An exchanged
     or modified reservation keeps its original end date but starts on the day of
-    the change, so its span is shorter than its term. Only a 3yr reservation can
-    span more than about a year, so any span from 401 days to the 3yr window is
-    3yr. A shorter span that is not close to one year (an exchanged reservation
-    or a Marketplace one) is left undetermined, and the row is then compared
-    on-demand rather than at a guessed term.
+    the change, so its span is shorter than its term. A 1yr term spans 365 days
+    (366 over a leap day, 364 when the end falls a second before), so only that
+    is 1yr; any longer span up to the 3yr window can only be a 3yr reservation,
+    exchanged or not. A shorter span (an exchanged 3yr one near its end, or a
+    Marketplace one) is left undetermined, and the row is then compared at the
+    on-demand ratio rather than at a guessed term.
     """
     from datetime import datetime
 
@@ -3512,9 +3521,9 @@ def _ri_lease_from_dates(start: str, end: str) -> str:
     elif b.tzinfo is not None and a.tzinfo is None:
         a = a.replace(tzinfo=b.tzinfo)
     days = (b - a).days
-    if 330 <= days <= 400:
+    if 364 <= days <= 366:
         return "1yr"
-    if 400 < days <= 1130:
+    if 366 < days <= 1130:
         return "3yr"
     return ""
 
